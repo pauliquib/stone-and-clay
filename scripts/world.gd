@@ -198,6 +198,8 @@ func build() -> void:
 		Color(0.55, 0.52, 0.47).linear_to_srgb(), 0.7)
 	m_asph.set_shader_parameter("snow_amount", 0.35)   # silnice se prohrnují
 	m_grav.set_shader_parameter("snow_amount", 0.8)
+	m_asph.set_shader_parameter("wet_boost", 1.6)      # Fáze 9: mokrý asfalt znatelně lesklejší (§12.3)
+	m_grav.set_shader_parameter("wet_boost", 1.25)
 	MapLoader.add_chunks(map_root, "Budovy_steny", MapLoader.load_chunks("res://data/walls.bin", m_wall), true, 0.0, "budova")
 	MapLoader.add_chunks(map_root, "Budovy_strechy", MapLoader.load_chunks("res://data/roofs.bin", m_roof), true, 0.0, "budova")
 	MapLoader.add_chunks(map_root, "Silnice", MapLoader.load_chunks("res://data/asphalt.bin", m_asph, terrain, 0.1), true, 1800.0, "asfalt")

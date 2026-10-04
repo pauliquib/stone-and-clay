@@ -71,6 +71,33 @@ def bilinear(arr, x0, y1, res, x, y):
             arr[r0 + 1, c0] * fr * (1 - fc) + arr[r0 + 1, c0 + 1] * fr * fc)
 
 
+def _box_mean(a, r):
+    """Separabilní klouzavý průměr (okno 2r+1) přes obě osy, okraje zrcadlené (reflect)."""
+    for ax in (0, 1):
+        pad = [(0, 0), (0, 0)]
+        pad[ax] = (r, r)
+        p = np.pad(a, pad, mode="reflect")
+        c = np.concatenate([np.zeros_like(p[:1] if ax == 0 else p[:, :1]), p.cumsum(axis=ax)], axis=ax)
+        lo = [slice(None), slice(None)]
+        hi = [slice(None), slice(None)]
+        lo[ax] = slice(0, -(2 * r + 1))
+        hi[ax] = slice(2 * r + 1, None)
+        a = (c[tuple(hi)] - c[tuple(lo)]) / float(2 * r + 1)
+    return a
+
+
+def microrelief(rows, cols):
+    """Fáze 9 (plán §12.1) – mikroreliéf pro vizuální výškovou mapu: jemné erozní hrby
+    a mělké prohlubně do ±0,2 m. Součet dvou oktáv boxem vyhlazeného hodnotového šumu
+    (vlnové délky řádově ~30 m a ~7 m při rastru 2 m). Deterministické – fixní seed,
+    export je reprodukovatelný. KOLIZE a metriky se z této mapy NEDERIVUJÍ (čisté DMR)."""
+    rng = np.random.default_rng(0x9E5A)
+    wide = _box_mean(_box_mean(rng.standard_normal((rows, cols)), 7), 8)   # hrubé hrbatost
+    fine = _box_mean(rng.standard_normal((rows, cols)), 2)                 # drobný reliéf
+    m = wide / np.abs(wide).max() * 0.14 + fine / np.abs(fine).max() * 0.06
+    return m
+
+
 def point_in_poly(x, y, poly):
     x, y = np.asarray(x, float), np.asarray(y, float)
     ins = np.zeros(x.shape, bool)
@@ -393,12 +420,17 @@ def main():
     print(f"ROAD FLATTEN: {int((ch > 0).sum())} grid vertices lowered, max {ch.max():.2f} m, "
           f"mean {ch[ch > 0].mean():.2f} m")
 
-    hm32 = hm.astype(np.float32)
+    # mikroreliéf (§12.1): jemný erozní šum ±0,2 m POUZE do vizuální výškové mapy;
+    # kolize (terrain_collision.bin) a hranice dlaždic zůstávají z čisté DMR mřížky `hm`
+    # – fyzika (vozidla, chůze, raycasty) se šumem nemění, výškový rozdíl je ≤ 0,2 m.
+    hm_vis = hm + microrelief(GH, GW)
+    hm32 = hm_vis.astype(np.float32)
     hm32.tofile(os.path.join(DATA, "terrain_height.bin"))
     # kolize: HeightMapShape3D má rozestup 1 → uzel se škáluje ×2 (uniformně), výšky /2
-    (hm32 / RES).astype(np.float32).tofile(os.path.join(DATA, "terrain_collision.bin"))
+    (hm / RES).astype(np.float32).tofile(os.path.join(DATA, "terrain_collision.bin"))
     # normály terénu (Godot souřadnice) pro plynulé osvětlení nezávislé na LOD sítě
-    gz, gx = np.gradient(hm, RES)            # gz: směr řádků (= +Z v Godotu), gx: +X
+    # – z vizuální mřížky, aby se hrby mikroreliéfu projevily i v osvětlení
+    gz, gx = np.gradient(hm_vis, RES)        # gz: směr řádků (= +Z v Godotu), gx: +X
     n = np.stack([-gx, np.ones_like(hm), -gz], axis=-1)
     n /= np.linalg.norm(n, axis=-1, keepdims=True)
     ((n * 0.5 + 0.5) * 255).round().astype(np.uint8).tofile(os.path.join(DATA, "terrain_normal.bin"))
@@ -416,6 +448,9 @@ def main():
     write_chunked(os.path.join(DATA, "roofs.bin"), roofs)
     write_chunked(os.path.join(DATA, "asphalt.bin"), asph)
     write_chunked(os.path.join(DATA, "gravel.bin"), grav)
+
+    # odteď `hsample` čte vizuální mřížku s mikroreliéfem – stromy a předměty stojí na viditelné zemi
+    hm = hm_vis
 
     # ---------------- stromy
     proto_names = [f"OKOLI_Strom_{k}_{i}" for k in ("dec", "con") for i in range(3)]

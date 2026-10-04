@@ -354,6 +354,12 @@ func is_snowing() -> bool:
 	return rain > 0.03 and temp < SNOW_BELOW
 
 
+## Mokro povrchu 0..1 (plán §12.3 „wetness_ground“) – alias ke `wetness`, terénní shader
+## jej čte přes globální uniform `wetness` (nastavuje Atmosphere), louže přes Puddles.
+func wetness_ground() -> float:
+	return wetness
+
+
 ## Srážky v mm/h.
 func precip_mm_h() -> float:
 	return rain * RAIN_MM_H

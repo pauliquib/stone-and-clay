@@ -24,6 +24,8 @@
 ##                   studna naplní konev, skleník ochrání před mrazem, garden_visuals save
 ##   --vegetationtest vegetace (Fáze 9): vegetation.bin VEG1, chunky MultiMeshů, LOD podle
 ##                   vzdálenosti, detail=0 skryje, wind_strength z Weather, field_lut u obilí
+##   --terraintest   terén (Fáze 9 / §12): mikroreliéf vs. kolize, wetness → shader, louže
+##                   (Puddles) při wetness > 0,7, wet_boost asfaltu, north_xz pro sněhové jazyky
 class_name Main
 extends Node3D
 
@@ -141,6 +143,8 @@ func _ready() -> void:
 		Tests.garden_test(self)
 	if _args.has("vegetationtest"):
 		Tests.vegetation_test(self)
+	if _args.has("terraintest"):
+		Tests.terrain_test(self)
 
 
 func _frames(n: int) -> void:

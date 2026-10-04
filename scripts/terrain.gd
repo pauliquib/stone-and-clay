@@ -88,6 +88,9 @@ func build(meta: Dictionary) -> void:
 	material.set_shader_parameter("grid_origin", Vector2(x0, z0))
 	material.set_shader_parameter("spacing", spacing)
 	material.set_shader_parameter("grid_size", Vector2(w, h))
+	# směr severu ve světě (sněhové jazyky na odvrácených svazích)
+	var nd := Clock.enu_to_world(Vector3(0.0, 1.0, 0.0), float(meta.get("north_angle_deg", 78.37)))
+	material.set_shader_parameter("north_xz", Vector2(nd.x, nd.z))
 	for key in ["ortho_full", "ortho_core"]:
 		var o: Dictionary = meta[key]
 		material.set_shader_parameter(key, load(o["file"]))

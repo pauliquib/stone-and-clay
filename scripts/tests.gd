@@ -22,6 +22,8 @@
 ##                 round-trip, kůň projde brankou; volitelně --fencedbg pro diagnostiku sond
 ##   --gardentest  zahrada a dvoříště (Fáze 8): růst rostlin v mesši, plevel, kompost → hnůj →
 ##                 hnojení, studna naplní konev, skleník chrání před mrazem, garden_visuals save
+##   --terraintest terén (Fáze 9): mikroreliéf vs. kolize, wetness → shader, louže při mokru,
+##                 wet_boost asfaltu, north_xz pro sněhové jazyky
 class_name Tests
 extends RefCounted
 
@@ -1728,4 +1730,96 @@ static func vegetation_test(g: Node) -> void:
 
 	var n_ok := res.count(true)
 	print("VÝSLEDEK vegetace: %d/%d OK" % [n_ok, res.size()])
+	g.get_tree().quit()
+
+
+## Terén (Fáze 9 / plán §12): mikroreliéf ve výškové mapě (konzistence s kolizí ≤0,2 m),
+## mokro → globální shader uniform + výraznější lesk asfaltu, louže (Puddles) kolem hráče
+## při wetness > 0.7 a zmizení po uschnutí, parametry pro sněhové jazyky (north_xz).
+## Kompilaci shaderů hlídá --import (chyby shaderu se vypíšou do logu).
+static func terrain_test(g: Node) -> void:
+	var w: World = g.world
+	var res := []
+	var check := func(name: String, cond: bool, extra := "") -> void:
+		res.append(cond)
+		print("%s %-52s %s" % ["OK  " if cond else "CHYBA", name, extra])
+	await g.get_tree().create_timer(1.0).timeout
+	var t: Terrain = w.terrain
+	check.call("terén a jeho ShaderMaterial existují", t != null and t.material != null)
+
+	# --- mikroreliéf (§12.1): vizuální výšková mapa vs. čistá kolize – rozdíl ≤ ~0,22 m
+	var hm := FileAccess.get_file_as_bytes("res://data/terrain_height.bin").to_float32_array()
+	var coll := FileAccess.get_file_as_bytes("res://data/terrain_collision.bin").to_float32_array()
+	var dmax := 0.0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	if hm.size() == coll.size() and hm.size() > 0:
+		for i in 4000:
+			var k := rng.randi() % hm.size()
+			dmax = maxf(dmax, absf(hm[k] - coll[k] * t.spacing))
+	check.call("výšková mapa vs. kolize: max rozdíl %.3f m (šum ≤0,2, zatím bez exportu 0)" % dmax,
+		hm.size() > 0 and hm.size() == coll.size() and dmax <= 0.25)
+
+	# --- sever pro sněhové jazyky (§12.3): uniform north_xz = světový sever z map.json
+	var nd: Variant = t.material.get_shader_parameter("north_xz")
+	var want_n: Vector3 = Clock.enu_to_world(Vector3(0.0, 1.0, 0.0), float(w.meta.get("north_angle_deg", 78.37)))
+	check.call("uniform north_xz je světový sever", nd is Vector2
+		and (Vector2(nd) - Vector2(want_n.x, want_n.z)).length() < 0.01, "%s" % nd)
+	var sh := FileAccess.get_file_as_string("res://shaders/terrain.gdshader")
+	check.call("shader: sněhové jazyky (prohlubeň/sever + jazýčkový šum)",
+		sh.contains("north_xz") and sh.contains("hold") and sh.contains("tc -= dhv"))
+	check.call("shader: koleje polních cest (track_detail, třída 7)", sh.contains("track_detail"))
+	var tp := FileAccess.get_file_as_string("res://shaders/tinted_triplanar.gdshader")
+	check.call("shader cest: výraznější mokro (wet_boost)", tp.contains("wet_boost"))
+
+	# --- mokro → globální shader uniform (Atmosphere.update propisuje Weather.wetness)
+	var wt: Weather = w.weather
+	var saved_wet := wt.wetness
+	var saved_snow := wt.snow_cover
+	wt.snow_cover = 0.0
+	wt.wetness = 0.85
+	check.call("weather.wetness_ground() alias", absf(wt.wetness_ground() - 0.85) < 0.001)
+	g.client.atmosphere.update(0.0)
+	var gw: Variant = RenderingServer.global_shader_parameter_get("wetness")
+	var wet_ok := gw is float and absf(float(gw) - 0.85) < 0.01
+	if gw == null:
+		# headless dummy renderer globální parametry nevrací – ověř aspoň deklaraci uniformy
+		var decl: Variant = ProjectSettings.get_setting("shader_globals/wetness", {})
+		wet_ok = decl is Dictionary and String(decl.get("type", "")) == "float" \
+			and sh.contains("global uniform float wetness")
+	check.call("wetness %.2f v globálním shader parametru" % wt.wetness, wet_ok, "=%s" % gw)
+	# asfalt má wet_boost (materiál prvního chunku silnic)
+	var m_asph: Material = null
+	var silnice := w.get_node_or_null("Mapa/Silnice")
+	if silnice != null and silnice.get_child_count() > 0:
+		var mi0 := silnice.get_child(0) as MeshInstance3D
+		if mi0 != null and mi0.mesh != null:
+			m_asph = mi0.mesh.surface_get_material(0)
+	check.call("asfalt má wet_boost > 1", m_asph is ShaderMaterial
+		and float((m_asph as ShaderMaterial).get_shader_parameter("wet_boost")) > 1.0)
+
+	# --- louže (Puddles): při wetness > 0.7 se objeví na vozovce, po uschnutí mizí
+	var pu: Puddles = g.client.season_fx.puddles if g.client.season_fx else null
+	check.call("manager louží (Puddles) existuje", pu != null)
+	if pu != null:
+		var ppos := _pl(g).global_position
+		for i in 5:
+			pu.update(ppos, 0.85)
+		var vis := pu.visible_count()
+		check.call("při mokru 0,85 jsou louže viditelné (%d ks)" % vis, vis > 0 and pu.alpha > 0.5)
+		var on_road := false
+		for d in pu._pool:
+			if not d.visible:
+				continue
+			var i2 := w.graph.nearest(Vector2(d.position.x, d.position.z))
+			if i2 >= 0 and w.graph.nodes[i2].distance_to(Vector2(d.position.x, d.position.z)) < 3.0:
+				on_road = true
+		check.call("louže leží u uzlů vozovky (≤3 m)", on_road)
+		for i in 8:
+			pu.update(ppos, 0.2)
+		check.call("po uschnutí (0,2) louže zmizí", pu.visible_count() == 0 and pu.alpha <= 0.0)
+	wt.wetness = saved_wet
+	wt.snow_cover = saved_snow
+	var n_ok2 := res.count(true)
+	print("VÝSLEDEK terénu: %d/%d OK" % [n_ok2, res.size()])
 	g.get_tree().quit()
