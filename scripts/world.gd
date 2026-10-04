@@ -100,6 +100,7 @@ var _collected := {}             # pořadí předmětu → true: už sebraný (u
 var _collected_jd := {}          # pořadí předmětu → juliánský den sběru (znovuvyrůstání sezónních předmětů)
 var surface: SurfaceMap          # maska povrchu terénu (data/surface.bin) – procedurální materiály, minimapa
 var surroundings: Surroundings   # M6.2: levná krajina za katastrem (bez kolizí, bez dat fallback prstenec)
+var villages: Villages           # vizuální zástavba 5 okolních vesnic (data/obce.json; jen pohled z dálky)
 var building_details: BuildingDetails   # okna, dveře, vrata a komíny budov (data/buildings.json; null bez dat)
 var estate: Estate               # registr nemovitostí (M1.7): čísla popisná, cedulky, domov = vlastnictví / nájem bytu
 var fields: Fields               # pole a louky (data/landuse.bin) – barvy polí kreslí terén podle kalendáře
@@ -185,6 +186,10 @@ func build() -> void:
 	surroundings.name = "Okoli"
 	add_child(surroundings)
 	surroundings.setup(terrain)
+	villages = Villages.new()                # zástavba okolních obcí (jen vzhled; potřebuje mřížku okolí)
+	villages.name = "Vesnice"
+	add_child(villages)
+	villages.setup(surroundings, terrain)
 
 	loading.emit("Budovy a cesty…")
 	await _frames(1)
