@@ -7,6 +7,8 @@ barva terénu je procedurální, ortofoto ČÚZK jen na přepnutí).
 > *„Tato hra je satirickým uměleckým dílem. Všechny postavy, události a vyobrazené soukromé objekty
 > jsou smyšlené. Jakákoliv podobnost se skutečnými osobami či konkrétními obydlími je čistě náhodná.“*
 
+*Veřejný snapshot — vývoj probíhá v privátním repozitáři, historie commitů je zde squashnutá.*
+
 ## Screenshoty
 
 | Letecký pohled na Dukelčice (dron) | Dialog s NPC na návsi |
