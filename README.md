@@ -7,6 +7,20 @@ silnice z OSM, ~21 800 stromů; barva terénu je procedurální, ortofoto ČÚZK
 > *„Tato hra je satirickým uměleckým dílem. Všechny postavy, události a vyobrazené soukromé objekty
 > jsou smyšlené. Jakákoliv podobnost se skutečnými osobami či konkrétními obydlími je čistě náhodná.“*
 
+## Screenshoty
+
+| Letecký pohled na Dukelčice (dron) | Dialog s NPC na návsi |
+|---|---|
+| ![Letecký pohled](docs/screenshots/dron-ves.png) | ![Dialog s NPC](docs/screenshots/dialog-kvetoslava.png) |
+
+| Motorka Javor 250 Kývačka za soumraku | Interiér pálenice |
+|---|---|
+| ![Javor 250](docs/screenshots/javor-kyvacka.png) | ![Pálenice](docs/screenshots/palenice.png) |
+
+| Rádio se stanicemi |
+|---|
+| ![Rádio](docs/screenshots/radio.png) |
+
 ## Spuštění
 
 ```bash
