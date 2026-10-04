@@ -20,6 +20,8 @@
 ##   --fencetest   ploty a ohrady (Fáze 7, FenceManager): procedurální ploty kolem výběhu,
 ##                 zahrady a pole, kolize, průchodnost branek, rebuild při stěhování, save
 ##                 round-trip, kůň projde brankou; volitelně --fencedbg pro diagnostiku sond
+##   --gardentest  zahrada a dvoříště (Fáze 8): růst rostlin v mesši, plevel, kompost → hnůj →
+##                 hnojení, studna naplní konev, skleník chrání před mrazem, garden_visuals save
 class_name Tests
 extends RefCounted
 
@@ -1467,4 +1469,165 @@ static func fence_test(g: Node) -> void:
 
 	var n_ok := res.count(true)
 	print("VÝSLEDEK plotů: %d/%d OK" % [n_ok, res.size()])
+	g.get_tree().quit()
+
+
+## Automatický test zahrady a dvoříště (Fáze 8, §11 plánu): zasetí záhonu přes skutečnou akci,
+## vizuál rostliny roste s `g` a plevel se přidává do meshe, kompost → předmět `hnuj` → akce `hnojit`
+## (klíč `f`, rychlejší růst), studna naplní konev, skleník ochrání záhony před mrazem a
+## `garden_visuals` (kompost + skleník) se ukládá a obnovuje.
+static func garden_test(g: Node) -> void:
+	var w: World = g.world
+	var p: Player = _pl(g)
+	var res := []
+	var check := func(name: String, cond: bool, extra := "") -> void:
+		res.append(cond)
+		print("%s %-52s %s" % ["OK  " if cond else "CHYBA", name, extra])
+	await g.get_tree().create_timer(1.0).timeout
+	var gd: Garden = w.garden
+	check.call("Garden existuje ve světě", gd != null)
+	var pl: Garden.Plot = gd.plot_by_key("zahrada") if gd != null else null
+	check.call("domácí plocha „zahrada“ stojí", pl != null)
+	if gd == null or pl == null:
+		print("VÝSLEDEK zahrady: Garden/zahrada chybí – konec")
+		g.get_tree().quit()
+		return
+
+	var verts := func() -> int:      # vrcholy 1. povrchu (půda+rostliny; 2. povrch je sklo skleníku)
+		var m: ArrayMesh = pl.mi.mesh
+		if m == null or m.get_surface_count() < 1:
+			return 0
+		return (m.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+
+	# --- výbava: studna je registrovaný cíl, E nabídky obsahují studnu, kompost i skleník
+	check.call("cíl „studna“ registrován", String(gd._studna.get("kind", "")) == "studna")
+	p.teleport(pl.center + Vector3(0, 0.3, 0), p.yaw, false)
+	await _frames(g, 3)
+	var its: Array = gd.interactables(1)
+	var texts := []
+	for it in its:
+		texts.append(String(it["text"]))
+	check.call("E nabídka „Studna – nabrat vodu“", texts.any(func(t: String) -> bool: return t.contains("Studna")))
+	check.call("E nabídka „Kompost – vzít hnůj“", texts.any(func(t: String) -> bool: return t.contains("Kompost")))
+	check.call("E nabídka „Skleník“", texts.any(func(t: String) -> bool: return t.contains("Skleník")),
+		"(gh_built=%s)" % str(gd.gh_built))
+
+	# --- zasít záhon přes skutečný handler `sit` (vybraná plodina + semena v kapse)
+	var k := Vector2i(0, 0)
+	pl.cells[k] = {"s": Garden.S_ZRYTO, "w": 0.0, "h": 1.0}
+	gd.sow_pick[1] = "rajcata"
+	p.add_item("semena_rajcata", 2)
+	var sem_before := p.item_count("semena_rajcata")
+	gd._on_sow(1, {}, {"plot": pl, "cell": k}, true)
+	var cell: Dictionary = pl.cells.get(k, {})
+	check.call("záhon zaset akcí `sit`", int(cell.get("s", -1)) == Garden.S_ZASETO and String(cell.get("c", "")) == "rajcata")
+	check.call("semena se spotřebovala", p.item_count("semena_rajcata") == sem_before - 1)
+
+	# --- vizuál rostliny roste: g=0 → méně vrcholů než zralá rostlina (více listů + plody)
+	cell["g"] = 0.0
+	cell["w"] = 0.0
+	gd._rebuild(pl)
+	var v0: int = verts.call()
+	cell["g"] = float(Garden.CROPS["rajcata"]["days"])
+	cell["s"] = Garden.S_ZRALE
+	gd._rebuild(pl)
+	var v1: int = verts.call()
+	check.call("rostlina v mesši roste se stádiem (%d → %d vrcholů)" % [v0, v1], v1 > v0)
+	check.call("druhý povrch meshe = sklo skleníku", pl.mi.mesh != null and pl.mi.mesh.get_surface_count() >= 2,
+		"(povrchů %d)" % (pl.mi.mesh.get_surface_count() if pl.mi.mesh != null else 0))
+
+	# --- plevel w > 0,5: záhon „ZRYTO“ s plevelem má v mesši trsy navíc
+	var kw := Vector2i(1, 0)
+	pl.cells[kw] = {"s": Garden.S_ZRYTO, "w": 0.0, "h": 1.0}
+	gd._rebuild(pl)
+	var vw0: int = verts.call()
+	pl.cells[kw]["w"] = 0.8
+	gd._rebuild(pl)
+	var vw1: int = verts.call()
+	check.call("plevel w>0.5 je ve vizuálu (%d → %d vrcholů)" % [vw0, vw1], vw1 > vw0)
+	check.call("popisek záhonu hlásí plevel", gd.cell_text(pl.cells[kw]).contains("plevel"))
+
+	# --- kompost: E „vzít hnůj“ přidá `hnuj` a ubere zásobu
+	gd.compost_left = Garden.COMPOST_MAX
+	var h_before := p.item_count("hnuj")
+	gd._on_compost(1)
+	check.call("kompost → 1× hnůj v kapse", p.item_count("hnuj") == h_before + 1)
+	check.call("zásoba kompostu klesla", gd.compost_left == Garden.COMPOST_MAX - 1)
+
+	# --- hnojit: kontrola cíle projde a handler nastaví `f` a spotřebuje hnůj
+	var kf := Vector2i(2, 0)
+	pl.cells[kf] = {"s": Garden.S_ZRYTO, "w": 0.0, "h": 1.0}
+	var aim_f := {"plot": pl, "cell": kf}
+	check.call("_check_fertilize pustí zrytý záhon", gd._check_fertilize(aim_f, 1) == "")
+	gd._on_fertilize(1, {}, aim_f, true)
+	check.call("záhon pohnojen (f = plné)", float(pl.cells[kf].get("f", 0.0)) >= Garden.FERT_MAX - 0.001)
+	check.call("hnůj se spotřeboval", p.item_count("hnuj") == h_before)
+	check.call("popisek hlásí hnojivo", gd.cell_text(pl.cells[kf]).contains("hnojivo"))
+	check.call("dvakrát za sebou hnojit nejde", gd._check_fertilize(aim_f, 1) != "")
+
+	# --- hnojivo urychluje denní růst a samo za den ubyde (FERT_DECAY)
+	var ka := Vector2i(0, 1)
+	var kb := Vector2i(1, 1)
+	pl.cells[ka] = {"s": Garden.S_ZASETO, "c": "mrkev", "g": 0.0, "dry": 0, "m": 1.0, "w": 0.0, "h": 1.0, "o": 0}
+	pl.cells[kb] = {"s": Garden.S_ZASETO, "c": "mrkev", "g": 0.0, "dry": 0, "m": 1.0, "w": 0.0, "h": 1.0, "o": 0, "f": Garden.FERT_MAX}
+	gd._grow_plot(pl, 15.0, 15.0, true)
+	var ga: float = pl.cells[ka]["g"]
+	var gb: float = pl.cells[kb]["g"]
+	check.call("pohnojený záhon roste rychleji (%.2f vs %.2f)" % [gb, ga], gb > ga + 0.1)
+	check.call("hnojivo za den ubylo (f %.2f)" % float(pl.cells[kb].get("f", -1.0)),
+		absf(float(pl.cells[kb].get("f", 0.0)) - (Garden.FERT_MAX - Garden.FERT_DECAY)) < 0.01)
+
+	# --- studna: E naplní prázdnou konev (bez kohoutku / deště)
+	p.inventory.clear()
+	p.add_item("konev", 1)
+	gd._on_well(1)
+	check.call("studna vymění konev → konev_plna", p.item_count("konev") == 0 and p.item_count("konev_plna") == 1)
+	check.call("konev po studně je plná", int(gd.can_left.get(1, 0)) == Garden.CAN_CHARGES)
+
+	# --- skleník: záhony pod ním přežijí mráz −5 °C, který venku rajčata zabije (frost_kill 0)
+	var kg_in := Vector2i(pl.w - 1, pl.d - 1)          # pravý zadní roh = uvnitř skleníku
+	var kg_out := Vector2i(0, 0)                        # venku (přepsaný pokusný záhon)
+	check.call("gh_cell pozná záhon pod skleníkem", gd.gh_cell(pl, kg_in) and not gd.gh_cell(pl, kg_out))
+	for kk in [kg_in, kg_out]:
+		pl.cells[kk] = {"s": Garden.S_ZASETO, "c": "rajcata", "g": 5.0, "dry": 0, "m": 1.0, "w": 0.0, "h": 1.0, "o": 0}
+	gd._check_frost(-5.0)
+	check.call("záhon ve skleníku mráz přežil", int(pl.cells[kg_in].get("s", -1)) == Garden.S_ZASETO)
+	check.call("venkovní záhon mráz zabil", int(pl.cells[kg_out].get("s", -1)) == Garden.S_ZRYTO)
+
+	# --- garden_visuals: oddělený klíč (kompost, skleník) – round-trip + výchozí stav starého savu
+	gd.compost_left = 3
+	var vd: Dictionary = gd.visuals_to_dict()
+	gd.compost_left = 0
+	gd.visuals_restore(vd)
+	check.call("garden_visuals round-trip (kompost=%d)" % gd.compost_left, gd.compost_left == 3)
+	gd.visuals_restore({})                                 # starý save bez klíče → výchozí stav
+	check.call("starý save → výchozí (plný kompost, skleník stojí)", gd.compost_left == Garden.COMPOST_MAX and gd.gh_built)
+
+	# --- buňka se stavem přežije to_dict → restore (včetně `f` a plochy)
+	var sd: Dictionary = gd.to_dict()
+	pl.cells[kf]["f"] = 0.5
+	var sd2: Dictionary = gd.to_dict()
+	var saved_f := -1.0
+	for pe in sd2["plots"]:
+		if String(pe["key"]) == "zahrada":
+			for ce in pe["cells"]:
+				if int(ce["i"]) == kf.x and int(ce["j"]) == kf.y:
+					saved_f = float(ce.get("f", -1.0))
+	check.call("hnojivo `f` se ukládá do save (%.2f)" % saved_f, absf(saved_f - 0.5) < 0.02)
+	gd.restore(sd)
+	check.call("to_dict → restore bez výjimky (plošiny %d)" % gd.plots.size(), gd.plots.size() >= 1)
+
+	# --- relocate: studna/kompost/skleník se přesunou s plochou (cíl `studna` sleduje novou pozici)
+	var well0: Vector3 = gd._well_pos(pl)
+	pl.center += Vector3(4.0, 0, 2.0)
+	pl.dirty = true
+	gd._studna["pos"] = gd._well_pos(pl) + Vector3(0, 0.7, 0)   # stejné jako v relocate()
+	var moved: float = gd._well_pos(pl).distance_to(well0)
+	check.call("studna/kompost se stěhují s plochou (Δ %.1f m)" % moved, moved > 3.5)
+	pl.center -= Vector3(4.0, 0, 2.0)
+	pl.dirty = true
+	gd._studna["pos"] = gd._well_pos(pl) + Vector3(0, 0.7, 0)
+
+	var n_ok := res.count(true)
+	print("VÝSLEDEK zahrady: %d/%d OK" % [n_ok, res.size()])
 	g.get_tree().quit()

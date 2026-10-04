@@ -59,6 +59,9 @@ const DEFS := {
 	# pořadí = přednost v HUD nápovědě: první proveditelná akce vyhraje, `zahon_info` je poslední záloha)
 	"ryt": {"name": "Ryt záhon", "target": "zahon", "tool": "lopata|motyka", "time_s": 20.0,
 		"stamina": 0.15, "skill": "zahradnictvi", "xp": 2, "level": 1, "anim": "dig", "fail_chance": 0.0},
+	# Fáze 8: hnojení z kompostu – před `sit`, aby držení kbelíku hnoje dalo přednost hnojení
+	"hnojit": {"name": "Pohnojit záhon", "target": "zahon", "tool": "hnuj", "time_s": 4.0,
+		"stamina": 0.05, "skill": "zahradnictvi", "xp": 2, "level": 1, "anim": "pour", "fail_chance": 0.0, "wear": 0},
 	"sit": {"name": "Zasít", "target": "zahon", "tool": "", "time_s": 4.0,
 		"stamina": 0.03, "skill": "zahradnictvi", "xp": 0, "level": 1, "anim": "kneel", "fail_chance": 0.0},
 	"zalevat": {"name": "Zalít záhon", "target": "zahon", "tool": "konev_plna", "time_s": 3.0,
@@ -70,6 +73,8 @@ const DEFS := {
 	"naplnit": {"name": "Naplnit konev", "target": "water", "tool": "konev", "time_s": 4.0,
 		"stamina": 0.02, "skill": "", "xp": 0, "level": 1, "anim": "pour", "fail_chance": 0.0, "wear": 0},
 	"naplnit_kohoutek": {"name": "Naplnit konev (sud u zahrady)", "target": "kohoutek", "tool": "konev", "time_s": 4.0,
+		"stamina": 0.02, "skill": "", "xp": 0, "level": 1, "anim": "pour", "fail_chance": 0.0, "wear": 0},
+	"naplnit_studna": {"name": "Nabrat vodu ze studny", "target": "studna", "tool": "konev", "time_s": 4.0,
 		"stamina": 0.02, "skill": "", "xp": 0, "level": 1, "anim": "pour", "fail_chance": 0.0, "wear": 0},
 	"zahon_info": {"name": "Prohlédnout záhon", "target": "zahon", "tool": "", "time_s": 0.6,
 		"stamina": 0.0, "skill": "", "xp": 0, "level": 1, "anim": "kneel", "fail_chance": 0.0},

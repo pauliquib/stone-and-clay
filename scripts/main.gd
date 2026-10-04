@@ -20,6 +20,8 @@
 ##   --flighttest    stavový automat letouna přes godot-state-charts (Fáze 4): vzlet z dráhy,
 ##                   přetažení/zotavení, dosazení + přímé události; bez addonu fallback flagy
 ##   --fencetest     ploty a ohrady (Fáze 7): kolize drží, branky průchodné, kůň projde brankou
+##   --gardentest    zahrada a dvoříště (Fáze 8): růst/plodiny vizuálně, kompost → hnůj → hnojení,
+##                   studna naplní konev, skleník ochrání před mrazem, garden_visuals save
 class_name Main
 extends Node3D
 
@@ -133,6 +135,8 @@ func _ready() -> void:
 		Tests.flight_test(self)
 	if _args.has("fencetest"):
 		Tests.fence_test(self)
+	if _args.has("gardentest"):
+		Tests.garden_test(self)
 
 
 func _frames(n: int) -> void:

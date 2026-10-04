@@ -136,6 +136,8 @@ const ITEMS := {
 	"motyka": {"name": "Motyka", "short": "Motyka", "type": "tool", "kg": 1.5, "price": 280, "durability": 250, "color": Color(0.5, 0.45, 0.4)},
 	"konev": {"name": "Konev", "short": "Konev", "type": "tool", "kg": 0.8, "price": 150, "durability": 400, "color": Color(0.3, 0.55, 0.7)},
 	"konev_plna": {"name": "Konev (plná vody)", "short": "Konev (plná)", "type": "tool", "kg": 4.0, "price": 0, "durability": 400, "color": Color(0.3, 0.55, 0.7)},
+	# ---- Fáze 8 Zahrádky (`Garden`, §11): hnůj z kompostu u zahrady – nosí se v kbelíku, akce `hnojit` na záhonu
+	"hnuj": {"name": "Hnůj (kbelík)", "short": "Hnůj", "type": "tool", "kg": 2.0, "price": 15, "stack": 10, "color": Color(0.28, 0.18, 0.1)},
 	# ---- M3.2 nářadí prací (zapůjčí ho zaměstnavatel na směnu – `Jobs` `zapujcit`; v obchodě zatím není, DOPLNIT: stavebniny M5.1)
 	"vidle": {"name": "Vidle", "short": "Vidle", "type": "tool", "kg": 1.6, "price": 290, "durability": 300, "color": Color(0.55, 0.55, 0.58)},
 	"kosa": {"name": "Kosa", "short": "Kosa", "type": "tool", "kg": 1.8, "price": 590, "durability": 300, "color": Color(0.6, 0.62, 0.66)},

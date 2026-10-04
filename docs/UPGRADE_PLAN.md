@@ -645,10 +645,10 @@ V `weather.gd` přidej `wetness_ground` (0-1):
 
 ### Fáze 8 (Zahrady)
 
-- [ ] Rozšířit `garden.gd` o vizuální stavy růstu
-- [ ] Přidat kompost, studna, skleník
-- [ ] Interakce E pro nové objekty
-- [ ] Uložení stavu zahrady do `save_game.gd` (klíč `garden_visuals`)
+- [x] Rozšířit `garden.gd` o vizuální stavy růstu (rostlina roste s `g/days`, plevel od `w>0.5`, zralé plody)
+- [x] Přidat kompost (E → `hnuj`, zásoba `compost_left` 6 dávek, +1/den), studna (E + akce `naplnit_studna` → `konev_plna`), skleník 3×2 m (`gh_cell`, +10 °C, mráz nezabíjí)
+- [x] Interakce E pro nové objekty (`interactables` + registrovaný cíl `studna`, akce `hnojit` s `hnuj` v ruce)
+- [x] Uložení stavu zahrady do `save_game.gd` (klíč `garden_visuals`) – `--gardentest` 31/31 OK
 
 ### Fáze 9 (Terén)
 
