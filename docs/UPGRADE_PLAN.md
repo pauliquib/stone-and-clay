@@ -346,8 +346,8 @@ func _on_stall_detected():
 
 ### Fáze 5 (Dokumentace)
 
-- [ ] Aktualizace `README.md` o nových závislostech
-- [ ] Přidání `THIRD_PARTY.md` s licencemi (Jolt je MIT, Qodot MIT, LimboAI MIT)
+- [x] Aktualizace `README.md` o nových závislostech (sekce „Add-ony a nástroje" + nové testy a generátory v `docs/DEV.md`)
+- [x] Přidání `THIRD_PARTY.md` s licencemi (Jolt je MIT, Qodot MIT, LimboAI MIT)
 
 ## 7. RIZIKA A ŘEŠENÍ PROBLÉMŮ
 

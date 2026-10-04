@@ -24,6 +24,8 @@ blender --background --python-exit-code 1 --python tools/export_map.py
 rm -rf data/orig && python3 tools/clean_road_clashes.py
 python3 tools/pois.py
 python3 tools/water.py      # vždy až po exportu – čte terrain_height.bin, silnice a trees.bin
+python3 tools/vegetation.py # po exportu i water.py – čte surface/landuse/trees.bin, výškovou mřížku
+                            # + water_carve.bin, vozovky a map.json → data/vegetation.bin (není v gitu)
 ```
 
 `water.py` čte vodní toky z `geodata/pbf/zlinsky-latest.osm.pbf` (pyosmium) a zapisuje `data/water.json`
@@ -70,7 +72,15 @@ zrychlení/brzdění a AI jízdu hospoda → domov, `--exittest` výstup z auta 
 `--faunatest [--shotdir=adr]` zvěř (pastva → útěk) a jízda na koni, `--naturesynctest` loopback přípravy přírody
 na multiplayer (snímky zvěře a hejn do klientské Fauny, odchylky poloh, velikost snímku, Clock / Weather round-trip; 60 s, pak skončí),
 `--weathertest` přilnavost a brzdná
-dráha auta za všech situací + expozice těla. `--date=RRRR-MM-DD` datum 1. dne,
+dráha auta za všech situací + expozice těla. Testy upgrade plánu (`docs/UPGRADE_PLAN.md`,
+vše v `scripts/tests.gd`): `--interiortest` mapový interiér hospody přes FuncGodot (vstup/výstup,
+fallback na procedurální), `--villagertest` behavior strom vesničana přes LimboAI (blackboard,
+větve denní rutiny, chůze za cílem), `--flighttest` stavový automat letouna přes
+godot-state-charts (vzlet z dráhy, přetažení/zotavení, dosazení), `--fencetest` kolize plotů
+a průchod brankou (i koněm), `--gardentest` růst plodin, kompost → hnůj → hnojení, studna
+a skleník + save klíč `garden_visuals`, `--vegetationtest` `vegetation.bin` (VEG1), chunky
+MultiMeshů a LOD, `--terraintest` mikroreliéf vs. kolize, wetness → shader a louže.
+`--date=RRRR-MM-DD` datum 1. dne,
 `--weather=druh` vynucené počasí (`jasno`, `polojasno`, `oblacno`, `zatazeno`, `mlha`, `prehanky`, `dest`,
 `bourka`, `snih`). Náhled modelů zvířat: `godot --path . --script res://tools/dev/zoo.gd -- --series=adresář`.
 
@@ -93,12 +103,35 @@ z `landuse.bin`). Maska povrchu: `python3 tools/surface.py` (stejné závislosti
 (magic `SURF`, rastr 4 m, 1 B na buňku; laditelné konstanty `FOREST_MIN`, `BUILDING_R`, `WATER_R`, `TRACK_W`). Bez něj shader
 odvodí třídy z `landuse.bin` a hustoty lesa. Dlaždicové textury (Poly Haven, CC0, 1k) patří do `assets/textures/terrain/`,
 seznam je v `ASSETY.md`; když chybí, použije se procedurální barva a šum. Minimapa (M) se kreslí z tříd povrchu
-(`SurfaceMap.make_map_image`). F2 → „Terén: …“ přepne na ortofoto a zpět.
+(`SurfaceMap.make_map_image`). F2 → „Terén: …“ přepne na ortofoto a zpět. `export_map.py` přidává do vizuální
+výškové mřížky mikroreliéf (erozní šum ±0,2 m; kolizní mřížka zůstává čisté DMR – projeví se až po dalším
+exportu mapy). Za mokro v shaderu jsou navíc polní cesty a koleje s wet-boost reflexí (sdílený `wet_boost`
+s `tinted_triplanar.gdshader` na vozovkách) a sněhové jazyky po severních svazích; louže kreslí
+`scripts/priroda/puddles.gd` (Decal) při `wetness > 0,7`.
 
 Fasády (M1.2): `python3 tools/buildings.py` (jen standardní knihovna) sloučí podklady `data/buildings_3d*.json` (půdorys OSM,
 výšky okapu a hřebene z DMP 1G, tvar střechy), `tools/out/domov_hrace.json` a `data/pois.json` do `data/buildings.json`
 (typ budovy, plocha, hřeben, `poi`, `home`, bod dveří u nejbližší silnice). Generátor `scripts/building_details.gd`
 z něj skládá okna, dveře, vrata a komíny; sklo řeší `shaders/window_glass.gdshader` (jeden uniform `lit_frac` pro noční svícení).
+
+Add-ony (`addons/`, licence v `THIRD_PARTY.md`): Godot Jolt (GDExtension, fyzika místo Godot Physics),
+FuncGodot (editor plugin – staví interiéry z Quake `.map` v `data/maps/`; `scripts/map_interiors.gd`,
+chybí-li mapa/addon → fallback na procedurální `InteriorGen`), LimboAI (GDExtension – behavior strom
+`ai/villager_routine.tres` + GDScript tasky `scripts/ai/{actions,conditions}/` připnuté k `Villager`),
+godot-state-charts (editor plugin – stavový automat letouna v `aircraft.gd`). Jejich generované soubory
+jsou v gitu a přegenerovávají se ručně: `python3 tools/gen_hospoda_map.py` → `data/maps/hospoda.map`
+(hospoda 10 × 8 m, editovatelná i v TrenchBroomu), `python3 tools/gen_interior_textures.py` →
+`assets/textures/interiors/*.png` (Pillow), `godot --headless --path . --script tools/gen_villager_bt.gd`
+→ `ai/villager_routine.tres`, `godot --headless --path . --script tools/gen_vegetation_meshes.gd` →
+`assets/models/vegetation/*.res` (low-poly, UV.y = poměrná výška pro ohýbání větrem).
+
+Vegetace (Fáze 9): `python3 tools/vegetation.py [--year=RRRR]` rozmístí deterministicky (SEED) body
+vegetace z `surface.bin`, `landuse.bin` (obilné řádky jen na polích, jejichž `Fields.crop_of` dává
+obilninu pro daný rok), `trees.bin` (podrost pod koruny), výškové mřížky + `water_carve.bin`, masek
+vozovek a obvodu z `map.json` → `data/vegetation.bin` (VEG1, typ/pozice/rotace/měřítko/tint/pole;
+soubor není v gitu – spustit ručně, při změně roku znovu). Kreslí `scripts/vegetation/vegetation_manager.gd`:
+MultiMesh chunky s LOD podle vzdálenosti, `wind_strength` z `Weather` → `shaders/vegetation.gdshader`,
+`detail=0` vegetaci skryje.
 
 Poznámka: po přidání skriptu s novým `class_name` je třeba obnovit seznam tříd
 (`godot --headless --path . --import`, dělá to i `run.sh`), jinak Godot hlásí „Could not find type …“.
