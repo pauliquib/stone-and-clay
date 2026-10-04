@@ -1,0 +1,28 @@
+{
+ "verze": 1,
+ "overeno": "2026-09-30 – doby lovu, odměny a výtěžnost jsou ORIENTAČNÍ a zjednodušené pro hru (vyhl. 245/2002 Sb., zákon 449/2001 Sb., 40/2009 Sb. § 304) – před vydáním ověřit aktuální znění. Nejde o právní radu.",
+ "dokument": "doklad_puvod",
+ "vyvrhnuti_hmotnost": 0.8,
+ "zkaza_h": 3,
+ "zkaza_leto_h": 2,
+ "zkaza_leto_mesice": [6, 7, 8],
+ "vyvrzene_zkaza_h": 24,
+ "zmizi_dny": 2,
+ "domov_dosah_m": 30.0,
+ "prekupnik": {"jmeno": "Kamarád Franta", "od_h": 19.0, "do_h": 24.0, "bonus": 1.3, "prask_p": 0.1, "soused_max_ks": 3, "soused_koef": 0.8},
+ "druhy": {
+  "srnec": {"nazev": "Srnec obecný", "doba_samec": [5, 16, 9, 30], "doba_samice": [9, 1, 12, 31], "noc": false,
+   "item": "zverina_srnci", "vynos": 0.5, "trofej": "trofej_parozky", "cargo": "srnec", "vyvrhnout_s": [25, 45], "xp": [20, 40], "rameno": true},
+  "divocak": {"nazev": "Divoké prase", "doba_samec": null, "doba_samice": null, "noc": true,
+   "item": "zverina_divocak", "vynos": 0.5, "trofej": "", "cargo": "divocak", "vyvrhnout_s": [45, 90], "xp": [40, 60], "rameno": false},
+  "sele": {"nazev": "Sele", "doba_samec": null, "doba_samice": null, "noc": true,
+   "item": "zverina_divocak", "vynos": 0.5, "trofej": "", "cargo": "zajic", "vyvrhnout_s": [25, 35], "xp": [20, 30], "rameno": true},
+  "zajic": {"nazev": "Zajíc polní", "doba_samec": [11, 1, 12, 31], "doba_samice": [11, 1, 12, 31], "noc": false,
+   "item": "zverina_zajic", "vynos": 0.5, "trofej": "", "cargo": "zajic", "vyvrhnout_s": [25, 30], "xp": [20, 25], "rameno": true}
+ },
+ "poznamky": {
+  "srnec": "Srnec 16. 5. – 30. 9., srna a srnče 1. 9. – 31. 12. (vyhl. 245/2002 Sb. – ověřit).",
+  "divocak": "Celoročně (jen orientačně, ověřit).",
+  "zajic": "Reálně 1. 11. – 31. 12. a při společném honu; zjednodušeně jen listopad–prosinec, bez podmínky společného honu (ověřit)."
+ }
+}

@@ -1,0 +1,877 @@
+{
+ "verze": 1,
+ "poznamka": "Katalog zaměstnání (M3.1, první tři práce M3.2). Upravuje člověk: práce v `prace`, pracovní úkoly v `ukoly`. Zaměstnavatelé a podniky jsou SMYŠLENÉ. Dny směn: 1 = pondělí … 7 = neděle; od / do = hodina (desetinná, do 24). Mzda = hrubá Kč za hodinu přítomnosti na pracovišti; výplata čistá (zjednodušeně). M3.2 volitelné klíče: prace.areal_r (m), povest_tyden, pozadavky.obleceni_slot, pozadavky.strizlivost; ukoly.mesice, snih_min / snih_max, zapujcit, r_cile, dovednosti_xp, kompas (viz scripts/jobs.gd). M3.3 volitelné klíče: ukoly.typ \"modul\" (pokrok hlásí modul práce), ukoly.hodiny [od, do]; prace.smeny[].nazev + smeny_volba (varianta směn – ranní / odpolední); prace.druh \"zakazka\" + zakazka {tvurce, odmena [min, max], lhuta_h, pauza_h, areal_r, respekt} = brigáda na zavolání bez směn. Klíč `pripravene` = práce připravené pro pozdější kroky (zatím se nenabízejí). M3.3 i prace.mesice (sezónní práce – směny jen v těch měsících) a prace.naturalie {předmět: počet} k týdenní výplatě.",
+ "pravni_poznamka": "Zjednodušená herní simulace, nejde o právní radu. Čistá mzda = hrubá × cista_mzda_k (zjednodušeně −15 % za daň z příjmů 586/1992 Sb. a pojistné 589/1992 Sb. a 592/1992 Sb.; reálně záleží na slevách a sazbách – ověřit aktuální znění). Výpověď po opakovaném porušení povinností odpovídá zjednodušeně § 52 písm. g) zákoníku práce 262/2006 Sb. (reálně písemně, s výpovědní dobou a upozorněním – ověřit aktuální znění). Zakázky na zavolání (zahradník u sousedů) se platí hotově na ruku bez odvodů – zjednodušeno; reálně jde o dohodu o provedení práce (§ 75 zákoníku práce 262/2006 Sb.) se srážkovou daní u malého příjmu (§ 6 odst. 4 zákona 586/1992 Sb.) – ověřit aktuální znění.",
+ "cista_mzda_k": 0.85,
+ "premie_max": 0.2,
+ "napomenuti_do_vypovedi": 3,
+ "prace": {
+  "hospoda_pomocnik": {
+   "nazev": "Pomocník v hospodě",
+   "zamestnavatel": "Hospoda U Hřiště",
+   "vedouci": "Hostinský Láďa",
+   "misto": "hospoda",
+   "popis": "Úklid stolů, vynášení odpadků, drobná pomoc hostinskému. Testovací práce systému zaměstnání (M3.1).",
+   "pozadavky": {
+    "dovednosti": {},
+    "ridicak": "",
+    "obleceni_tag": "",
+    "rejstrik_cisty": false,
+    "povest_min": -40,
+    "respekt": {
+     "stamgasti": -30
+    }
+   },
+   "smeny": [
+    {
+     "dny": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "od": 16.0,
+     "do": 20.0
+    }
+   ],
+   "mzda_hod": 150,
+   "vyplata": "tyden",
+   "sance_pohovoru": 0.8,
+   "ukoly": [
+    "hospoda_stoly",
+    "hospoda_odpadky",
+    "hospoda_stoly"
+   ],
+   "ukolu_za_hodinu": 0.75,
+   "dovednosti_xp": {
+    "vyrecnost": 0.5,
+    "kondice": 0.5
+   },
+   "respekt": "stamgasti"
+  },
+  "statek_pomocnik": {
+   "nazev": "Pomocník na farmě",
+   "zamestnavatel": "Statek Na Kopci",
+   "vedouci": "Hospodář Vladimír",
+   "misto": "statek",
+   "popis": "Krmení, napájení, dojení, vejce, kydání hnoje, v sezóně záhony. Hospodář je bručoun, ale platí včas.",
+   "pozadavky": {
+    "dovednosti": {
+     "chovatelstvi": 1
+    },
+    "ridicak": "",
+    "obleceni_tag": "pracovni",
+    "obleceni_slot": "boty",
+    "rejstrik_cisty": false,
+    "povest_min": -60
+   },
+   "smeny": [
+    {
+     "dny": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "od": 6.0,
+     "do": 14.0
+    }
+   ],
+   "mzda_hod": 160,
+   "vyplata": "tyden",
+   "sance_pohovoru": 0.75,
+   "areal_r": 90.0,
+   "ukoly": [
+    "statek_krmeni",
+    "statek_napajeni",
+    "statek_dojeni",
+    "statek_vejce",
+    "statek_hnuj",
+    "statek_pole"
+   ],
+   "ukolu_za_hodinu": 0.75,
+   "dovednosti_xp": {
+    "chovatelstvi": 1.0,
+    "zahradnictvi": 0.3
+   },
+   "respekt": "sousede"
+  },
+  "obec_udrzba": {
+   "nazev": "Obecní údržba",
+   "zamestnavatel": "Obecní úřad",
+   "vedouci": "Starosta Novák",
+   "misto": "urad",
+   "popis": "Sekání trávy u hřiště a na návsi, odpadky, lavičky, na podzim listí, v zimě sníh a posyp. Začátek směny u úřadu.",
+   "pozadavky": {
+    "dovednosti": {},
+    "ridicak": "",
+    "obleceni_tag": "",
+    "rejstrik_cisty": false,
+    "povest_min": -20
+   },
+   "smeny": [
+    {
+     "dny": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "od": 7.0,
+     "do": 15.0
+    }
+   ],
+   "mzda_hod": 170,
+   "vyplata": "tyden",
+   "sance_pohovoru": 0.75,
+   "areal_r": 450.0,
+   "povest_tyden": 1.0,
+   "ukoly": [
+    "udrzba_sekani",
+    "udrzba_odpadky",
+    "udrzba_listi",
+    "udrzba_lavicka",
+    "udrzba_snih",
+    "udrzba_posyp"
+   ],
+   "ukolu_za_hodinu": 0.6,
+   "dovednosti_xp": {
+    "kondice": 0.5,
+    "zahradnictvi": 0.3
+   },
+   "respekt": "sousede"
+  },
+  "vycepni": {
+   "nazev": "Výčepní",
+   "zamestnavatel": "Hospoda U Hřiště",
+   "vedouci": "Hostinský Láďa",
+   "misto": "hospoda",
+   "popis": "Čepování piva (drž LMB u pípy, pusť v zelené), nošení na stůl, spropitné podle spokojenosti hostů, úklid stolů.",
+   "pozadavky": {
+    "dovednosti": {
+     "vyrecnost": 3
+    },
+    "ridicak": "",
+    "obleceni_tag": "",
+    "rejstrik_cisty": true,
+    "povest_min": 0,
+    "strizlivost": true,
+    "respekt": {
+     "stamgasti": -20
+    }
+   },
+   "smeny": [
+    {
+     "dny": [
+      4,
+      5,
+      6
+     ],
+     "od": 17.0,
+     "do": 24.0
+    }
+   ],
+   "mzda_hod": 140,
+   "vyplata": "tyden",
+   "sance_pohovoru": 0.7,
+   "ukoly": [
+    "vycep_obsluha",
+    "vycep_obsluha",
+    "hospoda_stoly"
+   ],
+   "ukolu_za_hodinu": 0.75,
+   "dovednosti_xp": {
+    "vyrecnost": 1.0
+   },
+   "respekt": "stamgasti"
+  },
+  "lesni_delnik": {
+   "nazev": "Lesní dělník",
+   "zamestnavatel": "Lesní správa Na Hvozdě",
+   "vedouci": "Myslivec Franta",
+   "misto": "chata",
+   "popis": "Kácení vyznačených stromů (oranžový pruh na kmeni) na pasece u chaty, odvětvení a řezání, dřevo na hromadu, na jaře a na podzim výsadba sazenic. Motorová pila jen s ochrannou přilbou a kalhotami.",
+   "pozadavky": {
+    "dovednosti": {
+     "drevorubectvi": 8
+    },
+    "ridicak": "",
+    "obleceni_tag": "pracovni",
+    "rejstrik_cisty": false,
+    "povest_min": -40
+   },
+   "smeny": [
+    {
+     "dny": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "od": 6.0,
+     "do": 14.0
+    }
+   ],
+   "mzda_hod": 190,
+   "vyplata": "tyden",
+   "sance_pohovoru": 0.75,
+   "areal_r": 260.0,
+   "ukoly": [
+    "les_kaceni",
+    "les_zpracovani",
+    "les_hromada",
+    "les_vysadba"
+   ],
+   "ukolu_za_hodinu": 0.5,
+   "dovednosti_xp": {
+    "drevorubectvi": 1.0,
+    "kondice": 0.3
+   },
+   "respekt": "zemedelci"
+  },
+  "prodavac": {
+   "nazev": "Prodavač/ka v Potravinách",
+   "zamestnavatel": "Potraviny",
+   "vedouci": "Prodavačka Jarka",
+   "misto": "obchod",
+   "popis": "Pokladna (spočítat nákup a vrátit správně drobné), doplňování regálů bednami ze skladu, ráno převzetí pečiva. Ranní, nebo odpolední směna.",
+   "pozadavky": {
+    "dovednosti": {
+     "vyrecnost": 2
+    },
+    "ridicak": "",
+    "obleceni_tag": "",
+    "rejstrik_cisty": false,
+    "povest_min": 0
+   },
+   "smeny_volba": true,
+   "smeny": [
+    {
+     "nazev": "ranní",
+     "dny": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "od": 6.0,
+     "do": 12.0
+    },
+    {
+     "nazev": "ranní",
+     "dny": [
+      6
+     ],
+     "od": 7.0,
+     "do": 11.0
+    },
+    {
+     "nazev": "odpolední",
+     "dny": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "od": 12.0,
+     "do": 21.0
+    }
+   ],
+   "mzda_hod": 150,
+   "vyplata": "tyden",
+   "sance_pohovoru": 0.75,
+   "ukoly": [
+    "obchod_pecivo",
+    "obchod_pokladna",
+    "obchod_regaly",
+    "obchod_pokladna"
+   ],
+   "ukolu_za_hodinu": 0.75,
+   "dovednosti_xp": {
+    "vyrecnost": 1.0,
+    "kondice": 0.2
+   },
+   "respekt": "sousede"
+  },
+  "zahradnik": {
+   "nazev": "Zahradník u sousedů",
+   "zamestnavatel": "brigáda u sousedů (zakázky dohodí děda Vomáčka)",
+   "vedouci": "Děda Vomáčka",
+   "misto": "deda",
+   "popis": "Na zavolání: sekání trávy, stříhání keřů, rytí záhonů a výsadba na zahradě souseda. Nářadí půjčí zákazník, platí se za hotovou zakázku.",
+   "druh": "zakazka",
+   "pozadavky": {
+    "dovednosti": {
+     "zahradnictvi": 5
+    },
+    "ridicak": "",
+    "obleceni_tag": "",
+    "rejstrik_cisty": false,
+    "povest_min": -20
+   },
+   "smeny": [],
+   "mzda_hod": 0,
+   "vyplata": "zakazka",
+   "sance_pohovoru": 0.9,
+   "zakazka": {
+    "tvurce": "zahradnik",
+    "odmena": [
+     400,
+     900
+    ],
+    "lhuta_h": 8.0,
+    "pauza_h": 2.0,
+    "areal_r": 30.0,
+    "respekt": 1.5
+   },
+   "ukoly": [
+    "zahrada_sekani",
+    "zahrada_kere",
+    "zahrada_ryti",
+    "zahrada_vysadba"
+   ],
+   "ukolu_za_hodinu": 1.0,
+   "dovednosti_xp": {
+    "zahradnictvi": 1.0
+   },
+   "respekt": "sousede"
+  },
+  "palenice_pomocnik": {
+   "nazev": "Pomocník v pálenici",
+   "zamestnavatel": "Pálenice U Kotla",
+   "vedouci": "Palič Vojta",
+   "misto": "palenice",
+   "popis": "V sezóně (září–prosinec): nosit soudky s kvasem ke kotli, přikládat pod kotel a hlídat teplotu, plnit lahve. K výplatě lahev slivovice – ale v práci se nepije!",
+   "pozadavky": {
+    "dovednosti": {},
+    "ridicak": "",
+    "obleceni_tag": "",
+    "rejstrik_cisty": false,
+    "povest_min": -30,
+    "strizlivost": true
+   },
+   "mesice": [
+    9,
+    10,
+    11,
+    12
+   ],
+   "smeny": [
+    {
+     "dny": [
+      3,
+      4,
+      5,
+      6
+     ],
+     "od": 8.0,
+     "do": 16.0
+    }
+   ],
+   "mzda_hod": 150,
+   "vyplata": "tyden",
+   "naturalie": {
+    "slivovice": 1
+   },
+   "sance_pohovoru": 0.75,
+   "ukoly": [
+    "palenice_kvas",
+    "palenice_kotel",
+    "palenice_lahve"
+   ],
+   "ukolu_za_hodinu": 0.6,
+   "dovednosti_xp": {
+    "ohen": 0.6,
+    "kondice": 0.4
+   },
+   "respekt": "zemedelci"
+  }
+ },
+ "ukoly": {
+  "hospoda_stoly": {
+   "nazev": "Uklidit stoly",
+   "typ": "akce",
+   "akce": "uklidit_stul",
+   "cile": "hospoda_stoly",
+   "pocet": 3,
+   "popis": "Posbírej půllitry a otři stoly (zamiř na stůl a levé tlačítko myši). Uvnitř hospody, nebo na zahrádce."
+  },
+  "hospoda_odpadky": {
+   "nazev": "Vynést odpadky",
+   "typ": "dojdi",
+   "cile": "popelnice_u_mista",
+   "r": 3.0,
+   "popis": "Vynes pytel s odpadky k nejbližší popelnici u silnice (kompas ukáže směr)."
+  },
+  "statek_krmeni": {
+   "nazev": "Nakrmit zvířata",
+   "typ": "akce",
+   "akce": "nakrmit_koryto",
+   "cile": "statek_koryta",
+   "pocet": 3,
+   "r_cile": 1.4,
+   "popis": "Naber seno z hromady ve stodole (LMB na hromadu) a nasyp ho do tří koryt u přístřešků."
+  },
+  "statek_napajeni": {
+   "nazev": "Napojit zvířata",
+   "typ": "akce",
+   "akce": "napojit",
+   "cile": "statek_napajecky",
+   "pocet": 2,
+   "r_cile": 1.4,
+   "zapujcit": [
+    "kbelik"
+   ],
+   "popis": "Kbelíkem (Q do ruky) nalij vodu do napáječek."
+  },
+  "statek_dojeni": {
+   "nazev": "Podojit krávy",
+   "typ": "akce",
+   "akce": "podojit",
+   "cile": "statek_stani",
+   "pocet": 2,
+   "r_cile": 1.6,
+   "zapujcit": [
+    "kbelik"
+   ],
+   "popis": "Krávy přijdou na stání v přístřešku – podoj je (kbelík v ruce, LMB)."
+  },
+  "statek_vejce": {
+   "nazev": "Sebrat vejce",
+   "typ": "akce",
+   "akce": "sebrat_vejce",
+   "cile": "statek_hnizda",
+   "pocet": 2,
+   "r_cile": 1.1,
+   "popis": "Vyber vejce z hnízd v kurníku."
+  },
+  "statek_hnuj": {
+   "nazev": "Vykydat hnůj",
+   "typ": "akce",
+   "akce": "vykydat",
+   "cile": "statek_hnuj",
+   "pocet": 3,
+   "r_cile": 1.5,
+   "zapujcit": [
+    "vidle"
+   ],
+   "popis": "Vidlemi (Q do ruky) vykydej hnůj v chlívku a přístřešku."
+  },
+  "statek_pole": {
+   "nazev": "Okopat záhony",
+   "typ": "akce",
+   "akce": "okopat",
+   "cile": "statek_zahony",
+   "pocet": 4,
+   "r_cile": 2.2,
+   "zapujcit": [
+    "motyka"
+   ],
+   "mesice": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "dovednosti_xp": {
+    "zahradnictvi": 1.0,
+    "chovatelstvi": 0.2
+   },
+   "popis": "V sezóně okopej motykou záhony za výběhem."
+  },
+  "udrzba_sekani": {
+   "nazev": "Posekat trávu",
+   "typ": "akce",
+   "akce": "posekat",
+   "cile": "udrzba_trava",
+   "pocet": 6,
+   "r_cile": 1.8,
+   "zapujcit": [
+    "kosa"
+   ],
+   "mesice": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+   ],
+   "snih_max": 0.05,
+   "dovednosti_xp": {
+    "zahradnictvi": 0.6,
+    "kondice": 0.3
+   },
+   "popis": "Kosou (Q do ruky) posekej trávu u hřiště a na návsi – kompas ukáže neposekanou plochu."
+  },
+  "udrzba_odpadky": {
+   "nazev": "Vysbírat odpadky",
+   "typ": "akce",
+   "akce": "sebrat_odpadek",
+   "cile": "udrzba_odpadky",
+   "pocet": 99,
+   "r_cile": 0.9,
+   "snih_max": 0.3,
+   "popis": "Po obci se válí 8–15 odpadků u silnic – kompas ukazuje nejbližší."
+  },
+  "udrzba_lavicka": {
+   "nazev": "Opravit lavičku",
+   "typ": "akce",
+   "akce": "opravit_lavicku",
+   "cile": "udrzba_lavicka",
+   "pocet": 1,
+   "r_cile": 1.2,
+   "zapujcit": [
+    "kladivo"
+   ],
+   "mesice": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "dovednosti_xp": {
+    "kutilstvi": 1.5
+   },
+   "popis": "Na návsi někdo ulomil prkno z lavičky – přitluč ho (kladivo v ruce)."
+  },
+  "udrzba_listi": {
+   "nazev": "Shrabat listí",
+   "typ": "akce",
+   "akce": "shrabat_listi",
+   "cile": "udrzba_listi",
+   "pocet": 4,
+   "r_cile": 1.8,
+   "zapujcit": [
+    "hrabe"
+   ],
+   "mesice": [
+    9,
+    10,
+    11
+   ],
+   "snih_max": 0.05,
+   "popis": "Hráběmi shrab listí na návsi."
+  },
+  "udrzba_snih": {
+   "nazev": "Odklidit sníh",
+   "typ": "akce",
+   "akce": "odklidit_snih",
+   "cile": "udrzba_snih",
+   "pocet": 9,
+   "r_cile": 1.2,
+   "zapujcit": [
+    "lopata"
+   ],
+   "snih_min": 0.1,
+   "dovednosti_xp": {
+    "kondice": 1.0
+   },
+   "popis": "Lopatou odklid sníh z chodníku před úřadem, Potravinami a u zastávky."
+  },
+  "udrzba_posyp": {
+   "nazev": "Posypat chodník",
+   "typ": "akce",
+   "akce": "posypat",
+   "cile": "udrzba_posyp",
+   "pocet": 9,
+   "r_cile": 1.2,
+   "zapujcit": {
+    "pisek": 9
+   },
+   "snih_min": 0.1,
+   "popis": "Odklizené kusy chodníku posyp pískem (máš ho v kapse)."
+  },
+  "vycep_obsluha": {
+   "nazev": "Obsluha u výčepu",
+   "typ": "akce",
+   "akce": "donest_pivo",
+   "cile": "",
+   "pocet": 3,
+   "kompas": "vycep_kompas",
+   "dovednosti_xp": {
+    "vyrecnost": 1.0
+   },
+   "popis": "Host si objedná (bublina) – u pípy drž LMB a pusť v zelené, pak pivo odnes hostovi (LMB na hosta)."
+  },
+  "les_kaceni": {
+   "nazev": "Pokácet vyznačené stromy",
+   "typ": "modul",
+   "cile": "les_znacene",
+   "pocet": 3,
+   "zapujcit": [
+    "sekera"
+   ],
+   "dovednosti_xp": {
+    "drevorubectvi": 1.5
+   },
+   "popis": "Na pasece jsou stromy s oranžovým pruhem na kmeni – pokácej je (sekera, s ochranou i pila). Jiné stromy nekácej!"
+  },
+  "les_zpracovani": {
+   "nazev": "Odvětvit a rozřezat kmeny",
+   "typ": "modul",
+   "cile": "les_kmeny",
+   "pocet": 4,
+   "zapujcit": [
+    "sekera"
+   ],
+   "popis": "Padlé kmeny na pasece odvětvi a rozřežeš na špalky (každé odvětvení i rozřezání se počítá)."
+  },
+  "les_hromada": {
+   "nazev": "Složit dřevo na hromadu",
+   "typ": "akce",
+   "akce": "slozit_drevo",
+   "cile": "les_hromada",
+   "pocet": 4,
+   "r_cile": 1.8,
+   "dovednosti_xp": {
+    "kondice": 0.8,
+    "drevorubectvi": 0.4
+   },
+   "popis": "Špalky nos na rameni (G) k hromadě u kraje paseky, nebo přines polena (4 = jeden kus). LMB na hromadu."
+  },
+  "les_vysadba": {
+   "nazev": "Vysázet sazenice",
+   "typ": "modul",
+   "cile": "les_paseka",
+   "pocet": 3,
+   "zapujcit": {
+    "lopata": 1,
+    "sazenice_smrk": 3
+   },
+   "mesice": [
+    3,
+    4,
+    5,
+    10,
+    11
+   ],
+   "snih_max": 0.05,
+   "dovednosti_xp": {
+    "zahradnictvi": 1.0,
+    "drevorubectvi": 0.3
+   },
+   "popis": "Na pasece zasaď lopatou zapůjčené sazenice smrku (LMB na zem s lopatou v ruce)."
+  },
+  "obchod_pokladna": {
+   "nazev": "Pokladna",
+   "typ": "modul",
+   "cile": "obchod_pokladna",
+   "pocet": 3,
+   "dovednosti_xp": {
+    "vyrecnost": 1.0
+   },
+   "popis": "Zákazník čeká u pokladny – LMB na pokladnu, spočítej nákup a vrať správně drobné (mince v nabídce)."
+  },
+  "obchod_regaly": {
+   "nazev": "Doplnit regály",
+   "typ": "akce",
+   "akce": "doplnit_regal",
+   "cile": "obchod_regaly",
+   "pocet": 3,
+   "r_cile": 1.4,
+   "dovednosti_xp": {
+    "kondice": 0.6
+   },
+   "popis": "U skladu vedle obchodu vezmi bednu se zbožím (LMB, nese se na rameni) a vybal ji do regálu (uvnitř) nebo do stánku před obchodem."
+  },
+  "obchod_pecivo": {
+   "nazev": "Převzít pečivo",
+   "typ": "akce",
+   "akce": "prevzit_pecivo",
+   "cile": "obchod_pecivo",
+   "pocet": 1,
+   "r_cile": 1.5,
+   "hodiny": [
+    6.0,
+    8.0
+   ],
+   "popis": "Pekárna nechala přepravky u parkoviště obchodu – převezmi je (LMB) a bednu s pečivem vybal do regálu."
+  },
+  "zahrada_sekani": {
+   "nazev": "Posekat trávník",
+   "typ": "akce",
+   "akce": "posekat_zahradu",
+   "cile": "zahrada_trava",
+   "pocet": 4,
+   "r_cile": 1.8,
+   "zapujcit": [
+    "kosa"
+   ],
+   "mesice": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+   ],
+   "snih_max": 0.05,
+   "popis": "Kosou (Q do ruky) posekej přerostlou trávu na zahradě zákazníka."
+  },
+  "zahrada_kere": {
+   "nazev": "Zastřihnout keře",
+   "typ": "akce",
+   "akce": "strihat_ker",
+   "cile": "zahrada_ker",
+   "pocet": 2,
+   "r_cile": 1.4,
+   "zapujcit": [
+    "nuzky_zahradni"
+   ],
+   "mesice": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "snih_max": 0.05,
+   "popis": "Zahradními nůžkami zastřihni rozcuchané keře do tvaru."
+  },
+  "zahrada_ryti": {
+   "nazev": "Zrýt záhony",
+   "typ": "akce",
+   "akce": "ryt_cizi",
+   "cile": "zahrada_zahon",
+   "pocet": 2,
+   "r_cile": 1.6,
+   "zapujcit": [
+    "lopata"
+   ],
+   "mesice": [
+    3,
+    4,
+    5,
+    9,
+    10,
+    11
+   ],
+   "snih_max": 0.05,
+   "popis": "Lopatou zryj dva záhony (kolíky na zahradě)."
+  },
+  "zahrada_vysadba": {
+   "nazev": "Vysadit květiny",
+   "typ": "akce",
+   "akce": "vysadit_kvetiny",
+   "cile": "zahrada_kvetina",
+   "pocet": 3,
+   "r_cile": 1.2,
+   "zapujcit": {
+    "sazenice_kvetin": 3
+   },
+   "mesice": [
+    4,
+    5,
+    6,
+    9
+   ],
+   "snih_max": 0.05,
+   "popis": "Zasaď květiny ke kolíčkům před záhony (sazenice ti dal zákazník)."
+  },
+  "palenice_kvas": {
+   "nazev": "Donést kvas",
+   "typ": "akce",
+   "akce": "nalit_kvas",
+   "cile": "palenice_kotel",
+   "pocet": 2,
+   "r_cile": 1.6,
+   "dovednosti_xp": {
+    "kondice": 1.0
+   },
+   "popis": "U soudků vedle pálenice vezmi soudek s kvasem na rameno (LMB) a vylij ho do kotle. Dva soudky."
+  },
+  "palenice_kotel": {
+   "nazev": "Topit pod kotlem",
+   "typ": "modul",
+   "cile": "palenice_topeniste",
+   "pocet": 1,
+   "zapujcit": {
+    "polena": 16
+   },
+   "dovednosti_xp": {
+    "ohen": 1.5
+   },
+   "popis": "U topeniště přikládej polena (LMB = jedno poleno) a drž teplotu kotle v zeleném pásmu 88–96 °C celkem 40 s. Nepřetop to!"
+  },
+  "palenice_lahve": {
+   "nazev": "Plnit lahve",
+   "typ": "akce",
+   "akce": "plnit_lahve",
+   "cile": "palenice_lahve",
+   "pocet": 4,
+   "r_cile": 0.9,
+   "dovednosti_xp": {
+    "kondice": 0.2
+   },
+   "popis": "Na stole před pálenicí naplň čtyři lahve hotovou pálenkou (LMB na lahev)."
+  }
+ },
+ "pripravene": {
+  "plavcik": {
+   "nazev": "Plavčík na koupališti",
+   "zamestnavatel": "Obecní koupaliště",
+   "vedouci": "Správce koupaliště",
+   "misto": "koupaliste",
+   "popis": "Připraveno pro M5.2 (koupaliště) – přesune se do `prace`, až bude místo „koupaliste“ existovat.",
+   "pozadavky": {
+    "dovednosti": {
+     "kondice": 10
+    },
+    "ridicak": "",
+    "obleceni_tag": "plavky",
+    "rejstrik_cisty": true,
+    "povest_min": 0,
+    "strizlivost": true
+   },
+   "smeny": [
+    {
+     "dny": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "od": 10.0,
+     "do": 18.0
+    }
+   ],
+   "mzda_hod": 160,
+   "vyplata": "tyden",
+   "sance_pohovoru": 0.7,
+   "ukoly": [],
+   "ukolu_za_hodinu": 0.5,
+   "dovednosti_xp": {
+    "kondice": 1.0
+   },
+   "respekt": "sousede",
+   "mesice": [
+    6,
+    7,
+    8
+   ]
+  }
+ }
+}

@@ -1,0 +1,27 @@
+=== 2026-09-30 03:36:14 START noční běh M1+M2 (orchestrátor Claude Code, subagenti Sonnet), výchozí HEAD 6424cfb. Pozn.: M0 neotestováno, hra se nespouští (CLAUDE.md).
+2026-09-30 03:44:24 | M1.1 Terén bez satelitu | HOTOVO (Minimum splněno, shader nezkompilován; čeká surface.py + 6 textur od uživatele; API ověřena grepem v HEAD) | 169b6aa
+2026-09-30 03:53:41 | M1.2 Okna, dveře, komíny | HOTOVO (Minimum splněno; bez data/buildings.json se nic nezobrazí – uživatel spustí tools/buildings.py; zdroj data/buildings_3d*.json v kořeni ověřen) | 632fd00
+2026-09-30 03:57:04 | M1.3 Kouř z komínů | HOTOVO (Minimum splněno; bez buildings.json nic nevidět; LOD 350–900 m nedělán) | cda04b7
+2026-09-30 04:08:15 | M1.4 Systém interiérů + domov | HOTOVO po opravě (Minimum splněno; orchestrátor našel duplicitní World.player_pos → world.gd nepřeložitelný v d02a95f, opraveno v 606e075 přejmenováním na player_world_pos; ověřeno grepem) | d02a95f + 606e075
+2026-09-30 04:18:36 | M1.5 Interiéry veřejných budov | HOTOVO (Minimum splněno; zvuk hostů a vazba myslivce otevřené; API ověřena grepem, bez duplicit) | 78afef5
+2026-09-30 04:30:29 | M1.6 Nová vozidla a bazar | HOTOVO (Minimum splněno; bez .glb, poloha cedule bazaru odhad; API pro M2.10 ověřena grepem) | 82394e4
+--- 2026-09-30 04:30:29 M1 kompletní (6/6), pokračuji M2
+2026-09-30 04:41:44 | M2.1 Kácení a dřevo | HOTOVO (Minimum splněno; pád stromu kinematický, ne RigidBody; zahrada = kruh 35 m odhad; zakon.json validní; bez duplicit) | 4147d0b
+2026-09-30 04:55:19 | M2.2 Oheň a topení | HOTOVO (Minimum splněno + požár trávy a kamna; doba požáru herní vs. reálná DOPLNIT; bez duplicit, JSON ok) | fd1fa63
+2026-09-30 05:07:36 | M2.3 Oblečení | HOTOVO (Minimum splněno; klávesa I přesunuta z inventáře na šatník – ověřeno v project.godot a hud.gd; has_gear napojeno; bez duplicit) | 72a682c
+2026-09-30 05:18:44 | M2.4 Zahrada a pole | HOTOVO (Minimum splněno + pronájem pole; umístění zahrady algoritmem – zkontrolovat okem; bez duplicit) | 366dcc3
+2026-09-30 07:12:18 | M2.5 Sázení stromů | PŘERUŠENO rate limitem (session limit, reset 7:10 Praha) uprostřed práce – nezacommitováno, subagent obnoven se stejným kontextem a pokračuje
+2026-09-30 07:25:20 | M2.5 Sázení stromů | HOTOVO (Minimum splněno; sazenice celoročně u všech místo sezónně/myslivce – DOPLNIT M3.3; bez duplicit) | 7b6afcd
+2026-09-30 08:00:07 | M2.6 Hospodářská zvířata | HOTOVO (Minimum splněno + 4 druhy navíc; nákup u cedule výběhu místo inzerátu; farm druhy nejsou v ENCOUNTER_SPECIES – ověřeno; bez duplicit, JSON ok) | f649c0f
+2026-09-30 08:13:57 | M2.7 Rybaření | HOTOVO (Minimum splněno; povolenka stub → vždy pytláctví před svědkem; pruh napětí bez zelené zóny kvůli cizí práci v hud.gd; bez duplicit, JSON ok) | d4ead09
+2026-09-30 08:34:20 | M2.8 Zbraně a střelba | HOTOVO (Minimum splněno; zbraně v Potravinách místo stavebnin; zbrojní oprávnění = cheat do M4.6; hud.gd hunky ověřeny, aim_k existuje; bez duplicit, JSON ok) | 0184e12
+2026-09-30 08:48:37 | M2.9 Lov zvěře | HOTOVO (Minimum splněno; G sdílené s hvízdnutím – nejdřív zvednutí úlovku; vábnička/myslivec po výstřelu/otisky/trofej nedodány; bez duplicit, JSON ok) | 288d509
+2026-09-30 09:05:13 | M2.10 Náklad a ruční vozík | HOTOVO (Minimum splněno; G sdílené náklad/hvízdnutí, registr upraven; pomocník ve dvou a IK paží nehotové; bez duplicit) | 84029da
+2026-09-30 09:05:13 | OPRAVA M2.9 | hunk v World.cheat vložen v 288d509 mimo funkci → world.gd v HEAD nepřeložitelný (hlásil subagent M2.10, mylně jako cizí chybu; ověřeno grepem). Opraveno subagentem M2.9 přesunem v indexu, sken osiřelých bloků ve všech .gd v HEAD čistý | 141ca5b
+--- 2026-09-30 09:05:13 M2 kompletní (10/10), pokračuji doplňujícími body od uživatele
+2026-09-30 09:14:07 | DOPLNĚK 3D oprava | HOTOVO (příčina: lathe profily končetin shora dolů → obrácený winding; oprava v MeshKit.lathe + víčka _cap otočena pro všechny modely – riziko u aut/zvěře, ověřit ručně; úchopy GRIPS spočítané, ne doladěné; bez duplicit, sken čistý) | 66213e0
+2026-09-30 12:23:02 | DOPLNĚK Rozhovor T | HOTOVO (data od přerušeného subagenta napojena do Dialog: témata, rady, drby, paměť, navazující otázky, otázky zpět; oprava female v look; neověřeno spuštěním) | 45b6901
+2026-09-30 12:27:45 | DOPLŇKY roadmapa | HOTOVO (M1.7, M1.8, M4.7, M7.1–M7.4 zapsány do VIZE a README roadmapy) | bc6fb18
+2026-09-30 12:34:12 | OPRAVA parse error | public_interiors.gd:97, cargo.gd:1112 (inference z Variant) – hra neběžela vůbec; heuristický sken přidaných řádků od 6424cfb nic dalšího nenašel | 9719d56
+2026-09-30 12:39:06 | KONTROLA skriptů | godot --check-only všech 104 .gd (s povolením uživatele) – 0 chyb; detekce ověřena testovacím rozbitým souborem
+2026-09-30 13:35:26 | M1.7 + M1.8 | HOTOVO (9dc9125, a059181; prompty M3 navázány a9f5a2c; godot --check-only všech .gd = 0 chyb; neotestováno hrou, chybí data/buildings.json)

@@ -1,0 +1,14 @@
+# Godot cache
+.godot/
+# Generovaná herní data (tools/export_map.py) – velká binární data, reprodukovatelná
+data/*.bin
+textures/*.jpg
+textures/*.hdr
+tools/out/
+blend/*.blend
+blend/*.blend1
+# Lokální nástroje a cache
+.claude/
+__pycache__/
+*.pyc
+data/orig/

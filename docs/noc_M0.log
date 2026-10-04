@@ -1,0 +1,8 @@
+=== 2026-09-30 02:15:12 START noční běh M0 (varianta A, orchestrátor Claude Code), výchozí HEAD a69da20
+2026-09-30 02:17:31 | M0.1 Assety a licence | HOTOVO (Minimum splněno; test assetu ve hře čeká na uživatele) | 124941c
+2026-09-30 02:20:06 | M0.2 Katalog předmětů a inventář | HOTOVO (Minimum splněno) | 4c8c98e
+2026-09-30 02:23:31 | M0.3 Dovednosti a XP | HOTOVO (Minimum splněno; GAME_DESIGN.md neaktualizován – agent ho nenašel) | ffc21f8
+2026-09-30 02:31:40 | M0.4 Kontextové akce a nástroje | HOTOVO (Minimum splněno; náklad 2.4 přesunut do M2.10; klávesa G koliduje s hvízdnutím na koně; commit opravuje nepřeložitelné hunky z M0.2/M0.3 v HEAD – souběžná cizí session v hud/player/world/local_client) | 571e763
+2026-09-30 02:35:02 | M0.5 Katalog přestupků | HOTOVO (Minimum splněno; zákazy v hodinách, přezkoušení a placení pokut až M4) | 6b6101d
+2026-09-30 02:39:08 | M0.6 Respekt a karma | HOTOVO (Minimum splněno; pozn.: agent tvrdí, že fotbalový trenér neexistuje – v characters.gd je Evžen Trnka, komunitu Fotbalisté ověřit) | 6424cfb
+=== 2026-09-30 02:39:08 KONEC: 6/6 kroků M0 hotovo (124941c, 4c8c98e, ffc21f8, 571e763, 6b6101d, 6424cfb). Nic nespuštěno – vše čeká na ruční testy v docs/testy_M0.md. Rizika: souběžná session s necommitnutými změnami (pauza/nastavení/rádio) ve sdílených souborech; commity M0.2–M0.3 samostatně nepřeložitelné, opraveno v M0.4; klávesa G koliduje s hvízdnutím na koně (řešit v M2.10).

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "ph-asphalt_02",
+    "soubory": ["textures/asphalt_02_diff_2k.jpg", "textures/asphalt_02_nor_gl_2k.jpg", "textures/asphalt_02_rough_2k.jpg"],
+    "nazev": "asphalt_02 (PBR textura, 2k)",
+    "autor": "Poly Haven (autor konkrétní textury ověřit)",
+    "zdroj": "https://polyhaven.com/a/asphalt_02",
+    "licence": "CC0",
+    "stazeno": "před 2026-09 (přesné datum neznámé)",
+    "upravy": "žádné",
+    "pouziti": "povrch silnic (map_loader.gd, tinted_triplanar.gdshader)",
+    "v_titulcich": false
+  },
+  {
+    "id": "ph-bark_brown_02",
+    "soubory": ["textures/bark_brown_02_diff_2k.jpg", "textures/bark_brown_02_nor_gl_2k.jpg", "textures/bark_brown_02_rough_2k.jpg"],
+    "nazev": "bark_brown_02 (PBR textura, 2k)",
+    "autor": "Poly Haven (autor konkrétní textury ověřit)",
+    "zdroj": "https://polyhaven.com/a/bark_brown_02",
+    "licence": "CC0",
+    "stazeno": "před 2026-09 (přesné datum neznámé)",
+    "upravy": "žádné",
+    "pouziti": "kůra stromů (map_loader.gd)",
+    "v_titulcich": false
+  },
+  {
+    "id": "ph-beige_wall_001",
+    "soubory": ["textures/beige_wall_001_diff_2k.jpg", "textures/beige_wall_001_nor_gl_2k.jpg", "textures/beige_wall_001_rough_2k.jpg"],
+    "nazev": "beige_wall_001 (PBR textura, 2k)",
+    "autor": "Poly Haven (autor konkrétní textury ověřit)",
+    "zdroj": "https://polyhaven.com/a/beige_wall_001",
+    "licence": "CC0",
+    "stazeno": "před 2026-09 (přesné datum neznámé)",
+    "upravy": "žádné",
+    "pouziti": "fasády budov (map_loader.gd)",
+    "v_titulcich": false
+  },
+  {
+    "id": "ph-clay_roof_tiles_02",
+    "soubory": ["textures/clay_roof_tiles_02_diff_2k.jpg", "textures/clay_roof_tiles_02_nor_gl_2k.jpg", "textures/clay_roof_tiles_02_rough_2k.jpg"],
+    "nazev": "clay_roof_tiles_02 (PBR textura, 2k)",
+    "autor": "Poly Haven (autor konkrétní textury ověřit)",
+    "zdroj": "https://polyhaven.com/a/clay_roof_tiles_02",
+    "licence": "CC0",
+    "stazeno": "před 2026-09 (přesné datum neznámé)",
+    "upravy": "žádné",
+    "pouziti": "střechy (map_loader.gd)",
+    "v_titulcich": false
+  },
+  {
+    "id": "ph-gravel_road",
+    "soubory": ["textures/gravel_road_diff_2k.jpg", "textures/gravel_road_nor_gl_2k.jpg", "textures/gravel_road_rough_2k.jpg"],
+    "nazev": "gravel_road (PBR textura, 2k)",
+    "autor": "Poly Haven (autor konkrétní textury ověřit)",
+    "zdroj": "https://polyhaven.com/a/gravel_road",
+    "licence": "CC0",
+    "stazeno": "před 2026-09 (přesné datum neznámé)",
+    "upravy": "žádné",
+    "pouziti": "polní a lesní cesty (map_loader.gd)",
+    "v_titulcich": false
+  },
+  {
+    "id": "ph-sky-hdr",
+    "soubory": ["textures/sky.hdr"],
+    "nazev": "HDRI obloha (sky.hdr)",
+    "autor": "Poly Haven (název a autor konkrétního HDRI ověřit)",
+    "zdroj": "https://polyhaven.com/hdris",
+    "licence": "CC0",
+    "stazeno": "před 2026-09 (přesné datum neznámé)",
+    "upravy": "možná zmenšeno / přejmenováno",
+    "pouziti": "obloha a osvětlení prostředí",
+    "v_titulcich": false
+  },
+  {
+    "id": "cuzk-ortofoto",
+    "soubory": ["textures/ortho_full.jpg", "textures/ortho_core.jpg"],
+    "nazev": "Ortofoto ČR (podklad terénu a mapy)",
+    "autor": "Český úřad zeměměřický a katastrální (ČÚZK)",
+    "zdroj": "https://geoportal.cuzk.cz/",
+    "licence": "CC-BY-4.0",
+    "stazeno": "před 2026-09 (přesné datum neznámé)",
+    "upravy": "oříznuto, sesazeno, přepočteno (tools/export_map.py)",
+    "pouziti": "textura terénu a minimapa",
+    "v_titulcich": false
+  }
+]

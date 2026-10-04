@@ -1,0 +1,24 @@
+{
+  "poznamka": "Orientační herní hodnoty (míry, doba hájení, velikosti) – ověřit v rybářském řádu (vyhl. 197/2004 Sb.) a v zákoně 99/2004 Sb. Herní zjednodušení, ne právní rada.",
+  "voda_nadrz_min_m2": 20000,
+  "druhy": {
+    "kapr":    {"nazev": "Kapr obecný", "item": "ryba_kapr", "voda": ["rybnik", "nadrz"], "min_cm": 25, "max_cm": 80, "koef": 1.9e-5, "lovna_miera": 40, "hajeni": null, "noc_only": false, "vaha": 3.0, "cena": 120},
+    "lin":     {"nazev": "Lín obecný", "item": "ryba_lin", "voda": ["rybnik"], "min_cm": 15, "max_cm": 50, "koef": 1.6e-5, "lovna_miera": 25, "hajeni": null, "noc_only": false, "vaha": 2.0, "cena": 110},
+    "plotice": {"nazev": "Plotice obecná", "item": "ryba_plotice", "voda": ["rybnik", "nadrz", "reka", "potok"], "min_cm": 8, "max_cm": 30, "koef": 1.2e-5, "lovna_miera": 0, "hajeni": null, "noc_only": false, "vaha": 4.0, "cena": 25},
+    "perlin":  {"nazev": "Perlín ostrobřichý", "item": "ryba_perlin", "voda": ["rybnik", "nadrz", "reka"], "min_cm": 15, "max_cm": 45, "koef": 1.4e-5, "lovna_miera": 0, "hajeni": null, "noc_only": false, "vaha": 1.5, "cena": 60},
+    "cejn":    {"nazev": "Cejn velký", "item": "ryba_cejn", "voda": ["rybnik", "nadrz", "reka"], "min_cm": 15, "max_cm": 60, "koef": 1.3e-5, "lovna_miera": 0, "hajeni": null, "noc_only": false, "vaha": 2.5, "cena": 45},
+    "okoun":   {"nazev": "Okoun říční", "item": "ryba_okoun", "voda": ["rybnik", "nadrz", "reka"], "min_cm": 10, "max_cm": 45, "koef": 1.5e-5, "lovna_miera": 0, "hajeni": null, "noc_only": false, "vaha": 3.0, "cena": 55},
+    "stika":   {"nazev": "Štika obecná", "item": "ryba_stika", "voda": ["rybnik", "nadrz", "reka"], "min_cm": 30, "max_cm": 100, "koef": 0.6e-5, "lovna_miera": 50, "hajeni": [1, 1, 6, 15], "noc_only": false, "vaha": 1.0, "cena": 200},
+    "candat":  {"nazev": "Candát obecný", "item": "ryba_candat", "voda": ["nadrz", "reka"], "min_cm": 30, "max_cm": 90, "koef": 0.65e-5, "lovna_miera": 45, "hajeni": [1, 1, 6, 15], "noc_only": false, "vaha": 1.0, "cena": 220},
+    "pstruh":  {"nazev": "Pstruh obecný", "item": "ryba_pstruh", "voda": ["potok"], "min_cm": 12, "max_cm": 50, "koef": 1.0e-5, "lovna_miera": 25, "hajeni": [9, 1, 4, 15], "noc_only": false, "vaha": 5.0, "cena": 90},
+    "jelec":   {"nazev": "Jelec tloušť", "item": "ryba_jelec", "voda": ["potok", "reka"], "min_cm": 10, "max_cm": 40, "koef": 1.0e-5, "lovna_miera": 0, "hajeni": null, "noc_only": false, "vaha": 4.0, "cena": 25},
+    "klen":    {"nazev": "Klen obecný", "item": "ryba_klen", "voda": ["potok", "reka"], "min_cm": 15, "max_cm": 60, "koef": 1.3e-5, "lovna_miera": 0, "hajeni": null, "noc_only": false, "vaha": 2.0, "cena": 40},
+    "uhor":    {"nazev": "Úhoř říční", "item": "ryba_uhor", "voda": ["reka", "rybnik"], "min_cm": 40, "max_cm": 100, "koef": 0.25e-5, "lovna_miera": 50, "hajeni": null, "noc_only": true, "vaha": 1.0, "cena": 250},
+    "sumec":   {"nazev": "Sumec velký", "item": "ryba_sumec", "voda": ["nadrz"], "min_cm": 60, "max_cm": 180, "koef": 0.4e-5, "lovna_miera": 70, "hajeni": [1, 1, 6, 15], "noc_only": true, "vaha": 1.0, "cena": 400}
+  },
+  "navnady": {
+    "navnada_zizaly": {"faktor": 1.0, "druhy": {"pstruh": 1.5, "okoun": 1.5, "uhor": 2.0, "jelec": 1.3, "kapr": 0.7, "stika": 0.6, "candat": 0.6, "sumec": 0.6}},
+    "navnada_testo": {"faktor": 0.9, "druhy": {"kapr": 1.4, "lin": 1.5, "plotice": 1.4, "cejn": 1.5, "perlin": 1.2, "pstruh": 0.5, "okoun": 0.5, "stika": 0.3, "candat": 0.3, "sumec": 0.3, "uhor": 0.4}},
+    "navnada_kukurice": {"faktor": 1.1, "druhy": {"kapr": 2.0, "lin": 1.5, "cejn": 1.3, "plotice": 1.0, "pstruh": 0.3, "okoun": 0.3, "stika": 0.2, "candat": 0.2, "sumec": 0.3, "uhor": 0.3}}
+  }
+}

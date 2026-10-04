@@ -1,0 +1,30 @@
+{
+	"nazev": "Pravidla silničního provozu – cvičný",
+	"druh": "autoskola",
+	"popis": "10 obecných otázek k procvičení. Vlastní formulace – nejde o oficiální testové otázky.",
+	"prah": 8,
+	"zdroj": "zákon č. 361/2000 Sb. o provozu na pozemních komunikacích – zjednodušeno, ověřit aktuální znění",
+	"poznamka": "Cvičný test je zjednodušená herní simulace. Otázky jsou vlastní formulace, ne oficiální testy autoškoly (ostrý test přinese M4.1).",
+	"otazky": [
+		{"otazka": "Jakou nejvyšší rychlostí smíš jet autem v obci, když značka neurčuje jinak?",
+			"odpovedi": ["40 km/h", "50 km/h", "60 km/h"], "spravna": 1, "vysvetleni": "V obci platí obecně 50 km/h (§ 18)."},
+		{"otazka": "Kolik smí mít řidič v krvi alkoholu, když řídí?",
+			"odpovedi": ["0,5 promile", "0,2 promile", "Žádný – řídí se jen úplně střízlivý"], "spravna": 2, "vysvetleni": "V ČR platí nulová tolerance (§ 5)."},
+		{"otazka": "Jak rychle smí osobní auto jet mimo obec po běžné silnici (ne dálnici), když značka neurčuje jinak?",
+			"odpovedi": ["90 km/h", "110 km/h", "70 km/h"], "spravna": 0, "vysvetleni": "Mimo obec obecně 90 km/h (§ 18)."},
+		{"otazka": "Na neřízené křižovatce bez dopravních značek dáš přednost vozidlu, které přijíždí…",
+			"odpovedi": ["zleva", "zprava", "tomu, kdo jede rychleji"], "spravna": 1, "vysvetleni": "Platí pravidlo pravé ruky (§ 22)."},
+		{"otazka": "Kdy musí auto svítit za jízdy?",
+			"odpovedi": ["Jen v noci a za špatné viditelnosti", "Jen v zimě", "Vždy, i ve dne (potkávací nebo denní svícení)"], "spravna": 2, "vysvetleni": "V ČR se svítí celoročně (§ 32)."},
+		{"otazka": "Chodec stojí u přechodu a zjevně chce přejít. Co uděláš?",
+			"odpovedi": ["Zastavím a nechám ho bezpečně přejít", "Zatroubím, ať počká", "Projedu, dokud ještě nestojí na vozovce"], "spravna": 0, "vysvetleni": "Řidič musí chodci umožnit nerušené přejití (§ 5)."},
+		{"otazka": "Smíš za jízdy držet v ruce mobilní telefon?",
+			"odpovedi": ["Ano, když jedu pomalu", "Ne", "Ano, jen na krátký hovor"], "spravna": 1, "vysvetleni": "Držet telefon v ruce za jízdy je zakázáno (§ 7)."},
+		{"otazka": "Kdo v autě musí být připoutaný bezpečnostním pásem (pokud sedadlo pás má)?",
+			"odpovedi": ["Jen řidič", "Jen lidé vpředu", "Všichni ve voze"], "spravna": 2, "vysvetleni": "Povinnost platí pro řidiče i všechny spolujezdce (§ 6, § 9)."},
+		{"otazka": "Porouchal ses mimo obec na silnici (ne na dálnici). Kam dáš výstražný trojúhelník?",
+			"odpovedi": ["Hned za auto", "Aspoň 50 m za auto", "Před auto"], "spravna": 1, "vysvetleni": "Mimo obec nejméně 50 m za vozidlem, na dálnici 100 m (§ 25)."},
+		{"otazka": "Jaká je nejvyšší dovolená rychlost osobního auta na dálnici?",
+			"odpovedi": ["130 km/h", "150 km/h", "110 km/h"], "spravna": 0, "vysvetleni": "Na dálnici obecně 130 km/h (§ 18)."}
+	]
+}
