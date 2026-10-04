@@ -333,16 +333,16 @@ func _on_stall_detected():
 
 ### Fáze 3 (AI)
 
-- [ ] Instalace LimboAI
-- [ ] Vytvoření `villager_routine.tres`
-- [ ] Implementace 3 základních action nodů (GoTo, Wait, Animate)
-- [ ] Přiřazení stromu k 5 testovacím vesničanům
+- [x] Instalace LimboAI (v1.3.1 GDExtension, `addons/limboai`)
+- [x] Vytvoření `villager_routine.tres` (`ai/villager_routine.tres`, generátor `tools/gen_villager_bt.gd`)
+- [x] Implementace 3 základních action nodů (`scripts/ai/actions/` – go_to, wait, animate + `scripts/ai/conditions/`)
+- [x] Přiřazení stromu k 5 testovacím vesničanům (`Villager.BT_VILLAGERS`, `--villagertest` OK)
 
 ### Fáze 4 (Letadla)
 
-- [ ] Instalace State Charts
-- [ ] Refaktor `aircraft.gd` na stavový automat
-- [ ] Test vzletu/přistání s paramotorem
+- [x] Instalace State Charts (v0.22.5, `addons/godot_state_charts`)
+- [x] Refaktor `aircraft.gd` na stavový automat (Zeme/Vzduch/Let/Pretazeni, fallback bez addonu)
+- [x] Test vzletu/přistání s paramotorem (`--flighttest` OK)
 
 ### Fáze 5 (Dokumentace)
 
@@ -629,11 +629,11 @@ V `weather.gd` přidej `wetness_ground` (0-1):
 
 ### Fáze 6 (Vegetace)
 
-- [ ] Vytvořit `vegetation.py` exportér (čte `surface.bin` + `landuse.bin`)
-- [ ] Vytvořit 5 základních modelů vegetace (`grass_tall`, `nettle`, `bush_hazel`, `wheat`, `weed`)
-- [ ] Implementovat `VegetationManager` s MultiMesh
-- [ ] Propojit vítr s `Weather.wind_vector()`
-- [ ] Optimalizace: LOD pro vegetaci (zmizet nad 100m)
+- [x] Vytvořit `vegetation.py` exportér (čte `surface.bin` + `landuse.bin` + `trees.bin` + vozovky → `data/vegetation.bin`, ~73k instancí)
+- [x] Vytvořit 5 základních modelů vegetace (7 low-poly `.res` v `assets/models/vegetation/` – vč. `bush_blackthorn`, `garden_veg`; generátor `tools/gen_vegetation_meshes.gd`)
+- [x] Implementovat `VegetationManager` s MultiMesh (`scripts/vegetation/vegetation_manager.gd`, chunky 64×64 m)
+- [x] Propojit vítr s `Weather.wind_vector()` (`wind_strength`/`wind_dir` do `shaders/vegetation.gdshader`)
+- [x] Optimalizace: LOD pro vegetaci (per-chunk `view_range` 75–220 m × nastavení Detail; `--vegetationtest` 16/16)
 
 ### Fáze 7 (Ploty)
 
@@ -652,9 +652,9 @@ V `weather.gd` přidej `wetness_ground` (0-1):
 
 ### Fáze 9 (Terén)
 
-- [ ] Upravit exportér pro mikroreliéf (opatrně, neměnit kolize)
-- [ ] Shader terénu: mokré cesty, sněhové jazyky
-- [ ] Louže jako dekorace (`Decal` nebo shader)
+- [x] Upravit exportér pro mikroreliéf (`tools/export_map.py` `microrelief()` ±0,17 m jen do vizuální heightmapy; `terrain_collision.bin` z čistých dat – efekt po příštím exportu)
+- [x] Shader terénu: mokré cesty, sněhové jazyky (`terrain.gdshader` – koleje třídy 7, `wetness`, sníh v prohlubních/na severních svazích)
+- [x] Louže jako dekorace (`scripts/priroda/puddles.gd` – Decal pool na vozovce při `wetness>0,7`; `--terraintest` 13/13)
 
 ## 14. TECHNICKÉ POZNÁMKY PRO IMPLEMENTAČNÍHO AGENTA
 
