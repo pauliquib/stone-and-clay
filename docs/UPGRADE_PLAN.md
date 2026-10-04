@@ -637,11 +637,11 @@ V `weather.gd` přidej `wetness_ground` (0-1):
 
 ### Fáze 7 (Ploty)
 
-- [ ] Rozhodnout: OSM data vs procedurální (doporučuji procedurální pro zahrady)
-- [ ] Vytvořit 3 modely plotů (`wooden_slat`, `wire`, `hedge`)
-- [ ] Implementovat `FenceManager` s generováním kolem `Garden` a `Paddock`
-- [ ] Přidat kolize (`StaticBody3D`)
-- [ ] Test: Kůň nesmí projít plotem, ale skrz branku ano
+- [x] Rozhodnout: OSM data vs procedurální → procedurální (varianta B)
+- [x] Vytvořit modely plotů → místo `.tscn` scén procedurální geometrie přes `MeshKit` (5 typů vč. `stone_wall`)
+- [x] Implementovat `FenceManager` s generováním kolem `Garden` a `Paddock` (`scripts/structures/fence_manager.gd`)
+- [x] Přidat kolize → jedno `StaticBody3D` s `BoxShape3D` na úsek (ne `ConcavePolygonShape3D`)
+- [x] Test: Kůň nesmí projít plotem, ale skrz branku ano (`--fencetest`, 22/22 OK)
 
 ### Fáze 8 (Zahrady)
 

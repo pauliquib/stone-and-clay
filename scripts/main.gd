@@ -19,6 +19,7 @@
 ##                   rutiny (zahrada, hospoda), chůze za cílem; bez addonu jen fallback
 ##   --flighttest    stavový automat letouna přes godot-state-charts (Fáze 4): vzlet z dráhy,
 ##                   přetažení/zotavení, dosazení + přímé události; bez addonu fallback flagy
+##   --fencetest     ploty a ohrady (Fáze 7): kolize drží, branky průchodné, kůň projde brankou
 class_name Main
 extends Node3D
 
@@ -130,6 +131,8 @@ func _ready() -> void:
 		Tests.villager_test(self)
 	if _args.has("flighttest"):
 		Tests.flight_test(self)
+	if _args.has("fencetest"):
+		Tests.fence_test(self)
 
 
 func _frames(n: int) -> void:

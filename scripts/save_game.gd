@@ -104,6 +104,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["fire"] = world.fire_mgr.to_dict()           # ohniště (i vyhaslá), stav kamen doma (M2.2)
 	if world.garden:
 		d["garden"] = world.garden.to_dict()           # záhony, pronájem pole, zvolená semena, náplň konve (M2.4)
+	if world.fences:
+		d["fences"] = world.fences.to_dict()           # hráčem postavené úseky plotů (Fáze 7; procedurální se přegenerují)
 	if world.farm:
 		d["farm"] = world.farm.to_dict()               # hospodářská zvířata, branka, čekající vejce (M2.6)
 	if world.udrzba:
@@ -310,6 +312,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		world.fire_mgr.restore(d.get("fire", {}))            # starý save bez klíče = žádná ohniště, studená kamna
 	if world.garden:
 		world.garden.restore(d.get("garden", {}))            # starý save bez klíče = prázdná zahrada, žádné pole
+	if world.fences:
+		world.fences.restore(d.get("fences", {}))            # starý save bez klíče = žádné hráčské ploty (Fáze 7)
 	if world.farm:
 		world.farm.restore(d.get("farm", {}))                # starý save bez klíče = prázdné hospodářství
 	if world.udrzba:

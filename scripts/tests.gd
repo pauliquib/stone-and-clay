@@ -17,6 +17,9 @@
 ##                  ráno zahrada + kopání, pátek večer stůl v hospodě + pivo; bez addonu fallback
 ##   --flighttest  letoun test_letoun na dráze letiště: vzlet, přetažení/zotavení, dosazení;
 ##                 stavy přes godot-state-charts (Fáze 4), bez addonu fallback na flagy
+##   --fencetest   ploty a ohrady (Fáze 7, FenceManager): procedurální ploty kolem výběhu,
+##                 zahrady a pole, kolize, průchodnost branek, rebuild při stěhování, save
+##                 round-trip, kůň projde brankou; volitelně --fencedbg pro diagnostiku sond
 class_name Tests
 extends RefCounted
 
@@ -1304,4 +1307,164 @@ static func flight_test(g: Node) -> void:
 	await _frames(g, 1)
 	check.call("událost dosednuti → Zeme i z Pretazeni (+stall reset)", a.stav_letu() == "Zeme" and a.on_ground and not a._stalled)
 	print("VÝSLEDEK letu: %s" % ("OK" if bad.is_empty() else "%d chyb" % bad.size()))
+	g.get_tree().quit()
+
+
+## Ploty a ohrady (Fáze 7, FenceManager): po startu stojí procedurální ploty kolem výběhu a zahrady
+## (mesh + jedno kolizní těleso s boxy na úsek), bokem plotu kapsle narazí, branka je průchodná;
+## kůň reálně projde brankou výběhu při `Horse.call_to`; `rebuild()` sleduje přesunutí plochy,
+## `apply_home` ploty přestaví a `to_dict`/`restore` projde round-trip. Volitelně WIRE plot pole,
+## když se pronájem povede (potřebuje `data/landuse.bin`).
+static func fence_test(g: Node) -> void:
+	var w: World = g.world
+	var p: Player = _pl(g)
+	var res := []
+	var check := func(name: String, cond: bool, extra := "") -> void:
+		res.append(cond)
+		print("%s %-52s %s" % ["OK  " if cond else "CHYBA", name, extra])
+	await g.get_tree().create_timer(1.0).timeout
+	var space := w.get_world_3d().direct_space_state
+	var fm: FenceManager = w.fences
+	check.call("FenceManager existuje ve světě", fm != null)
+	if fm == null:
+		print("VÝSLEDEK plotů: FenceManager chybí – konec")
+		g.get_tree().quit()
+		return
+	var body: StaticBody3D = fm.fence_body()
+	var n_shapes: int = body.get_child_count() if body != null else 0
+	check.call("kolizní těleso s tvary (%d)" % n_shapes, body != null and n_shapes > 0)
+	var mi: MeshInstance3D = fm.fence_mesh()
+	check.call("mesh plotů (jeden ArrayMesh)", mi != null and mi.mesh != null and mi.mesh.get_surface_count() > 0)
+	var n_runs := fm.runs().size()
+	check.call("procedurální úseky (%d)" % n_runs, n_runs >= 2)   # výběh + zahrada (pole až po pronájmu)
+
+	# Kapsle ~jako postava: překryje-li na místě těleso plotů? (Terén se nehodnotí.)
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.3
+	cap.height = 1.4
+	var hit_fence := func(pos: Vector3) -> bool:
+		var q := PhysicsShapeQueryParameters3D.new()
+		q.shape = cap
+		q.transform = Transform3D(Basis(), pos)
+		q.collision_mask = 1
+		var hs := space.intersect_shape(q, 8)
+		for h in hs:
+			if h["collider"] == fm.fence_body():     # POZOR: rebuild() těleso přetváří – nesmíme držet starou referenci
+				return true
+		if OS.get_cmdline_user_args().has("--fencedbg"):
+			var cols := []
+			for h in hs:
+				cols.append("%s(%s)" % [(h["collider"] as Node).name, (h["collider"] as Node).get_class()])
+			print("     DBG %.1f,%.1f,%.1f → %s" % [pos.x, pos.y, pos.z, ", ".join(cols)])
+		return false
+	var grounded := func(pos: Vector3) -> Vector3:
+		pos.y = w.terrain.height_at(pos.x, pos.z)
+		return pos
+
+	# --- výběh: plot kolem dokola s brankou na straně k domu
+	var pd: Paddock = w.paddock
+	var paddock_ok := pd != null and pd.ok
+	check.call("výběh koně stojí", paddock_ok)
+	if paddock_ok:
+		var side: Vector3 = grounded.call(pd.to_world(pd.half.x + 0.15, 0.0))
+		check.call("kolize na boku výběhu (kůň/zvěř neprojde)", hit_fence.call(side + Vector3(0, 0.75, 0)))
+		var back: Vector3 = grounded.call(pd.to_world(0.0, pd.half.y + 0.15))
+		check.call("kolize na zadní straně výběhu", hit_fence.call(back + Vector3(0, 0.75, 0)))
+		var gate: Vector3 = grounded.call(pd.to_world(0.0, -pd.half.y - 0.15))
+		check.call("branka výběhu průchodná (%.1f m)" % Paddock.GATE_W, not hit_fence.call(gate + Vector3(0, 0.75, 0)))
+
+	# --- zahrada: latěný plot s brankou ~1,2 m na straně k domu
+	var pl: Garden.Plot = w.garden.plot_by_key("zahrada") if w.garden else null
+	var gside := Vector3.ZERO
+	var ggate := Vector3.ZERO
+	var zahrada_ok := pl != null
+	check.call("zahrada stojí", zahrada_ok)
+	if zahrada_ok:
+		gside = grounded.call(pl.local_pos(-float(pl.w) * 0.5 - 0.3, 0.0))
+		check.call("kolize na boku zahrady", hit_fence.call(gside + Vector3(0, 0.75, 0)))
+		ggate = grounded.call(pl.local_pos(0.0, -float(pl.d) * 0.5 - 0.3))
+		check.call("branka zahrady průchodná (%.1f m)" % FenceManager.GATE_GARDEN,
+			not hit_fence.call(ggate + Vector3(0, 0.75, 0)))
+		check.call("střed zahrady bez plotu", not hit_fence.call(pl.center + Vector3(0, 0.75, 0)))
+
+	# --- pronajaté pole (WIRE): jen když se pronájem povede (potřebuje ornou půdu v landuse.bin)
+	if w.garden != null:
+		p.money = 100000
+		w.garden.service(1, "pronajem_pole", 1)
+		await _frames(g, 2)          # kolizní tvary se do fyzikálního prostoru zapisují až další physics frame
+		var pole: Garden.Plot = w.garden.plot_by_key("pole")
+		if pole == null:
+			print("     (pole se nepodařilo pronajmout – přeskakuji kontrolu drátěného plotu)")
+		else:
+			check.call("pole pronajato – WIRE plot", true)
+			if OS.get_cmdline_user_args().has("--fencedbg"):
+				print("     DBG pole center %s, yaw %.2f" % [pole.center, pole.yaw])
+				for r in fm.runs():
+					if int(r["type"]) == FenceManager.FenceType.WIRE:
+						print("     DBG wire pts %s gaps %s" % [r["pts"], r["gaps"]])
+			var fside: Vector3 = grounded.call(pole.local_pos(float(pole.w) * 0.5 + 0.3, 0.0))
+			check.call("kolize na boku pole (drát)", hit_fence.call(fside + Vector3(0, 0.75, 0)))
+			var fgate: Vector3 = grounded.call(pole.local_pos(0.0, -float(pole.d) * 0.5 - 0.3))
+			check.call("branka pole průchodná (%.1f m)" % FenceManager.GATE_FIELD,
+				not hit_fence.call(fgate + Vector3(0, 0.75, 0)))
+
+	# --- rebuild sleduje přesunutí plochy (simulace relocate; pak se vrátí zpět)
+	if pl != null:
+		pl.center += Vector3(3.0, 0, 1.0)
+		fm.rebuild()
+		await _frames(g, 2)          # nový kolizní těleso plotů se zapíše do prostoru až další frame
+		var gside2: Vector3 = grounded.call(pl.local_pos(-float(pl.w) * 0.5 - 0.3, 0.0))
+		var ggate2: Vector3 = grounded.call(pl.local_pos(0.0, -float(pl.d) * 0.5 - 0.3))
+		check.call("plot se přesunul s plochou (bok)", hit_fence.call(gside2 + Vector3(0, 0.75, 0)))
+		check.call("branka se přesunula s plochou", ggate2.distance_to(ggate) > 3.0 and
+			not hit_fence.call(ggate2 + Vector3(0, 0.75, 0)))
+		check.call("na starém místě plot už není", not hit_fence.call(gside + Vector3(0, 0.75, 0)))
+		pl.center -= Vector3(3.0, 0, 1.0)
+		fm.rebuild()
+
+	# --- apply_home: celý řetěz clear → relocate → rebuild (stejný domov = stejná místa)
+	w.apply_home(1)
+	await _frames(g, 2)
+	check.call("po apply_home ploty zase stojí", fm.fence_body() != null and fm.fence_body().get_child_count() > 0)
+
+	# --- save round-trip: to_dict → restore nechá svět konzistentní
+	var sd: Dictionary = fm.to_dict()
+	var n_before: int = fm.fence_body().get_child_count()
+	fm.restore(sd)
+	check.call("save round-trip (dict→restore)", fm.fence_body() != null and
+		fm.fence_body().get_child_count() == n_before and fm.fence_mesh() != null and fm.fence_mesh().mesh != null,
+		"kolizí %d" % n_before)
+
+	# --- kůň reálně projde brankou: zavřít do výběhu, hráč venku před brankou, Horse.call_to
+	var h: Horse = w.fauna.horse_of(1) if w.fauna else null
+	if pd != null and pd.ok and h != null and h.rider == null:
+		var inside := pd.to_world(0.0, 0.0)
+		h.global_position = inside + Vector3(0, 0.15, 0)
+		h.velocity = Vector3.ZERO
+		h.speed = 0.0
+		h.tether = inside
+		h._target = Vector3.INF
+		p.teleport(pd.to_world(0.0, -pd.half.y - 6.0) + Vector3(0, 0.1, 0), 0.0, false)
+		await _frames(g, 2)
+		check.call("kůň slyší přivolání", h.call_to(p))
+		var gate_mid := pd.to_world(0.0, -pd.half.y)
+		var near_gate := false
+		var reached := false
+		var t0 := Time.get_ticks_msec()
+		while Time.get_ticks_msec() - t0 < 45000:
+			await g.get_tree().physics_frame
+			if h.global_position.distance_to(gate_mid) < 2.6:
+				near_gate = true
+			if h.global_position.distance_to(p.global_position) < 4.5:
+				reached = true
+				break
+		check.call("kůň prošel brankou k hráči", reached and near_gate and not pd.contains(h.global_position),
+			"pos %s, branka %.1f m" % [h.global_position, h.global_position.distance_to(gate_mid)])
+	elif pd != null and pd.ok and h == null:
+		check.call("kůň prošel brankou k hráči", false, "kůň nenalezen")
+	else:
+		print("     (výběh/kůň nedostupný – přeskakuji průchod brankou)")
+
+	var n_ok := res.count(true)
+	print("VÝSLEDEK plotů: %d/%d OK" % [n_ok, res.size()])
 	g.get_tree().quit()

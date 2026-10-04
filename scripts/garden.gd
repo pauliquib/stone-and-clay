@@ -394,6 +394,8 @@ func _add_plot(key: String, title: String, center: Vector3, yaw: float, w: int, 
 	if key == "zahrada":
 		_tap = {"pos": pl.sign_pos + pl.right() * -1.0 + Vector3(0, 0.6, 0), "r": 1.6, "kind": "kohoutek"}
 		world.register_target(_tap)
+	if world.fences:
+		world.fences.rebuild()      # nová plocha = nový obvodový plot (Fáze 7)
 	return pl
 
 
@@ -401,6 +403,8 @@ func _remove_plot(pl: Plot) -> void:
 	if is_instance_valid(pl.mi):
 		pl.mi.queue_free()
 	plots.erase(pl)
+	if world.fences:
+		world.fences.rebuild()      # plot zaniklé plochy (vypršelý pronájem) zrušit
 
 
 func plot_by_key(key: String) -> Plot:

@@ -112,6 +112,7 @@ var trees: TreeManager           # stromy za běhu (M2.1): index instancí, pok�
 var forestry: Forestry           # kácení a zpracování dřeva (M2.1): pád stromu, kmeny, špalky, zákon
 var fire_mgr: FireManager        # oheň a topení (M2.2): ohniště, opékání, zákon u lesa, požár trávy, kamna doma
 var garden: Garden             # zahrada u domu a pronajaté pole (M2.4): záhony, růst podle dnů, sklizeň
+var fences: FenceManager       # ploty a ohrady (Fáze 7): obvody výběhu, zahrady a pole + hráčské úseky
 var farm: Farm                   # hospodářská zvířata u usedlosti (M2.6): výběh, kurník, chlívek, přístřešek
 var fishing: Fishing             # rybaření (M2.7): nahození, záběr, zdolávání, úlovek, zákon (háčky)
 var weapons: Weapons             # zbraně a střelba (M2.8): luk, kuše, puška, balistika, střelnice u chaty, zákon o zbraních
@@ -437,6 +438,10 @@ func add_player(id: int, pos: Vector3, yaw: float) -> Player:
 		add_child(permits)
 		permits.setup(self)
 	permits.add_player(id)
+	if fences == null:            # ploty a ohrady (Fáze 7) – až PO výběhu, zahradě i statku: sondy `_find_spot`
+		fences = FenceManager.new()   # hledají jejich místa kolizním kvádrem a na hotový plot by narazily
+		add_child(fences)
+		fences.setup(self)
 	drone_states[id] = {}
 	aircrafts[id] = []                 # M6.3: letouny hráče (naplní načtení save / F2)
 	return p
@@ -1054,11 +1059,17 @@ func apply_home(pid: int) -> void:
 			_radio_home = {"pos": rp, "yaw": face}
 	if interior_streamer:
 		interior_streamer.set_home(estate.home_title(pid), estate.is_flat(pid))
-	# zahrada a výběh koně se přestěhují k domovu (při prvním volání z build ještě nejsou – vytvoří se v add_player)
+	# zahrada a výběh koně se přestěhují k domovu (při prvním volání z build ještě nejsou – vytvoří se v add_player);
+	# obvodové ploty (Fáze 7) se před hledáním místa zahodí – jinak by jejich kolize blokovala sondu `_find_spot` –
+	# a po relocate se postaví znovu na nové pozici
+	if fences:
+		fences.clear_auto()
 	if paddock:
 		paddock.relocate()
 	if garden:
 		garden.relocate()
+	if fences:
+		fences.rebuild()
 
 
 ## Kam hráč vyjde z interiéru `iid`: [poloha na zemi ~1 m před dveřmi, yaw od domu]. Dveře modelu z BuildingDetails,
