@@ -17,6 +17,8 @@
 ##   --interiortest  mapový interiér hospody přes FuncGodot (Fáze 2) + vstup/výstup a fallback
 ##   --villagertest  behavior strom vesničana přes LimboAI (Fáze 3): blackboard, větve denní
 ##                   rutiny (zahrada, hospoda), chůze za cílem; bez addonu jen fallback
+##   --flighttest    stavový automat letouna přes godot-state-charts (Fáze 4): vzlet z dráhy,
+##                   přetažení/zotavení, dosazení + přímé události; bez addonu fallback flagy
 class_name Main
 extends Node3D
 
@@ -126,6 +128,8 @@ func _ready() -> void:
 		Tests.interior_test(self)
 	if _args.has("villagertest"):
 		Tests.villager_test(self)
+	if _args.has("flighttest"):
+		Tests.flight_test(self)
 
 
 func _frames(n: int) -> void:

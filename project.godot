@@ -12,7 +12,7 @@ config/features=PackedStringArray("4.3", "Forward Plus")
 
 [editor_plugins]
 
-enabled=PackedStringArray("func_godot")
+enabled=PackedStringArray("func_godot", "godot_state_charts")
 
 [display]
 

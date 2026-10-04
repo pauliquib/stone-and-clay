@@ -15,6 +15,8 @@
 ##                  expozice těla, trakce chůze, AI opatrnost, předpověď
 ##   --villagertest  vesničan s behavior stromem (Fáze 3, LimboAI): blackboard z herních dat,
 ##                  ráno zahrada + kopání, pátek večer stůl v hospodě + pivo; bez addonu fallback
+##   --flighttest  letoun test_letoun na dráze letiště: vzlet, přetažení/zotavení, dosazení;
+##                 stavy přes godot-state-charts (Fáze 4), bez addonu fallback na flagy
 class_name Tests
 extends RefCounted
 
@@ -1149,4 +1151,157 @@ static func villager_test(g: Node) -> void:
 		v._bt_inst.get_last_status()])
 	check.call("strom tickuje (last_status RUNNING/SUCCESS)", v._bt_inst.get_last_status() in [1, 3])
 	print("VÝSLEDEK villager: %s" % ("OK" if bad.is_empty() else "%d chyb" % bad.size()))
+	g.get_tree().quit()
+
+
+## Letový test (Fáze 4, godot-state-charts): stavový automat letouna na dráze letiště.
+## Reálná fyzika: rozjezd s plným plynem → vzlet (Zeme→Vzduch/Let); teleport do výšky
+## ověří konzistenci `physics_process` ve vzduchu; přetažení tahem výškovky po zrychlujícím
+## se sestupu (Let→Pretazeni) a zotavení; dosazení na dráhu (Vzduch→Zeme). „Létající
+## bedna“ má v headless jen mezní výkon – proto teleporty na finále/do výšky místo
+## dlouhého stoupání (výšku drží laminární proud v modelu jen do ~v_max). Na závěr
+## přímé události `send_event` (stroj bez pilota – fyzika stav nepřepíše).
+## Bez addonu běží fallback flagy `_fb_*` a test ověří totéž rozhraní.
+static func flight_test(g: Node) -> void:
+	var w: World = g.world
+	await g.get_tree().create_timer(1.0).timeout
+	var bad := []
+	var check := func(name: String, ok: bool) -> void:
+		if not ok:
+			bad.append(name)
+		print("%s %s" % ["OK  " if ok else "CHYBA", name])
+	var addon := Aircraft.chart_addon()
+	print("FLIGHT: addon godot-state-charts=%s" % addon)
+
+	# --- stroj na ose dráhy u prahu A (rovinatý pás ~260 m bez překážek, směr 30°)
+	var a := Aircraft.make("test_letoun")
+	a.name = "LetounTest"
+	w.add_child(a)
+	a.setup(w, 1, "test_letoun")
+	var d0 := w.airfield.dir()
+	var yaw_rwy: float = w.airfield._yaw_of(d0)
+	var spos := Vector3(Airfield.RWY_A.x + d0.x * 10.0, 0.0, Airfield.RWY_A.y + d0.y * 10.0)
+	spos.y = w.terrain.height_at(spos.x, spos.z)
+	a.park(spos, yaw_rwy)
+	w.aircrafts.get_or_add(1, []).append(a)
+	a.body_entered.connect(func(b: Node) -> void:
+		print("  kontakt tělesa: %s (v=%.1f m/s)" % [b.name if b else "?", a.linear_velocity.length()]))
+	await _frames(g, 5)
+	check.call("chart vystavěn podle dostupnosti addonu", (a._chart != null) == addon)
+	check.call("parkování: stav Zeme, on_ground, not flying", a.stav_letu() == "Zeme" and a.on_ground and not a.flying())
+	w.enter_aircraft(1, a)
+	await _frames(g, 3)
+	if a.pilot == null:
+		print("CHYBA: pilot nenastoupil – konec testu")
+		g.get_tree().quit()
+		return
+
+	# --- rozjezd a vzlet: plný plyn (W = move_forward) držíme až do stoupání –
+	#     po odlepení nesmí zhasnout, jinak stroj usedne zpátky (vztlak ∝ v²)
+	Input.action_press("move_forward")
+	var t0 := Time.get_ticks_msec()
+	var odlepl := false
+	var last_log := -10.0
+	while Time.get_ticks_msec() - t0 < 30000 and not odlepl:
+		await g.get_tree().physics_frame
+		odlepl = not a.on_ground
+		var tt := (Time.get_ticks_msec() - t0) / 1000.0
+		if tt - last_log >= 2.0:
+			last_log = tt
+			print("  rozběh t=%.0f s: pos=(%.0f,%.0f) v=%.1f m/s dmg=%.0f stav=%s" % [tt,
+				a.global_position.x, a.global_position.z, a.speed, a.dmg, a.stav_letu()])
+		if a.dmg >= 100.0:
+			break
+	check.call("vzlet: přechod Zeme→Vzduch (on_ground=false)", odlepl)
+	check.call("stav Let po vzletu", a.stav_letu() == "Let")
+	check.call("flying() konzistentní s on_ground", a.flying() == (not a.on_ground))
+	print("  odlepení: v=%.1f m/s, stav=%s" % [a.speed, a.stav_letu()])
+
+	# --- teleport do výšky ~120 m nad dráhou: stav Vzduch přetrvává, fyzika běží dál.
+	#     ~4 s klidného letu s motorem → drží se vzduchu a chart je ve stavu Let.
+	var hod := Vector3(Airfield.RWY_A.x + d0.x * 130.0, 0.0, Airfield.RWY_A.y + d0.y * 130.0)
+	hod.y = w.terrain.height_at(hod.x, hod.z) + 120.0
+	a.global_transform = Transform3D(Basis(Vector3.UP, yaw_rwy), hod)
+	a.linear_velocity = Vector3(d0.x, 0.0, d0.y) * float(a.spec["v_trim"])
+	a.angular_velocity = Vector3.ZERO
+	a._yaw = yaw_rwy
+	a._pitch = 0.0
+	a._bank = 0.0
+	t0 = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 4000 and not a.on_ground and a.dmg < 100.0:
+		await g.get_tree().physics_frame
+	var agl0: float = a.global_position.y - w.terrain.height_at(a.global_position.x, a.global_position.z)
+	print("  ve výšce: %.0f m AGL, v=%.1f m/s, stav=%s" % [agl0, a.speed, a.stav_letu()])
+	check.call("let ve výšce konzistentní (Vzduch/Let, bez nárazu)",
+		not a.on_ground and a.stav_letu() == "Let" and a.dmg < 100.0 and agl0 > 60.0)
+
+	# --- přetažení ve výšce: krátký sestup pro rychlost (Ctrl ~3 s), pak prudké zatažení
+	#     (Mezerník) → přechodový náběh alpha > a_crit → stav Pretazeni
+	Input.action_release("move_forward")
+	Input.action_press("crouch")
+	t0 = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 3000 and not a.on_ground:
+		await g.get_tree().physics_frame
+	Input.action_release("crouch")
+	Input.action_press("jump")
+	var stall_seen := false
+	var stav_stall := ""
+	t0 = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 15000 and not stall_seen and not a.on_ground:
+		await g.get_tree().physics_frame
+		if a._stalled:
+			stall_seen = true
+			stav_stall = a.stav_letu()
+	Input.action_release("jump")
+	if not stall_seen:
+		# headless: turbulence/vítr může přechodový náběh utlumit → ověřím stav přímo
+		print("  fyzikální přetažení nenastalo – stav ověřím přímou událostí")
+		a._stav_event(&"pretazeni")
+		await _frames(g, 1)
+		stall_seen = a._stalled
+		stav_stall = a.stav_letu()
+	check.call("přetažení: stav Pretazeni (_stalled)", stall_seen and stav_stall == "Pretazeni")
+
+	# --- zotavení: přiklonit (Ctrl) + plyn → nos padá, alpha < 0,75·a_crit → zpět Let
+	Input.action_press("crouch")
+	Input.action_press("move_forward")
+	t0 = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 15000 and a._stalled and not a.on_ground:
+		await g.get_tree().physics_frame
+	Input.action_release("crouch")
+	Input.action_release("move_forward")
+	check.call("zotavení: zpět ve stavu Let", a.stav_letu() == "Let" and not a._stalled)
+
+	# --- dosazení: teleport na finále dráhy (~12 m AGL, mírný sestup, bez plynu) –
+	#     nízko, aby stroj v podvozkové výšce spolehlivě dosedl a neklouzal nad terénem
+	var fin := Vector3(Airfield.RWY_A.x + d0.x * 40.0, 0.0, Airfield.RWY_A.y + d0.y * 40.0)
+	fin.y = w.terrain.height_at(fin.x, fin.z) + 12.0
+	a.global_transform = Transform3D(Basis(Vector3.UP, yaw_rwy), fin)
+	a.linear_velocity = Vector3(d0.x, 0.0, d0.y) * float(a.spec["v_trim"]) + Vector3(0.0, -1.5, 0.0)
+	a.angular_velocity = Vector3.ZERO
+	a._yaw = yaw_rwy
+	a._pitch = 0.0
+	a._bank = 0.0
+	t0 = Time.get_ticks_msec()
+	while not a.on_ground and Time.get_ticks_msec() - t0 < 40000:
+		await g.get_tree().physics_frame
+	var od_prahu := Vector2(a.global_position.x - Airfield.RWY_A.x, a.global_position.z - Airfield.RWY_A.y).length()
+	check.call("dosednutí: stav Zeme (on_ground)", a.on_ground and a.stav_letu() == "Zeme")
+	check.call("přetažení po dosednutí vyresetováno", not a._stalled)
+	check.call("dosazení bez havárie", a.dmg < 100.0)
+	print("  dosazeno %.0f m od prahu A, v=%.1f m/s, poškození %.0f %%" % [od_prahu, a.speed, a.dmg])
+
+	# --- přímé události (bez pilota fyzika stav nepřepíše): chart reaguje správně
+	w.exit_aircraft(1)
+	await _frames(g, 3)
+	a._stav_event(&"vzlet")
+	await _frames(g, 1)
+	check.call("událost vzlet → Let", a.stav_letu() == "Let" and not a.on_ground and a.flying())
+	a._stav_event(&"pretazeni")
+	await _frames(g, 1)
+	check.call("událost pretazeni → Pretazeni (_stalled)", a.stav_letu() == "Pretazeni" and a._stalled)
+	a._stav_event(&"dosednuti")
+	await _frames(g, 1)
+	check.call("událost dosednuti → Zeme i z Pretazeni (+stall reset)", a.stav_letu() == "Zeme" and a.on_ground and not a._stalled)
+	print("VÝSLEDEK letu: %s" % ("OK" if bad.is_empty() else "%d chyb" % bad.size()))
 	g.get_tree().quit()

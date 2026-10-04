@@ -321,6 +321,11 @@ func _flare_land(impact: float) -> void:
 		world.play_sfx(owner_id, "land", 1.0, -6.0)
 
 
+## Hláška při vstupu do přetažení (Fáze 4, stav „Pretazeni“) – u padáku se pouštějí brzdy.
+func _stall_hint() -> String:
+	return "PŘETAŽENÍ křídla! Povol brzdy a přidej plyn – nos padne a křídlo se zase chytí."
+
+
 # ------------------------------------------------------------------ přestupky (svědek = hluk ~800 m)
 
 ## Nad rámec alkoholu (`Aircraft._law_check`): bez průkazu / registrace, nízko nad obcí,

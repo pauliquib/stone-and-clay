@@ -79,13 +79,30 @@ var seat_pos := Vector3(0.0, 0.55, -0.15)
 var fuel_l := 0.0                  # zbývá paliva (l)
 var dmg := 0.0                     # poškození 0..100
 var throttle := 0.0                # vyhlazený plyn 0..1
-var on_ground := true
+## Stav „na zemi“ drží stavový automat `_chart` (Fáze 4 – godot-state-charts); zápis
+## (`on_ground = …`) jen pošle událost vzlet/dosednutí, čtení se odvozuje z aktivního stavu.
+## Bez addonu (GDScript třídy chybí) běží zjednodušený fallback na bool flagy – fyzika stejná.
+var on_ground: bool:
+	get:
+		if _chart_up():
+			return _st_zeme.active
+		return _fb_ground
+	set(v):
+		_stav_event(&"dosednuti" if v else &"vzlet")
 var speed := 0.0                   # pozemní rychlost při pojíždění / celková rychlost stroje (m/s)
 
 var _yaw := 0.0
 var _pitch := 0.0
 var _bank := 0.0
-var _stalled := false
+## Přetažení = aktivita stavu „Pretazeni“ (jen čtení; stav řídí události pretazeni/zotaveni).
+var _stalled: bool:
+	get:
+		if _chart_up():
+			return _st_stall.active
+		return _fb_stall
+var _fb_ground := true             # fallback bez addonu / dokud chart nevstoupil do init stavu
+var _fb_stall := false
+var _stall_warn_t := -10.0         # _life_t posledního varování přetažení (turbulence jinak spamuje)
 var _off_cd := {}
 var _law_t := 0.0
 var _life_t := 0.0
@@ -105,6 +122,145 @@ var _cam_yaw := 0.0                # volný pohled myší (chase, drift zpět)
 var _cam_pos := Vector3.ZERO       # vyhlazená pozice chase kamery
 var snd: AudioStreamPlayer3D
 var _prop: MeshInstance3D
+
+# --------------------------------------------------- stavový automat letu (Fáze 4)
+## addon godot-state-charts (GDScript, `addons/godot_state_charts`) – třídy se načítají
+## dynamicky, aby `aircraft.gd` fungoval i bez addonu (fallback na `_fb_*` flagy).
+const GSC_DIR := "res://addons/godot_state_charts/"
+## Uzly chartu držíme jako Variant (netypované) – addon třídy nemusejí existovat
+## a volání `send_event`/`active`/`initial_state` tak zůstane dynamické (fallback OK).
+var _chart = null                  # StateChart uzel (nebo null bez addonu)
+var _st_zeme = null                # AtomicState „Zeme“
+var _st_vzduch = null              # CompoundState „Vzduch“
+var _st_stall = null               # AtomicState „Pretazeni“
+
+
+## Je addon godot-state-charts v projektu k dispozici?
+static func chart_addon() -> bool:
+	return ResourceLoader.exists(GSC_DIR + "state_chart.gd") \
+		and ResourceLoader.exists(GSC_DIR + "atomic_state.gd") \
+		and ResourceLoader.exists(GSC_DIR + "compound_state.gd") \
+		and ResourceLoader.exists(GSC_DIR + "transition.gd")
+
+
+## Chart řídí stav teprve po vstupu do výchozího stavu (init běží deferred po _ready).
+func _chart_up() -> bool:
+	return _chart != null and _chart.is_node_ready() \
+		and _st_zeme != null and (_st_zeme.active or _st_vzduch.active)
+
+
+## Událost do stavového automatu; bez addonu (nebo dokud init nenaběhl) jen přepíše flagy.
+func _stav_event(ev: StringName) -> void:
+	if _chart_up():
+		_chart.send_event(ev)
+		return
+	match ev:
+		&"vzlet":
+			_fb_ground = false
+			_fb_stall = false   # vstup do Vzduch → výchozí podstav Let (stejně jako v chartu)
+		&"pretazeni":
+			if not _fb_ground:
+				_fb_stall = true
+		&"zotaveni":
+			_fb_stall = false
+		&"dosednuti":
+			_fb_ground = true
+			_fb_stall = false
+
+
+## Sestaví stavový automat programově (stroj vzniká čistě v kódu – žádná .tscn):
+##   Koren (Compound, init Zeme)
+##   ├── Zeme   (Atomic) – pojíždění / parkování; událost vzlet → Vzduch
+##   └── Vzduch (Compound, init Let) – událost dosednuti → Zeme (z obou podstavů)
+##       ├── Let        (Atomic) – událost pretazeni → Pretazeni
+##       └── Pretazeni  (Atomic) – událost zotaveni → Let
+func _build_chart() -> void:
+	if not chart_addon():
+		return
+	var atomic: GDScript = load(GSC_DIR + "atomic_state.gd")
+	var compound: GDScript = load(GSC_DIR + "compound_state.gd")
+	var trans_gd: GDScript = load(GSC_DIR + "transition.gd")
+	var chart_gd: GDScript = load(GSC_DIR + "state_chart.gd")
+	if atomic == null or compound == null or trans_gd == null or chart_gd == null:
+		push_warning("Aircraft: godot-state-charts se nepodařilo načíst – fallback na bool flagy.")
+		return
+	_chart = chart_gd.new()
+	_chart.name = "StavLetu"
+	var koren = compound.new()
+	koren.name = "Koren"
+	_st_zeme = atomic.new()
+	_st_zeme.name = "Zeme"
+	_st_vzduch = compound.new()
+	_st_vzduch.name = "Vzduch"
+	var st_let = atomic.new()
+	st_let.name = "Let"
+	_st_stall = atomic.new()
+	_st_stall.name = "Pretazeni"
+	_chart.add_child(koren)
+	koren.add_child(_st_zeme)
+	koren.add_child(_st_vzduch)
+	_st_vzduch.add_child(st_let)
+	_st_vzduch.add_child(_st_stall)
+	koren.initial_state = NodePath("Zeme")           # před vstupem do stromu (onready se váže)
+	_st_vzduch.initial_state = NodePath("Let")
+	var mk_tr := func(parent, nazev: String, ev: StringName, to: NodePath) -> void:
+		var t = trans_gd.new()
+		t.name = nazev
+		t.event = ev
+		t.to = to
+		parent.add_child(t)
+	# `to` je relativní k uzlu Transition (ne ke stavu) → sourozenci rodiče = „../../Cil“
+	mk_tr.call(_st_zeme, "NaVzlet", &"vzlet", NodePath("../../Vzduch"))
+	mk_tr.call(st_let, "NaPretazeni", &"pretazeni", NodePath("../../Pretazeni"))
+	mk_tr.call(_st_stall, "NaZotaveni", &"zotaveni", NodePath("../../Let"))
+	mk_tr.call(_st_vzduch, "NaDosednuti", &"dosednuti", NodePath("../../Zeme"))
+	# §4.3: enter/exit hooky – přetažení hlásí + varovný tón, dosednutí jen přepne stav
+	_st_zeme.state_entered.connect(_on_zeme_entered)
+	_st_stall.state_entered.connect(_on_pretazeni_entered)
+	_st_stall.state_exited.connect(_on_pretazeni_exited)
+	add_child(_chart)
+
+
+## Vstup do stavu „Zeme“ (dosednutí, havárie, parkování): let se ukončuje – uklidíme
+## volný pohled a varování okraje, ať příští vzlet startuje čistě (fyzika dosednutí
+## zůstává v `_in_air` – tam jsou podmínky, dopad i XP).
+func _on_zeme_entered() -> void:
+	_cam_yaw = 0.0
+	_edge_warned = false
+
+
+## Vstup do stavu „Pretazeni“: varování pilota (HUD hláška v `status()` trvá, dokud stav trvá;
+## hláška + tón jen jednou za ~6 s, aby turbulence kolem a_crit nespamovala oznámení).
+func _on_pretazeni_entered() -> void:
+	if _life_t - _stall_warn_t < 6.0:
+		return
+	_stall_warn_t = _life_t
+	_notify(_stall_hint(), 3.0)
+	if world:
+		world.play_sfx(owner_id, "fail", 1.6, -6.0)
+
+
+## Výstup z přetažení (zotavení i dosednutí) – hláška v HUD mizí sama přes `status()`.
+func _on_pretazeni_exited() -> void:
+	pass
+
+
+## Hláška při vstupu do přetažení (podtřídy mohou přepsat – u paramotoru se pouští brzdy).
+func _stall_hint() -> String:
+	return "PŘETAŽENÍ! Nos padá – přikloň (Ctrl) a přidej plyn."
+
+
+## Aktuální stav automatu pro testy / ladění („Zeme“, „Let“, „Pretazeni“; „-“ bez chartu).
+func stav_letu() -> String:
+	if _chart_up():
+		if _st_zeme.active:
+			return "Zeme"
+		if _st_stall.active:
+			return "Pretazeni"
+		if _st_vzduch.active:
+			return "Let"
+		return "-"
+	return "Zeme" if _fb_ground else ("Pretazeni" if _fb_stall else "Let")
 
 
 func spec_of(m: String) -> Dictionary:
@@ -150,6 +306,7 @@ func setup(w: World, pid: int, model_id: String) -> void:
 	_turb.seed = 4501 + pid
 	_prev_xf = global_transform
 	_cur_xf = global_transform
+	_build_chart()                       # Fáze 4: stavový automat letu (on_ground / _stalled)
 
 
 ## Procedurální „létající bedna“: tříkolká bedna + bedňová křídla (padák zjednodušen),
@@ -398,9 +555,9 @@ func _in_air(xf: Transform3D, wind: Vector3, v: Vector3,
 	var alpha := atan2(lrw.y, vf)                        # náběh (rad)
 	var a_crit := deg_to_rad(float(spec["a_crit"]))
 	if not _stalled and alpha > a_crit:
-		_stalled = true
+		_stav_event(&"pretazeni")
 	elif _stalled and alpha < a_crit * 0.75:
-		_stalled = false
+		_stav_event(&"zotaveni")
 	var cl: float
 	if _stalled:
 		cl = (float(spec["CL0"]) + float(spec["CL_A"]) * a_crit) * CL_STALL * signf(alpha)
