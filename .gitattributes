@@ -1,0 +1,4 @@
+# Vendor/third-party kód (Godot addony: FuncGodot, Godot Jolt, LimboAI) —
+# není autorský kód tohoto repozitáře.
+# Vyřazeno ze statistiky jazyků na GitHubu (linguist-vendored).
+addons/** linguist-vendored
