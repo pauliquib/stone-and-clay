@@ -326,10 +326,10 @@ func _on_stall_detected():
 
 ### Fáze 2 (Interiéry)
 
-- [ ] Instalace Qodot pluginu
-- [ ] Vytvoření `hospoda.map` v TrenchBroom
-- [ ] Úprava `interior_streamer.gd` pro podporu Qodot
-- [ ] Test vstupu do hospody (E u dveří)
+- [x] Instalace Qodot pluginu (FuncGodot 2025.1 – nástupce Qodotu pro Godot 4.x, `addons/func_godot`)
+- [x] Vytvoření `hospoda.map` v TrenchBroom (ručně psaný Quake 1 `.map` v `data/maps/`, editovatelný v TrenchBroom)
+- [x] Úprava `interior_streamer.gd` pro podporu Qodot (druh interiéru `qodot` přes `MapInteriors`, fallback na procedurální)
+- [x] Test vstupu do hospody (E u dveří) (`--interiortest`)
 
 ### Fáze 3 (AI)
 

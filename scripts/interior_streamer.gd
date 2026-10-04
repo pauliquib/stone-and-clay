@@ -5,6 +5,8 @@
 ## - **Pevné interiéry** (domov M1.4 / M1.7, veřejné budovy M1.5) mají stálé sloty 0–6 jako dřív (uložené pozice uvnitř platí).
 ## - **Generované** (`InteriorGen`): každá nemovitost z `Estate` s dveřmi, která není místem z pois.json – id interiéru "b:<id>",
 ##   druh podle typu: rodinný dům `gen_house`, bytový dům `gen_flats` (i usedlost s podnájmem), hospodářská `gen_hall`.
+## - **Mapové** (Fáze 2, `MapInteriors` / FuncGodot): pevný veřejný interiér, ke kterému existuje `data/maps/<místo>.map`,
+##   má druh `qodot` – staví se z .map místo `PublicInteriors` (chybí-li mapa/addon, padá zpět na procedurální).
 ##   Slot podle pořadí id → stálé souřadnice pod mapou (`World.INTERIOR_BASE`, mřížka `COLS` × `World.INTERIOR_STEP`).
 ##   Veřejná budova bez místa (kostel…) má jen zamčené dveře.
 ## - **Přístup** (`access`): bytový dům (chodba) otevřený; vlastní byt → „domov“, cizí byt zamčený (zazvonit); hospodářská budova
@@ -73,7 +75,11 @@ func setup(w: World, parent: Node3D) -> void:
 	for i in FIXED.size():
 		var f: Array = FIXED[i]
 		var iid: String = f[0]
-		specs[iid] = {"iid": iid, "kind": String(f[1]), "eid": 0, "slot": i, "door": Vector3.INF}
+		var kind := String(f[1])
+		# Fáze 2: veřejná budova s .map (data/maps/<místo>.map) a addonem FuncGodot → mapový interiér
+		if iid != "domov" and MapInteriors.has_map(iid):
+			kind = "qodot"
+		specs[iid] = {"iid": iid, "kind": kind, "eid": 0, "slot": i, "door": Vector3.INF}
 
 
 ## Generované interiéry ze všech nemovitostí s dveřmi (volá World.build po Estate.setup).

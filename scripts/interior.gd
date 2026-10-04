@@ -10,7 +10,8 @@
 ##
 ## M1.8: stavba po krocích (`begin_build` + `build_step` jednou za snímek řídí `InteriorStreamer`, `build()` = vše naráz);
 ## každý krok (místnost) se sloučí do vlastního meshe (`flush_mesh`). Generované druhy `gen_house`, `gen_flats`, `gen_hall`
-## skládá `InteriorGen` z půdorysu nemovitosti (`estate_id`, seed = id budovy).
+## skládá `InteriorGen` z půdorysu nemovitosti (`estate_id`, seed = id budovy). Druh `qodot` (Fáze 2) staví ručně
+## navržený Quake `.map` přes addon FuncGodot – viz `MapInteriors` (geometrie + kolize z mapy, obsah ze značek).
 class_name Interior
 extends Node3D
 
@@ -104,6 +105,9 @@ func begin_build() -> void:
 			_steps.append(func() -> void: PublicInteriors.build(self, kind))
 		"gen_house", "gen_flats", "gen_hall":                              # M1.8 – viz InteriorGen
 			_steps.append_array(InteriorGen.steps(self))
+		"qodot":                                                           # Fáze 2 – .map přes FuncGodot (viz MapInteriors)
+			place_key = id                                                 # id pevného interiéru = klíč místa
+			_steps.append_array(MapInteriors.steps(self))
 		_:
 			push_warning("Interiér %s: neznámý druh „%s“" % [id, kind])
 	visible = false           # zobrazí se jen s hráčem uvnitř (ušetří vykreslování)

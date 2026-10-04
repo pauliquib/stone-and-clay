@@ -928,3 +928,95 @@ static func _clean_force(w: Weather, k: String) -> void:
 	if w.temp < 2.0:
 		w.temp = 8.0
 	w.force(k)
+
+
+## Mapový interiér (Fáze 2): hospoda z `data/maps/hospoda.map` přes FuncGodot. Ověří druh "qodot",
+## neprázdný mesh + kolize, E-objekty a sedadla/spots ze značek, vstup a výstup hráče,
+## a že místo bez .map zůstává procedurální (obchod). Bez addonu se hospoda staví procedurálně – OK.
+static func interior_test(g: Node) -> void:
+	var w: World = g.world
+	await g.get_tree().create_timer(1.0).timeout
+	var bad := []                        # lambda zachytává proměnné hodnotou → počítadlo jako pole
+	var check := func(name: String, ok: bool) -> void:
+		if not ok:
+			bad.append(name)
+		print("%s %s" % ["OK  " if ok else "CHYBA", name])
+	print("INTERIOR: addon FuncGodot=%s, mapa hospoda=%s" % [MapInteriors.addon_ok(),
+		FileAccess.file_exists(MapInteriors.map_path("hospoda"))])
+	# --- hospoda: druh podle dostupnosti mapy
+	var st: InteriorStreamer = w.interior_streamer
+	var k := String(st.specs["hospoda"]["kind"])
+	check.call("druh hospody = qodot (mapa+addon) nebo hospoda (fallback)", k == ("qodot" if MapInteriors.has_map("hospoda") else "hospoda"))
+	check.call("obchod zůstává procedurální (kind obchod)", String(st.specs["obchod"]["kind"]) == "obchod")
+	var fake := Interior.make(null, "neexistujici_misto", "qodot", Vector3.ZERO)
+	check.call("místo bez .map → procedurální kroky", MapInteriors.steps(fake).size() == 1)
+	if not w.ensure_interior("hospoda"):
+		print("CHYBA: ensure_interior(hospoda) selhalo")
+		g.get_tree().quit()
+		return
+	var it: Interior = w.interiors["hospoda"]
+	var t0 := Time.get_ticks_msec()
+	while not it.built and Time.get_ticks_msec() - t0 < 15000:
+		await g.get_tree().process_frame
+	check.call("hospoda dostavěna", it.built)
+	var map := it.get_node_or_null("Mapa")
+	if MapInteriors.has_map("hospoda"):
+		check.call("mapový uzel Mapa existuje", map != null)
+		var meshes: Array = map.find_children("*", "MeshInstance3D", true, false) if map else []
+		var bodies: Array = map.find_children("*", "StaticBody3D", true, false) if map else []
+		var faces := 0
+		var shapes := 0
+		for m in meshes:
+			var mi := m as MeshInstance3D
+			if mi.mesh:
+				faces += mi.mesh.get_faces().size()
+		for b in bodies:
+			shapes += (b as StaticBody3D).get_child_count()
+		print("  mesh instancí %d (stěn %d), kolizních těles %d (tvarů %d)" % [meshes.size(), faces, bodies.size(), shapes])
+		check.call("mesh není prázdný", faces > 0)
+		check.call("kolize vygenerovány", shapes > 0)
+		var surf_ok := false
+		for b in bodies:
+			if String((b as StaticBody3D).get_meta("surface", "")) == "budova":
+				surf_ok = true
+		check.call("kolize mají surface=budova", surf_ok)
+	# --- E-objekty a místa ze značek (platí pro mapový i procedurální interiér)
+	var keys := []
+	for o in it.objects:
+		keys.append(String(o["key"]))
+	print("  E-objekty: %s" % str(keys))
+	check.call("E Vyjít ven", "exit" in keys)
+	check.call("E obsluha (place:hospoda)", "place:hospoda" in keys)
+	check.call("keeper_spot za pultem", it.keeper_spot != Vector3.INF)
+	check.call("sedadla reg", it.seats.get("reg", []).size() > 0)
+	check.call("sedadla fri", it.seats.get("fri", []).size() > 0)
+	check.call("spots pipa + stoly", it.spots.has("pipa") and String(it.spots.keys()[0]) != "" and it.spots.keys().filter(
+		func(s): return String(s).begins_with("stul:")).size() > 0)
+	# --- vstup a výstup
+	w.teleport_inside(1, "hospoda")
+	await _frames(g, 5)
+	var p: Player = _pl(g)
+	check.call("hráč uvnitř hospody", p.inside == "hospoda")
+	check.call("spawn u dveří čelem dovnitř (−Z)", it.inside_door != Vector3.ZERO and absf(it.inside_yaw) < 0.5)
+	var interact := it.interactables()
+	check.call("interactables uvnitř neprázdné", interact.size() > 0)
+	w.exit_interior(1, false)            # bez fade – synchronní výstup
+	await _frames(g, 5)
+	check.call("hráč zase venku", p.inside == "")
+	# --- procedurální interiér (obchod) – stejný vstup jako kontrola bez mapy
+	w.teleport_inside(1, "obchod")
+	await _frames(g, 10)
+	var ob: Interior = w.interiors.get("obchod")
+	check.call("interiér obchodu vytvořen", ob != null)
+	if ob == null:
+		g.get_tree().quit()
+		return
+	var t2 := Time.get_ticks_msec()
+	while not ob.built and Time.get_ticks_msec() - t2 < 15000:
+		await g.get_tree().process_frame
+	check.call("obchod procedurálně dostavěn", ob.built)
+	check.call("hráč uvnitř obchodu", p.inside == "obchod")
+	w.exit_interior(1, false)
+	await _frames(g, 5)
+	print("VÝSLEDEK interiérů: %s" % ("OK" if bad.is_empty() else "%d chyb" % bad.size()))
+	g.get_tree().quit()

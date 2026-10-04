@@ -1,0 +1,14 @@
+[remap]
+
+importer="func_godot.map"
+type="Resource"
+uid="uid://dvl1yy4b8gwhs"
+path="res://.godot/imported/hospoda.map-6b8a6904c8f210b97af6d776ff7329ea.tres"
+
+[deps]
+
+source_file="res://data/maps/hospoda.map"
+dest_files=["res://.godot/imported/hospoda.map-6b8a6904c8f210b97af6d776ff7329ea.tres"]
+
+[params]
+

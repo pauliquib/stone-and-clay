@@ -14,6 +14,7 @@
 ##   --load=slot       po načtení světa nahraje uloženou pozici (rychly, auto, 1, 2, 3 – viz SaveGame)
 ##   --testmove / --bottest / --cartest / --drinktest / --questtest / --traffictest / --faunatest / --naturesynctest
 ##   --weathertest  testy (tests.gd); weathertest = přilnavost a brzdná dráha za všech situací
+##   --interiortest  mapový interiér hospody přes FuncGodot (Fáze 2) + vstup/výstup a fallback
 class_name Main
 extends Node3D
 
@@ -119,6 +120,8 @@ func _ready() -> void:
 		Tests.nature_sync_test(self)
 	if _args.has("weathertest"):
 		Tests.weather_test(self)
+	if _args.has("interiortest"):
+		Tests.interior_test(self)
 
 
 func _frames(n: int) -> void:
