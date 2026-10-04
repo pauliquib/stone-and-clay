@@ -1,4 +1,5 @@
-## Auto: VehicleBody3D (raycastové kolo s pružením) + model motoru a převodovky.
+## Auto: RigidBody3D + vlastní raycastová kola s pružením (Jolt, dřív VehicleWheel3D)
+## + model motoru a převodovky.
 ## - motor: momentová křivka (Nm) podle otáček, omezovač, brzdění motorem
 ## - automatická převodovka (řazení podle otáček a plynu, prodleva při řazení), zpátečka, prokluz spojky
 ## - brzdy (impulz na kolo ~ zpomalení 9 m/s²), ruční brzda (zadní kola, menší boční přilnavost → smyk)
@@ -14,7 +15,34 @@
 ##   rozchodu + stabilizace náklonu, vizuálně 2 kola uprostřed, náklon do zatáčky, natáčená vidlice,
 ##   kolo: šlapání (síla do max. rychlosti, bez motoru a brzdění motorem), zvonek místo klaksonu
 class_name Car
-extends VehicleBody3D
+extends RigidBody3D
+
+## Raycastové kolo (náhrada VehicleWheel3D pro Jolt): paprsek z uchycení nápravy po ose
+## podvozku (−Y auta), pružina + tlumič tlačí po normále terénu, pneumatika přenáší
+## podélnou (motor/brzda) a boční (proti smyku) sílu omezenou přilnavostí × zatížením.
+class Wheel extends RayCast3D:
+	var attach := Vector3.ZERO        # lokální uchycení nápravy (= position uzlu)
+	var front := false                # řízené kolo (dřív use_as_steering)
+	var traction := false             # poháněné kolo (dřív use_as_traction)
+	var radius := 0.3                 # poloměr kola (m)
+	var rest := 0.16                  # klidová délka pružení attach→střed kola = max. vypružení (m)
+	var travel := 0.3                 # zdvih pružení směrem nahoru – mez stlačení (m)
+	var stiff := 35000.0              # tuhost pružiny (N/m)
+	var damp := 4500.0                # tlumení (N·s/m)
+	var engine_force := 0.0           # požadovaná tažná síla (N) – nastavuje _powertrain
+	var brake := 0.0                  # požadovaná brzdná síla (N) – nastavuje _powertrain
+	var grip := 1.0                   # aktuální µ = povrch × pneu (dřív wheel_friction_slip)
+	var load := 0.0                   # normálové zatížení z posledního kroku (N)
+	var skid := 1.0                   # 1 = žádný smyk, → 0 = plný smyk (náhrada get_skidinfo)
+	var spin := 0.0                   # úhel odvalení pro vizuál kola (rad)
+	var v_lon := 0.0                  # podélná rychlost v místě kola (m/s)
+	var v_lat := 0.0                  # boční rychlost v místě kola (m/s, diagnostika smyku)
+	var sus_len := 0.0                # aktuální délka pružení attach→střed (m)
+	var contact_body: Object = null   # collider pod kolem (pro _surface_grip)
+
+	func is_in_contact() -> bool:
+		return is_colliding()
+
 
 signal crashed(impact: float, what: String, other: Object)
 signal hit_person(who: Node, speed: float)
@@ -79,8 +107,9 @@ var _ai_yield_ignore := 0.0            # vzájemné zablokování na křižovatc
 var _ai_obst_t := 0.0
 var _ai_obst := {}
 
+var steering := 0.0               # úhel natočení řízených kol (rad, + = doleva) – dřív na VehicleBody3D
 var vis: Node3D
-var wheels: Array[VehicleWheel3D] = []
+var wheels: Array[Wheel] = []
 var _wheel_vis: Array[MeshInstance3D] = []
 var _prev_xf := Transform3D()
 var _cur_xf := Transform3D()
@@ -137,6 +166,10 @@ var _wphase := 0.0
 var _glass_drops: GPUParticles3D   # kapky na čelním skle (vidět z interiéru)
 var _rain_roof: AudioStreamPlayer3D
 
+## Pružení kol v SI jednotkách (spec["susp"] z modelu je relativní násobek).
+@export var suspension_stiffness := 35000.0   # N/m za kolo (při susp = 26)
+@export var suspension_damping := 5200.0      # N·s/m za kolo (při susp = 26)
+
 
 func setup(id: String, color: Color, police := false, plate_text := "") -> void:
 	model_id = id
@@ -160,7 +193,7 @@ func _ready() -> void:
 	center_of_mass = Vector3(0, spec.get("com_y", 0.62 if spec.get("boxy", false) else 0.48), 0.05 if not two_wheeler else 0.0)
 	contact_monitor = true
 	max_contacts_reported = 6
-	continuous_cd = false
+	continuous_cd = true                 # Jolt: auto v rychlosti neprostřelí zeď/terén
 	can_sleep = false
 	linear_damp_mode = RigidBody3D.DAMP_MODE_REPLACE
 	linear_damp = 0.0
@@ -195,24 +228,27 @@ func _ready() -> void:
 		wmesh_l = CarModel.first_mesh(spec["wheel_scene"])
 		wmesh_r = wmesh_l
 	var single_track := two_wheeler and float(spec.get("lean_max", 0.0)) > 0.0   # dvě kola v ose
+	# spec["susp"] (~20–42) = relativní tuhost podle modelu; výchozí auto 26 → exportní default
+	var susp_scale := float(spec.get("susp", 30.0 if spec.get("boxy", false) else 26.0)) / 26.0
 	for i in wpos.size():
-		var w := VehicleWheel3D.new()
+		var w := Wheel.new()
 		var p: Vector3 = wpos[i]
 		w.position = Vector3(p.x, wr + rest - 0.09, p.z)
-		w.wheel_radius = wr
-		w.wheel_rest_length = rest
-		w.suspension_travel = 0.3
+		w.attach = w.position
+		w.radius = wr
+		w.rest = rest
+		w.travel = 0.45                                  # doraz/droop – kolo dokáže sledovat prohlubně terénu
+		w.target_position = Vector3(0.0, -(rest + w.travel + wr), 0.0)  # paprsek sahá až po plně vypružené kolo (jako VehicleWheel3D)
+		w.collision_mask = collision_mask
+		w.exclude_parent = true
 		# single-track (2 kola v ose): každé kolo nese polovinu hmotnosti → dvojnásobná tuhost pružení,
 		# jinak se podvozek propadne k zemi
-		w.suspension_stiffness = float(spec.get("susp", 30.0 if spec.get("boxy", false) else 26.0)) * (2.0 if single_track else 1.0)
-		w.suspension_max_force = mass * 9.81 * 2.5
-		w.damping_compression = 1.3 * (1.4 if single_track else 1.0)
-		w.damping_relaxation = 1.9 * (1.4 if single_track else 1.0)
-		w.wheel_friction_slip = 1.05
-		w.wheel_roll_influence = 0.06
+		w.stiff = suspension_stiffness * susp_scale * (2.0 if single_track else 1.0)
+		w.damp = suspension_damping * susp_scale * (1.4 if single_track else 1.0)
+		w.sus_len = rest                                   # start na klidové délce
 		var front := p.z > 0.0
-		w.use_as_steering = front
-		w.use_as_traction = front == _driven_front
+		w.front = front
+		w.traction = front == _driven_front
 		add_child(w)
 		wheels.append(w)
 		_wheel_attach.append(w.position)
@@ -700,6 +736,7 @@ func _physics_process(delta: float) -> void:
 			brake_in = 0.0
 			handbrake = true
 	_powertrain(delta)
+	_wheels(delta)
 	# odpor vzduchu a valivý odpor
 	var v := linear_velocity
 	var vl := v.length()
@@ -713,7 +750,7 @@ func _physics_process(delta: float) -> void:
 	var skid := 0.0
 	for w in wheels:
 		if w.is_in_contact():
-			skid = maxf(skid, 1.0 - w.get_skidinfo())
+			skid = maxf(skid, 1.0 - w.skid)
 	_skid.volume_db = lerpf(-60.0, -4.0, clampf(skid * 1.6 - 0.2, 0.0, 1.0)) if absf(speed) > 3.0 else -80.0
 	# déšť na střeše: uvnitř kabiny jiný zvuk než venku
 	if _rain_roof:
@@ -801,29 +838,90 @@ func _balance(delta: float) -> void:
 		pedal_angle = fmod(pedal_angle + maxf(speed, 1.2) / float(model.spec["wheel_r"]) / 2.6 * delta, TAU)
 
 
-## Poloha kol pro vizuál: vlastní paprsek od uchycení nápravy (uzel VehicleWheel3D v Godotu 4.3
-## nesedí přesně na středu kola nad zemí), rotace (odvalení + natočení) z VehicleWheel3D.
+## Kola (Jolt, náhrada VehicleWheel3D): paprsek z uchycení nápravy dolů o délce
+## rest + radius → pružina `stiff × stlačení + damp × rychlost stlačování` (strop
+## mass·g·2.5 jako dřív) tlačí po normále terénu v kontaktním bodu. Rychlost
+## stlačování se bere z rychlosti uchycení (ne diferencí délky – při doskoku
+## z výskoku by to dalo falešný kopanec a auto poskakovalo); odpružení tlumí
+## ~1,45× víc než stlačení (dřív damping_relaxation/compression 1.9/1.3).
+## Pneumatika pak přenáší boční sílu proti smyku omezenou třecím limitem
+## µ (grip) × normálové zatížení a podélnou sílu motoru/brzd přímo – stejně
+## jako VehicleBody3D (engine_force nepřes třecí kruh, jinak by rozjezd
+## vyšel ~2× pomalejší než dřív). Náplň limitu → w.skid (zvuk smyku),
+## v_lon → otáčky kol pro motor (náhrada get_rpm) a odvalení vizuálu.
+func _wheels(delta: float) -> void:
+	var xf := global_transform
+	var up := xf.basis.y.normalized()
+	var com := xf * center_of_mass                       # světové těžiště
+	var m_eff := mass / float(maxi(wheels.size(), 1))    # podíl hmotnosti na kolo
+	var f_max := mass * 9.81 * 2.5                       # strop pružné síly (dřív suspension_max_force)
+	for w in wheels:
+		var steer_a := steering if w.front else 0.0
+		w.force_raycast_update()                           # čerstvý paprsek – po teleportu jinak vrací kontakt ze staré pozice
+		var have := w.is_colliding()
+		var n := up
+		var pt := w.global_position - up * (w.rest + w.travel + w.radius)
+		if have:
+			var hp := w.get_collision_point()
+			# sanity: zásah mimo dosah paprsku = zastaralý kontakt, ignorovat
+			if hp.distance_to(w.global_position) <= w.rest + w.travel + w.radius + 0.05:
+				pt = hp
+				n = w.get_collision_normal()
+			else:
+				have = false
+		var fwd_w := xf.basis * Vector3(sin(steer_a), 0.0, cos(steer_a))
+		fwd_w -= n * fwd_w.dot(n)                        # směr kvaltování promítnutý na rovinu terénu
+		if fwd_w.length_squared() < 0.001:
+			continue
+		fwd_w = fwd_w.normalized()
+		var right_w := n.cross(fwd_w)
+		var rel := pt - com
+		var v_pt := linear_velocity + angular_velocity.cross(rel)
+		w.v_lon = v_pt.dot(fwd_w)
+		w.v_lat = v_pt.dot(right_w)
+		w.spin += w.v_lon / w.radius * delta
+		var v_lat := w.v_lat
+		w.contact_body = w.get_collider() if have else null
+		var sus := w.rest + w.travel                       # bez kontaktu: plně vypružené (doraz)
+		if have:
+			sus = clampf(pt.distance_to(w.global_position) - w.radius, maxf(w.rest - w.travel, 0.02), w.rest + w.travel)
+		w.sus_len = sus
+		# tlumič: rychlost stlačování z rychlosti kontaktního bodu podél normály
+		var cvel := -v_pt.dot(n) if have else 0.0
+		var dk := 1.0 if cvel > 0.0 else 1.45            # odpružení tlumí víc než stlačení
+		# za klidovou délkou jde síla do mínusu – kolo visí na dorazu a drží karoserii u země
+		# (jako VehicleBody3D); tah omezený, aby visící kolo neštíplo auto k zemi
+		var compr := w.rest - sus
+		var f_sus := clampf(w.stiff * compr + w.damp * dk * cvel, -mass * 9.81 * 0.2, f_max)
+		w.load = maxf(f_sus, 0.0)
+		if f_sus != 0.0:
+			apply_force(n * f_sus, pt - xf.origin)
+		if f_sus <= 0.0:
+			w.skid = 1.0
+			continue
+		# pneumatika: boční síla omezená µ·N; podélná (motor/brzda) přímo jako VehicleBody3D
+		var cap := maxf(w.grip * f_sus, 0.0)
+		var f_lat_d := -v_lat * m_eff / delta
+		var f_lat := clampf(f_lat_d, -cap, cap)
+		var f_lon := w.engine_force - signf(w.v_lon) * w.brake
+		if absf(w.v_lon) < 0.1:
+			# pomalý pohyb: brzda drží auto na místě (odpor proti rozběhu, ne sign-flick)
+			f_lon = w.engine_force + clampf(-w.v_lon * m_eff / delta, -w.brake, w.brake)
+		apply_force(right_w * f_lat + fwd_w * f_lon, pt - xf.origin)
+		var dem := sqrt(f_lat_d * f_lat_d + f_lon * f_lon)
+		w.skid = 1.0 if dem <= cap or dem < 1.0 else clampf(cap / dem, 0.0, 1.0)
+
+
+## Poloha kol pro vizuál: attach → střed kola podle délky pružení `w.sus_len` (fyzikální
+## paprsek), rotace (odvalení `w.spin` + natočení `steering`) složená ručně.
 func _update_wheel_visuals() -> void:
 	var xf := global_transform
 	var up := xf.basis.y.normalized()
-	var space := get_world_3d().direct_space_state
-	var near := drive == Drive.PLAYER or (get_viewport().get_camera_3d() != null and \
-		get_viewport().get_camera_3d().global_position.distance_squared_to(xf.origin) < 90.0 * 90.0)
 	for i in wheels.size():
 		var w := wheels[i]
-		var wxf := w.global_transform
-		if near:
-			var from := xf * _wheel_attach[i]
-			var reach := w.wheel_rest_length + w.suspension_travel + w.wheel_radius
-			var q := PhysicsRayQueryParameters3D.create(from, from - up * reach, 1 | 8 | 16)
-			q.exclude = [get_rid()]
-			var hit := space.intersect_ray(q)
-			if hit.is_empty():
-				wxf.origin = from - up * (w.wheel_rest_length + w.suspension_travel * 0.5)
-			else:
-				var hub: Vector3 = hit["position"] + up * w.wheel_radius
-				var along := (from - hub).dot(up)
-				wxf.origin = from - up * clampf(along, 0.0, reach)
+		var steer_a := steering if w.front else 0.0
+		var wxf := Transform3D(xf.basis * Basis(Vector3.UP, steer_a) * Basis(Vector3.RIGHT, w.spin), Vector3.ZERO)
+		wxf.origin = (xf * _wheel_attach[i]) - up * minf(w.sus_len, w.rest + w.travel)
 		if two_wheeler:
 			wxf.origin -= xf.basis.x * _wheel_attach[i].x      # kolo uprostřed mezi paprsky
 		_prev_wxf[i] = _cur_wxf[i]
@@ -902,12 +1000,12 @@ func _powertrain(delta: float) -> void:
 	var final_d: float = spec["final"]
 	var wr: float = spec["wheel_r"]
 	var rmax: float = spec["rpm_max"]
-	# otáčky kol → motor
+	# otáčky kol → motor (ω = v_lon / r z raycastu kol)
 	var wrpm := 0.0
 	var n := 0
 	for w in wheels:
-		if w.use_as_traction:
-			wrpm += absf(w.get_rpm())
+		if w.traction:
+			wrpm += absf(w.v_lon) / w.radius * 60.0 / TAU
 			n += 1
 	wrpm /= maxf(n, 1)
 	var ratio: float = (3.3 if gear == -1 else float(gears[gear - 1])) * final_d
@@ -944,33 +1042,33 @@ func _powertrain(delta: float) -> void:
 		force = tq * ratio * 0.9 / wr
 		if gear == -1:
 			force = -force
-	var brake_imp := mass * 8.8 / 4.0 / Engine.physics_ticks_per_second * brake_in
+	var brake_force := mass * 8.8 / 4.0 * brake_in             # N za kolo (~ zpomalení 9 m/s²)
 	var engine_brake := 0.0
 	if throttle < 0.05 and not dead:
-		engine_brake = mass * 0.9 / 4.0 / Engine.physics_ticks_per_second
+		engine_brake = mass * 0.9 / 4.0
 	var tire_grip := float(spec.get("grip", 1.0))              # přilnavost pneu podle modelu (motorky: lepší guma)
 	var lean_phys := float(spec.get("lean_max", 0.0)) > 0.0
 	var load_xfer := clampf(absf(speed) / 10.0, 0.0, 1.0)
 	for w in wheels:
 		var surf := _surface_grip(w)
 		var grip := 1.05 * surf * tire_grip
-		if not w.use_as_steering and handbrake:
+		if not w.front and handbrake:
 			grip *= 0.55
 		if lean_phys:
 			# podélný přenos zatížení: brzda naloží přední kolo (+grip vpředu, zadek odlehčený),
 			# plyn zadní – zadek sice drží líp, ale klouže při plném výkonu
-			grip *= 1.0 + (0.16 if w.use_as_steering else -0.10) * brake_in * load_xfer
-			grip *= 1.0 + (-0.05 if w.use_as_steering else 0.08) * throttle * load_xfer
-		w.wheel_friction_slip = grip
-		if w.use_as_traction and brake_in < 0.05:
+			grip *= 1.0 + (0.16 if w.front else -0.10) * brake_in * load_xfer
+			grip *= 1.0 + (-0.05 if w.front else 0.08) * throttle * load_xfer
+		w.grip = grip
+		if w.traction and brake_in < 0.05:
 			w.engine_force = force / maxf(n, 1)
 			w.brake = 0.0 if force != 0.0 else engine_brake
 		else:
 			w.engine_force = 0.0
-			w.brake = brake_imp + (engine_brake if w.use_as_traction else 0.0)
-		if handbrake and not w.use_as_steering:
+			w.brake = brake_force + (engine_brake if w.traction else 0.0)
+		if handbrake and not w.front:
 			w.engine_force = 0.0
-			w.brake = mass * 7.0 / 4.0 / Engine.physics_ticks_per_second
+			w.brake = mass * 7.0 / 4.0
 	# řízení – menší rejd při rychlosti (steer_v = rychlost dosažení minima, steer_hi = minimum, steer_rate = rychlost náběhu)
 	var max_steer := lerpf(0.6, float(spec.get("steer_hi", 0.09)), clampf(absf(speed) / float(spec.get("steer_v", 33.0)), 0.0, 1.0))
 	var s_tgt := steer_in * max_steer
@@ -1000,27 +1098,27 @@ func _pedal_force(wrpm: float, dead: bool) -> void:
 			force = -push * 0.4 * throttle * clampf(1.5 - absf(speed), 0.0, 1.0)
 		else:
 			force = push * throttle * clampf((vmax - speed) / 2.5, 0.0, 1.0) * (1.0 - damage / 200.0)
-	var brake_imp := mass * 7.5 / 4.0 / Engine.physics_ticks_per_second * brake_in
+	var brake_force := mass * 7.5 / 4.0 * brake_in             # N za kolo
 	var tire_grip := float(spec.get("grip", 1.0))
 	for w in wheels:
 		var grip := 1.05 * _surface_grip(w) * tire_grip
-		if not w.use_as_steering and handbrake:
+		if not w.front and handbrake:
 			grip *= 0.55
-		w.wheel_friction_slip = grip
-		w.engine_force = force * 0.5 if w.use_as_traction and brake_in < 0.05 else 0.0
-		w.brake = brake_imp if brake_in >= 0.05 else 0.0
-		if handbrake and not w.use_as_steering:
+		w.grip = grip
+		w.engine_force = force * 0.5 if w.traction and brake_in < 0.05 else 0.0
+		w.brake = brake_force if brake_in >= 0.05 else 0.0
+		if handbrake and not w.front:
 			w.engine_force = 0.0
-			w.brake = mass * 7.0 / 4.0 / Engine.physics_ticks_per_second
+			w.brake = mass * 7.0 / 4.0
 	var max_steer := lerpf(0.6, float(spec.get("steer_hi", 0.12)), clampf(absf(speed) / float(spec.get("steer_v", 12.0)), 0.0, 1.0))
 	steering = move_toward(steering, steer_in * max_steer, get_physics_process_delta_time() * float(spec.get("steer_rate", 2.6)))
 	model.tail_mat.emission_energy_multiplier = 0.9 if lights_on else 0.3
 
 
-func _surface_grip(w: VehicleWheel3D) -> float:
+func _surface_grip(w: Wheel) -> float:
 	if not w.is_in_contact():
 		return 1.0
-	var b := w.get_contact_body()
+	var b := w.contact_body
 	if b == null:
 		return 1.0
 	var s: String = b.get_meta("surface", "")

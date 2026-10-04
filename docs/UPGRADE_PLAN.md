@@ -318,11 +318,11 @@ func _on_stall_detected():
 
 ### Fáze 1 (Základy)
 
-- [ ] Záloha projektu (git commit)
-- [ ] Instalace Jolt, přepnutí physics engine
-- [ ] Úprava `car.gd` (raycast suspension)
-- [ ] Úprava `aircraft.gd` (přesun fyziky do `_physics_process`)
-- [ ] Test `--cartest` a `--faunatest`
+- [x] Záloha projektu (git commit)
+- [x] Instalace Jolt, přepnutí physics engine
+- [x] Úprava `car.gd` (raycast suspension)
+- [x] Úprava `aircraft.gd` (přesun fyziky do `_physics_process`)
+- [x] Test `--cartest` a `--faunatest`
 
 ### Fáze 2 (Interiéry)
 

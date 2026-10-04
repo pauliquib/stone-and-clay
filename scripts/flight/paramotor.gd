@@ -176,7 +176,7 @@ func clear_pilot() -> void:
 
 ## Pojíždění = běh pilota s motorem na zádech. W = nohy; tah vrtule se započítá až s křídlem
 ## nad hlavou (plyn předtím = fumble). Vzlet při v_min a dostatečném vztlaku padáku.
-func _on_ground(state: PhysicsDirectBodyState3D, xf: Transform3D, gy: float,
+func _on_ground(xf: Transform3D, gy: float,
 		steer_in: float, elev_in: float, dt: float) -> void:
 	var pos := xf.origin
 	var fwd := Vector3(-sin(_yaw), 0.0, -cos(_yaw))
@@ -194,7 +194,7 @@ func _on_ground(state: PhysicsDirectBodyState3D, xf: Transform3D, gy: float,
 		if pg_state == "wing_up":
 			a += float(spec["thrust"]) * throttle / m            # tah vrtule pomáhá doběhnout
 		elif _sprint_in() and _life_t > _lock_t:
-			_fumble(state)
+			_fumble()
 			return
 		v_ground = maxf(v_ground + a * dt, 0.0)
 		if _life_t < _lock_t:
@@ -207,14 +207,14 @@ func _on_ground(state: PhysicsDirectBodyState3D, xf: Transform3D, gy: float,
 		_pitch = lerpf(_pitch, pitch_tgt, minf(dt * 4.0, 1.0))
 		pos.y = gy + float(spec["gear_h"])
 		var new_basis := Basis.from_euler(Vector3(_pitch, _yaw, _bank))
-		state.transform = Transform3D(new_basis, pos)
-		state.linear_velocity = new_basis * Vector3(0, 0, -v_ground)
+		global_transform = Transform3D(new_basis, pos)
+		linear_velocity = new_basis * Vector3(0, 0, -v_ground)
 		speed = v_ground
 		_burn_fuel(dt)
 		_update_inflate(dt, wind, v_ground)
 		# vzlet: křídlo nahoře a vztlak převáží
 		if pg_state == "wing_up" and v_ground >= float(spec["v_min"]) * 0.95:
-			var rw := wind_at(pos) - state.linear_velocity
+			var rw := wind_at(pos) - linear_velocity
 			var lrw := new_basis.inverse() * rw
 			var va := maxf(lrw.length(), 0.01)
 			var cl := float(spec["CL0"]) + float(spec["CL_A"]) * atan2(lrw.y, maxf(lrw.z, 0.01))
@@ -252,7 +252,7 @@ func _update_inflate(dt: float, wind: Vector3, v_ground: float) -> void:
 
 
 ## Plyn (Shift) dřív, než je křídlo nad hlavou → pád na záda, vrtule do trávy.
-func _fumble(state: PhysicsDirectBodyState3D) -> void:
+func _fumble() -> void:
 	dmg = minf(dmg + 8.0, 99.0)
 	if body_state:
 		body_state.hurt(6.0, "pád při rozběhu paramotoru")
@@ -262,7 +262,7 @@ func _fumble(state: PhysicsDirectBodyState3D) -> void:
 	_inflate = 0.0
 	throttle = 0.0
 	speed = 0.0
-	state.linear_velocity = Vector3.ZERO
+	linear_velocity = Vector3.ZERO
 
 
 ## Vytržení křídla silným větrem (vléčení, pád).

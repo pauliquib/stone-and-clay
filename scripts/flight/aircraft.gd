@@ -122,10 +122,12 @@ func setup(w: World, pid: int, model_id: String) -> void:
 	collision_layer = 16                   # vozidla – registrují ho terén, props i postavy
 	collision_mask = 1 | 2 | 4 | 8 | 16
 	contact_monitor = true
-	max_contacts_reported = 4
+	max_contacts_reported = 8
 	can_sleep = false
-	custom_integrator = true               # fyziku počítáme sami (vztlak/odpor/tah)
-	gravity_scale = 0.0
+	gravity_scale = 0.0                    # gravitaci počítáme sami (G = 9,81 ≠ default 20)
+	continuous_cd = true                   # Jolt: CCD – letoun v rychlosti neprostřelí terén
+	angular_damp = 0.5                     # Jolt má jiné defaulty tlumení než Godot Physics
+	linear_damp = 0.1
 	var cs := CollisionShape3D.new()
 	var bx := BoxShape3D.new()
 	bx.size = Vector3(1.8, 1.6, 3.0)
@@ -303,21 +305,20 @@ func _delayed_input(dt: float) -> Array:
 	return _hist[0][1]
 
 
-func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
-	var dt := state.step
+func _physics_process(dt: float) -> void:
 	_life_t += dt
 	if pilot == null or world == null:
 		return                                                    # bez pilota zamrzlý (park)
 	if dmg >= 100.0:                                            # havárie – jen klesá a kutálí se
-		state.linear_velocity += Vector3(0, -G, 0) * dt
+		linear_velocity += Vector3(0, -G, 0) * dt
 		_prev_xf = _cur_xf
-		_cur_xf = state.transform
+		_cur_xf = global_transform
 		return
-	var xf := state.transform
+	var xf := global_transform
 	var pos := xf.origin
 	var gy: float = world.terrain.height_at(pos.x, pos.z) if world.terrain else pos.y
 	var agl: float = pos.y - gy
-	var v: Vector3 = state.linear_velocity
+	var v: Vector3 = linear_velocity
 	var inp := _delayed_input(dt)
 	var thr_in: float = inp[0]
 	var steer_in: float = inp[1]
@@ -326,26 +327,26 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var wind := wind_at(pos) + _turbulence(pos)
 
 	if on_ground:
-		_on_ground(state, xf, gy, steer_in, elev_in, dt)
+		_on_ground(xf, gy, steer_in, elev_in, dt)
 	else:
-		_in_air(state, xf, wind, v, agl, gy, steer_in, elev_in, dt)
+		_in_air(xf, wind, v, agl, gy, steer_in, elev_in, dt)
 
 	# hranice letu (M6.2): přetáčivý protivítr / strop 1500 m AGL
-	var fb: Dictionary = world.flight_bounds(state.transform.origin)
-	state.linear_velocity += (fb["push"] as Vector3) * dt
+	var fb: Dictionary = world.flight_bounds(global_transform.origin)
+	linear_velocity += (fb["push"] as Vector3) * dt
 	_edge_warned = bool(fb["warn"])
 	_law_check(dt)
 	# XP za nalétané metry (zapíše se při dosednutí / vystoupení)
 	if not on_ground:
 		_xp_d += Vector3(v.x, 0, v.z).length() * dt
 	_prev_xf = _cur_xf
-	_cur_xf = state.transform
-	speed = state.linear_velocity.length()
+	_cur_xf = global_transform
+	speed = linear_velocity.length()
 
 
 ## Pojíždění po zemi: tah–valivý odpor, řízení kolem svislé osy, terén kopíruje profil,
 ## vzlet sám při v_min (vztlak překročí váhu), posadka ze vzduchu řeší _in_air → dotyk.
-func _on_ground(state: PhysicsDirectBodyState3D, xf: Transform3D, gy: float,
+func _on_ground(xf: Transform3D, gy: float,
 		steer_in: float, elev_in: float, dt: float) -> void:
 	var pos := xf.origin
 	var fwd := Vector3(-sin(_yaw), 0.0, -cos(_yaw))
@@ -369,12 +370,12 @@ func _on_ground(state: PhysicsDirectBodyState3D, xf: Transform3D, gy: float,
 	_pitch = lerpf(_pitch, pitch_tgt, minf(dt * 4.0, 1.0))
 	pos.y = gy + float(spec["gear_h"])
 	var new_basis := Basis.from_euler(Vector3(_pitch, _yaw, _bank))
-	state.transform = Transform3D(new_basis, pos)
-	state.linear_velocity = new_basis * Vector3(0, 0, -v_ground)
+	global_transform = Transform3D(new_basis, pos)
+	linear_velocity = new_basis * Vector3(0, 0, -v_ground)
 	speed = v_ground
 	_burn_fuel(dt)
 	# vzlet: vztlak převáží
-	var rw := wind_at(pos) - state.linear_velocity
+	var rw := wind_at(pos) - linear_velocity
 	var lrw := new_basis.inverse() * rw
 	var va := maxf(lrw.length(), 0.01)
 	var cl := float(spec["CL0"]) + float(spec["CL_A"]) * atan2(lrw.y, maxf(lrw.z, 0.01))
@@ -386,7 +387,7 @@ func _on_ground(state: PhysicsDirectBodyState3D, xf: Transform3D, gy: float,
 
 ## Ve vzduchu: aerodynamika (CL(α) s přetáčením, CD0 + CL²/(π·AR·e)), tah, gravitace;
 ## orientaci držíme sami – bank ze steer → zatáčka g·tan(φ)/v, pitch auto-trim na γ+α_trim.
-func _in_air(state: PhysicsDirectBodyState3D, xf: Transform3D, wind: Vector3, v: Vector3,
+func _in_air(xf: Transform3D, wind: Vector3, v: Vector3,
 		agl: float, gy: float, steer_in: float, elev_in: float, dt: float) -> void:
 	var pos := xf.origin
 	var basis := Basis.from_euler(Vector3(_pitch, _yaw, _bank))
@@ -459,8 +460,8 @@ func _in_air(state: PhysicsDirectBodyState3D, xf: Transform3D, wind: Vector3, v:
 			world.play_sfx(owner_id, "land", 1.0, -6.0)
 		_xp_flush()
 		v = Vector3(hg.x, 0.0, hg.z)
-	state.transform = Transform3D(new_basis, pos)
-	state.linear_velocity = v
+	global_transform = Transform3D(new_basis, pos)
+	linear_velocity = v
 
 
 # ------------------------------------------------------------------ háčky pro M6.4 paramotor

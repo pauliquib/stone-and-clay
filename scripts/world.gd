@@ -35,8 +35,9 @@ const SEASON_ITEMS := {
 }
 const HRIB_DRY := 0.25
 ## Srážka auta se zvěří: poškození auta v % = HIT_DAMAGE_K × hmotnost (kg) × rychlost² (m/s)² – zajíc ~2 %,
-## srnec při 70 km/h ~20 %, divočák při 50 km/h ~37 %. Kůň (550 kg) je nižší a pružnější → násobek HIT_HORSE_K.
-const HIT_DAMAGE_K := 0.0022
+## srnec při 70 km/h ~15 %, divočák při 50 km/h ~28 %. Kůň (550 kg) je nižší a pružnější → násobek HIT_HORSE_K.
+## Jolt (2024): přesnější kolize → práh poškození ~+15 % v rychlosti → K = 0,0022 / 1,15² ≈ 0,00166.
+const HIT_DAMAGE_K := 0.00166
 const HIT_HORSE_K := 0.35
 ## Zvíře těžší než HIT_INJURY_MASS zraní řidiče při rychlosti nad HIT_INJURY_SPEED (m/s ≈ 47 km/h).
 const HIT_INJURY_MASS := 40.0
