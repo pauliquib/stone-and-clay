@@ -514,7 +514,7 @@ func _ready() -> void:
 	(_loading as ColorRect).color = Color(0.08, 0.1, 0.08)
 	_loading.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(_loading)
-	_loading_label = _label(_loading, "DUKELČICE A JÍL\n\nNačítám mapu katastru…", 34)
+	_loading_label = _label(_loading, "KAMENÍ A JÍL\n\nNačítám mapu katastru…", 34)
 	_loading_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_loading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_loading_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -527,7 +527,7 @@ func _ready() -> void:
 
 
 func set_loading(text: String) -> void:
-	_loading_label.text = "DUKELČICE A JÍL\n\n" + text
+	_loading_label.text = "KAMENÍ A JÍL\n\n" + text
 
 
 func finish_loading() -> void:
