@@ -40,6 +40,10 @@ kontroly, poškozené auto. Pod jednoduchým, laskavě humorným povrchem běž�
 fyziologie, počasí a roční doby, doprava a policie, ekonomika, práce, zvěř a lov, hospodářství,
 zahrada a desítky dalších systémů.
 
+Kolem katastru leží pět okolních obcí s fiktivními názvy (Břehatice, Bohulečice, Březouchy,
+Velký Oříškov, Hřiváčův Újezd) – jsou jen vizuální kulisou krajiny pro pohled z výšky
+a na mapě (M), bez herního obsahu; hráč vždy startuje v Dukelčicích.
+
 Vize, pilíře a herní smyčka: [`GAME_DESIGN.md`](GAME_DESIGN.md).
 Úplný technický rozpis všech implementovaných systémů: [`docs/SYSTEMS.md`](docs/SYSTEMS.md).
 
@@ -111,6 +115,7 @@ Generované soubory a jejich nástroje (výstupy se commitují, kromě `data/*.b
 | `godot --headless --path . --script tools/gen_villager_bt.gd` | `ai/villager_routine.tres` | po změně struktury behavior stromu (vyžaduje načtený LimboAI GDExtension) |
 | `python3 tools/gen_hospoda_map.py` | `data/maps/hospoda.map` | po změně mapy hospody (editovatelná i v TrenchBroomu) |
 | `python3 tools/gen_interior_textures.py` | `assets/textures/interiors/*.png` | po změně vzhledu interiérových textur (vyžaduje Pillow) |
+| `python3 tools/obce.py` | `data/obce.json` | po změně výběru/geometrie okolních obcí (5 fiktivních katastrů; vyžaduje `osmium`, `numpy`) |
 
 Binární data mapy (`data/*.bin`) se regenerují exportem z Blenderu přes `tools/export_map.py`
 (postup v [`docs/DEV.md`](docs/DEV.md)); `data/vegetation.bin` navíc přes `tools/vegetation.py`.

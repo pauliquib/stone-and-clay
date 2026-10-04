@@ -55,6 +55,8 @@ const FLY_CEIL_PUSH := 6.0       # jak rychle stroj tlačí dolů nad stropem (m
 
 var args := {}
 var meta: Dictionary
+var obce: Array = []             # okolní obce z data/obce.json (id, name, center, radius, boundary, roads…)
+var _obec_bounds := {}           # id obce → Rect2 hranice katastru – počítá obec_bounds() jednou (mapa, obec_at)
 var terrain: Terrain
 var water: Water                 # potoky, řeka, rybníky (OSM / DIBAVOD)
 var radio: Radio                 # rádio doma (u vchodu domova, uvnitř na komodě) – hudba a sousedi
@@ -168,6 +170,7 @@ func build() -> void:
 	await _frames(2)
 	meta = JSON.parse_string(FileAccess.get_file_as_string("res://data/map.json"))
 	weather.north_deg = float(meta.get("north_angle_deg", 78.37))
+	obce = _load_obce()            # okolní obce pro mapu (HUD) a „nacházíš se v X"; 3D zástavbu staví Villages
 
 	loading.emit("Terén (DMR 5G, 2 m) a povrch…")
 	await _frames(1)
@@ -190,6 +193,11 @@ func build() -> void:
 	villages.name = "Vesnice"
 	add_child(villages)
 	villages.setup(surroundings, terrain)
+	if not villages.stats.is_empty():        # ladění: kolik budov se v které obci postavilo
+		var _vs := []
+		for k in villages.stats:
+			_vs.append("%s %d budov" % [k, int(villages.stats[k]["buildings"])])
+		print("Okolní obce (villages.stats): %s" % ", ".join(_vs))
 
 	loading.emit("Budovy a cesty…")
 	await _frames(1)
@@ -586,6 +594,68 @@ func player_anchor(i: int) -> Vector3:
 	var ids := players.keys()
 	ids.sort()
 	return player_world_pos(players[ids[i % ids.size()]])
+
+
+# ------------------------------------------------------------------ okolní obce (data/obce.json)
+
+## Okolní obce (tools/obce.py → data/obce.json): pole dictů s id / name (fiktivní) / center / radius /
+## boundary / roads / buildings / water / forest ve světových souřadnicích (x, z). Chybí-li soubor
+## nebo má jiný formát → prázdné pole + varování (hra běží dál, jen bez obcí na mapě a ve světě).
+static func _load_obce() -> Array:
+	if not FileAccess.file_exists(Villages.DATA_PATH):
+		push_warning("World: chybí %s – okolní obce bez dat (tools/obce.py)" % Villages.DATA_PATH)
+		return []
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(Villages.DATA_PATH))
+	if data is Dictionary and data.get("obce") is Array:
+		return data["obce"]
+	push_warning("World: neznámý formát %s" % Villages.DATA_PATH)
+	return []
+
+
+## Ohraničující obdélník katastru obce (svět x, z) z `boundary`; bez něj center ± radius.
+## Výsledek se drží v `_obec_bounds` – používá obec_at() i mapa v HUD pro ořez kreslení.
+func obec_bounds(o: Dictionary) -> Rect2:
+	var id := String(o.get("id", o.get("name", "")))
+	if _obec_bounds.has(id):
+		return _obec_bounds[id]
+	var r := Rect2()
+	var first := true
+	for q in o.get("boundary", []):
+		if q is Array and q.size() >= 2:
+			var p := Vector2(float(q[0]), float(q[1]))
+			r = Rect2(p, Vector2.ZERO) if first else r.expand(p)
+			first = false
+	if first:
+		var c: Array = o.get("center", [0.0, 0.0])
+		var rr := float(o.get("radius", 500.0))
+		r = Rect2(Vector2(float(c[0]), float(c[1])) - Vector2(rr, rr), Vector2(2.0 * rr, 2.0 * rr))
+	_obec_bounds[id] = r
+	return r
+
+
+## Obec, v jejímž katastru bod (x, z) leží – pro budoucí „nacházíš se v X". Pravdivá
+## příslušnost je polygon hranice (radius v datech je jen ekvivalentní plochy – jeho kružnice
+## sousedům přesahuje i nedosahuje), při případných překryvech hranic vítězí nejbližší střed.
+## Mimo všechny katastry → {}. Levné: 5 obcí, test v polygonu jen při zásahu obdélníku (obec_bounds).
+func obec_at(pos: Vector3) -> Dictionary:
+	var p := Vector2(pos.x, pos.z)
+	var best: Dictionary = {}
+	var bd := INF
+	for o in obce:
+		if not obec_bounds(o).has_point(p):
+			continue
+		var poly := PackedVector2Array()
+		for q in o.get("boundary", []):
+			if q is Array and q.size() >= 2:
+				poly.append(Vector2(float(q[0]), float(q[1])))
+		if poly.size() < 3 or not Geometry2D.is_point_in_polygon(p, poly):
+			continue
+		var c: Array = o.get("center", [])
+		var d := p.distance_to(Vector2(float(c[0]), float(c[1]))) if c.size() >= 2 else 0.0
+		if d < bd:
+			bd = d
+			best = o
+	return best
 
 
 # ------------------------------------------------------------------ zprávy klientům

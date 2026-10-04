@@ -424,7 +424,7 @@ func _ready() -> void:
 	_map_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_map_overlay.draw.connect(_draw_map)
 	_map_tex.add_child(_map_overlay)
-	var mt := _label(_map, "Katastr obce Dukelčic – ortofoto ČÚZK     ● hráč   ■ domov   ◆ místa   ★ cíl úkolu   ▲ tvoje auto   M – zavřít", 16)
+	var mt := _label(_map, "Katastr obce Dukelčic a okolí – ortofoto © ČÚZK    ● hráč   ■ domov   ◆ místa   ★ cíl úkolu   ▲ tvoje auto   ◇ okolní obce      kolečko – přiblížení · tažení – posun · M / Esc – zavřít", 16)
 	mt.position = Vector2(46, 10)
 	_map_pos = _label(_map, "", 14)
 	_map_pos.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -536,6 +536,7 @@ func finish_loading() -> void:
 	tw.tween_callback(_loading.hide)
 	refresh_map_texture()
 	show_message("Vítej v Dukelčicích!\nDěda Vomáčka u domu by něco potřeboval. Klikni do okna pro ovládání myší.", 6.0)
+	_hook_obce_map()                     # okolní obce na hlavní mapě (druhý draw callback _map_view)
 
 
 ## Podklad minimapy (M): mapa z tříd povrchu, nebo ortofoto, podle nastavení terénu (World.map_texture).
@@ -1555,3 +1556,163 @@ func _bar(parent: Node, col: Color, w: float) -> ProgressBar:
 	pb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(pb)
 	return pb
+
+
+# ------------------------------------------------------------------ okolní obce na mapě (M)
+# data/obce.json → World.obce (3D zástavbu staví scripts/villages.gd): na hlavní mapě se
+# kreslí tečkovaná hranice katastru, tlumené obecní silnice a název u kotvy středu – mimo
+# katastr, kam ortofoto nesahá. Pohled se smí roztáhnout i za katastr (_map_extent –
+# pojí ho _map_clamp), kolečko oddálí až na MAP_ZOOM_MIN. Kreslí druhý draw callback na
+# _map_view (_hook_obce_map z finish_loading), ať zůstane oddělené od obsahu mapy.
+
+## Nejmenší přiblížení mapy (M) – na něm se najednou vejde katastr i všech 5 okolních obcí.
+const MAP_ZOOM_MIN := 0.5
+## Hranice katastru okolní obce na mapě – tlumená okrová, kreslí se tečkovaně.
+const OBEC_BOUNDARY := Color(0.85, 0.78, 0.45, 0.7)
+## Název obce na mapě – teplá bělavá, čitelná i na tmavém podkladu za katastrem.
+const OBEC_NAME := Color(0.96, 0.89, 0.64)
+## Obecní silnice na mapě – tlumenější provedení stylů hlavních silnic: druh → [barva, px].
+const OBEC_ROAD_STYLE := {
+	"secondary": [Color(0.82, 0.66, 0.35, 0.55), 2.0],
+	"tertiary": [Color(0.78, 0.78, 0.74, 0.5), 1.7],
+	"residential": [Color(0.72, 0.72, 0.7, 0.45), 1.3],
+	"unclassified": [Color(0.72, 0.72, 0.7, 0.45), 1.3],
+	"service": [Color(0.62, 0.62, 0.6, 0.4), 1.0],
+	"track": [Color(0.55, 0.44, 0.3, 0.45), 1.0],
+	"path": [Color(0.5, 0.42, 0.3, 0.4), 0.4],
+	"footway": [Color(0.5, 0.42, 0.3, 0.4), 0.4],
+	"other": [Color(0.68, 0.68, 0.68, 0.4), 1.2],
+}
+const OBEC_DASH := 7.0         # délka čárky hranice obce na mapě (px)
+const OBEC_GAP := 4.5          # mezera mezi čárkami (px)
+
+var _map_ext := Rect2()        # oblast, kterou smí pohled mapy pokrýt (katastr + okolní obce)
+var _map_ext_ok := false       # _map_ext už je spočítané (obce se za běhu nemění)
+
+
+## Napojí kreslení okolních obcí na hlavní mapu (M) – volá finish_loading.
+## Obce kreslí druhý draw callback na _map_view (přepsaná mapa s přiblížením a tažením);
+## starší podoba mapy (_map_tex/_map_overlay) je nemá – bez _map_view se nic nenapojí.
+func _hook_obce_map() -> void:
+	var mv: Variant = get("_map_view")
+	if mv is Control and not (mv as Control).draw.is_connected(_draw_map_obce):
+		(mv as Control).draw.connect(_draw_map_obce)
+
+
+## Oblast, kterou smí pohled mapy (M) pokrýt: katastr (ortho_full) + hranice všech okolních
+## obcí + malá rezerva, ať se na vesnice dá dozoomovat i dotažení – ale ne donekonečna.
+func _map_extent() -> Rect2:
+	if not _map_ext_ok:
+		var o: Dictionary = meta["ortho_full"]
+		_map_ext = Rect2(float(o["x0"]), float(o["z0"]), float(o["size_x"]), float(o["size_z"]))
+		var w := game as World
+		if w != null:
+			for ob in w.obce:
+				_map_ext = _map_ext.merge(w.obec_bounds(ob))
+		_map_ext = _map_ext.grow(200.0)
+		_map_ext_ok = true
+	return _map_ext
+
+
+## Okolní obce na _map_view – druhý draw callback (napojený v _hook_obce_map až po načtení,
+## kdy World.obce existuje). Svět → pohled přepočítává stejně jako _w2v; členy přepsané
+## mapy čte přes get()/call(), ať skript projde i bez nich (starší podoba mapy).
+func _draw_map_obce() -> void:
+	var w := game as World
+	var mv: Variant = get("_map_view")
+	if w == null or w.obce.is_empty() or not (mv is Control):
+		return
+	var cv: Variant = get("_map_center")
+	var pv: Variant = call("_map_ppm")
+	if not (cv is Vector2) or pv == null:
+		return
+	if player != null and player.body.promile() >= 2.2:
+		return                                   # opilý: mapa se rozmazává (jako _draw_map_view)
+	var ppm := float(pv)
+	var center: Vector2 = cv
+	var canvas := mv as Control
+	var w2v := func(p: Vector2) -> Vector2:
+		return canvas.size * 0.5 + (p - center) * ppm
+	var half := canvas.size * 0.5 / maxf(ppm, 0.001)
+	var vrect := Rect2(center - half, half * 2.0).grow(200.0)   # pohled ve světě + rezerva
+	var font := ThemeDB.fallback_font
+	# hranice katastrů tečkovaně + obecní silnice dávkově (dvojice bodů pro draw_multiline)
+	var rbuckets := {}                                          # druh → PackedVector2Array
+	for o in w.obce:
+		if not w.obec_bounds(o).intersects(vrect):
+			continue
+		var bp := PackedVector2Array()
+		for q in o.get("boundary", []):
+			if q is Array and q.size() >= 2:
+				bp.append(w2v.call(Vector2(float(q[0]), float(q[1]))))
+		if bp.size() >= 3:
+			bp.append(bp[0])
+			canvas.draw_multiline(_dash_segments(bp), OBEC_BOUNDARY, 1.4)
+		for rd in o.get("roads", []):
+			var kind := String(rd.get("kind", "other"))
+			if not OBEC_ROAD_STYLE.has(kind):
+				kind = "other"
+			var pts: PackedVector2Array = rbuckets.get(kind, PackedVector2Array())
+			var prev := Vector2.ZERO
+			var has_prev := false
+			for q in rd.get("pts", []):
+				if q is Array and q.size() >= 2:
+					var v: Vector2 = w2v.call(Vector2(float(q[0]), float(q[1])))
+					if has_prev:
+						pts.append(prev)
+						pts.append(v)
+					prev = v
+					has_prev = true
+			rbuckets[kind] = pts
+	for kind in rbuckets:
+		var st: Array = OBEC_ROAD_STYLE[kind]
+		canvas.draw_multiline(rbuckets[kind], st[0], st[1])
+	# názvy až nad silnicemi – kotva středu s ◇ značkou (symbol obce v mapě)
+	for o in w.obce:
+		if not w.obec_bounds(o).intersects(vrect):
+			continue
+		var c: Array = o.get("center", [])
+		if c.size() < 2:
+			continue
+		var cp: Vector2 = w2v.call(Vector2(float(c[0]), float(c[1])))
+		var d := 5.0
+		canvas.draw_polyline(PackedVector2Array([cp + Vector2(0, -d), cp + Vector2(d, 0),
+			cp + Vector2(0, d), cp + Vector2(-d, 0), cp + Vector2(0, -d)]), OBEC_BOUNDARY, 1.4)
+		var nm := String(o.get("name", ""))
+		if nm == "":
+			continue
+		var fs := 15
+		var nw := font.get_string_size(nm, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var np := cp + Vector2(-nw * 0.5, -12.0)
+		canvas.draw_string_outline(font, np, nm, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.9))
+		canvas.draw_string(font, np, nm, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, OBEC_NAME)
+	# legenda symbolu obce – vlevo dole vedle údaje o přiblížení
+	var lp := Vector2(120.0, canvas.size.y - 10.0)
+	canvas.draw_string(font, lp, "◇ okolní obce", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, OBEC_NAME)
+
+
+## Lomená čára (px) → dvojice bodů úseků pro draw_multiline = tečkovaná čára (hranice obcí).
+## Vzor čárka/mezera pokračuje přes vrcholy, aby obrys působil souvisle.
+static func _dash_segments(pts: PackedVector2Array, dash := OBEC_DASH, gap := OBEC_GAP) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var on := true
+	var left := dash
+	for i in range(pts.size() - 1):
+		var a := pts[i]
+		var b := pts[i + 1]
+		var seg := a.distance_to(b)
+		if seg < 0.001:
+			continue
+		var u := (b - a) / seg
+		var s := 0.0
+		while s < seg:
+			var step := minf(left, seg - s)
+			if on:
+				out.append(a + u * s)
+				out.append(a + u * (s + step))
+			s += step
+			left -= step
+			if left <= 0.001:
+				on = not on
+				left = dash if on else gap
+	return out

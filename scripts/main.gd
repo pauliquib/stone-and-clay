@@ -26,6 +26,8 @@
 ##                   vzdálenosti, detail=0 skryje, wind_strength z Weather, field_lut u obilí
 ##   --terraintest   terén (Fáze 9 / §12): mikroreliéf vs. kolize, wetness → shader, louže
 ##                   (Puddles) při wetness > 0,7, wet_boost asfaltu, north_xz pro sněhové jazyky
+##   --obcetest      okolní obce (data/obce.json → World.obce, Villages): 5 fiktivních
+##                   obcí, obec_at, postavená zástavba; --shot=… navíc snímek mapy okolí
 class_name Main
 extends Node3D
 
@@ -145,6 +147,8 @@ func _ready() -> void:
 		Tests.vegetation_test(self)
 	if _args.has("terraintest"):
 		Tests.terrain_test(self)
+	if _args.has("obcetest"):
+		Tests.obec_test(self)
 
 
 func _frames(n: int) -> void:

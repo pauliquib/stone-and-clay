@@ -24,6 +24,8 @@
 ##                 hnojení, studna naplní konev, skleník chrání před mrazem, garden_visuals save
 ##   --terraintest terén (Fáze 9): mikroreliéf vs. kolize, wetness → shader, louže při mokru,
 ##                 wet_boost asfaltu, north_xz pro sněhové jazyky
+##   --obcetest   okolní obce (data/obce.json → World.obce, Villages): 5 fiktivních obcí mimo
+##                katastr, středy ±6 km, zástavba postavená, obec_at(center) → ta obec
 class_name Tests
 extends RefCounted
 
@@ -1822,4 +1824,137 @@ static func terrain_test(g: Node) -> void:
 	wt.snow_cover = saved_snow
 	var n_ok2 := res.count(true)
 	print("VÝSLEDEK terénu: %d/%d OK" % [n_ok2, res.size()])
+	g.get_tree().quit()
+
+
+## Okolní obce (tools/obce.py → data/obce.json): 5 fiktivně pojmenovaných obcí mimo katastr.
+## Ověří data v souboru (středy ±6 km od domova, budovy, hranice; názvy nesmí být reálné –
+## PRAVNI_DOPORUCENI.md), naplněnost World.obce, hledání obec_at(center) a postavenou
+## zástavbu Villages.stats (5 MeshInstance3D, budov > 0 u každé obce).
+## Volitelně --shot=cesta.png: po testech uloží snímek hlavní mapy (M) oddálené na celé okolí.
+static func obec_test(g: Node) -> void:
+	var w: World = g.world
+	var res := []
+	var check := func(name: String, cond: bool, extra := "") -> void:
+		res.append(cond)
+		print("%s %-52s %s" % ["OK  " if cond else "CHYBA", name, extra])
+	await g.get_tree().create_timer(1.0).timeout
+
+	# --- data/obce.json: 5 obcí, fiktivní názvy, rozumná geometrie
+	check.call("data/obce.json existuje", FileAccess.file_exists(Villages.DATA_PATH))
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(Villages.DATA_PATH))
+	var list: Array = (data as Dictionary).get("obce", []) if data is Dictionary else []
+	check.call("v souboru je 5 obcí", list.size() == 5, "=%d" % list.size())
+	var realne := ["Březnic", "Bohuslav", "Březůvk", "Ořech", "Hřivín"]
+	var names_ok := true
+	var geo_ok := true
+	for o in list:
+		var nm := String(o.get("name", ""))
+		if nm == "":
+			names_ok = false
+		for s in realne:
+			if nm.contains(s):
+				names_ok = false
+		var c: Array = o.get("center", [])
+		var in_range: bool = c.size() == 2 and absf(float(c[0])) <= 6000.0 and absf(float(c[1])) <= 6000.0
+		var nb := (o.get("buildings", []) as Array).size()
+		var bb := (o.get("boundary", []) as Array).size()
+		if not in_range or nb < 50 or bb < 20:
+			geo_ok = false
+			print("     !! %s: center=%s budov=%d hranice=%d" % [nm, c, nb, bb])
+	check.call("názvy neprázdné a fiktivní (žádné reálné toponymum)", names_ok)
+	check.call("středy ±6 km, budov ≥50, hranice ≥20 bodů", geo_ok)
+
+	# --- World.obce + obec_at
+	check.call("world.obce naplněné (5 dictů)", w.obce.size() == 5)
+	var at_ok := true
+	for o in w.obce:
+		var c: Array = o.get("center", [])
+		if c.size() < 2:
+			at_ok = false
+			continue
+		var hit: Dictionary = w.obec_at(Vector3(float(c[0]), 0.0, float(c[1])))
+		if String(hit.get("id", "")) != String(o.get("id", "")):
+			at_ok = false
+			print("     !! obec_at(%s) → %s, čeká se %s" % [c, hit.get("id"), o.get("id")])
+	check.call("obec_at(center) vrátí tu obec (5×)", at_ok)
+	check.call("obec_at uprostřed katastru (0,0) → {}",
+		w.obec_at(Vector3.ZERO).is_empty())
+	# příslušnost = polygon hranice, ne kružnice radiusu: bod uvnitř katastru, ale za jeho
+	# ekvivalentním poloměrem, se musí najít (od nejvzdálenějšího vrcholu dovnitř)
+	var edge_ok := true
+	var edge_tested := 0
+	for o in w.obce:
+		var c: Array = o.get("center", [])
+		if c.size() < 2:
+			continue
+		var ctr := Vector2(float(c[0]), float(c[1]))
+		var rr := float(o.get("radius", 0.0))
+		var poly := PackedVector2Array()
+		for q in o.get("boundary", []):
+			poly.append(Vector2(float(q[0]), float(q[1])))
+		var vs := Array(poly)
+		vs.sort_custom(func(a: Vector2, b: Vector2) -> bool:
+			return ctr.distance_squared_to(a) > ctr.distance_squared_to(b))
+		var found := false
+		for v in vs:
+			if found:
+				break
+			for f in [0.97, 0.95, 0.9, 0.85]:
+				var pt: Vector2 = ctr + (v - ctr) * f
+				if pt.distance_to(ctr) > rr and Geometry2D.is_point_in_polygon(pt, poly):
+					edge_tested += 1
+					var hid := String(w.obec_at(Vector3(pt.x, 0.0, pt.y)).get("id", ""))
+					if hid != String(o.get("id", "")):
+						edge_ok = false
+						print("     !! obec_at(%s) → %s, čeká se %s" % [pt, hid, o.get("id")])
+					found = true
+					break
+	check.call("obec_at uvnitř polygonu i za ekvivalentním poloměrem (%d×)" % edge_tested,
+		edge_ok and edge_tested == 5)
+	# invariant: obec_at u hráče souhlasí s přímým testem v polygonech (nájem los z celé mapy)
+	var pp := Vector2(_pl(g).global_position.x, _pl(g).global_position.z)
+	var exp_id := ""
+	for o in w.obce:
+		var poly2 := PackedVector2Array()
+		for q in o.get("boundary", []):
+			poly2.append(Vector2(float(q[0]), float(q[1])))
+		if poly2.size() >= 3 and Geometry2D.is_point_in_polygon(pp, poly2):
+			exp_id = String(o.get("id", ""))
+	var hrac: Dictionary = w.obec_at(_pl(g).global_position)
+	check.call("obec_at u hráče = polygonová pravda (%s)" % (exp_id if exp_id != "" else "mimo obce"),
+		String(hrac.get("id", "")) == exp_id, "pos=%s → %s" % [pp, hrac.get("id", "nic")])
+
+	# --- Villages: 5 postavených obcí, budov > 0 u každé
+	var vs: Villages = w.villages
+	check.call("Villages uzel existuje", vs != null)
+	if vs != null:
+		check.call("villages.stats: 5 instancí", vs.stats.size() == 5, "=%s" % str(vs.stats.keys()))
+		var rep := []
+		var b_ok := true
+		for k in vs.stats:
+			var nb2 := int(vs.stats[k].get("buildings", 0))
+			rep.append("%s:%d" % [k, nb2])
+			if nb2 <= 0:
+				b_ok = false
+		check.call("budov > 0 u každé obce (%s)" % ", ".join(rep), b_ok)
+		check.call("5 MeshInstance3D Obec_* ve světě",
+			vs.get_children().filter(func(n): return n is MeshInstance3D).size() == 5)
+
+	var n_ok := res.count(true)
+	print("VÝSLEDEK obcí: %d/%d OK" % [n_ok, res.size()])
+
+	# --- volitelný snímek hlavní mapy (M) oddálené na celé okolí s popisky obcí
+	if g._args.has("shot"):
+		var hud: Hud = g.client.hud
+		var mv: Variant = hud.get("_map_view")   # přepsaná mapa – přes get/set/call, ať projde i stará
+		if mv is Control:
+			(hud.get("_map") as Control).visible = true
+			hud.set("_map_zoom", Hud.MAP_ZOOM_MIN)
+			hud.set("_map_center", hud._map_extent().get_center())
+			hud.call("_map_clamp")
+			(mv as Control).queue_redraw()
+		await g.get_tree().create_timer(1.0).timeout
+		g.client.screenshot()                  # uloží args["shot"] a ukončí hru
+		return
 	g.get_tree().quit()

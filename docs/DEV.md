@@ -53,6 +53,17 @@ výšky ve vertex shaderu (`shaders/surroundings.gdshader`), paleta tříd jako 
 oblast katastru zapuštěná pod detailní terén (žádný šev), les jako tmavší povrch + MultiMesh kuželů
 do 4 km, bez kolizí a stínů. Bez dat vznikne plochá zvlněná krajina ve výšce okraje (fallback).
 
+Okolní obce (jen vizuální vrstva okolí): `python3 tools/obce.py` čte z OSM
+(`geodata/pbf/zlinsky-latest.osm.pbf`) 5 katastrů v okolí domova – hranice polygonu, půdorysy
+budov, silnice, vodní a lesní plochy → `data/obce.json` (v gitu; názvy obcí jsou fiktivní –
+PRAVNI_DOPORUCENI.md). 3D zástavbu z ní staví `scripts/villages.gd` (`Villages`, uzel „Vesnice“
+ve World po `surroundings.setup`): půdorysy tažené do zdí se sedlovou/valbovou střechou,
+5 MeshInstance3D bez kolizí a stínů (~52 tis. tris). `World.obce` drží pole dat pro mapu
+(popisky, hranice a silnice obcí kreslí HUD na mapě M; rozsah pohledu = katastr + obce)
+a `World.obec_at(pos)` vrátí obec, v jejímž katastru bod leží (test v polygonu hranice;
+radius je jen ekvivalentní plocha, při překryvech vítězí nejbližší střed; mimo katastry `{}`).
+Bez souboru jen warning a hra běží dál.
+
 Formáty: `terrain_height.bin` (float32, řádky od severu, 2 m), `terrain_collision.bin`
 (výšky / 2 pro HeightMapShape3D škálovaný ×2), `terrain_normal.bin` (RGB8),
 `walls/roofs/asphalt/gravel.bin` (DBM1: trojúhelníky po dlaždicích 256 m – pozice,
@@ -79,7 +90,9 @@ větve denní rutiny, chůze za cílem), `--flighttest` stavový automat letouna
 godot-state-charts (vzlet z dráhy, přetažení/zotavení, dosazení), `--fencetest` kolize plotů
 a průchod brankou (i koněm), `--gardentest` růst plodin, kompost → hnůj → hnojení, studna
 a skleník + save klíč `garden_visuals`, `--vegetationtest` `vegetation.bin` (VEG1), chunky
-MultiMeshů a LOD, `--terraintest` mikroreliéf vs. kolize, wetness → shader a louže.
+MultiMeshů a LOD, `--terraintest` mikroreliéf vs. kolize, wetness → shader a louže,
+`--obcetest [--shot=obce.png]` okolní obce (5 fiktivních, `World.obce`, `obec_at`,
+`Villages.stats`; `--shot` uloží snímek hlavní mapy oddálené na celé okolí s popisky).
 `--date=RRRR-MM-DD` datum 1. dne,
 `--weather=druh` vynucené počasí (`jasno`, `polojasno`, `oblacno`, `zatazeno`, `mlha`, `prehanky`, `dest`,
 `bourka`, `snih`). Náhled modelů zvířat: `godot --path . --script res://tools/dev/zoo.gd -- --series=adresář`.
