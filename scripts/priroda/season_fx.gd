@@ -47,6 +47,8 @@ func _process(delta: float) -> void:
 	var pos := player.car.global_position if player.car else player.global_position
 	flowers.update(pos, doy, snow, jd)
 	decor.update(pos, doy, snow, jd)
+	if world.vegetation:                 # Fáze 9: LOD chunků vegetace podle vzdálenosti
+		world.vegetation.update(pos, doy, snow)
 
 
 func _update_lut(doy: float, year: int) -> void:
@@ -57,5 +59,7 @@ func _update_lut(doy: float, year: int) -> void:
 	if _lut == null:
 		_lut = ImageTexture.create_from_image(img)
 		world.terrain.set_field_lut(_lut)
+		if world.vegetation:
+			world.vegetation.set_field_lut(_lut)   # obilí zraje podle kalendáře pole
 	else:
 		_lut.update(img)

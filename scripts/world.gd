@@ -103,6 +103,7 @@ var surroundings: Surroundings   # M6.2: levná krajina za katastrem (bez koliz�
 var building_details: BuildingDetails   # okna, dveře, vrata a komíny budov (data/buildings.json; null bez dat)
 var estate: Estate               # registr nemovitostí (M1.7): čísla popisná, cedulky, domov = vlastnictví / nájem bytu
 var fields: Fields               # pole a louky (data/landuse.bin) – barvy polí kreslí terén podle kalendáře
+var vegetation: VegetationManager   # Fáze 9: trsy, kopřivy, keře, obilné řádky, plevel (data/vegetation.bin)
 var village_events: VillageEvents   # svátky a události v obci (výzdoba, průvod, oheň, ohňostroj)
 var hunter: Hunter               # myslivec, krmelce, posed, sběr uhynulé zvěře, včelař
 var paddock: Paddock             # výběh pro koně u usedlosti (Estate.lot_id; ohrada, žlab, napáječka)
@@ -216,6 +217,12 @@ func build() -> void:
 	add_child(trees)
 	trees.setup(self, terrain)
 	MapLoader.build_trees(map_root, water.drop_trees, terrain, trees)
+
+	loading.emit("Vegetace…")
+	await _frames(1)
+	vegetation = VegetationManager.new()   # Fáze 9: detailní vegetace (trsy, keře, obilí; data/vegetation.bin)
+	add_child(vegetation)
+	vegetation.setup(self)
 
 	loading.emit("Hráč, vesničané, předměty, auta…")
 	await _frames(1)

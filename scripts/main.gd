@@ -22,6 +22,8 @@
 ##   --fencetest     ploty a ohrady (Fáze 7): kolize drží, branky průchodné, kůň projde brankou
 ##   --gardentest    zahrada a dvoříště (Fáze 8): růst/plodiny vizuálně, kompost → hnůj → hnojení,
 ##                   studna naplní konev, skleník ochrání před mrazem, garden_visuals save
+##   --vegetationtest vegetace (Fáze 9): vegetation.bin VEG1, chunky MultiMeshů, LOD podle
+##                   vzdálenosti, detail=0 skryje, wind_strength z Weather, field_lut u obilí
 class_name Main
 extends Node3D
 
@@ -137,6 +139,8 @@ func _ready() -> void:
 		Tests.fence_test(self)
 	if _args.has("gardentest"):
 		Tests.garden_test(self)
+	if _args.has("vegetationtest"):
+		Tests.vegetation_test(self)
 
 
 func _frames(n: int) -> void:

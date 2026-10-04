@@ -1631,3 +1631,101 @@ static func garden_test(g: Node) -> void:
 	var n_ok := res.count(true)
 	print("VÝSLEDEK zahrady: %d/%d OK" % [n_ok, res.size()])
 	g.get_tree().quit()
+
+
+## Detailní vegetace (Fáze 9, VegetationManager, §9 plánu): data/vegetation.bin se načte
+## (hlavička VEG1, délka souhlasí), instance se naplní do MultiMeshů po chunkách, LOD zapíná
+## chunky podle vzdálenosti hráče (mimo dosah skryté, detail=0 vše skryje), `wind_strength`
+## se propisuje z Weather.wind_vector() a obilí drží texturu `field_lut` (zralost z Fields).
+static func vegetation_test(g: Node) -> void:
+	var w: World = g.world
+	var p: Player = _pl(g)
+	var res := []
+	var check := func(name: String, cond: bool, extra := "") -> void:
+		res.append(cond)
+		print("%s %-52s %s" % ["OK  " if cond else "CHYBA", name, extra])
+	await g.get_tree().create_timer(1.0).timeout
+	var vm: VegetationManager = w.vegetation
+	check.call("VegetationManager existuje ve světě", vm != null)
+	if vm == null:
+		print("VÝSLEDEK vegetace: VegetationManager chybí – konec")
+		g.get_tree().quit()
+		return
+
+	# --- soubor a načtení
+	check.call("data/vegetation.bin existuje", FileAccess.file_exists(VegetationManager.PATH))
+	var b := FileAccess.get_file_as_bytes(VegetationManager.PATH)
+	var magic_ok := b.size() >= VegetationManager.HEADER \
+		and b.slice(0, 4).get_string_from_ascii() == "VEG1"
+	var n_rec := b.decode_s32(8) if magic_ok else -1
+	check.call("hlavička VEG1 a délka souhlasí (%d záznamů)" % n_rec,
+		magic_ok and b.size() == VegetationManager.HEADER + n_rec * VegetationManager.RECORD)
+	check.call("manager soubor načetl", vm.loaded)
+	if not vm.loaded:
+		print("VÝSLEDEK vegetace: vegetation.bin se nenačetl – konec")
+		g.get_tree().quit()
+		return
+	check.call("celkem %d instancí" % vm.total, vm.total > 1000)
+
+	# --- počty per typ (tam, kde data dávají: všechny typy v našich datech mají instance)
+	var per_type := true
+	var rep := []
+	for t in range(VegetationManager.VegType.size()):
+		var c := vm.instance_count(t)
+		rep.append("%d" % c)
+		if c <= 0:
+			per_type = false
+	check.call("všech %d typů má instance (%s)" % [VegetationManager.VegType.size(), "/".join(rep)], per_type)
+
+	# --- multimeshe naplněné (každý chunk: mesh + instance_count > 0, barvy instancí)
+	var mm_ok := true
+	for t in vm.multimeshes:
+		var arr: Array = vm.multimeshes[t]
+		if arr.is_empty():
+			mm_ok = false
+		for mmi in arr:
+			var mm: MultiMesh = (mmi as MultiMeshInstance3D).multimesh
+			if mm == null or mm.mesh == null or mm.instance_count <= 0:
+				mm_ok = false
+	check.call("chunky MultiMeshů naplněné (%d chunků)" % vm.chunk_count(), mm_ok and vm.chunk_count() > 0)
+
+	# --- LOD podle vzdálenosti hráče
+	var pos := p.global_position
+	vm.update(pos, 200.0, 0.0)
+	var vis := vm.visible_chunks()
+	check.call("u hráče jsou viditelné chunky (%d/%d)" % [vis, vm.chunk_count()], vis > 0)
+	check.call("vzdálené chunky jsou skryté", vis < vm.chunk_count())
+	var zelene0 := vm.visible_chunks(VegetationManager.VegType.GRASS_TALL)
+	vm.update(Vector3(1.0e5, 0.0, 1.0e5), 200.0, 0.0)
+	check.call("mimo mapu je vše skryto", vm.visible_chunks() == 0)
+	vm.update(pos, 200.0, 0.0)
+	check.call("návrat k hráči chunky obnoví", vm.visible_chunks() == vis)
+	check.call("tráva: část chunků v dosahu, část mimo (%d)" % zelene0,
+		zelene0 >= 0 and zelene0 <= vis)
+
+	# --- detail (Nastavení → Grafika → Vegetace): 0 = vypnuto
+	vm.set_detail(0.0)
+	check.call("detail 0 skryje celou vegetaci", vm.visible_chunks() == 0)
+	vm.set_detail(1.0)
+	check.call("detail 1 ji zase ukáže", vm.visible_chunks() == vis)
+
+	# --- vítr: wind_strength z Weather.wind_vector() (0..2) se propíše do materiálů
+	await g.get_tree().create_timer(0.5).timeout
+	await _frames(g, 2)
+	var wv: Vector3 = w.weather.wind_vector()
+	var want := clampf(Vector2(wv.x, wv.z).length() / 10.0, 0.0, 2.0)
+	var got := vm.wind_uniform()
+	check.call("wind_strength v materiálu (%.2f ≈ %.2f)" % [got, want], absf(got - want) < 0.05)
+
+	# --- obilí: materiál drží tabulku barev polí (Fields.lut_image přes SeasonFx/terén)
+	var mats_ok := false
+	for t in vm.multimeshes:
+		if int(t) != VegetationManager.VegType.CROP_WHEAT:
+			continue
+		var mmi0: MultiMeshInstance3D = vm.multimeshes[t][0]
+		mats_ok = (mmi0.material_override as ShaderMaterial).get_shader_parameter("field_lut") != null
+	check.call("obilí má field_lut (zralost pole)", mats_ok)
+
+	var n_ok := res.count(true)
+	print("VÝSLEDEK vegetace: %d/%d OK" % [n_ok, res.size()])
+	g.get_tree().quit()

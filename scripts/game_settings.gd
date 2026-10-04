@@ -176,6 +176,8 @@ func apply_graphics(client: Node) -> void:
 	if client.season_fx and client.season_fx.flowers:
 		client.season_fx.flowers.set_detail(veg)
 		client.season_fx.decor.set_detail(veg)
+	if client.world and client.world.vegetation:   # Fáze 9: statická vegetace – 0 = vypnuto
+		client.world.vegetation.set_detail(veg)
 	# strop FPS (--maxfps má přednost)
 	if not maxfps_from_args:
 		Engine.max_fps = FPS_CAPS[clampi(fps_cap, 0, FPS_CAPS.size() - 1)]
