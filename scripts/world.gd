@@ -732,7 +732,9 @@ func _spawn_bots() -> void:
 	_bot_nodes = cand
 	for i in N_VILLAGERS:
 		var v := Villager.new()
-		v.setup(graph, terrain, self, cand[rng.randi() % cand.size()], 1000 + i, Characters.profile(i))
+		# Fáze 3 (LimboAI): prvních `Villager.BT_VILLAGERS` vesničanů řídí behavior strom denních rutin
+		v.setup(graph, terrain, self, cand[rng.randi() % cand.size()], 1000 + i, Characters.profile(i),
+			i < Villager.BT_VILLAGERS)
 		bots_root.add_child(v)
 	for i in N_DOGS:
 		var n: Vector2 = graph.nodes[cand[rng.randi() % cand.size()]]

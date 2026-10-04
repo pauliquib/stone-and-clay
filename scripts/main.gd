@@ -15,6 +15,8 @@
 ##   --testmove / --bottest / --cartest / --drinktest / --questtest / --traffictest / --faunatest / --naturesynctest
 ##   --weathertest  testy (tests.gd); weathertest = přilnavost a brzdná dráha za všech situací
 ##   --interiortest  mapový interiér hospody přes FuncGodot (Fáze 2) + vstup/výstup a fallback
+##   --villagertest  behavior strom vesničana přes LimboAI (Fáze 3): blackboard, větve denní
+##                   rutiny (zahrada, hospoda), chůze za cílem; bez addonu jen fallback
 class_name Main
 extends Node3D
 
@@ -122,6 +124,8 @@ func _ready() -> void:
 		Tests.weather_test(self)
 	if _args.has("interiortest"):
 		Tests.interior_test(self)
+	if _args.has("villagertest"):
+		Tests.villager_test(self)
 
 
 func _frames(n: int) -> void:

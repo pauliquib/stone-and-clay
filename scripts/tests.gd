@@ -13,6 +13,8 @@
 ##                     odchylek poloh, velikosti snímku a round-trip Clock / Weather
 ##   --weathertest  počasí a hratelnost: přilnavost povrchů, brzdná dráha auta (měřená),
 ##                  expozice těla, trakce chůze, AI opatrnost, předpověď
+##   --villagertest  vesničan s behavior stromem (Fáze 3, LimboAI): blackboard z herních dat,
+##                  ráno zahrada + kopání, pátek večer stůl v hospodě + pivo; bez addonu fallback
 class_name Tests
 extends RefCounted
 
@@ -1019,4 +1021,132 @@ static func interior_test(g: Node) -> void:
 	w.exit_interior(1, false)
 	await _frames(g, 5)
 	print("VÝSLEDEK interiérů: %s" % ("OK" if bad.is_empty() else "%d chyb" % bad.size()))
+	g.get_tree().quit()
+
+
+## Vesničan s behavior stromem (Fáze 3, LimboAI): ověří, že se `ai/villager_routine.tres` načetl,
+## instancoval u prvních `Villager.BT_VILLAGERS` vesničanů, blackboard se naplnil z herních dat
+## (domov z Estate, pracoviště z povolání, stůl u hospody), strom vybírá větve podle denní doby
+## a vesničan se za cílem hýbe. Bez addonu LimboAI jen zkontroluje, že boti běží jako dřív.
+static func villager_test(g: Node) -> void:
+	var w: World = g.world
+	await g.get_tree().create_timer(1.0).timeout
+	var bad := []
+	var check := func(name: String, ok: bool) -> void:
+		if not ok:
+			bad.append(name)
+		print("%s %s" % ["OK  " if ok else "CHYBA", name])
+	var addon := ClassDB.class_exists("BehaviorTree")
+	print("VILLAGER: addon LimboAI=%s, strom=%s" % [addon, ResourceLoader.exists(Villager.BT_TREE)])
+	var bots: Array = []
+	for b in w.bots_root.get_children():
+		if b is Villager:
+			bots.append(b)
+	var with_bt: Array = bots.filter(func(v): return v._bt_inst != null)
+	check.call("villager.gd bez addonu běží (žádná tvrdá reference na LimboAI)", true)
+	if not addon:
+		print("VILLAGER: addon chybí – vesničanů %d bez BT, fallback = původní chůze (OK)" % bots.size())
+		check.call("villager.gd se načetl", bots.size() > 0)
+		print("VÝSLEDEK villager: %s" % ("OK" if bad.is_empty() else "%d chyb" % bad.size()))
+		g.get_tree().quit()
+		return
+	check.call("strom se načetl", ResourceLoader.exists(Villager.BT_TREE) and load(Villager.BT_TREE) != null)
+	check.call("prvních %d vesničanů má BT" % Villager.BT_VILLAGERS,
+		with_bt.size() == mini(Villager.BT_VILLAGERS, bots.size()))
+	check.call("každý má vlastní instanci stromu", with_bt.filter(func(v):
+		return v.persona != null and v.persona.daily_routine != null).size() == with_bt.size())
+	if with_bt.is_empty():
+		print("VÝSLEDEK villager: CHYBA – žádný vesničan nemá BT")
+		g.get_tree().quit()
+		return
+	await _frames(g, 30)   # nechat líně naplnit blackboard (places + estate vznikly až po botách)
+	var v: Villager = with_bt[0]
+	for key in ["self", "world", "graph", "terrain", "home", "garden", "pub_table"]:
+		check.call("blackboard má „%s“" % key, v._bt_bb.has_var(key) and v._bt_bb.get_var(key) != null)
+	check.call("domov je skutečné místo (Estate)", v._bt_bb.get_var("home") is Vector3 \
+		and v._bt_bb.get_var("home") != Vector3.INF)
+	var wp = v._bt_bb.get_var("workplace")
+	print("  %s – povolání „%s“, pracoviště %s" % [v.persona.display_name(),
+		v.persona.profile.get("job", "?"), wp if wp is Vector3 and wp != Vector3.INF else "žádné"])
+
+	# --- pracovní den 7:00 → větev „Ranní rutina“ (zahrada + kopání)
+	while w.clock.weekday() >= 5:
+		w.clock.minutes += 1440.0
+	w.clock.minutes = floor(w.clock.minutes / 1440.0) * 1440.0 + 7.0 * 60.0
+	var home: Vector3 = v._bt_bb.get_var("home")
+	var n0 := w.graph.nearest(Vector2(home.x, home.z))
+	var h2 := w.graph.nodes[n0] if n0 >= 0 else Vector2(home.x, home.z)
+	v.global_position = Vector3(h2.x, w.terrain.height_at(h2.x, h2.y) + 0.1, h2.y)
+	v.clear_target()
+	var garden: Vector3 = v._bt_bb.get_var("garden")
+	var arrived := false
+	var digged := false
+	var p0 := v.global_position
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 60000 and not digged:
+		await g.get_tree().physics_frame
+		if v.bt_target() == garden and Vector2(v.global_position.x - garden.x,
+				v.global_position.z - garden.z).length() < 2.0:
+			arrived = true
+		if String(v._visual.action) == "dig":
+			digged = true
+	check.call("ranní rutina: BT zvolil cíl „zahrada“", v.bt_target() == garden or arrived)
+	check.call("ranní rutina: došel na zahradu (<2 m)", arrived)
+	check.call("ranní rutina: animace kopání (dig)", digged)
+	print("  ráno 7:00 – cíl %s, ušel %.1f m, akce „%s“, bt_cíl %s" % [garden,
+		v.global_position.distance_to(p0), v._visual.action, v.bt_target()])
+
+	# --- pátek 18:00 → větev „Večerní hospoda“ (stůl, sednutí, pivo, promile)
+	while w.clock.weekday() != 4:
+		w.clock.minutes += 1440.0
+	w.clock.minutes = floor(w.clock.minutes / 1440.0) * 1440.0 + 18.0 * 60.0
+	var pub: Vector3 = v._bt_bb.get_var("pub_table")
+	# 1) počkat, až se větev hospody chytí (doběhne předchozí rutina – sekvence si
+	#    pamatuje běžící akci; kopání na zahradě trvá až 20 s)
+	var tw := Time.get_ticks_msec()
+	while v.bt_target() != pub and Time.get_ticks_msec() - tw < 40000:
+		await g.get_tree().physics_frame
+	check.call("hospoda: BT zvolil cíl „pub_table“", v.bt_target() == pub)
+	# 2) teleport na uzel ~8 m od stolu + clear_target → BT musí trasu naplánovat.
+	#    (Teleport přímo ke stolu/dveřím je moc blízko: d < arrive=1,5 → akce Jít
+	#    uspěje hned bez move_to, bt_target zůstane INF a check „došel“ by neprošel.)
+	var pub2 := Vector2(pub.x, pub.z)
+	var n1 := -1
+	var n1_diff := 1e9
+	for i in w.graph.nodes.size():
+		var dn: float = w.graph.nodes[i].distance_to(pub2)
+		if dn >= 5.0 and dn <= 20.0 and absf(dn - 8.0) < n1_diff:
+			n1_diff = absf(dn - 8.0)
+			n1 = i
+	if n1 < 0:
+		var hosp: Place = w.places.get("hospoda")
+		n1 = w.graph.nearest(Vector2(hosp.door.x, hosp.door.z) if hosp else pub2)
+	var p2: Vector2 = w.graph.nodes[n1] if n1 >= 0 else pub2
+	v.global_position = Vector3(p2.x, w.terrain.height_at(p2.x, p2.y) + 0.1, p2.y)
+	v.clear_target()
+	var sat := false
+	var drank := false
+	arrived = false
+	p0 = v.global_position
+	var dmin := 1e9
+	t0 = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 90000 and not drank:
+		await g.get_tree().physics_frame
+		var dp := Vector2(v.global_position.x - pub.x, v.global_position.z - pub.z).length()
+		dmin = minf(dmin, dp)
+		if dp < 1.8 and v.bt_target() == pub:
+			arrived = true
+		if v._visual.pose == "sit":
+			sat = true
+		if String(v._visual.action) == "drink" and v.promile > 0.0:
+			drank = true
+	check.call("hospoda: BT zvolil cíl „pub_table“", v.bt_target() == pub or arrived)
+	check.call("hospoda: došel ke stolu (<1,8 m)", arrived)
+	check.call("hospoda: sedl si (pose sit)", sat)
+	check.call("hospoda: objednal pivo (drink + promile > 0)", drank)
+	print("  pátek 18:00 – cíl %s, ušel %.1f m, min.vzdál. %.1f m, póza „%s“, promile %.2f ‰, stav %d" % [
+		pub, v.global_position.distance_to(p0), dmin, v._visual.pose, v.promile,
+		v._bt_inst.get_last_status()])
+	check.call("strom tickuje (last_status RUNNING/SUCCESS)", v._bt_inst.get_last_status() in [1, 3])
+	print("VÝSLEDEK villager: %s" % ("OK" if bad.is_empty() else "%d chyb" % bad.size()))
 	g.get_tree().quit()

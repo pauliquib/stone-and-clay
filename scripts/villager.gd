@@ -3,10 +3,30 @@
 ## a pozdraví podle své povahy, nálady a pověsti hráče (Dialog.greet). Odpovídá na to, co hráč řekne (T),
 ## a na E prozradí drb. Vždy řeší nejbližšího hráče.
 ## Daleko od všech hráčů se pohybuje bez fyziky (jen po terénu) – šetří výkon.
+## Fáze 3 (LimboAI): prvních `BT_VILLAGERS` vesničanů řídí behavior strom `ai/villager_routine.tres`
+## (denní rutiny – zahrada, práce, hospoda, procházka). BT jen volí cíl (`move_to`/`clear_target`),
+## samotný pohyb, zdravení i útěk řeší původní kód; bez addonu nebo stromu běží vše jako dřív.
 class_name Villager
 extends CharacterBody3D
 
 const PHYSICS_RANGE := 160.0
+## Kolik prvních spawnutých vesničanů dostane behavior strom (0 = BT nikdo; Fáze 3: testovací podmnožina).
+const BT_VILLAGERS := 5
+const BT_TREE := "res://ai/villager_routine.tres"
+## Druhy hran pro pěší A* trasu k cíli z BT (vše, kudy vesničan chodí).
+const WALK_KINDS := ["secondary", "tertiary", "unclassified", "residential", "service", "living_street",
+	"track", "footway", "path"]
+## Povolání postavy (Characters.PROFILES[].job) → klíč místa pracoviště (`World.places`). Co nesedí,
+## zaměstnání nemá (důchodce, student, maminka na mateřské…) → větev „Práce“ ve stromu selže.
+const JOB_PLACE := {
+	"úřad": "urad", "účetní": "urad", "starosta": "urad",
+	"hospod": "hospoda", "hostinsk": "hospoda", "výčep": "hospoda",
+	"prodavač": "obchod", "obchod": "obchod", "pošt": "obchod", "cukrář": "obchod",
+	"vinař": "sklep", "sklep": "sklep",
+	"pálen": "palenice", "palič": "palenice",
+	"myslivec": "chata", "lesní": "chata", "hajn": "chata",
+	"zemědělec": "statek", "hospodář": "statek", "chovatel": "statek", "farm": "statek",
+}
 
 var graph: RoadGraph
 var terrain: Terrain
@@ -32,12 +52,26 @@ var persona: Persona               # kdo to je (jméno, povaha…) a jak se na h
 var _name_label: Label3D
 var _talk_len := 3.5              # jak dlouho aktuální replika trvá (mává jen na začátku)
 var _wait := 0.0                  # hráč píše odpověď (T) – postůj a nikam neodcházej
+var promile := 0.0                # Fáze 3: zjednodušená hladina alkoholu vesničana (pije v hospodě)
+var use_bt := false               # setup(): má dostat behavior strom (prvních BT_VILLAGERS)
+var _seed := 0                    # seed ze setup() – určuje i domov vesničana pro BT
+var _bt = null                    # BehaviorTree (Resource) – klon na vesničana; netypované (addon nemusí být)
+var _bt_inst = null               # BTInstance – živá instance stromu (tickuje se v _physics_process)
+var _bt_bb = null                 # Blackboard – self, world, graph, terrain, home, workplace, garden, pub_table
+var _bt_vars_ok := false          # jsou v blackboardu naplněné cíle (places/estate vznikají až po botách)
+var _bt_target_pos := Vector3.INF # cíl pohybu z BT (INF = choď po grafu jako dřív)
+var _bt_path: PackedVector3Array = PackedVector3Array()   # body trasy k _bt_target_pos (uzly grafu → 3D)
+var _bt_path_i := 0               # index aktuálního bodu trasy
+var _bt_home := Vector3.INF       # dveře domu vesničana (estate) – plní _bt_fill_vars
+var _bt_home_normal := Vector3(0, 0, 1)
 
 
-func setup(g: RoadGraph, t: Terrain, w: Node, start_node: int, seed_: int, prof: Dictionary) -> void:
+func setup(g: RoadGraph, t: Terrain, w: Node, start_node: int, seed_: int, prof: Dictionary, bt := false) -> void:
 	graph = g
 	terrain = t
 	world = w
+	use_bt = bt
+	_seed = seed_
 	rng.seed = seed_
 	persona = Persona.make(prof)
 	name = "Vesnican_" + String(prof["name"]).replace(" ", "_")
@@ -86,6 +120,145 @@ func _ready() -> void:
 	_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM   # delší text roste nahoru
 	_label.visible = false
 	add_child(_label)
+	if use_bt:
+		_bt_start()
+
+
+## ----------------------------------------------------------------- Fáze 3: behavior strom (LimboAI)
+
+## Spustí behavior strom – jen když je addon LimboAI a strom existuje; jinak zůstane původní chůze.
+## Strom se klonuje na vesničana (`persona.daily_routine`), aby si nesdíleli runtime stav.
+func _bt_start() -> void:
+	if not ClassDB.class_exists("BehaviorTree") or not ResourceLoader.exists(BT_TREE):
+		return
+	var src: Resource = load(BT_TREE)
+	if src == null or not src.has_method("instantiate"):
+		return
+	_bt = src.clone()
+	if persona:
+		persona.daily_routine = _bt
+	_bt_bb = ClassDB.instantiate("Blackboard")
+	for k in ["self", "world", "graph", "terrain", "home", "garden", "workplace", "pub_table"]:
+		_bt_bb.set_var(k, Vector3.INF)
+	_bt_bb.set_var("self", self)
+	_bt_bb.set_var("world", world)
+	_bt_bb.set_var("graph", graph)
+	_bt_bb.set_var("terrain", terrain)
+	# custom_scene_root = hlavní scéna: runtime-add_child uzly nemají owner, jinak instantiate selže.
+	_bt_inst = _bt.instantiate(self, _bt_bb, self, get_tree().current_scene)
+
+
+## Naplní blackboard cíli z herních dat – až když existují místa a registr nemovitostí
+## (vesničané se rodí před `_spawn_places`/`estate`, proto se to dělá líně za běhu).
+func _bt_fill_vars() -> void:
+	var places = world.get("places") if world else null
+	if _bt_vars_ok or not (places is Dictionary) or places.is_empty() or world.get("estate") == null:
+		return
+	_bt_vars_ok = true
+	_bt_home = _home_pos()
+	_bt_bb.set_var("home", _bt_home)
+	_bt_bb.set_var("garden", _garden_pos())
+	_bt_bb.set_var("workplace", _workplace_pos())
+	_bt_bb.set_var("pub_table", _pub_table_pos())
+
+
+## Dveře domu vesničana – nemovitost z registru (`Estate.pick_customer_house`, seed = jeho spawn seed).
+func _home_pos() -> Vector3:
+	var e = world.get("estate")
+	if e and e.has_method("pick_customer_house"):
+		var id: int = e.pick_customer_house(_seed, 700.0)
+		var info: Dictionary = e.info(id)
+		var door = info.get("door", Vector3.INF)
+		if door is Vector3 and door != Vector3.INF:
+			var n = info.get("normal", Vector3(0, 0, 1))
+			if n is Vector3:
+				_bt_home_normal = n
+			return door
+	return global_position   # bez registru: kde stojí
+
+
+## Vlastní zahrada u domu – kus před vchodem (normála fasády domu). Kopání ranno 6–8.
+func _garden_pos() -> Vector3:
+	if _bt_home == Vector3.INF:
+		return Vector3.INF
+	var g := _bt_home + _bt_home_normal * 4.0
+	g.y = terrain.height_at(g.x, g.z)
+	return g
+
+
+## Dveře pracoviště podle povolání (`JOB_PLACE` → `World.places`); INF = zaměstnání nemá.
+func _workplace_pos() -> Vector3:
+	var job := String(persona.profile.get("job", "")).to_lower() if persona else ""
+	for k in JOB_PLACE:
+		if k in job:
+			var pl: Place = world.get("places").get(JOB_PLACE[k])
+			if pl:
+				return pl.door
+	return Vector3.INF
+
+
+## Stůl na zahrádce u hospody (`Place.garden_tables`), jinak dveře hospody.
+func _pub_table_pos() -> Vector3:
+	var pl: Place = world.get("places").get("hospoda")
+	if pl == null:
+		return Vector3.INF
+	if pl.garden_tables.size() > 0:
+		return pl.garden_tables[0]
+	return pl.door
+
+
+## Povel z BT: jdi na pozici `target` (trasa po silnicích, `_bt_step`). Opakované volání
+## se stejným cílem nic nemění; nový cíl přepočítá trasu.
+func move_to(target: Vector3) -> void:
+	if target == Vector3.INF:
+		return
+	if _bt_target_pos == Vector3.INF or _bt_target_pos.distance_to(target) > 3.0:
+		_bt_target_pos = target
+		_bt_path = PackedVector3Array()
+		_bt_path_i = 0
+
+
+## BT větev skončila (procházka): zruš cíl – vesničan zase chodí po grafu náhodně.
+func clear_target() -> void:
+	_bt_target_pos = Vector3.INF
+	_bt_path = PackedVector3Array()
+	_bt_path_i = 0
+
+
+## Aktuální cíl z BT (testy, ladění); Vector3.INF = žádný.
+func bt_target() -> Vector3:
+	return _bt_target_pos
+
+
+## Naplánuj pěší trasu k `_bt_target_pos` přes A* silničního grafu (uzly → 3D body po terénu).
+func _bt_replan() -> void:
+	_bt_path = PackedVector3Array()
+	_bt_path_i = 0
+	if graph == null or _bt_target_pos == Vector3.INF:
+		return
+	var ids := graph.route(Vector2(global_position.x, global_position.z),
+		Vector2(_bt_target_pos.x, _bt_target_pos.z), WALK_KINDS)
+	for id in ids:
+		var n := graph.nodes[id]
+		_bt_path.append(Vector3(n.x, terrain.height_at(n.x, n.y) + 0.1, n.y))
+	_bt_path.append(_bt_target_pos)
+
+
+## Krok po naplánované trase – jako `_goal`/`_advance`, jen s pevným cílem. Vrací žádanou rychlost.
+func _bt_step() -> Vector3:
+	if _bt_path.is_empty():
+		_bt_replan()
+	while _bt_path_i < _bt_path.size():
+		var goal := _bt_path[_bt_path_i]
+		var d := Vector2(goal.x - global_position.x, goal.z - global_position.z)
+		var last := _bt_path_i == _bt_path.size() - 1
+		# poslední bod <1,0 m: musí být menší než `arrive` v BT akcích Jdi na… (1,5+), jinak
+		# by vesničan zaparkoval na okraji a BT úkol zůstal navždy RUNNING
+		if d.length() < (1.0 if last else 1.3):
+			_bt_path_i += 1
+			continue
+		return Vector3(d.x, 0, d.y).normalized() * _speed
+	return Vector3.ZERO
 
 
 func _physics_process(delta: float) -> void:
@@ -93,6 +266,8 @@ func _physics_process(delta: float) -> void:
 	var to_player := player.global_position - global_position if player else Vector3(INF, 0, 0)
 	var dist := to_player.length()
 	_talk_cool = maxf(_talk_cool - delta, 0.0)
+	if promile > 0.0:
+		promile = maxf(promile - delta * 0.01, 0.0)   # ~0,6 ‰ za reálnou minutu (Fáze 3)
 
 	# --- sražený autem: leží, pak vstane
 	if _knocked > 0.0:
@@ -135,6 +310,10 @@ func _physics_process(delta: float) -> void:
 		_label.text = Dialog.greet(world.dialog_context(int(player.get("id")), self))
 		_label.visible = true
 	var desired := Vector3.ZERO
+	# --- Fáze 3: behavior strom zvolí cíl pohybu (_bt_target_pos); cíle se plní líně z herních dat
+	if _bt_inst != null:
+		_bt_fill_vars()
+		_bt_inst.update(delta)
 	if _talk > 0.0:
 		_talk -= delta
 		_yaw = lerp_angle(_yaw, atan2(to_player.x, to_player.z), 1.0 - exp(-6.0 * delta))
@@ -151,12 +330,17 @@ func _physics_process(delta: float) -> void:
 	elif _pause > 0.0:
 		_pause -= delta
 	else:
-		var goal := _goal()
-		var d := Vector2(goal.x - global_position.x, goal.y - global_position.z)
-		if d.length() < 1.3:
-			_advance()
+		if _bt_target_pos != Vector3.INF:
+			# cíl z behavior stromu (Fáze 3): jdi po naplánované trase po silnicích
+			desired = _bt_step()
 		else:
-			desired = Vector3(d.x, 0, d.y).normalized() * _speed
+			var goal := _goal()
+			var d := Vector2(goal.x - global_position.x, goal.y - global_position.z)
+			if d.length() < 1.3:
+				_advance()
+			else:
+				desired = Vector3(d.x, 0, d.y).normalized() * _speed
+		if desired.length() > 0.1:
 			# neprojít skrz hráče
 			if dist < 1.6 and to_player.normalized().dot(desired.normalized()) > 0.5:
 				desired = Vector3.ZERO
@@ -181,10 +365,15 @@ func _physics_process(delta: float) -> void:
 			_stuck += delta
 			if _stuck > 2.0:
 				_stuck = 0.0
-				var t := _next
-				_next = _cur
-				_cur = t
-				_side = -_side
+				if _bt_target_pos != Vector3.INF:
+					# zaseknutý cestou za cílem z BT → přeskoč bod a naplánuj trasu znovu odsud
+					_bt_path_i += 1
+					_bt_replan()
+				else:
+					var t := _next
+					_next = _cur
+					_cur = t
+					_side = -_side
 		else:
 			_stuck = 0.0
 		if global_position.y < terrain.height_at(global_position.x, global_position.z) - 3.0:
@@ -193,6 +382,7 @@ func _physics_process(delta: float) -> void:
 	_visual.rotation.y = _yaw
 	_visual.speed = Vector3(velocity.x, 0, velocity.z).length()
 	_visual.on_floor = true
+	_visual.drunk = clampf(promile / 2.0, 0.0, 1.0)   # Fáze 3: potácení podle promile
 
 
 func _goal() -> Vector2:

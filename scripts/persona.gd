@@ -13,6 +13,8 @@ const FRIEND_GIFT := 6.0          # základ za dárek (× hodnota předmětu, vi
 const FRIEND_HIGH := 60.0         # od této hodnoty postava zdraví přátelsky a pomůže (M2.10)
 
 var profile := {}                 # name, trait, job, hobby, topics, age, female, role, place
+var daily_routine = null          # Fáze 3: klon behavior stromu postavy (LimboAI `BehaviorTree`);
+                                  # netypované – addon nemusí být nainstalovaný, plní `Villager._bt_start`
 var mood := {}                    # id hráče → −1..1
 var met := {}                     # id hráče → true: už se představili
 var friendship := {}              # id hráče → 0..100
