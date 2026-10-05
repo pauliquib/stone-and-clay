@@ -29,6 +29,7 @@ var rng := RandomNumberGenerator.new()
 var _stuck := {}
 var _plate_n := 1000
 var _tractor_t := 0.0
+var _zones: Array = []           # [Vector3(x, z, r)] zóny „v obci“ – Dukelčice + katastry z obce.json
 var respawn_log: Array = []      # [čas ms, auto, důvod] – pro --traffictest
 
 
@@ -37,6 +38,27 @@ func setup(g: RoadGraph, t: Terrain, w: Node) -> void:
 	terrain = t
 	world = w
 	rng.seed = 490
+	# zóny „v obci“ (limit 50 km/h, svědci u policie/pověsti): Dukelčice + každá obec
+	# z World.obce (střed + ekvivalentní poloměr katastru); parkování zůstává jen Dukelčice
+	_zones = [Vector3(VILLAGE_CENTER.x, VILLAGE_CENTER.y, VILLAGE_R)]
+	var obce: Variant = w.get("obce") if w != null else null
+	if obce is Array:
+		for o in obce:
+			var c: Array = o.get("center", [])
+			if c.size() >= 2:
+				_zones.append(Vector3(float(c[0]), float(c[1]), float(o.get("radius", 500.0))))
+
+
+## Je bod (x, z) uvnitř některé obce – Dukelčice (VILLAGE_CENTER/R) nebo katastru okolní
+## obce z data/obce.json (střed ± radius)? Sdílený test pro limit 50 km/h AI aut
+## a pro svědky/hlídky (police.gd, reputation.gd).
+func in_village(p: Vector2) -> bool:
+	if _zones.is_empty():
+		return p.distance_to(VILLAGE_CENTER) < VILLAGE_R
+	for z in _zones:
+		if p.distance_to(Vector2(z.x, z.y)) < z.z:
+			return true
+	return false
 
 
 ## Smyšlená SPZ – písmeno Q se v českých SPZ nevydává, takže se nemůže shodovat s reálným vozidlem.
@@ -260,8 +282,8 @@ func _respawn(c: Car, first := false) -> void:
 		var pts := graph.lane_points(ids, terrain)
 		var d := Vector2(pts[1].x - pts[0].x, pts[1].z - pts[0].z)
 		place_car(c, Vector2(pts[0].x, pts[0].z), atan2(d.x, d.y))
-		var in_village := sp.distance_to(VILLAGE_CENTER) < VILLAGE_R
-		c.set_ai_route(pts, minf(13.9 if in_village else 19.0, float(c.model.spec.get("ai_vmax", 99.0))))
+		var v_obci := in_village(sp)
+		c.set_ai_route(pts, minf(13.9 if v_obci else 19.0, float(c.model.spec.get("ai_vmax", 99.0))))
 		_stuck[c] = 0.0
 		return
 
@@ -275,9 +297,9 @@ func _physics_process(delta: float) -> void:
 		if c.drive != Car.Drive.AI:
 			continue
 		var d: float = world.nearest_player_dist(c.global_position)
-		# rychlostní limit podle obce
-		var in_village := Vector2(c.global_position.x, c.global_position.z).distance_to(VILLAGE_CENTER) < VILLAGE_R
-		c.ai_speed_limit = minf(13.9 if in_village else 19.0, float(c.model.spec.get("ai_vmax", 99.0)))
+		# rychlostní limit podle obce (Dukelčice + katastry okolních obcí)
+		var v_obci := in_village(Vector2(c.global_position.x, c.global_position.z))
+		c.ai_speed_limit = minf(13.9 if v_obci else 19.0, float(c.model.spec.get("ai_vmax", 99.0)))
 		if absf(c.speed) < 0.6 and c.ai_blocked <= 0.0:
 			_stuck[c] = float(_stuck.get(c, 0.0)) + delta
 		else:

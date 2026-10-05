@@ -388,7 +388,7 @@ func _physics_process(delta: float) -> void:
 		var kmh := absf(c.speed) * 3.6
 		var pos := c.global_position
 		if kmh > 65.0 and _speed_cool <= 0.0 and \
-				Vector2(pos.x, pos.z).distance_to(Traffic.VILLAGE_CENTER) < Traffic.VILLAGE_R and _witnesses(35.0) > 0:
+				game.traffic.in_village(Vector2(pos.x, pos.z)) and _witnesses(35.0) > 0:
 			_speed_cool = 45.0
 			change(-3.0, "řítil se obcí %d km/h kolem lidí" % int(kmh), "rychlá jízda obcí")
 	elif c == null and player.horse == null and p > 1.6 and _drunk_cool <= 0.0 and _witnesses(10.0) > 0:

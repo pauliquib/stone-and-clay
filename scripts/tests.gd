@@ -1829,8 +1829,9 @@ static func terrain_test(g: Node) -> void:
 
 ## Okolní obce (tools/obce.py → data/obce.json): 5 fiktivně pojmenovaných obcí mimo katastr.
 ## Ověří data v souboru (středy ±6 km od domova, budovy, hranice; názvy nesmí být reálné –
-## PRAVNI_DOPORUCENI.md), naplněnost World.obce, hledání obec_at(center) a postavenou
-## zástavbu Villages.stats (5 MeshInstance3D, budov > 0 u každé obce).
+## PRAVNI_DOPORUCENI.md), naplněnost World.obce, hledání obec_at(center) a zástavbu
+## Villages.stats: obec s katastrem celým uvnitř detailní mřížky (union B2) se přeskočí
+## (zástavbu drží fyzické budovy exportu – jinak dvojí zdi), obec mimo detail se postaví.
 ## Volitelně --shot=cesta.png: po testech uloží snímek hlavní mapy (M) oddálené na celé okolí.
 static func obec_test(g: Node) -> void:
 	var w: World = g.world
@@ -1925,21 +1926,54 @@ static func obec_test(g: Node) -> void:
 	check.call("obec_at u hráče = polygonová pravda (%s)" % (exp_id if exp_id != "" else "mimo obce"),
 		String(hrac.get("id", "")) == exp_id, "pos=%s → %s" % [pp, hrac.get("id", "nic")])
 
-	# --- Villages: 5 postavených obcí, budov > 0 u každé
+	# --- Villages: zástavba jen pro obce MIMO detailní mřížku (B4). Katastr celý uvnitř
+	#     union terénu → vizuální vrstva se přeskočí (stats[id].skipped), staví fyzika mapy.
 	var vs: Villages = w.villages
 	check.call("Villages uzel existuje", vs != null)
 	if vs != null:
-		check.call("villages.stats: 5 instancí", vs.stats.size() == 5, "=%s" % str(vs.stats.keys()))
+		var trect := Rect2(w.terrain.x0, w.terrain.z0,
+			(w.terrain.w - 1) * w.terrain.spacing, (w.terrain.h - 1) * w.terrain.spacing).grow(1.0)
+		var want_skip := {}
+		for o in w.obce:
+			# stejná logika jako Villages._inside_detail: body hranice, jinak center ± radius
+			var bpts := PackedVector2Array()
+			for q in o.get("boundary", []):
+				if q is Array and q.size() >= 2:
+					bpts.append(Vector2(float(q[0]), float(q[1])))
+			if bpts.is_empty():
+				var c: Array = o.get("center", [])
+				var rr := float(o.get("radius", 0.0))
+				if c.size() >= 2 and rr > 0.0:
+					var cc := Vector2(float(c[0]), float(c[1]))
+					bpts = PackedVector2Array([cc + Vector2(-rr, -rr), cc + Vector2(rr, -rr),
+						cc + Vector2(rr, rr), cc + Vector2(-rr, rr)])
+			var inside := not bpts.is_empty()
+			for bp in bpts:
+				if not trect.has_point(bp):
+					inside = false
+					break
+			want_skip[String(o.get("id", ""))] = inside
+		check.call("villages.stats: záznam pro každou obec", vs.stats.size() == w.obce.size(),
+			"=%s" % str(vs.stats.keys()))
 		var rep := []
-		var b_ok := true
-		for k in vs.stats:
-			var nb2 := int(vs.stats[k].get("buildings", 0))
-			rep.append("%s:%d" % [k, nb2])
-			if nb2 <= 0:
-				b_ok = false
-		check.call("budov > 0 u každé obce (%s)" % ", ".join(rep), b_ok)
-		check.call("5 MeshInstance3D Obec_* ve světě",
-			vs.get_children().filter(func(n): return n is MeshInstance3D).size() == 5)
+		var s_ok := true
+		var want_meshes := 0
+		for o in w.obce:
+			var oid := String(o.get("id", ""))
+			var st: Dictionary = vs.stats.get(oid, {})
+			var skipped := bool(st.get("skipped", false))
+			if skipped != bool(want_skip.get(oid, false)):
+				s_ok = false
+			if skipped:
+				rep.append("%s:skipped" % oid)
+			else:
+				want_meshes += 1
+				rep.append("%s:%d" % [oid, int(st.get("buildings", 0))])
+				if int(st.get("buildings", 0)) <= 0:
+					s_ok = false
+		check.call("uvnitř detailu skipped, venku postavené (%s)" % ", ".join(rep), s_ok)
+		check.call("MeshInstance3D Obec_* = počet vykreslených obcí (%d)" % want_meshes,
+			vs.get_children().filter(func(n): return n is MeshInstance3D).size() == want_meshes)
 
 	var n_ok := res.count(true)
 	print("VÝSLEDEK obcí: %d/%d OK" % [n_ok, res.size()])

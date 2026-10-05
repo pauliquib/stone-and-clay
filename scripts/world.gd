@@ -196,7 +196,8 @@ func build() -> void:
 	if not villages.stats.is_empty():        # ladění: kolik budov se v které obci postavilo
 		var _vs := []
 		for k in villages.stats:
-			_vs.append("%s %d budov" % [k, int(villages.stats[k]["buildings"])])
+			_vs.append(("%s skipped (detailní mapa)" % k) if villages.stats[k].get("skipped", false)
+				else "%s %d budov" % [k, int(villages.stats[k]["buildings"])])
 		print("Okolní obce (villages.stats): %s" % ", ".join(_vs))
 
 	loading.emit("Budovy a cesty…")

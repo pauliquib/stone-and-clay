@@ -7,10 +7,16 @@
 ## uvnitř katastru, jinak z hrubé mřížky `Surroundings.height_at` (25 m) – paty zdí
 ## kopírují terén po bodech, základ je zapuštěný SINK pod terén kvůli svahům.
 ## Bez dat (chybí obce.json nebo grid okolí) se nic nestaví – hra běží (fallback jako Surroundings).
+##
+## Fáze B4 (union mřížka): obec, jejíž katastr leží celý uvnitř detailního terénu, se
+## nekreslí – na jejím území už stojí fyzické budovy s kolizemi z exportu mapy (jinak
+## dvojí zdi / z-fighting). Obce mimo detail se kreslí dál; přeskočené mají v `stats`
+## záznam {"skipped": true}.
 class_name Villages
 extends Node3D
 
 const DATA_PATH := "res://data/obce.json"
+const MAP_PATH := "res://data/map.json"
 const SINK := 0.35              # zapuštění základu pod terén (m) – hrubá 25 m mřížka, svahy
 const OVERHANG := 0.15          # přesah střechy přes zdi (m)
 const SMALL_AREA := 20.0        # m² – menší budovy (garáž, kůlna) = nízký kvádr s plochou střechou
@@ -74,7 +80,53 @@ func setup(surr: Surroundings, terrain: Terrain = null) -> void:
 		push_warning("Villages: neznámý formát %s" % DATA_PATH)
 		return
 	for obec in (data as Dictionary)["obce"]:
+		if _inside_detail(obec):
+			# katastr obce celý v detailní mřížce → zástavbu staví fyzická mapa, ne dekorace
+			stats[String(obec.get("id", "obec"))] = {"skipped": true, "buildings": 0, "tris": 0}
+			continue
 		_build_obec(obec)
+
+
+## Leží celý katastr obce uvnitř detailního terénu? Test: každý bod `boundary` uvnitř
+## obdélníku mřížky (bez hranice → rohy čtverce center ± radius). Malá tolerance 1 m
+## pro hranice vedené těsně po okraji mřížky. Bez známého rozsahu terénu → false
+## (kreslit, jako před rozšířením mapy).
+func _inside_detail(obec: Dictionary) -> bool:
+	var r := _detail_rect()
+	if not r.has_area():
+		return false
+	r = r.grow(1.0)
+	var poly := PackedVector2Array()
+	for q in obec.get("boundary", []):
+		if q is Array and q.size() >= 2:
+			poly.append(Vector2(float(q[0]), float(q[1])))
+	if poly.is_empty():                      # bez boundary: střed ± ekvivalentní poloměr
+		var c: Array = obec.get("center", [])
+		if c.size() < 2:
+			return false
+		var cc := Vector2(float(c[0]), float(c[1]))
+		var rr := float(obec.get("radius", 0.0))
+		poly = PackedVector2Array([cc + Vector2(-rr, -rr), cc + Vector2(rr, -rr),
+			cc + Vector2(rr, rr), cc + Vector2(-rr, rr)])
+	for p in poly:
+		if not r.has_point(p):
+			return false
+	return true
+
+
+## Obdélník detailního terénu (svět x, z): preferuje živý `Terrain` (už má meta z map.json),
+## jinak čte `height` z data/map.json. Prázdný obdélník = rozsah neznámý.
+func _detail_rect() -> Rect2:
+	if _terr != null and _terr.w > 1 and _terr.h > 1:
+		return Rect2(_terr.x0, _terr.z0, (_terr.w - 1) * _terr.spacing, (_terr.h - 1) * _terr.spacing)
+	if FileAccess.file_exists(MAP_PATH):
+		var m: Variant = JSON.parse_string(FileAccess.get_file_as_string(MAP_PATH))
+		if m is Dictionary and (m as Dictionary).get("height") is Dictionary:
+			var hm: Dictionary = (m as Dictionary)["height"]
+			var sp := float(hm.get("spacing", 0.0))
+			return Rect2(float(hm.get("x0", 0.0)), float(hm.get("z0", 0.0)),
+				(float(hm.get("w", 1.0)) - 1.0) * sp, (float(hm.get("h", 1.0)) - 1.0) * sp)
+	return Rect2()
 
 
 # ------------------------------------------------------------------ data → mesh

@@ -246,7 +246,7 @@ func _watch(delta: float, cop: Car, pl: Player) -> void:
 	var spd_v: float = pcar.speed if pcar != null else pl.horse.speed
 	var wobble: float = absf(pcar.steer_in) if pcar != null else absf(pl.horse._yaw_rate) * 0.6
 	var kmh := absf(spd_v) * 3.6
-	var in_village := Vector2(pnode.global_position.x, pnode.global_position.z).distance_to(Traffic.VILLAGE_CENTER) < Traffic.VILLAGE_R
+	var in_village := traffic.in_village(Vector2(pnode.global_position.x, pnode.global_position.z))
 	var limit := 50.0 if in_village else 90.0
 	var reason := ""
 	if kmh > limit + 12.0:
