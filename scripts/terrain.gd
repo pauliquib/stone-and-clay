@@ -5,7 +5,6 @@
 class_name Terrain
 extends Node3D
 
-const LOD_QUADS := [64, 32, 16, 4]
 const LOD_RANGES := [0.0, 190.0, 480.0, 1250.0, 100000.0]
 ## Dlaždicové textury procedurálního povrchu (M1.1): uniform, bit v `tex_mask`, soubor v `assets/` (AssetLib.has).
 ## DOPLNIT: názvy textur jsou doporučená výchozí volba (Poly Haven, CC0), uživatel je stáhne a případně změní; nic se nestahuje automaticky.
@@ -99,10 +98,12 @@ func build(meta: Dictionary) -> void:
 
 	_load_surface_textures()
 
-	# --- dlaždice
+	# --- dlaždice (LOD hustota se odvozuje z chunk_cells: LOD0 = 2 m rozlišení,
+	# další úrovně 4/8/32 m – beze změny pro chunk_cells 64 i 128)
 	var size := chunk_cells * spacing
+	var lod_quads := [chunk_cells, chunk_cells / 2, chunk_cells / 4, chunk_cells / 16]
 	var meshes := []
-	for q in LOD_QUADS:
+	for q in lod_quads:
 		meshes.append(_grid_mesh(q, size))
 	var mm := FileAccess.get_file_as_bytes("res://data/terrain_chunks.bin").to_float32_array()
 	var ncx := int(hm["ncx"])
@@ -113,7 +114,7 @@ func build(meta: Dictionary) -> void:
 			var hmax := mm[(iz * ncx + ix) * 2 + 1] + 1.0
 			var origin := Vector3(x0 + ix * size, 0.0, z0 + iz * size)
 			var aabb := AABB(Vector3(0, hmin, 0), Vector3(size, hmax - hmin, size))
-			for li in LOD_QUADS.size():
+			for li in lod_quads.size():
 				var mi := MeshInstance3D.new()
 				mi.mesh = meshes[li]
 				mi.material_override = material

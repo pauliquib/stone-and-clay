@@ -82,7 +82,10 @@ class Collector(osmium.SimpleHandler):
 def main():
     meta = json.load(open(os.path.join(DATA, "map.json")))
     ref = json.load(open(os.path.join(PDATA, "scene_reference.json")))
-    b0 = json.load(open(os.path.join(PDATA, "osm_raw_full.json")))["bbox_latlon_margin"]
+    raw_name = "osm_raw_union.json" if os.path.exists(os.path.join(PDATA, "osm_raw_union.json")) \
+        else "osm_raw_full.json"
+    b0 = json.load(open(os.path.join(PDATA, raw_name)))["bbox_latlon_margin"]
+    print(f"OSM bbox: {raw_name}")
     m = 0.03      # rezerva ve stupních – bbox z osm_raw je užší než výšková mřížka; pořadí (lon0, lat0, lon1, lat1)
     bbox = [b0[0] - m, b0[1] - m, b0[2] + m, b0[3] + m]
     tf = make_transform(ref)

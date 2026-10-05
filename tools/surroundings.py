@@ -212,7 +212,13 @@ def main():
     extent = float(a.extent)
 
     meta = json.load(open(os.path.join(DATA, "map.json")))
-    meta_full = jload("geodata_meta_full.json")
+    # union geodata (B2) pokud jsou – jinak starý full rozsah (jen katastr Dukelčic)
+    meta_name = "geodata_meta_union.json" if os.path.exists(
+        os.path.join(PDATA, "geodata_meta_union.json")) else "geodata_meta_full.json"
+    meta_full = jload(meta_name)
+    dtm_name = "dtm_union_scene.npy" if os.path.exists(
+        os.path.join(GEO, "dtm_union_scene.npy")) else "dtm_full_scene.npy"
+    print(f"edge-blend DEM: {dtm_name} (+{meta_name})")
     ref = jload("scene_reference.json")
     h_ref = jload("terrain_ref.json")["H_ref"]
     hm = meta["height"]
@@ -264,7 +270,7 @@ def main():
     grid = grid - h_ref + H_REF_CORR
 
     # navázání na hranici katastru: do EDGE_BLEND metrů přejít na přesné DMR 5G okolí
-    dtm = np.load(os.path.join(GEO, "dtm_full_scene.npy")).astype(np.float64) - h_ref
+    dtm = np.load(os.path.join(GEO, dtm_name)).astype(np.float64) - h_ref
     fx0, fy1, fres = meta_full["grid_x0"], meta_full["grid_y1"], meta_full["dem_res"]
     xs = gx0 + np.arange(nx) * step
     zs = gz0 + np.arange(nz) * step
