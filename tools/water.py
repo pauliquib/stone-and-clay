@@ -64,6 +64,9 @@ FICTIONAL_NAMES = {
     "Neradovský potok": "Sojčí potok",
     "Oskorušný potok": "Jeřabinový potok",
     "Zlámanecký potok": "Sokolí potok",
+    # reálné názvy ulic (sjednoceno s tools/obce.py a export_map.py)
+    "Švambovce": "Štambovce",
+    "Březovská": "Březoucká",
 }
 
 

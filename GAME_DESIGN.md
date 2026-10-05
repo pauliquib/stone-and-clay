@@ -32,7 +32,7 @@ zvrací nebo usne v příkopu.
 | Žánr | open-world sandbox / life-sim s úkoly, humor |
 | Engine | Godot 4.3 (Forward+, Vulkan), GDScript |
 | Pohled | 1. i 3. osoba (přepínání V) |
-| Svět | celý katastr Dukelčic, ~5,2 × 4,6 km, bez načítacích obrazovek |
+| Svět | katastr Dukelčic + katastry 5 okolních obcí, ~11,3 × 7,5 km detailu, bez načítacích obrazovek |
 | Hráči | singleplayer + kooperativní multiplayer 2–8 hráčů |
 | Platforma | PC (Linux, Windows), klávesnice+myš i ovladač |
 | Délka sezení | 30–120 min („jeden večer ve vsi“) |

@@ -96,6 +96,10 @@ FICTIONAL_NAMES.update({
     "Neradovský potok": "Sojčí potok",
     "Oskorušný potok": "Jeřabinový potok",
     "Zlámanecký potok": "Sokolí potok",
+    # reálné názvy ulic (nejsou place uzly → filtr toponym je nechytnul):
+    # „Švambovce“ je unikátní lokální název, „Březovská“ vede k reálné Březové
+    "Švambovce": "Štambovce",
+    "Březovská": "Březoucká",
 })
 
 # OSM building=* → hrubý typ (church/chapel/tower pro zvýraznění dominant)
@@ -574,8 +578,10 @@ def main():
             for seg_pts in clip_road(pts, boundary, ROAD_OVERHANG):
                 item = {"kind": kind,
                         "pts": [[round(x, 2), round(z, 2)] for x, z in seg_pts]}
-                # name=None i když OSM jméno existuje, ale nelze ho anonymizovat
-                item["name"] = fname_road(name, place_names) if name else None
+                # name=None i když OSM jméno existuje, ale nelze ho anonymizovat;
+                # kratičké junk hodnoty („w“ apod.) rovnou zahodit – jako expand_map
+                item["name"] = fname_road(name, place_names) \
+                    if name and len(str(name).strip()) >= 3 else None
                 roads.append(item)
 
         # ---- fallback hranice, když relace chyběla: obálka obsahu + HULL_PAD

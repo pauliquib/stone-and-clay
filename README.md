@@ -1,8 +1,9 @@
 # Stone & Clay – herní verze mapy (MVP)
 
-Open-world MVP v **Godot 4.3** nad mapou celého katastru obce Dukelčic
-(`blend/mapa_okoli.blend` – terén DMR 5G, budovy s výškami z DMP 1G, silnice z OSM, ~21 800 stromů;
-barva terénu je procedurální, ortofoto ČÚZK jen na přepnutí).
+Open-world MVP v **Godot 4.3** nad detailní mapou ~11,3 × 7,5 km – katastr obce Dukelčic
+plus katastry pěti okolních obcí (`blend/mapa_okoli.blend` + rozšíření v Pythonu – terén
+DMR 5G, budovy s výškami z DMP 1G, silnice z OSM, ~51 700 stromů; barva terénu je
+procedurální, ortofoto ČÚZK jen na přepnutí).
 
 > *„Tato hra je satirickým uměleckým dílem. Všechny postavy, události a vyobrazené soukromé objekty
 > jsou smyšlené. Jakákoliv podobnost se skutečnými osobami či konkrétními obydlími je čistě náhodná.“*
@@ -41,8 +42,9 @@ fyziologie, počasí a roční doby, doprava a policie, ekonomika, práce, zvě�
 zahrada a desítky dalších systémů.
 
 Kolem katastru leží pět okolních obcí s fiktivními názvy (Břehatice, Bohulečice, Březouchy,
-Velký Oříškov, Hřiváčův Újezd) – jsou jen vizuální kulisou krajiny pro pohled z výšky
-a na mapě (M), bez herního obsahu; hráč vždy startuje v Dukelčicích.
+Velký Oříškov, Hřiváčův Újezd) – jsou součástí detailní mapy: skutečná zástavba s kolizemi,
+průjezdné silnice a zóna „v obci“ (limit 50 km/h), ale zatím bez vlastního herního obsahu
+(úkoly, práce a příběh zůstávají v Dukelčicích); hráč vždy startuje v Dukelčicích.
 
 Vize, pilíře a herní smyčka: [`GAME_DESIGN.md`](GAME_DESIGN.md).
 Úplný technický rozpis všech implementovaných systémů: [`docs/SYSTEMS.md`](docs/SYSTEMS.md).

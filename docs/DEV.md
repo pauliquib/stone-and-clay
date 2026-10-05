@@ -44,9 +44,42 @@ mřížky – index, nová výška, normála RGB8; `Terrain` je aplikuje při na
 sedí na ortofotu, tyto objekty ne); originály nechá v `data/orig/`. Ruční úpravy v Blenderu
 patří do kolekcí `HRA_*` (viz `BLENDER_UPRAVY.md`), exportér je přidá.
 
-Krajina za okrajem katastru (M6.2, pro pohled z výšky – dron, později paraglide): `tools/surroundings.py`
-stáhne z ČÚZK DMR 5G (ImageServer, stejný zdroj jako mapa – © ČÚZK CC BY 4.0) nízkorozlišenou výškovou
-mřížku okolí (katastr + ~2,5 km na každou stranu, krok 25 m) → `data/surround_height.bin` a z OSM
+### Rozšíření detailní mapy na okolní obce (union mřížka)
+
+Detailní terén pokrývá ~11,3 × 7,5 km (mřížka 5675 × 3772 bodů, krok 2 m) přes katastr
+Dukelčic i katastry všech 5 okolních obcí. Stará mřížka 2626 × 2302 zůstává bajtově
+zachována jako blok v nové mřížce (offset col +1381, row +768 – fázově sladěná 2 m buňka),
+nové území se generuje čistě v Pythonu (bez Blenderu) ze stejných zdrojů:
+
+```bash
+python3 tools/fetch_geodata_union.py    # ČÚZK DMR5G/DMP1G + ortofoto pro union bbox (download;
+                                        # po pásech ~2048 px – reálný limit ImageServeru ~8 Mpx)
+python3 tools/fetch_osm_union.py        # OSM extrakt union bbox z geodata/pbf (offline, pyosmium;
+                                        # + place_names z celého kraji pro hygienický filtr názvů)
+python3 tools/expand_map.py             # terrain_*.bin, trees.bin (staré instance verbatim),
+                                        # map.json (roads z union extraktu), ortho_full.jpg
+python3 tools/expand_buildings.py       # += walls/roofs/asphalt/gravel.bin (budovy + silniční
+                                        #   pásy mimo katastr; dedup osm_id + překryv půdorysu)
+python3 tools/water.py                  # přegenerovat – čte novou mřížku z map.json
+python3 tools/landuse.py                #   „ (rastry 4 m zarovnané na union mřížku)
+python3 tools/surface.py                #   „
+python3 tools/surroundings.py           #   „ (preferuje geodata_meta_union.json + dtm_union_scene.npy;
+                                        #     --no-download pro offline přegenerování masky)
+python3 tools/vegetation.py             # body vegetace (zůstávají uvnitř katastru z map.json boundary)
+python3 tools/clean_road_clashes.py     # budovy/stromy ve vozovce i na novém území
+```
+
+Fetch nástroje jsou idempotentní (přepisují `geodata/*_union_*` a `pipeline/data/*union*`);
+`expand_map.py`/`expand_buildings.py` si před přepsáním udělají snapshot do
+`pipeline/data/pre_expand/` resp. `pre_b3/` a reportují švy/překryvy. Dekorativní zástavba
+`Villages` se pro obec s katastrem celým uvnitř detailní mřížky přeskakuje
+(`stats[id].skipped`) – zástavbu tam drží fyzické budovy exportu; obce mimo detail se
+kreslí jako dosud.
+
+Krajina za okrajem detailního terénu (M6.2, pro pohled z výšky – dron, později paraglide):
+`tools/surroundings.py` stáhne z ČÚZK DMR 5G (ImageServer, stejný zdroj jako mapa – © ČÚZK CC BY 4.0)
+nízkorozlišenou výškovou mřížku okolí (obdélník z `map.json` height – po rozšíření ~11,3 × 7,5 km –
++ ~2,5 km na každou stranu, krok 25 m → ~16 × 12 km) → `data/surround_height.bin` a z OSM
 (`geodata/pbf/zlinsky-latest.osm.pbf`) hrubou masku povrchu (les / pole / louka / zástavba / voda)
 → `data/surround_surface.bin`. Oba .bin nejsou v gitu.
 
@@ -60,16 +93,20 @@ výšky ve vertex shaderu (`shaders/surroundings.gdshader`), paleta tříd jako 
 oblast katastru zapuštěná pod detailní terén (žádný šev), les jako tmavší povrch + MultiMesh kuželů
 do 4 km, bez kolizí a stínů. Bez dat vznikne plochá zvlněná krajina ve výšce okraje (fallback).
 
-Okolní obce (jen vizuální vrstva okolí): `python3 tools/obce.py` čte z OSM
+Okolní obce: `python3 tools/obce.py` čte z OSM
 (`geodata/pbf/zlinsky-latest.osm.pbf`) 5 katastrů v okolí domova – hranice polygonu, půdorysy
 budov, silnice, vodní a lesní plochy → `data/obce.json` (v gitu; názvy obcí jsou fiktivní –
-PRAVNI_DOPORUCENI.md). 3D zástavbu z ní staví `scripts/villages.gd` (`Villages`, uzel „Vesnice“
-ve World po `surroundings.setup`): půdorysy tažené do zdí se sedlovou/valbovou střechou,
-5 MeshInstance3D bez kolizí a stínů (~52 tis. tris). `World.obce` drží pole dat pro mapu
-(popisky, hranice a silnice obcí kreslí HUD na mapě M; rozsah pohledu = katastr + obce)
-a `World.obec_at(pos)` vrátí obec, v jejímž katastru bod leží (test v polygonu hranice;
-radius je jen ekvivalentní plocha, při překryvech vítězí nejbližší střed; mimo katastry `{}`).
-Bez souboru jen warning a hra běží dál.
+PRAVNI_DOPORUCENI.md). Dekorativní 3D zástavbu z ní staví `scripts/villages.gd` (`Villages`,
+uzel „Vesnice“ ve World po `surroundings.setup`) jen pro obec **mimo** detailní mřížku:
+půdorysy tažené do zdí se sedlovou/valbovou střechou, MeshInstance3D bez kolizí a stínů.
+Po rozšíření mapy (union) leží všech 5 obcí v detailu → jejich fyzická zástavba pochází
+z `walls/roofs.bin` a vrstva Villages je přeskočená (`stats[id].skipped`; viz výše).
+`World.obce` drží pole dat pro mapu (popisky, hranice a silnice obcí kreslí HUD na mapě M;
+rozsah pohledu = katastr + obce) a `World.obec_at(pos)` vrátí obec, v jejímž katastru bod
+leží (test v polygonu hranice; radius je jen ekvivalentní plocha, při překryvech vítězí
+nejbližší střed; mimo katastry `{}`). Katastry obcí se počítají i do zón „v obci“ –
+limit 50 km/h, svědci a hlídka policie (`Traffic.in_village`). Bez souboru jen warning
+a hra běží dál.
 
 Formáty: `terrain_height.bin` (float32, řádky od severu, 2 m), `terrain_collision.bin`
 (výšky / 2 pro HeightMapShape3D škálovaný ×2), `terrain_normal.bin` (RGB8),
@@ -106,7 +143,7 @@ MultiMeshů a LOD, `--terraintest` mikroreliéf vs. kolize, wetness → shader a
 
 Letové hranice (M6.2, platí pro dron a budoucí letouny M6.3+ – napojení přes `World.flight_bounds(pos)`
 → `{ok, warn, push, out, agl}`): strop `World.FLY_CEIL_AGL` = 1 500 m nad terénem (měkké odepření –
-tlačí dolů), vodorovná hranice `World.FLY_LIMIT_M` = 2 km za obdélníkem katastru – v pásmu
+tlačí dolů), vodorovná hranice `World.FLY_LIMIT_M` = 2 km za obdélníkem detailního terénu – v pásmu
 `World.FLY_WARN_M` (400 m) před ní měkké odpuzení protivětrem (`World.FLY_PUSH_MS`) a varování
 „Dál už nelétej – opouštíš oblast“, za hranicí návrat domů. Chodce a auta drží stále neviditelné
 zdi `Terrain._add_bounds`. Kontrola okolí z výšky: F2 → Teleport → Ladění → „Volná kamera ~500 m

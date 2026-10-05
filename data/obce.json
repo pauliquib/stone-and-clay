@@ -30314,7 +30314,7 @@
        -920.76
       ]
      ],
-     "name": "Fabiánka I"
+     "name": null
     },
     {
      "kind": "residential",
@@ -30360,7 +30360,7 @@
        -918.49
       ]
      ],
-     "name": "Fabiánka II"
+     "name": null
     },
     {
      "kind": "service",
@@ -33674,7 +33674,7 @@
        -2559.9
       ]
      ],
-     "name": "Březovská"
+     "name": "Březoucká"
     },
     {
      "kind": "residential",
@@ -34052,7 +34052,7 @@
        -1787.11
       ]
      ],
-     "name": "Skalka I"
+     "name": null
     },
     {
      "kind": "residential",
@@ -34140,7 +34140,7 @@
        -2974.89
       ]
      ],
-     "name": "Březovská"
+     "name": "Březoucká"
     },
     {
      "kind": "path",
@@ -97988,7 +97988,7 @@
        1569.9
       ]
      ],
-     "name": "w"
+     "name": null
     },
     {
      "kind": "footway",
