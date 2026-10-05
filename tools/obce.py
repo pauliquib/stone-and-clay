@@ -19,7 +19,7 @@ Postup:
      budovy a silnice uvnitř katastru (silnice s ~ROAD_OVERHANG m přesahem, ať
      ulice navazují), plochy natural=water a landuse=forest,
   3. vše se transformuje lat/lon → scéna (make_transform z
-     scripts/phase2_osm_to_local.py) → hra (x = scene x, z = −scene y).
+     pipeline/scripts/phase2_osm_to_local.py) → hra (x = scene x, z = −scene y).
 
 Souřadnicový transform (ověřený): ref Doubravy 122 → lat0=49.14354261,
 lon0=17.67175015 → scene (11.071, 11.816); e = R·Δlon·cos(lat0), n = R·Δlat
@@ -61,9 +61,12 @@ import osmium
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.dirname(HERE)
-ROOT = os.path.dirname(GAME)
+PIPE = os.path.join(GAME, "pipeline")
+PDATA = os.path.join(PIPE, "data")
+GEO = os.path.join(GAME, "geodata")
+PSCRIPTS = os.path.join(PIPE, "scripts")
 DATA = os.path.join(GAME, "data")
-PBF = os.path.join(ROOT, "geodata", "pbf", "zlinsky-latest.osm.pbf")
+PBF = os.path.join(GEO, "pbf", "zlinsky-latest.osm.pbf")
 OUT = os.path.join(DATA, "obce.json")
 
 # --- laditelné konstanty -----------------------------------------------------
@@ -453,9 +456,9 @@ def transform_latlon(tf):
 
 
 def main():
-    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    sys.path.insert(0, PSCRIPTS)
     from phase2_osm_to_local import make_transform  # noqa: E402
-    ref = json.load(open(os.path.join(ROOT, "data", "scene_reference.json")))
+    ref = json.load(open(os.path.join(PDATA, "scene_reference.json")))
     tf = transform_latlon(make_transform(ref))
     lat0, lon0 = ref["house_latlon"]
     hx, hy = ref["house_scene_xy"]

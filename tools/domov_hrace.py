@@ -3,7 +3,7 @@
 Detailní 3D model domu se do hry nepřebírá. Místo něj se dům postaví úplně
 stejnou metodou jako zbytek zástavby (fáze 6): půdorys z OSM/RÚIAN
 (way/279053823), výška okapu/hřebene a tvar střechy fitem na DMP 1G, barva
-střechy z ortofota. Výstup má stejné schéma jako data/buildings_3d.json.
+střechy z ortofota. Výstup má stejné schéma jako pipeline/data/buildings_3d.json.
 
 Spuštění (systémový python – numpy/scipy/PIL):
   python3 tools/domov_hrace.py
@@ -18,8 +18,12 @@ import numpy as np
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
-sys.path.insert(0, os.path.join(ROOT, "scripts"))
+GAME = os.path.dirname(HERE)
+PIPE = os.path.join(GAME, "pipeline")
+PDATA = os.path.join(PIPE, "data")
+GEO = os.path.join(GAME, "geodata")
+PSCRIPTS = os.path.join(PIPE, "scripts")
+sys.path.insert(0, PSCRIPTS)
 import phase6_analyze as p6  # noqa: E402  (čisté funkce fit_roof, roof_from_fit, mar, pip, …)
 
 Image.MAX_IMAGE_PIXELS = None
@@ -27,11 +31,11 @@ HOUSE_OSM_ID = 279053823
 
 
 def main():
-    gj = json.load(open(os.path.join(ROOT, "data", "okoli_full_local.geojson")))
+    gj = json.load(open(os.path.join(PDATA, "okoli_full_local.geojson")))
     feat = next(f for f in gj["features"] if f["properties"].get("osm_id") == HOUSE_OSM_ID)
     poly = p6.open_ring(feat["geometry"]["coordinates"][0])
-    H_ref = json.load(open(os.path.join(ROOT, "data", "terrain_ref.json")))["H_ref"]
-    geo = os.path.join(ROOT, "geodata")
+    H_ref = json.load(open(os.path.join(PDATA, "terrain_ref.json")))["H_ref"]
+    geo = GEO
     dtm = np.load(os.path.join(geo, "dtm_scene.npy")).astype(np.float64)   # původní DMR (bez snížení pod model)
     dsm = np.load(os.path.join(geo, "dsm_scene.npy")).astype(np.float64)
     ortho = np.asarray(Image.open(os.path.join(geo, "ortho_scene.jpg")).convert("RGB"))

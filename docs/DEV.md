@@ -6,7 +6,7 @@
 ## Jak vzniká herní mapa
 
 ```
-mapa_okoli.blend
+blend/mapa_okoli.blend
    │  tools/domov_hrace.py      – dům hráče stejnou metodou jako ostatní budovy (půdorys OSM/RÚIAN,
    │                           tvar a výška střechy fitem na DMP 1G, barva střechy z ortofota)
    ▼  tools/export_map.py    – (Blender, headless)
@@ -15,6 +15,13 @@ blend/mapa.blend   herní verze mapy: model domu odebrán, jednoduchý dům hrá
 data/*.bin, data/map.json       geometrie a metadata pro Godot
 textures/                       PBR textury (Poly Haven) + ortofoto (jen pro porovnání, ve hře se ve výchozím stavu nepoužívá)
 ```
+
+Pipeline, která `blend/mapa_okoli.blend` vytvořila z otevřených dat (ČÚZK, OSM, Poly Haven),
+je součástí repozitáře: skripty v `pipeline/scripts/` (`run_all.sh` spustí fáze 1–13 headless),
+mezidata v `pipeline/data/`, stažené PBR textury/HDRI v `pipeline/assets/`, kontrolní rendery
+a logy v `pipeline/renders/` a `pipeline/logs/`. Velká geodata ČÚZK (rastry DMR/DMP, ortofoto,
+OSM .pbf) leží v `geodata/` – všechny tyto velké adresáře jsou mimo git. Vstupní model domu
+`blend/Doubravy_3D.blend` (~726 MB) se do repa nedává.
 
 Regenerace dat (z kořene repozitáře):
 

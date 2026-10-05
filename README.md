@@ -1,7 +1,7 @@
 # Stone & Clay – herní verze mapy (MVP)
 
 Open-world MVP v **Godot 4.3** nad mapou celého katastru obce Dukelčic
-(`mapa_okoli.blend` – terén DMR 5G, budovy s výškami z DMP 1G, silnice z OSM, ~21 800 stromů;
+(`blend/mapa_okoli.blend` – terén DMR 5G, budovy s výškami z DMP 1G, silnice z OSM, ~21 800 stromů;
 barva terénu je procedurální, ortofoto ČÚZK jen na přepnutí).
 
 > *„Tato hra je satirickým uměleckým dílem. Všechny postavy, události a vyobrazené soukromé objekty

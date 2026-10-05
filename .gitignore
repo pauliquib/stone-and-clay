@@ -7,6 +7,12 @@ textures/*.hdr
 tools/out/
 blend/*.blend
 blend/*.blend1
+# Pipeline okolí (ČÚZK/OSM podklady a mezidata – velké, reprodukovatelné)
+geodata/
+pipeline/data/
+pipeline/assets/
+pipeline/renders/
+pipeline/logs/
 # Lokální nástroje a cache
 .claude/
 __pycache__/

@@ -7,13 +7,13 @@ povrchu (les / pole / louka / zástavba / voda) ze stejných licencovaných zdro
 
 Zdroje (jen ČÚZK a OSM – viz README → Právní zásady obsahu):
   DMR 5G ČÚZK (© ČÚZK, CC BY 4.0)  – nástroj sám stáhne z ImageServeru (jako
-        scripts/phase10_fetch_geodata_full.py), oblast = katastr + EXTENT; server
+        pipeline/scripts/phase10_fetch_geodata_full.py), oblast = katastr + EXTENT; server
         interpoluje na krok STEP, takže stačí jeden požadavek.
         URL: https://ags.cuzk.cz/arcgis2/rest/services/dmr5g/ImageServer/exportImage
   OSM (© přispěvatelé OpenStreetMap, ODbL) – geodata/pbf/zlinsky-latest.osm.pbf
         (už ho používají tools/water.py, landuse.py, surface.py; případně stáhni
         znovu z https://download.geofabrik.de/europe/czech-republic.html – příslušný kraj).
-  geodata/dtm_full_scene.npy + data/geodata_meta_full.json – přesná výška na hranici
+  geodata/dtm_full_scene.npy + pipeline/data/geodata_meta_full.json – přesná výška na hranici
         katastru, k níž se okolí do `EDGE_BLEND` m navazuje (žádný šev).
 
 Výstup (oba v .gitignore – data/*.bin):
@@ -47,9 +47,11 @@ from PIL import Image, ImageDraw
 Image.MAX_IMAGE_PIXELS = None
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.dirname(HERE)
-ROOT = os.path.dirname(GAME)
+PIPE = os.path.join(GAME, "pipeline")
+PDATA = os.path.join(PIPE, "data")
+GEO = os.path.join(GAME, "geodata")
+PSCRIPTS = os.path.join(PIPE, "scripts")
 DATA = os.path.join(GAME, "data")
-GEO = os.path.join(ROOT, "geodata")
 
 DMR_URL = "https://ags.cuzk.cz/arcgis2/rest/services/dmr5g/ImageServer/exportImage"
 PBF = os.path.join(GEO, "pbf", "zlinsky-latest.osm.pbf")
@@ -67,7 +69,7 @@ DL_TRIES = 4
 
 
 def jload(rel):
-    return json.load(open(os.path.join(ROOT, rel)))
+    return json.load(open(os.path.join(PDATA, rel)))
 
 
 def bilinear(arr, x0, y1, res, x, y):
@@ -210,9 +212,9 @@ def main():
     extent = float(a.extent)
 
     meta = json.load(open(os.path.join(DATA, "map.json")))
-    meta_full = jload("data/geodata_meta_full.json")
-    ref = jload("data/scene_reference.json")
-    h_ref = jload("data/terrain_ref.json")["H_ref"]
+    meta_full = jload("geodata_meta_full.json")
+    ref = jload("scene_reference.json")
+    h_ref = jload("terrain_ref.json")["H_ref"]
     hm = meta["height"]
 
     # scénový obdélník katastru (Godot x = scene x; Godot z = -scene y)
@@ -289,7 +291,7 @@ def main():
     col.apply(PBF)
     print(f"OSM: {len(col.areas)} ploch, {len(col.lines)} čar")
 
-    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    sys.path.insert(0, PSCRIPTS)
     from phase2_osm_to_local import make_transform  # noqa: E402
     tf = make_transform(ref)
 
