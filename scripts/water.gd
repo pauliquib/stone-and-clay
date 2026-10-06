@@ -85,7 +85,7 @@ func build(w: World, t: Terrain) -> void:
 			mi.mesh = _ribbon(streams[si])
 			mi.material_override = m
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			mi.visibility_range_end = VIS_RANGE
+			mi.visibility_range_end = _vis_end(mi.mesh)
 			add_child(mi)
 	# rybníky
 	var mp := _material(ntex, 0.0)
@@ -121,12 +121,20 @@ func build(w: World, t: Terrain) -> void:
 		mi.mesh = am
 		mi.material_override = mp
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.visibility_range_end = VIS_RANGE
+		mi.visibility_range_end = _vis_end(am)
 		add_child(mi)
 		var r := Rect2(poly[0], Vector2.ZERO)
 		for q in poly:
 			r = r.expand(q)
 		ponds.append({"name": String(pd.get("name", "")), "level": level, "poly": poly, "aabb": r.grow(1.0)})
+
+
+## Dohled hladiny: Godot ho měří od STŘEDU AABB meshe. Tok je jeden mesh dlouhý i několik km
+## (union mapa), takže pevný VIS_RANGE by ho schoval i hráči stojícímu na břehu daleko od
+## středu toku → dohled + půlka vodorovné úhlopříčky (každý kus toku vidět aspoň do VIS_RANGE).
+static func _vis_end(m: Mesh) -> float:
+	var ab := m.get_aabb()
+	return VIS_RANGE + Vector2(ab.size.x, ab.size.z).length() * 0.5
 
 
 func _material(ntex: Texture2D, flow: float) -> ShaderMaterial:

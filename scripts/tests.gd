@@ -2025,8 +2025,7 @@ static func obec_test(g: Node) -> void:
 
 ## --perf[=s]: měření výkonu po načtení – každou sekundu vypíše FPS, čas CPU (process + physics)
 ## a statistiky vykreslování. Rozdíl mezi dobou snímku (1000/FPS) a součtem process+physics
-## ukazuje, jestli brzdí CPU (skripty/fyzika) nebo GPU (vykreslování). --perfnpc=0 před startem
-## navíc vypne NPC/provoz/faunu pro srovnání (viz World.apply_perf_flags).
+## ukazuje, jestli brzdí CPU (skripty/fyzika) nebo GPU (vykreslování).
 static func perf_test(g: Node) -> void:
 	var raw := String(g._args.get("perf", "12"))
 	var dur := clampi(int(raw) if raw != "" else 12, 3, 600)

@@ -88,7 +88,7 @@ var clients := {}                # id → LocalClient (jen hráči na tomto poč
 var ready_done := false
 ## Simulační bublina kolem nejbližšího hráče (m) – za její hranicí přejdou vesničané, psi, NPC
 ## a AI auta do levného režimu (kinematika ~2 Hz, schovaný vizuál) nebo zamraznou. Nastavuje
-## GameSettings dle volby „Aktivita světa“ (0 = bez omezení – vše běží jako dřív).
+## GameSettings dle volby „Aktivita světa“ (GameSettings.SIMS: 250–900 m).
 var sim_radius := 320.0
 var _blackout := {}              # id → true: hráč právě „nevidí“ (okno, spánek, záchytka)
 var _cheat_permits := {}         # id → {druh oprávnění: true} – jen ladicí cheat (F2 → Hráč), dokud nejsou doklady (M4.6)
@@ -219,7 +219,9 @@ func build() -> void:
 	m_asph.set_shader_parameter("wet_boost", 1.6)      # Fáze 9: mokrý asfalt znatelně lesklejší (§12.3)
 	m_grav.set_shader_parameter("wet_boost", 1.25)
 	# zdi/střechy mají konečný dohled – dosah dost velký, aby domy byly vidět i při Dohlednosti
-	# „Krátká“ (násobič 0.6 → reálně ~960/1020 m); dláždice se mimo dosah skipují po chunkách
+	# „Krátká“ (násobič 0.6 → reálně ~960/1020 m); dláždice se mimo dosah skipují po chunkách.
+	# Dohled se měří od středu dlaždice 256 m (MapLoader.load_chunks posouvá uzel do středu AABB –
+	# prolínání FADE_SELF by jinak počítalo od spawnu a za ~1,3 km od domu by mapa zmizela, vlna 0b)
 	MapLoader.add_chunks(map_root, "Budovy_steny", MapLoader.load_chunks("res://data/walls.bin", m_wall), true, 1600.0, "budova")
 	MapLoader.add_chunks(map_root, "Budovy_strechy", MapLoader.load_chunks("res://data/roofs.bin", m_roof), true, 1700.0, "budova")
 	MapLoader.add_chunks(map_root, "Silnice", MapLoader.load_chunks("res://data/asphalt.bin", m_asph, terrain, 0.1), true, 1800.0, "asfalt")

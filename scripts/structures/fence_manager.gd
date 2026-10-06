@@ -219,12 +219,16 @@ func _rebuild_geometry() -> void:
 		_build_run(k, run)
 	_mi = MeshInstance3D.new()
 	_mi.name = "PlotyMesh"
-	_mi.visibility_range_end = VIS_END
-	add_child(_mi)
 	if k.is_empty():
 		_mi.mesh = ArrayMesh.new()
 	else:
 		_mi.mesh = k.commit(MeshKit.vc_material(0.85))
+	# Godot měří dohled od STŘEDU AABB celého meshe – ploty domova a vzdálené pole / hráčem
+	# postavené úseky jsou jeden mesh, takže dohled se prodlouží o půlku vodorovné úhlopříčky:
+	# každý úsek je pak vidět aspoň do VIS_END (vlna 0b)
+	var ab := _mi.mesh.get_aabb()
+	_mi.visibility_range_end = VIS_END + Vector2(ab.size.x, ab.size.z).length() * 0.5
+	add_child(_mi)
 
 
 func _build_run(k: MeshKit, run: Dictionary) -> void:

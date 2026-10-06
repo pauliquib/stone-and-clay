@@ -53,7 +53,13 @@ static func tinted_material(tex: String, size_m: float, desat: float, gain: floa
 	return m
 
 
-## Načte DBM1 soubor → seznam dlaždic {mesh: ArrayMesh, faces: PackedVector3Array}.
+## Načte DBM1 soubor → seznam dlaždic {mesh: ArrayMesh, faces: PackedVector3Array, origin: Vector3}.
+## Vrcholy meshe i `faces` jsou LOKÁLNÍ vůči `origin` = střed AABB dlaždice (add_chunks na něj posadí
+## MeshInstance3D i kolizní těleso). Proč: Godot 4.3 ořezává visibility range podle středu AABB instance,
+## ale prolínání VISIBILITY_RANGE_FADE_SELF počítá z POČÁTKU uzlu (RenderForwardClustered:
+## `inst->transform.origin.distance_to(cam)`). S uzlem v počátku světa (dům hráče) a geometrií
+## v absolutních souřadnicích tak každá dlaždice zprůhlednila, jakmile byla kamera dál než dohled
+## od spawnu – „za spawnem nic není“ (vlna 0b).
 ## `drape` – terén: povrch silnic/cest se "přilepí" na terén (konstantní výška nad ním). V exportu
 ## některé silnice (např. III/49010 u úřadu) visely až 1 m nad terénem, zatímco navazující místní
 ## komunikace terén kopírovaly → na křižovatkách vznikaly svislé schody, přes které auto neprojelo.
@@ -78,13 +84,20 @@ static func load_chunks(path: String, mat: Material, drape: Terrain = null, drap
 		v.resize(n)
 		nn.resize(n)
 		cc.resize(n)
+		var box := AABB()
 		for i in n:
 			var k := i * 3
-			v[i] = Vector3(pos[k], pos[k + 1], pos[k + 2])
+			var p := Vector3(pos[k], pos[k + 1], pos[k + 2])
 			if drape:
-				v[i].y = drape.height_at(v[i].x, v[i].z) + drape_h
+				p.y = drape.height_at(p.x, p.z) + drape_h
+			v[i] = p
+			box = AABB(p, Vector3.ZERO) if i == 0 else box.expand(p)
 			nn[i] = Vector3(nrm[k], nrm[k + 1], nrm[k + 2])
 			cc[i] = Color(col[k], col[k + 1], col[k + 2])
+		# posun do lokálních souřadnic dlaždice (střed AABB) – viz komentář nad funkcí
+		var origin := box.get_center()
+		for i in n:
+			v[i] = v[i] - origin
 		var arr := []
 		arr.resize(Mesh.ARRAY_MAX)
 		arr[Mesh.ARRAY_VERTEX] = v
@@ -93,19 +106,22 @@ static func load_chunks(path: String, mat: Material, drape: Terrain = null, drap
 		var m := ArrayMesh.new()
 		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 		m.surface_set_material(0, mat)
-		out.append({"mesh": m, "faces": v})
+		out.append({"mesh": m, "faces": v, "origin": origin})
 	return out
 
 
-## Přidá dlaždice do scény; volitelně s kolizí (ConcavePolygonShape3D).
+## Přidá dlaždice do scény; volitelně s kolizí (ConcavePolygonShape3D). Mesh i těleso stojí ve středu
+## dlaždice (`origin` z load_chunks) – dohled i jeho prolínání se tak měří od dlaždice, ne od spawnu.
 static func add_chunks(parent: Node3D, name: String, chunks: Array, collide: bool, vis_range := 0.0,
 		surface := "") -> void:
 	var root := Node3D.new()
 	root.name = name
 	parent.add_child(root)
 	for ch in chunks:
+		var origin: Vector3 = ch.get("origin", Vector3.ZERO)
 		var mi := MeshInstance3D.new()
 		mi.mesh = ch["mesh"]
+		mi.position = origin
 		if vis_range > 0.0:
 			mi.visibility_range_end = vis_range
 			mi.visibility_range_end_margin = minf(vis_range * 0.08, 60.0)   # jemné dofadování
@@ -123,6 +139,7 @@ static func add_chunks(parent: Node3D, name: String, chunks: Array, collide: boo
 			var cs := CollisionShape3D.new()
 			cs.shape = shape
 			body.add_child(cs)
+			body.position = origin           # faces jsou lokální vůči středu dlaždice
 			root.add_child(body)
 
 
