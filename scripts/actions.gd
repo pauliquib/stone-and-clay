@@ -137,6 +137,11 @@ const DEFS := {
 	# (M2.5); dřevo na hromadu u paseky (špalek na rameni nebo 4 polena z kapsy)
 	"slozit_drevo": {"name": "Složit dřevo na hromadu", "target": "job_hromada", "tool": "", "time_s": 3.0,
 		"stamina": 0.08, "skill": "drevorubectvi", "xp": 0, "level": 1, "anim": "kneel", "fail_chance": 0.0, "job": true},
+	# M4.4 část B: hromada klestí u domu (`Klesti`) – čerstvé větve z kapsy na hromadu (schnou), suché z hromady do kapsy
+	"slozit_vetve": {"name": "Složit větve na hromadu klestí", "target": "klesti_hromada", "tool": "", "time_s": 3.0,
+		"stamina": 0.05, "skill": "", "xp": 0, "level": 1, "anim": "kneel", "fail_chance": 0.0},
+	"vzit_vetve": {"name": "Vzít suché větve z hromady", "target": "klesti_hromada", "tool": "", "time_s": 2.0,
+		"stamina": 0.04, "skill": "", "xp": 0, "level": 1, "anim": "kneel", "fail_chance": 0.0},
 	# prodavač/ka v Potravinách (`ProdavacPrace`): pokladna (minihra s mincemi v nabídce), bedny ze skladu do regálu, pečivo
 	"markovat": {"name": "Namarkovat nákup", "target": "job_pokladna", "tool": "", "time_s": 1.5,
 		"stamina": 0.0, "skill": "vyrecnost", "xp": 0, "level": 1, "anim": "pour", "fail_chance": 0.0, "job": true},

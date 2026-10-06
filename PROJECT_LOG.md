@@ -707,3 +707,25 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Otevřené body: zalévání z vodovodu (není vodovodní zdroj), hromada klestí, sekačka, ubalení, sběr lysohlávek, samostatný přepínač efektů obrazu,
   následky nahlášení u zahrádkáře, zákonná čísla NEOVĚŘENO, hajný bez zabavení luku/kuše.
 - Ruční testy: podle `docs/testy_M4.md` (všechny oddíly M4.1–M4.9c). Regresní oddíl „Závěrečná kontrola M4“ na konci.
+
+## 2026-10-06 – M4.4 B zbytek: hromada klestí (zalévání z vodovodu zapsáno jako otevřený bod)
+
+### Hotovo (staticky ověřeno čtením kódu a `godot --check-only` – ruční test čeká)
+- **Co**: nový `scripts/klesti.gd` (`class_name Klesti`, `World.klesti`, instance v inicializaci `World` vedle `vyhlasky`):
+  hromada klestí 3 m vpravo od dveří domu (jen vlastník domu, `Estate.owns_house`), cíl `klesti_hromada` (`World.register_target`,
+  `data.pid`), vizuál z `MeshKit` (suché tmavé, čerstvé světlé). Vzniká líně z `_process` (každé 2 s pro hráče ve `World.players`).
+- **Co**: akce `slozit_vetve` (čerstvé `vetve_cerstve` i suché `vetve` z kapsy na hromadu; čerstvé schnou `Vyhlasky.DRY_DAYS`,
+  za sucha rychleji, za deště pomaleji – stejné ladění jako `Vyhlasky`) a `vzit_vetve` (max. `Klesti.MAX_TAKE` = 20 suchých do kapsy)
+  v `actions.gd` (`DEFS`), handlery a kontroly cíle v `klesti.gd`.
+- **Co**: ukládání klíč `klesti` (`{cerstve: [{n, dny}], suche}`) v `save_game.gd` (výchozí prázdno); poloha se odvozuje z domu.
+- **Kontrola**: `godot --import` a `--check-only` na `klesti`, `actions`, `world`, `save_game` – výstup prázdný.
+
+### Otevřené body
+- **Zalévání z vodovodu** (kohoutek u domu): neřešeno – ve hře není vodovodní zdroj a přidání interaktivního bodu u domu + napojení
+  na `Vyhlasky.zalevani_zakazano()` je samostatný malý krok (`poruseni_vyhlasky_obce`, svědek soused). Zatím bez háčku.
+- **Hromada u bytu**: byt nemá pozemek, hromada tam není (cíl jen pro `owns_house`).
+- **Dávky ve `Vyhlasky`**: fresh dávka v kapse po odložení na hromadu zůstane v `Vyhlasky.batches` a při zrání převede jen
+  kusy, které hráč právě nese (jako dnes) – drobné časové zkreslení, když hráč mezitím nasbírá nové čerstvé větve.
+- **Hromada nehoří sama**: zapálení celé hromady a hlídání velkého pálení (háček M5.3) zůstává otevřené.
+- **Sekačka, hudba z auta, výstřel** v registru hluku bez volajícího (zbytek části B, mimo tento krok).
+- Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl „M4.4 B zbytek – hromada klestí“).

@@ -128,6 +128,7 @@ var witness_sources: Array[Callable] = []   # M4.4/M4.6: další zdroje svědků
 var fire_mgr: FireManager        # oheň a topení (M2.2): ohniště, opékání, zákon u lesa, požár trávy, kamna doma
 var npc_grow: NpcGrow            # M4.8 obsah pro dospělé: záhon zahrádkáře Ladislava (konopí), jen při zapnuté volbě
 var vyhlasky: Vyhlasky           # obecní vyhlášky (pálení, sucho, nedělní klid) a sušení čerstvých větví (M4.4 část B)
+var klesti: Klesti                # hromada klestí u domu (M4.4 část B): čerstvé větve schnou, suché se berou zpět
 var noise: NoiseRegistry                # M4.4 část B: hluk (motorová pila, hudba, výstřel) a noční / nedělní klid
 var garden: Garden             # zahrada u domu a pronajaté pole (M2.4): záhony, růst podle dnů, sklizeň
 var fences: FenceManager       # ploty a ohrady (Fáze 7): obvody výběhu, zahrady a pole + hráčské úseky
@@ -338,6 +339,9 @@ func build() -> void:
 	vyhlasky = Vyhlasky.new()
 	add_child(vyhlasky)
 	vyhlasky.setup(self)
+	klesti = Klesti.new()
+	add_child(klesti)
+	klesti.setup(self)
 	npc_grow = NpcGrow.new()
 	add_child(npc_grow)
 	npc_grow.setup(self)

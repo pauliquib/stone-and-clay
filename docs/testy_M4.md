@@ -176,3 +176,15 @@ Doporučené pořadí testování celé M4: M4.1 → M4.2 → M4.3 → M4.4 A/B 
 8. Kufr auta s konopím / tabákem (zapnutá volba) při kontrole kufru → zápis „Držení návykové látky“ (prechovavani_navykove_latky, NEOVĚŘENO) a hlášení „látky“.
 9. Snědení lysohlávek (pokud je nějaké v inventáři, např. F2 → Hráč) → lehce zvlněný obraz; vypnutá volba → obraz bez změn, předměty zmizí.
 10. F5 → F9 a načtení starého save bez klíče `npc_grow` a bez `psilo` / `thc` projde bez chyby; záhon Ladislava se po načtení obnoví.
+
+## M4.4 B zbytek – hromada klestí
+1. Nová hra s domem (vlastní dům, ne byt): u dveří domu je 3 m vpravo hromada klestí jen když je cíl v dosahu (~2 m); v bytě žádná hromada.
+2. Odvětvit (sekera / pila) na paseka u lesa → v inventáři „Čerstvé větve (klestí)“.
+3. U hromady doma (cíl „Složit větve na hromadu klestí“, E / LMB dle HUD) → čerstvé větve zmizí z kapsy, na hromadě přibude vrstva světlejších větví; hlášení „Na hromadě klestí: N čerstvých, 0 suchých.“
+4. Hned potom „Vzít suché větve z hromady“ → hlášení „Na hromadě nejsou suché větve…“ (čerstvé musí proschnout).
+5. F2 → Datum: + ~30 dní (bez deště) → čerstvé na hromadě se změní na suché; hromada ztmavne.
+6. Vzít suché větve z hromady → v inventáři „Větve (klestí)“, na hromadě ubyde (max. 20 najednou).
+7. Suché větve z hromady přiložit do ohniště (oheň mimo zakázané období) → fungují jako palivo.
+8. Byt bez pozemku: hromada není ani po odvětvení (F2 → Hráč: větve v kapse, žádný cíl u dveří bytu).
+9. F5 → F9 s naplněnou hromadou → počet čerstvých i suchých se obnoví; starý save bez klíče `klesti` se načte, hromada prázdná.
+10. Zalévání z vodovodu se netestuje – ve hře není vodovodní zdroj (otevřený bod).
