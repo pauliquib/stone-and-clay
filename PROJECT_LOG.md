@@ -269,3 +269,13 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Auto-trim drží rychlost i v zatáčce (víc vztlaku /cos φ) – při velkém náklonu a malém tahu stroj ztrácí výšku;
   laditelné `TRIM_W`, `TRIM_ZETA`, `TRIM_ELEV_V`, `ROT_ALPHA_K` nahoře v `aircraft.gd`.
 - Paramotor ve vzduchu: celý vizuál (pilot + křídlo) se klopí o pitch (pár stupňů) – realisticky by visel pilot svisle.
+
+## 2026-10-06 – Vlna 0: ruční test uživatele
+
+### Hotovo
+- Uživatel prošel `docs/testy_vlna0.md` (0b, F1–F5 + otevřené body): **vše OK**.
+- Po sloučení opraveny chyby překladu (`14a1c58`: duplicitní `cap` v body_state, závorka v game_menu, typy
+  `player_world_pos`) a nápověda triku (`4612e71`). Kontrola `godot --check-only` všech skriptů bez chyby.
+
+### Další krok
+- Úprava promptů M4 podle `docs/audit_vlna0.md` (oddíl Odloženo) a nápadů z `DALSI DOPLNKY.md`, pak M4 po vlnách.
