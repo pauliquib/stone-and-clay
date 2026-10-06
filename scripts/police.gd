@@ -57,6 +57,7 @@ var _returning: Array = []           # [npc, dočasný?, vůz | null, stanovišt
 var _cp_post := Vector3.INF
 var _cp_yaw := 0.0
 const COP_WALK := 1.7                # m/s
+const TRUNK_CHECK_P := 0.35          # M4.6: šance, že policista u okénka prohlédne kufr auta (ověřit / ladit)
 
 
 func setup(t: Traffic, g: RoadGraph, ter: Terrain, w: Node, c: Clock) -> void:
@@ -585,6 +586,9 @@ func _stopping(delta: float) -> void:
 			if _stop_t > 3.2:
 				if cop:
 					cop.visual.stop_action()
+				var trunk := _trunk_search(sp)
+				if trunk != "":
+					_banner(sp, "Policista: v kufru: %s." % trunk, 4.0)
 				var said := ""
 				match _stop_plan:
 					"test":
@@ -610,6 +614,28 @@ func _stopping(delta: float) -> void:
 				_stop_cop = null
 				_stop_player = null
 				_end_chase()
+
+
+## M4.6: prohlídka kufru řidiče u zastavení (jen někdy – `TRUNK_CHECK_P`). Zbraň, která není v ruce, a bez zbrojního
+## oprávnění, se zabaví (`Weapons.police_check`, zbraň je v kufru). Nelegální úlovek v kufru = přestupek `pytlactvi`.
+## Vrací text nálezu (prázdné = nic nenalezeno nebo kufr se neprohledává).
+func _trunk_search(pl: Player) -> String:
+	if pl.car == null or _rng.randf() > TRUNK_CHECK_P:
+		return ""
+	var found := ""
+	var wpn = world.get("weapons")
+	if pl.item_count("puska") > 0 and pl.equipped != "puska" and not world.has_permit(pl.id, "zbrojni", pl.global_position):
+		if wpn != null and wpn.police_check(pl.id, "kufr"):
+			found = "zbraň bez zbrojního oprávnění"
+	var cargo = world.get("cargo")
+	if cargo != null:
+		for e in cargo.vehicle_items(pl.car):
+			var c = e.get("c", null)
+			if c is Carcass and not (c as Carcass).legal:
+				world.commit_offense(pl.id, "pytlactvi", {"severity": 0.5})
+				found += ("; " if found != "" else "") + "nelegální úlovek"
+				break
+	return found
 
 
 ## Policisté po kontrole: ten z hlídky dojde zpátky k vozu a nastoupí (vůz pak odjede),

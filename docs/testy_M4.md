@@ -140,3 +140,15 @@ Doporučené pořadí testování celé M4: M4.1 → M4.2 → M4.3 → M4.4 A/B 
    bez „Porušení obecně závazné vyhlášky“.
 9. **Panel P:** po koupi povolenky k lovu / rybolovu ukazuje „platí ještě N dní“, po vypršení „PROŠLÁ“.
 10. **Katastr:** inzeráty domů na úřadě nikdy neobsahují budovu statku (M3.2).
+
+## M4.9a – M4.6 doplnění (kufr policií, udice u stráže, zkouška střelbou, posudek)
+1. F2 → Hráč → „zbrojni“ (cheat). Vezmi pušku do ruky, sedni do auta, nech se zastavit policií (silniční kontrola). Při několika kontrolách (šance ~35 %) se v banneru objeví „v kufru: zbraň bez zbrojního oprávnění“ a puška zmizí z inventáře.
+2. Stejně s nelegálním úlovkem (zajíc / srnec, bez lovu v kufru – F2 → Teleport / Hráč): při kontrole se objeví „v kufru: nelegální úlovek“ a v deníku J → Zákon přibude přestupek pytláctví.
+3. Bez zbrojního oprávnění bez pušky v ruce: policejní kontrola nezabaví nic (kontrola kufru jen zbraň mimo ruku a nelegální úlovek).
+4. Rybaření bez lístku u potoka (F2 → Teleport na potok, bez cheatu) → v okolí stráž (so/ne 5–12 h, nebo teleport do jejího okolí) → hláška „Zapisuji: … zabaveno: Udice, Kapr…“, udice a ryby zmizí z inventáře, rybaření skončí, přestupek v rejstříku.
+5. Stejná kontrola s rybářským lístkem a povolenkou (F2 → Hráč, nebo kupte v chatě) → hláška „V pořádku, hezký den u vody.“ a nic se neodebere.
+6. U myslivecké chaty (dveře) → Spolek: „Lékařský posudek pro zbrojní průkaz (1 500 Kč)“ zaplať; pak „Zbrojní průkaz – kurz“ (4 000 Kč) jde koupit jen po posudku.
+7. Po kurzu zkus „Zbrojní průkaz – zkouška střelbou“ bez výstřelů → hláška „vystřel aspoň 5 ran“. Vystřel 5 ran na terč střelnice u chaty; aspoň 4 zásahy s 5+ body → popup „Zkouška střelbou složena“, doklad v panelu P.
+8. Zkouška neprošla (4 mimo terč) → hláška „Zkouška neprošla (x z 5 ran dobrých…)“, doklad se nevydá; eTest (počítač doma) dál funguje.
+9. Uložení a načtení: F5 / F9 uprostřed kurzu (zaplacený posudek a kurz) → po načtení zůstane posudek i kurz; starý save bez klíče `gamekeeper` se načte bez chyby.
+10. Legální rybař (lístek + povolenka) a legální lovec: kontroly neberou nic, nic se nezapíše do rejstříku.

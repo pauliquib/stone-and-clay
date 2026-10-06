@@ -559,6 +559,11 @@ func _g_with_cart(id: int, p: Player) -> void:
 # ------------------------------------------------------------------ vozidla: kufr, ložná plocha, nosič
 
 ## Způsob uložení: "trunk" (kufr, nevidět), "bed" (ložná plocha pickupu, vidět), "rack" (nosič motorky / kola, vidět), "" = nejde.
+## Náklad uložený v kufru / na ložné ploše vozidla (M4.6: policejní kontrola kufru). Jen čtení, kopie seznamu.
+func vehicle_items(car: Car) -> Array:
+	return (_store.get(car, []) as Array).duplicate()
+
+
 func _veh_mode(car: Car) -> String:
 	if car.two_wheeler:
 		return "rack" if car.has_rack() else ""

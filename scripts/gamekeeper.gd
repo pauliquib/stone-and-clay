@@ -28,6 +28,10 @@ const PRICES := {"zbrojni": 4000, "lovecky_listek": 5000, "rybarsky_listek": 100
 const POV_NEEDS := {"povolenka_lov": "lovecky_listek", "povolenka_rybolov": "rybarsky_listek"}
 const POV_DAYS := {"povolenka_lov": 30, "povolenka_rybolov": 365}
 const DOC_NO := {"zbrojni": "ZBP", "lovecky_listek": "LL", "rybarsky_listek": "RL"}
+const POSUDEK_PRICE := 1500            # lékařský posudek pro zbrojní průkaz (orientačně, ověřit); bez něj zbrojní kurz nejde
+const SHOT_RUN := 5                    # zkouška střelbou: počet ran na střelnici u chaty (alternativa k eTestu)
+const SHOT_MIN_PTS := 5                # bodů z 10 na jednu ránu, která se počítá jako dobrá
+const SHOT_NEED := 4                   # kolik dobrých ran z SHOT_RUN stačí
 
 # ------------------------------------------------------------------ stav
 
@@ -172,7 +176,12 @@ func _check_players() -> void:
 		if not _suspicious(id, p):
 			continue
 		_checked[id] = world.clock.minutes
-		_control(id)
+		# rybářská stráž bere udici a úlovek hned při zjištění (bez volby hráče)
+		var issues := _issues(id)
+		if role == STRAZ and not issues.is_empty():
+			_apply(id, issues)
+		else:
+			_control(id)
 		return                        # jedna kontrola naráz
 
 
@@ -210,7 +219,24 @@ func _issues(id: int) -> Array:
 			out.append({"text": "zbraň bez zbrojního oprávnění", "offense": "", "seize": true})
 	elif world.fishing != null and world.fishing.sessions.has(id):
 		if not (world.has_permit(id, "rybarsky_listek", p.global_position) and world.has_permit(id, "povolenka_rybolov", p.global_position)):
-			out.append({"text": "rybaření bez lístku a povolenky", "offense": "rybarske_pytlactvi", "seize": false})
+			var gear := _fishing_gear(id)
+			out.append({"text": "rybaření bez lístku a povolenky", "offense": "rybarske_pytlactvi", "seize": false, "zabavit": gear})
+	return out
+
+
+## Udice a úlovek (ryby z tabulky druhů) v inventáři hráče – to stráž zabaví.
+func _fishing_gear(id: int) -> Array:
+	var p: Player = world.players.get(id)
+	var out: Array = []
+	if p == null:
+		return out
+	for t in Fishing.ROD_TOOLS:
+		if p.item_count(t) > 0:
+			out.append(t)
+	for sid in Fishing.species_table():
+		var item := String((Fishing.species_table()[sid] as Dictionary).get("item", ""))
+		if item != "" and p.item_count(item) > 0 and not out.has(item):
+			out.append(item)
 	return out
 
 
@@ -228,12 +254,23 @@ func _control(id: int) -> void:
 
 func _apply(id: int, issues: Array) -> void:
 	var texts := ""
+	var p: Player = world.players.get(id)
 	for i in issues:
 		texts += ("; " if texts != "" else "") + String(i["text"])
 		if String(i.get("offense", "")) != "":
 			world.commit_offense(id, String(i["offense"]), {"severity": 0.5})
 		if bool(i.get("seize", false)) and world.weapons:
 			world.weapons.police_check(id, "hajny")
+		var taken: Array = []
+		for w in i.get("zabavit", []):
+			var n := p.item_count(String(w)) if p != null else 0
+			if n > 0 and p.remove_item(String(w), n):
+				taken.append(ItemsDB.name_of(String(w)))
+		if not taken.is_empty():
+			texts += "; zabaveno: %s" % ", ".join(taken)
+			if world.fishing != null:
+				world.fishing.cancel(id)
+			world.emit_game_event(id, "item_seized", {"items": taken, "by": role})
 	_msg(id, "Zapisuji: %s." % texts, 5.0)
 
 
@@ -281,7 +318,9 @@ func interactables(id: int) -> Array:
 
 func _office_menu(id: int) -> void:
 	var opts := [
+		["Lékařský posudek pro zbrojní průkaz (%d Kč)" % POSUDEK_PRICE, _posudek.bind(id)],
 		["Zbrojní průkaz – kurz a poplatek (%d Kč)" % PRICES["zbrojni"], _enroll.bind(id, "zbrojni")],
+		["Zbrojní průkaz – zkouška střelbou na střelnici (místo eTestu)", _shot_test.bind(id)],
 		["Lovecký lístek – kurz (%d Kč)" % PRICES["lovecky_listek"], _enroll.bind(id, "lovecky_listek")],
 		["Povolenka k lovu na 30 dní (%d Kč)" % PRICES["povolenka_lov"], _buy.bind(id, "povolenka_lov")],
 		["Rybářský lístek – kurz (%d Kč)" % PRICES["rybarsky_listek"], _enroll.bind(id, "rybarsky_listek")],
@@ -302,6 +341,9 @@ func _enroll(id: int, kind: String) -> void:
 	if _has_kurz(id, kind) or world.permits.has(id, kind):
 		_msg(id, "Tenhle kurz už máš – polož test na počítači doma.")
 		return
+	if kind == "zbrojni" and not _has_kurz(id, "posudek"):
+		_msg(id, "Zbrojní průkaz vyžaduje lékařský posudek (tady u chaty).", 4.0)
+		return
 	var price: int = PRICES[kind]
 	if p.money < price:
 		_msg(id, "Na kurz nemáš dost peněz (%d Kč)." % price)
@@ -312,6 +354,53 @@ func _enroll(id: int, kind: String) -> void:
 	(_kurz[id] as Dictionary)[kind] = true
 	world.play_sfx(id, "cash")
 	_msg(id, "Kurz zaplacen. Test najdeš v počítači doma (eTesty).", 5.0)
+
+
+func _posudek(id: int) -> void:
+	var p: Player = world.players.get(id)
+	if p == null:
+		return
+	if _has_kurz(id, "posudek"):
+		_msg(id, "Posudek už máš.")
+		return
+	if p.money < POSUDEK_PRICE:
+		_msg(id, "Posudek nemáš za co zaplatit (%d Kč)." % POSUDEK_PRICE)
+		return
+	p.money -= POSUDEK_PRICE
+	if not _kurz.has(id):
+		_kurz[id] = {}
+	(_kurz[id] as Dictionary)["posudek"] = true
+	world.play_sfx(id, "cash")
+	_msg(id, "Lékařský posudek vydán. Teď můžeš složit zbrojní kurz.", 5.0)
+
+
+## Zkouška střelbou na střelnici u chaty: posledních SHOT_RUN ran, aspoň SHOT_NEED dobrých. Alternativa k eTestu,
+## bez kurzu a posudku nejde. Doklad se vydá stejně jako po eTestu.
+func _shot_test(id: int) -> void:
+	if not _has_kurz(id, "zbrojni"):
+		_msg(id, "Nejdřív zaplať zbrojní kurz a posudek v chatě.", 4.0)
+		return
+	if world.permits.has(id, "zbrojni"):
+		_msg(id, "Zbrojní průkaz už máš.")
+		return
+	var rng: ShootingRange = world.weapons.range_ if world.weapons != null else null
+	if rng == null or not rng.ok:
+		_msg(id, "Střelnice u chaty tu teď není k dispozici.", 4.0)
+		return
+	var list: Array = rng.scores.get(id, [])
+	if list.size() < SHOT_RUN:
+		_msg(id, "Zkouška: vystřel aspoň %d ran na střelnici (zatím %d)." % [SHOT_RUN, list.size()], 4.5)
+		return
+	var good := 0
+	for s in list:
+		if int((s as Dictionary).get("score", 0)) >= SHOT_MIN_PTS:
+			good += 1
+	if good < SHOT_NEED:
+		_msg(id, "Zkouška neprošla (%d z %d ran dobrých, je třeba %d)." % [good, list.size(), SHOT_NEED], 5.0)
+		return
+	world.permits.grant(id, "zbrojni", "%s-%04d" % [DOC_NO["zbrojni"], id])
+	world.notify(id, "popup", ["Zkouška střelbou složena. Doklad vydán: %s" % Permits.KINDS["zbrojni"][0], 5.0])
+	world.emit_game_event(id, "doklad_vydan", {"kind": "zbrojni"})
 
 
 func _buy(id: int, kind: String) -> void:

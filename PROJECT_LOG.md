@@ -621,3 +621,22 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Rozsudek v nepřítomnosti s nepodmíněným trestem se nevykoná (chybí zatčení); OPP jen evidence.
 - `witness_check` bez raycastu (zdi nebrání dohledu); hajný = kapsle bez animací.
 - `Jobs`: rejstřík čistý i během obvinění (záměr M4.3); výpověď z práce při vězení přes událost `jailed`.
+
+## 2026-10-06 – M4.6 doplnění (kufr policií, udice u rybářské stráže, zkouška střelbou, lékařský posudek)
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou `godot --import` + `--check-only` na `cargo.gd`, `police.gd`, `gamekeeper.gd` – výstup prázdný; ruční test čeká)
+- **Co (kufr policií)**: `police.gd` `_trunk_search(pl)` – při zastavení v autě řidiče s šancí `TRUNK_CHECK_P` (0,35, ladit): zbraň mimo ruku bez zbrojního oprávnění → `World.weapons.police_check` (zabavení, přestupek `nedovolene_ozbrojovani` přes zákon); nelegální úlovek (`Carcass.legal == false`) v kufru → `commit_offense("pytlactvi")`. Nález jde do banneru. Zjednodušení: zbraň se „v kufru“ počítá jako zbraň v inventáři mimo ruku (hra zatím neumí zbraň do kufru uložit).
+- **Co (cargo)**: `cargo.gd` `vehicle_items(car)` – čtení nákladu v kufru / na ložné ploše (kopie seznamu).
+- **Co (udice u stráže)**: `gamekeeper.gd` – rybářská stráž při zjištění rybaření bez lístku a povolenky hned zabaví udici (`Fishing.ROD_TOOLS`) a ryby (tabulka druhů → `item`) z inventáře, ukončí relaci (`Fishing.cancel`), zapíše přestupek `rybarske_pytlactvi` (rejstřík, deník J → Zákon) a událost `item_seized`. Menu se u stráže už neotevírá (bez volby hráče, „Nechat být“ nelze obejít). Hajný se chová beze změny.
+- **Co (posudek)**: `gamekeeper.gd` `_posudek` – lékařský posudek 1 500 Kč (`POSUDEK_PRICE`, orientačně, ověřit) v menu chaty; uložen do `_kurz[id]["posudek"]` (klíč `gamekeeper` už existuje). Zbrojní kurz bez posudku nejde.
+- **Co (střelnice)**: `_shot_test` – alternativa k eTestu: po zaplaceném kurzu a posudku se posuzuje posledních 5 ran na střelnici u chaty (`ShootingRange.scores`); aspoň 4 rány s ≥ 5 body → doklad `zbrojni`. Konstanty `SHOT_RUN`, `SHOT_MIN_PTS`, `SHOT_NEED`.
+- **Ukládání**: žádný nový klíč v `save_game.gd` (posudek a zkouška jsou v existujícím klíči `gamekeeper`, zabavení a kufr nejsou stav). Starý save se načte beze změny.
+- **Dokumentace**: `docs/testy_M4.md` (oddíl „M4.9a – M4.6 doplnění“, 10 bodů), `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` – M4.6 zůstává `[ ]` s přesným popisem zbytku.
+
+### Otevřené body
+- **Hajný**: bez zabavení luku / kuše a bez pověsti −20 / respektu `zemedelci` −20 (jen přes `commit_offense`).
+- **Rybářská stráž**: obchůzka je kolem chaty, ne podél úseků vody (`Water`).
+- **Panel P**: povolenky k lovu / rybolovu se v panelu P ještě neukazují (`hud.gd`, patří M4.7).
+- **Zbraň v kufru**: hra zatím neumí uložit zbraň do kufru; policie ji zabaví jen z inventáře mimo ruku.
+- **Lékařský posudek**: zjednodušeně v chatě (v roadmapě je u úřadu jako „posudek“) – čísla ověřit.
+- **Čeká na ruční test uživatele** (checklist v `docs/testy_M4.md`, oddíl „M4.9a – M4.6 doplnění“).
