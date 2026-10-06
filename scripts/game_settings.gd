@@ -24,7 +24,7 @@ var fov := 72.0              # základní zorné pole postavy (°)
 var volume := 1.0            # hlavní hlasitost 0–1
 var fullscreen := false
 var vsync := 0               # index do VSYNC_MODES
-var trike_intuitive := false # M6.5: arkádové řízení rogala hrazdou (W = nahoru); výchozí realistické obrácené
+var trike_realistic := false # M6.5 / vlna 0d: realistické obrácené řízení rogala hrazdou; výchozí intuitivní (W = nahoru, A = vlevo)
 var show_fps := true
 var withdrawal_shake := true # třes obrazu při abstinenci a zimě (Esc → Nastavení → Třes obrazu)
 var vsync_from_args := false # --vsync / --novsync na příkazové řádce má přednost před uloženým nastavením
@@ -84,7 +84,7 @@ func load_file() -> void:
 		return
 	mouse_sens = clampf(float(cf.get_value("ovladani", "citlivost", mouse_sens)), 0.2, 3.0)
 	invert_y = bool(cf.get_value("ovladani", "obratit_y", invert_y))
-	trike_intuitive = bool(cf.get_value("ovladani", "rogalo_intuitivni", trike_intuitive))
+	trike_realistic = bool(cf.get_value("ovladani", "rogalo_realisticke", trike_realistic))   # starý klíč rogalo_intuitivni se ignoruje
 	fov = clampf(float(cf.get_value("obraz", "fov", fov)), 55.0, 95.0)
 	fullscreen = bool(cf.get_value("obraz", "cela_obrazovka", fullscreen))
 	vsync = clampi(int(cf.get_value("obraz", "vsync", vsync)), 0, VSYNC_MODES.size() - 1)
@@ -105,7 +105,7 @@ func save_file() -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("ovladani", "citlivost", mouse_sens)
 	cf.set_value("ovladani", "obratit_y", invert_y)
-	cf.set_value("ovladani", "rogalo_intuitivni", trike_intuitive)
+	cf.set_value("ovladani", "rogalo_realisticke", trike_realistic)
 	cf.set_value("obraz", "fov", fov)
 	cf.set_value("obraz", "cela_obrazovka", fullscreen)
 	cf.set_value("obraz", "vsync", vsync)
