@@ -422,10 +422,42 @@ func _interact() -> void:
 		open_sleep_menu(it["node"])
 	elif it["kind"] == "radio":
 		radio_view.open()
+	elif it["kind"] == "favor":
+		open_favor_menu(it)
 	elif it["kind"] == "custom":
 		(it["action"] as Callable).call(pid)     # krmelec, žlab, včelař, parůžky… (Hunter / Paddock)
 	else:
 		world.talk(pid, it)
+
+
+## Nabídka u vesničana (M4.5): rozhovor, prosba (přijetí / stav), dárek z inventáře, přátelské výhody.
+func open_favor_menu(it: Dictionary) -> void:
+	var v: Node = it["node"]
+	var per: Persona = v.get("persona")
+	if per == null:
+		return
+	var nm := per.display_name()
+	var off: Dictionary = world.favors.offer_for(pid, nm)
+	var fr := per.get_friendship(pid)
+	var lines := ["Přátelství %d / 100" % int(fr)]
+	var perks: Array = world.favors.perks(per, pid)
+	if not perks.is_empty():
+		lines.append("Výhody: " + ", ".join(PackedStringArray(perks)))
+	var opts := []
+	opts.append(["Promluvit", func(): world.talk(pid, {"kind": "villager", "node": v})])
+	if not off.is_empty():
+		var f: Dictionary = Favors.FAVORS.get(off["tpl"], {})
+		if off["state"] == "offer":
+			lines.append("Prosba: %s" % f["title"])
+			opts.append(["★ Přijmout: %s" % f["title"], func(): world.favors.accept(pid, nm)])
+		elif off["state"] == "accepted":
+			lines.append("Slib: %s (%d / %d)" % [f["text"], int(off["progress"]), int(f["n"])])
+	var p: Player = world.players[pid]
+	for item in p.inventory.keys():
+		var n := int(p.inventory[item])
+		if n > 0 and ItemsDB.exists(item):
+			opts.append(["Dát: %s (%d)" % [ItemsDB.name_of(item), n], func(): world.give_to_npc(pid, v, item)])
+	hud.open_menu(nm, "\n".join(PackedStringArray(lines)), opts)
 
 
 ## Nabídka postavy mimo Place (včelař): akce rozdělaného úkolu a úkoly, které postava nabízí.

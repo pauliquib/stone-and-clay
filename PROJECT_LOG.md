@@ -303,3 +303,27 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Přezkoušení po 12 bodech je zjednodušené (stejný kurz jako nová zkouška, skupina B); M4.2 doplní žádost na úřadě.
 - `valid_until` v `Permits` je zatím připravený, nepoužívá se.
 - Pořadí teorie/jízd: jízdy se počítají i před teorií; dokončení vyžaduje obojí.
+
+## 2026-10-06 – M4.5 Dobré skutky a přátelství (prosby, dárek, oblíbené)
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou `godot --check-only` – ruční test čeká)
+- **Co**: nový `scripts/favors.gd` (`class_name Favors`, `World.favors`): každý herní den 2–4 vesničané (ze všech 28,
+  seed podle dne) nabízí prosbu ze šablon `FAVORS` (zahrada, sníh, nákup); přijetí, plnění přes `emit_game_event`
+  (`harvest`, `snow_volunteer`, `gift_given` s typem jídla), odměna (přátelství +15, respekt +3, pověst +2, karma +1),
+  nesplněný slib přátelství −10; výhody přátelství ≥ 40 / ≥ 60 (texty v nabídce). Ukládání klíč `favors`
+  (starý save = žádné prosby).
+- **Co**: `persona.gd` – `likes()` (odvozeno z povolání a koníčku), `dislikes()` (přísné / plaché: tvrdý alkohol),
+  `gift_mult()`; `world.gd` – `give_to_npc` násobí přátelství (oblíbené ×2, neoblíbené −1), vesničan má E nabídku
+  (`kind "favor"`), `emit_game_event` předává události `Favors`.
+- **Kde**: `local_client.gd` `open_favor_menu` (Promluvit / Přijmout prosbu / Dát dárek z inventáře + přátelství a výhody).
+- **Ukládání**: `save_game.gd` klíč `favors` (výchozí prázdný při načítání).
+
+### Otevřené body
+- Šablona **„Najdi mi ztracenou věc“** a spontánní dobré skutky (vrácení peněženky, úklid odpadků, pomoc při nehodě)
+  nejsou – prompt je v minimu jen částečně, zbytek zapsat do M4.5b nebo navázat.
+- Dialogové téma „potřebujete pomoct?“ (T) není; prosby se přijímají přes nabídku E.
+- Výhody ≥ 40 / ≥ 60 jsou zatím jen text v nabídce; skutečný efekt (`witness_check` z M4.4, varování před kontrolou
+  `Police.set_checkpoint`, nošení M2.10, půjčení nářadí) čeká na M4.4 / M5.11.
+- Prosby plní „zahrada“ a „sníh“ jakákoli sklizeň / úklid, nerozlišují zadavatele.
+- README.md (Ovládání / Systémy) a `docs/CONTROLS.md` zatím nemají nový text E u vesničana – doplnit.
+- Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.5).

@@ -82,6 +82,7 @@ var skills := {}                 # id → Skills (dovednosti a XP každého hrá
 var talk_recent := {}            # id → {druh herní události → herní minuty}: nedávné události pro rozhovor (DialogData.RECENT_MAP)
 var law := {}                    # id → Law.LawRecord (rejstřík přestupků a body, M0.5)
 var jobs := {}                   # id → Jobs (zaměstnání, směny, docházka, výplata – M3.1, data/prace.json)
+var favors: Favors               # prosby vesničanů a dobré skutky (M4.5), stav per hráč
 var action_runner: ActionRunner  # výběr cíle a průběh kontextových akcí (M0.4)
 var sleep_spots: Array[SleepSpot] = []
 var clients := {}                # id → LocalClient (jen hráči na tomto počítači)
@@ -470,6 +471,9 @@ func add_player(id: int, pos: Vector3, yaw: float) -> Player:
 		add_child(permits)
 		permits.setup(self)
 	permits.add_player(id)
+	if favors == null:            # M4.5: prosby vesničanů (jedna instance, stav per hráč)
+		favors = Favors.new()
+		favors.setup(self)
 	if fences == null:            # ploty a ohrady (Fáze 7) – až PO výběhu, zahradě i statku: sondy `_find_spot`
 		fences = FenceManager.new()   # hledají jejich místa kolizním kvádrem a na hotový plot by narazily
 		add_child(fences)
@@ -1459,6 +1463,8 @@ func emit_game_event(id: int, kind: String, data: Dictionary) -> void:
 	var sk: Skills = skills.get(id)
 	if sk:
 		sk.on_event(kind, data)
+	if favors:
+		favors.on_event(id, kind, data)     # M4.5: splněné prosby (sklizeň, sníh, dárek jídla)
 	var jb: Jobs = jobs.get(id)
 	if jb:
 		jb.on_event(kind, data)      # M3.1: úkoly směny (action_done), pití v práci, zadržení → výpověď
@@ -2447,8 +2453,8 @@ func interactables(id: int) -> Array:
 		out.append({"pos": npcs["pepa"].global_position, "r": 2.6, "kind": "place", "key": "hospoda", "text": "Pepa (štamgast)"})
 	for v in bots_root.get_children():
 		if v is Villager and v.global_position.distance_squared_to(p.global_position) < 9.0:
-			out.append({"pos": v.global_position, "r": 2.4, "kind": "villager", "node": v,
-				"text": "%s (drby)   [T] promluvit" % v.persona.display_name()})
+			out.append({"pos": v.global_position, "r": 2.4, "kind": "favor", "node": v,
+				"text": "%s (drby)   [E] promluvit, prosby, dárek" % v.persona.display_name()})
 	for s in sleep_spots:
 		out.append({"pos": s.global_position, "r": 3.0, "kind": "sleep", "key": s.kind, "node": s, "text": "Nocleh: " + s.title()})
 	if radio:
@@ -2800,7 +2806,7 @@ func give_to_npc(id: int, npc: Node, item_id: String) -> bool:
 	if p == null or per == null or not ItemsDB.exists(item_id) or not p.remove_item(item_id, 1):
 		return false
 	var price := float(ItemsDB.info(item_id).get("price", 0))
-	var d := Persona.FRIEND_GIFT * clampf(1.0 + price / 200.0, 1.0, 3.0)
+	var d := Persona.FRIEND_GIFT * clampf(1.0 + price / 200.0, 1.0, 3.0) * per.gift_mult(item_id)   # M4.5: oblíbené ×2, neoblíbené mírné mínus
 	per.add_friendship(id, d, clock.minutes, clock.day(), true)
 	per.add_mood(id, 0.3, clock.minutes)
 	notify(id, "show_message", ["%s: „Děkuju, to je od tebe hezké.“" % per.first_name(), 3.0])
