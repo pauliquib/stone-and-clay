@@ -29,6 +29,7 @@
 3. **Testování dělá výhradně uživatel.** Hru, testy ani simulace (`godot …`, `run.sh`, `--questtest`,
    `--shot`, `--faunatest`, headless běhy, `--import`) **nikdy nespouštěj**, pokud tě k tomu uživatel
    výslovně nepověří. Ověřuj čtením kódu. Testovací parametry, které úkol chce, napiš, ale nespouštěj.
+   **Jediná povolená výjimka (od 6. 10. 2026): kontrola překladu** – viz kap. 6 (`--import` + `--check-only`).
 4. **Na konci úkolu** (v tomto pořadí):
    1. statická kontrola (viz kap. 6),
    2. aktualizuj `README.md` (Systémy / Ovládání / Ladicí parametry) a jiné dotčené návody,
@@ -144,6 +145,17 @@ zákon, respekt…) se na `emit_game_event` napojí stejně. **Nevolej HUD pří
 
 ## 6. Statická kontrola před commitem (místo spuštění hry)
 
+- **Povinná kontrola překladu (uživatel povolil):** po dokončení změn spusť
+  ```bash
+  timeout 300 godot --headless --path . --import >/dev/null 2>&1
+  for f in $(git diff --name-only HEAD -- '*.gd') <nové .gd soubory>; do
+    timeout 60 godot --headless --path . --check-only --script res://$f 2>&1 | grep -E "SCRIPT ERROR|ERROR:"
+  done
+  ```
+  Výstup musí být prázdný. Hlášky „Could not resolve…“ / „Cannot infer the type…“ jsou často jen následek
+  chyby v jiném skriptu – oprav první skutečnou příčinu a zkontroluj znovu. Hru samotnou ani testy (`--…test`)
+  nespouštěj. (Ve vlně 0 tahle kontrola odhalila 3 chyby, kvůli kterým hra nešla spustit: duplicitní
+  proměnná ve funkci, nespárovaná závorka, `:=` s hodnotou bez typu z proměnné typu `Node`.)
 - `grep -n` na každou nově volanou funkci / proměnnou – existuje a má správné parametry?
 - Nový `class_name` nekoliduje s existujícím (`grep -rn "class_name X" scripts`).
 - **Názvy metod a proměnných nesmí kolidovat s nativními členy** `Node` / `Node3D` / `Object` (`set_owner`, `owner`, `name`,
