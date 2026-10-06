@@ -258,7 +258,12 @@ func _process_impl(delta: float) -> void:
 	# hráči ve vodě (Player.wade brzdí chůzi)
 	for pl in world.players.values():
 		var pp: Vector3 = pl.global_position
-		pl.wade = 0.0 if pl.car or pl.horse else maxf(info_at(pp.x, pp.z)["depth"], 0.0) * (1.0 - ice_flow)
+		var inf := info_at(pp.x, pp.z)
+		pl.wade = 0.0 if pl.car or pl.horse else maxf(float(inf["depth"]), 0.0) * (1.0 - ice_flow)
+		pl.water_level = float(inf["level"])
+		# teplota vody (M5.2): sezóna + vzduch – chladí tělo ve vodě (Player._update_body)
+		if world.weather != null and world.clock != null:
+			pl.water_temp = Koupaliste.water_temp(world.clock.day_of_year(), world.weather.temp)
 	# zamrzání podle teploty (herní čas): rybník pod −1 °C, potok pod −5 °C, tání nad nulou
 	var now: float = world.clock.minutes
 	if _last_min < 0.0:

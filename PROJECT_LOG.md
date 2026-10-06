@@ -925,3 +925,40 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - **Nápověda / README / VIZE / prompts/roadmapa/README.md** nejsou upraveny (zadání: `prompts/roadmapa/README.md` a
   `docs/VIZE_A_ROADMAPA.md` neměnit; README dopsat až po ověření).
 - Rockové stanice: podle rozhodnutí uživatele nepatří do tohoto kroku (M5.9).
+## 2026-10-06 – M5.2 Koupaliště na bývalé hasičské nádrži + plavání
+
+### Hotovo (staticky ověřeno: `--import` rc 0, `--check-only` na všechna změněná .gd – výstup prázdný; ruční test čeká)
+- **Umístění (odvozeno z dat, ne z hlavy)**: potok č. 275 v `data/water.json` → `streams` (kind `stream`, 337 bodů,
+  délka 685 m). Výběr: (1) začíná 16 m od silnice `tertiary` (`data/map.json` → `roads`) a vede pryč do lesa
+  (ostatní kandidáti u silnic – č. 111/112 u `secondary`, č. 143/407 – buď stojí na silnici, nebo jsou daleko);
+  (2) jihozápadně od středu Dukelčice `VILLAGE_CENTER = (120, 180)` (`scripts/traffic.gd`) – směr SZ/JZ podle
+  `north_angle_deg = 78.37` (`scripts/hud.gd`, šipka severu: sever = (−sin n, cos n)), SW = (0,55; −0,835);
+  (3) bod `pts[150]` = (163,12; −441,82), výška toku y = −30,5; tečna z `pts[147]`→`pts[153]` = (0,179; −0,984);
+  kolmice k potoku, 10 m na stranu s větší vzdáleností od silnice → střed nádrže **(173,0; −440,0)**, vzdálenost od
+  středu obce 622 m; nejbližší bod nádrže ke korytu 4,2 m (půlšířka toku 1,775 m). Výšku terénu ve středu bere
+  `Terrain.height_at` za běhu (`data/terrain_height.bin` v repozitáři není, proto nešlo číst přímo).
+  Uživatelovu modrou značku na screenshotu jsem neviděl – shoda je podle popisu („potok od silnice do lesa, SZ obce“).
+- **Koupaliště** (`scripts/koupaliste.gd`, class `Koupaliste`): nádrž 25 × 12 m nad terénem, hloubka vody 1,5 m
+  (hladina = terén + 1,5), betonový lem s 3 schůdky na krátké straně, vlastní kolize dna a lemu (vrstva 1),
+  průhledná hladina. Registrace do `Water.ponds` jako „Koupaliště“ → `info_at` / brodění / zamrzání jako u rybníků.
+- **Plavání** (`scripts/player.gd`, všechny vodní plochy): od hloubky 1,2 m (`SWIM_DEPTH`) žádná gravitace, Mezerník
+  nahoru, Ctrl (C) dolů (`SWIM_VY` 1,4 m/s), pohyb 1,2 m/s, Shift 2 m/s (výdrž `drain_stamina`), skok ve vodě vypnut.
+  Dech `breath` 15 s, pod hladinou (Ctrl nebo hlava pod hladinou) ubývá, pak `body.hurt` 2 HP/s (`utopení`).
+- **Teplota vody** (`Koupaliste.water_temp(doy, air)`): sezóna 8 °C v zimě, ~15 °C v květnu, ~22 °C v červenci,
+  z 80 % sezóna + 20 % teplota vzduchu. `Water` ji každých 0,2 s nastavuje hráči (`Player.water_temp`); v pití
+  vody je pocitová teplota `env.temp` nejvýš na teplotě vody → rychlejší prochladnutí (`BodyState`).
+- **Napojení**: `scripts/world.gd` – var `koupaliste`, vytvoření za `water.build` (3 řádky). `scripts/water.gd` –
+  nastavuje `pl.water_temp` a `pl.water_level`. `scripts/save_game.gd` **beze změny** (nic perzistentního: teplota
+  plyne z kalendáře a počasí, dech je přechodný).
+
+### Otevřené body
+- **Vykopání dna**: nádrž je nad terénem (doporučená varianta z promptu); na svahu je výška dna a hladina nerovná.
+  Skutečný bazén vyžaduje úpravu `tools/water.py` / `water_carve.bin` (nespuštěno).
+- **Ověřit výšku terénu** u nádrže v běhu (odhad z výšek toku; `terrain_height.bin` nebylo k dispozici).
+- **Umístění podle popisu, ne podle modré značky** – uživatel potvrdí na mapě M; případně posunout `CENTER`.
+  Vztah k „statku“ (M5.1, jižně od statku) nebyl ověřen – stavebniny/statek nejsou pevně v datech.
+- **Nedokončeno z bodů 1–6 promptu**: vstupné a pokladna, stánek s občerstvením, plot, šatna, sprcha, cedule,
+  mola / skokanský můstek, plavčík, skoky a zranění při mělké vodě, bruslení a tenký led, NPC na pláži,
+  podvodní zabarvení kamery.
+- Dokumentace: README (Systémy / Ovládání – plavání), `prompts/roadmapa/README.md` a `docs/VIZE_A_ROADMAPA.md`
+  neupraveny (zadání: nemenit). Ladicí konstanty: `Player.SWIM_*`, `Koupaliste.CENTER/DEPTH`.
