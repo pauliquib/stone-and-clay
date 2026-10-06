@@ -68,3 +68,11 @@ Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kab
 8. Plavání v rybníce v lese (Teleport k rybníku) – stejné ovládání jako v nádrži.
 9. Chůze mimo nádrž po zemi se nezměnila; u potoka (mělčina < 1,2 m) se chodí brodem jako dřív.
 10. Starý save se načte beze změny (žádný nový klíč v `save_game.gd`).
+
+## M5.1 pokračování (pila a dvůr stavebnin)
+1. F2 → Teleport → Pila: budova (stodola) severně od haly stavebnin, cedule „Pila Na Bidýlku“, parkování mezi halou a pilou.
+2. Dvůr: u haly na jihu hromady písku, štěrku, cihel na paletách, prken a dříví; u pily kulatina, řezivo, piliny.
+3. Pila → obsluha Pilař Ondřej: nabídka „Dřevo a řezivo“ (prkno 180, hranol 260, dříví 90 Kč); motorovou pilu koupit jen ve stavebninách.
+4. Stavebniny → „Materiál (dvůr)“: písek 10 Kč.
+5. Otevírací doba pily: po–pá 7–17, so 7–12, v neděli zavřeno (F2 → Datum na sobotu a neděli).
+6. Mapa M: značka pily na stodole severně od haly; hromady stojí mimo budovy (ne uvnitř zdí).

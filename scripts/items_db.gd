@@ -177,6 +177,10 @@ const ITEMS := {
 	"hrabe": {"name": "Hrábě", "short": "Hrábě", "type": "tool", "kg": 1.0, "price": 190, "durability": 300, "color": Color(0.55, 0.4, 0.22)},
 	"kladivo": {"name": "Kladivo a hřebíky", "short": "Kladivo", "type": "tool", "kg": 0.8, "price": 250, "durability": 300, "color": Color(0.4, 0.4, 0.42)},
 	"pisek": {"name": "Posypový písek (kbelík)", "short": "Písek", "type": "material", "kg": 3.0, "price": 10, "stack": 20, "color": Color(0.78, 0.68, 0.48)},
+	# M5.1 pokračování: dřevo a řezivo z pily (DOPLNIT: ceny odhad)
+	"prkno": {"name": "Prkno 2 m (smrk)", "short": "Prkno", "type": "material", "kg": 9.0, "price": 180, "stack": 10, "color": Color(0.88, 0.74, 0.5)},
+	"rezivo": {"name": "Hranol 6 × 10 cm, 4 m", "short": "Hranol", "type": "material", "kg": 14.0, "price": 260, "stack": 6, "color": Color(0.8, 0.66, 0.42)},
+	"poleno": {"name": "Palivové dříví (štípané, pytel)", "short": "Dříví", "type": "material", "kg": 6.0, "price": 90, "stack": 10, "color": Color(0.5, 0.36, 0.22)},
 	# ---- M3.3 zahradník u sousedů (zapůjčí je zákazník / děda na zakázku; DOPLNIT: prodej ve stavebninách M5.1)
 	"nuzky_zahradni": {"name": "Zahradní nůžky na živý plot", "short": "Zahradní nůžky", "type": "tool", "kg": 1.2, "price": 390, "durability": 300, "color": Color(0.35, 0.55, 0.3)},
 	"sazenice_kvetin": {"name": "Sazenice květin (plato)", "short": "Květiny (sazenice)", "type": "seed", "kg": 0.4, "price": 35, "stack": 20, "color": Color(0.9, 0.4, 0.6)},

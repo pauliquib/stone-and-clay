@@ -1087,6 +1087,7 @@ func _spawn_places() -> void:
 		places[k] = pl
 		if pl.keeper:
 			npcs[k] = pl.keeper
+	root.add_child(DvurStavebnin.build(terrain))  # M5.1 pokračování: dvůr stavebnin a pily (hromady materiálu)
 	if places["hospoda"].regulars.size() > 0:
 		npcs["pepa"] = places["hospoda"].regulars[0]
 	# děda Vomáčka na lavičce kousek od usedlosti (místo „domov“ je teď ještě na původním bodu z pois.json;

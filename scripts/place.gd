@@ -21,7 +21,10 @@ const OFFERS := {
 		["Výkup zvěřiny (s dokladem o původu)", 0, "header"], ["zverina_srnci", 180, "sell"], ["zverina_divocak", 120, "sell"],
 		["zverina_zajic", 150, "sell"], ["trofej_parozky", 100, "sell"]],
 	# M5.1 stavebniny (smyšlené „Stavebniny Cihla a Hřebík“, místo ze `pois.json`): železářství přesunuto z Potravin
-	"stavebniny": [["Nářadí", 0, "header"], ["sekera_stara", 390, "buy"], ["sekera", 1290, "buy"], ["motorova_pila", 6900, "buy"]],
+	"stavebniny": [["Nářadí", 0, "header"], ["sekera_stara", 390, "buy"], ["sekera", 1290, "buy"], ["motorova_pila", 6900, "buy"],
+		["Materiál (dvůr)", 0, "header"], ["pisek", 10, "buy"]],
+	# M5.1 pokračování: pila NAD halou stavebnin (budova `279052820`, OSM barn); dřevo a řezivo na venkovní ploše (dvůr)
+	"pila": [["Dřevo a řezivo", 0, "header"], ["prkno", 180, "buy"], ["rezivo", 260, "buy"], ["poleno", 90, "buy"]],
 	"obchod": [["pivo", 25, "buy"], ["nealko", 22, "buy"], ["vino_bile", 129, "buy"], ["vino_cervene", 139, "buy"],
 		["vodka", 229, "buy"], ["rum", 189, "buy"], ["becherovka", 259, "buy"], ["slivovice", 520, "buy"],
 		["voda", 19, "buy"], ["rohlik", 8, "buy"], ["chipsy", 45, "buy"], ["jablko", 6, "buy"],
@@ -85,12 +88,13 @@ const OFFERS := {
 	"statek": [["Prodej ze dvora", 0, "header"], ["vejce", 6, "buy"], ["mleko", 22, "buy"], ["seno", 20, "buy"], ["zrni", 12, "buy"]],
 }
 const HOURS := {"hospoda": [10, 26], "obchod": [6, 21], "palenice": [8, 22], "sklep": [12, 24],
-	"chata": [0, 24], "urad": [8, 14], "domov": [0, 24], "statek": [5, 20], "stavebniny": [7, 17]}
+	"chata": [0, 24], "urad": [8, 14], "domov": [0, 24], "statek": [5, 20], "stavebniny": [7, 17], "pila": [7, 17]}
 ## Výjimky z otevírací doby podle dne v týdnu (0 = pondělí … 6 = neděle): [od, do] nebo [] = zavřeno.
 ## Svátky (Clock.holiday) mají obchod zavřený; svátky a události v obci mění hodiny přes VillageEvents.event_hours.
 const WEEK_HOURS := {
 	"obchod": {5: [7, 11], 6: []},                        # sobota jen dopoledne, v neděli zavřeno
 	"stavebniny": {5: [7, 12], 6: []},                    # M5.1: sobota jen dopoledne, v neděli zavřeno
+	"pila": {5: [7, 12], 6: []},                          # M5.1 pokračování: jako stavebniny
 	"hospoda": {4: [10, 27], 5: [10, 27], 6: [10, 24]},    # pá a so do 3:00, v neděli do půlnoci
 	# A4-02: obecní úřad má úřední dny – Po a St déle, Út a Čt základní doba, v pátek krátce, víkend zavřeno
 	"urad": {0: [7, 17], 2: [7, 17], 4: [8, 12], 5: [], 6: []},
@@ -109,6 +113,7 @@ const KEEPERS := {
 	"urad": ["Starosta Novák", "", Color(0.3, 0.3, 0.45)],
 	"statek": ["Hospodář Vladimír", "", Color(0.35, 0.42, 0.28)],      # M3.2 (smyšlený)
 	"stavebniny": ["Prodavač Miroslav", "", Color(0.6, 0.45, 0.2)],  # M5.1 (smyšlený)
+	"pila": ["Pilař Ondřej", "", Color(0.4, 0.3, 0.2)],              # M5.1 pokračování (smyšlený)
 }
 ## Povaha obsluhy pro rozhovor (Persona / Dialog): [povaha, povolání, věk, o sobě, témata]
 const KEEPER_PERSONA := {
@@ -119,6 +124,7 @@ const KEEPER_PERSONA := {
 	"chata": ["bruclavy", "myslivec", 60, "V lese se chodí potichu, ať nevyplašíš zvěř.", ["les", "zver", "vcely"]],
 	"urad": ["prisny", "starosta obce", 57, "Obec musí mít pořádek i rozpočet.", ["urad", "poradek", "silnice"]],
 	"stavebniny": ["prisny", "prodavač ve Stavebninách Cihla a Hřebík", 49, "Hřebík do zdi, cihla do základu. Plot bez prken nepostavíte.", ["drby", "pocasi", "zahrada"]],
+	"pila": ["bruclavy", "pilař", 52, "Dřevo musí aspoň rok volně vyschnout, jinak vám to ve stodole popraská.", ["pocasi", "zahrada", "drby"]],
 	"statek": ["bruclavy", "hospodář na Statku Na Kopci", 58, "Kráva nepočká, ta se dojí i na Štědrý den.", ["pole", "zvirata", "pocasi"]],
 }
 const REGULARS_PERSONA := [
@@ -215,6 +221,7 @@ func _sign_color() -> Color:
 		"hospoda": return Color(0.45, 0.25, 0.1)
 		"obchod": return Color(0.1, 0.4, 0.2)
 		"stavebniny": return Color(0.55, 0.4, 0.15)
+		"pila": return Color(0.42, 0.28, 0.14)
 		"palenice": return Color(0.35, 0.15, 0.4)
 		"sklep": return Color(0.45, 0.08, 0.15)
 		"chata": return Color(0.25, 0.3, 0.15)

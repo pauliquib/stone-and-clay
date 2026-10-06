@@ -962,3 +962,33 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
   podvodní zabarvení kamery.
 - Dokumentace: README (Systémy / Ovládání – plavání), `prompts/roadmapa/README.md` a `docs/VIZE_A_ROADMAPA.md`
   neupraveny (zadání: nemenit). Ladicí konstanty: `Player.SWIM_*`, `Koupaliste.CENTER/DEPTH`.
+
+## 2026-10-06 – M5.1 pokračování: pila a dvůr stavebnin
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu – ruční test čeká)
+- **Zdroj souřadnic (z dat, ne z hlavy)**: `data/buildings.json` – hala stavebnin = `279052827` (barn, 3 457 m², střed
+  (−305,0; 756,8), dveře (−328,5; 763,1)); okolí do 260 m: pila = `279052820` (barn, 1 270 m², střed (−241,0; 741,2),
+  dveře (−250,1; 743,5), `road_dist` 9,3). Výběr: první velká budova **severně** od haly (cz < 753), bližší k návsi;
+  jediná v okruhu 260 m s cz < 745. Pozn.: je spíš východně / severovýchodně (dx +55, dz −12), ne přímo nad halou.
+- **`data/pois.json`**: nový záznam `pila` („Pila Na Bidýlku“, osm_id 279052820, smyšlený název), dveře a `face_yaw`
+  z budovy, parkování (−256,5; 736,0) odhadem mezi halou a pilou – DOPLNIT na mapě M.
+- **`scripts/place.gd`**: `OFFERS["pila"]` (dřevo a řezivo: prkno 180, hranol 260, palivové dříví 90), `OFFERS["stavebniny"]`
+  doplněno o písek v sekci „Materiál (dvůr)“; `HOURS["pila"]` [7,17], `WEEK_HOURS["pila"]` (so 7–12, ne zavřeno jako stavebniny);
+  `KEEPERS` / `KEEPER_PERSONA` „Pilař Ondřej“ (smyšlený), barva cedule.
+- **`scripts/items_db.gd`**: materiál `prkno`, `rezivo`, `poleno` (ceny odhad).
+- **`scripts/dvur_stavebnin.gd`** (nový, `class_name DvurStavebnin`): procedurální dvůr jedním meshem – tabulka `PILES`
+  (hromady na paletách, písek / štěrk kužely, kulatina, piliny). Stavebniny: jižně od haly (z ≈ 800–806, mimo půdorys).
+  Pila: jižně od ní, před dveřmi (z ≈ 688–712, mimo půdorys). Výška terénu přes `Terrain.height_at`.
+- **`scripts/world.gd`**: jediný řádek v `_spawn_places` (`root.add_child(DvurStavebnin.build(terrain))`).
+- Hala zůstává pro stavebniny; dvůr u pily je dřevo a řezivo (podle upřesnění koordinátora).
+
+### Kontrola překladu
+- `--check-only` na `dvur_stavebnin.gd`, `items_db.gd`, `place.gd`, `world.gd`: výstup prázdný.
+- `--import` vypršel na 300 s (rc 124), nedokončeno; hra ani testy nespouštěny.
+
+### Otevřené body
+- Čeká na ruční test (checklist v `docs/testy_M5.md`).
+- Parkování pily a směr přístupové cesty ověřit na mapě M (silnice k pile nebyla v datech ověřena).
+- Ceny a hmotnosti nových materiálů odhad (DOPLNIT); velký materiál jako náklad (M2.10) zatím není napojen.
+- Kutilské stavby (M5.1 část 4) a U-rampa (M5.8) nejsou v tomto kroku.
+- Sdílený `world.gd` a `save_game.gd` nezměněny kromě jednoho napojení; kalendář / M5.5 netknut.
