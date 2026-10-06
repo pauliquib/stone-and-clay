@@ -465,6 +465,35 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Nenahlášený kouř odhalí hajný / policie až později (zatím jen registr `unreported`).
 - Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.4 část B).
 
+## 2026-10-06 – M4.4 část B doplnění: hluk a nedělní klid (částečně)
+
+### Hotovo (staticky ověřeno – `godot --import` a `--check-only` na `noise_registry`, `world`, `forestry` – výstup prázdný)
+- **Co**: nový `scripts/noise_registry.gd` (`class_name NoiseRegistry`; název `Noise` koliduje s nativní třídou Godotu),
+  instance `World.noise`. Registr `KINDS`: `motorova_pila` (300 m), `sekacka`, `krovinorez` (nedělní klid), `hudba_auto`,
+  `vystrel` (noční klid). `offense_for(kind)` podle času: neděle / svátek (`Clock.weekday()==6` nebo `holiday()`) a hodina
+  v `zakazane_hodiny` → `poruseni_nedelniho_klidu`; noc 22–6 h → `ruseni_nocniho_klidu`. `emit(id, kind, pos)` projde
+  `World.witness_check(…, hear_r)`: nahlášeno → `commit_offense` + popup; nikdo → `add_unreported` (odhalí hajný / policie);
+  sousedé, kteří slyšeli a nenahlásili, ztrácejí náladu (`Persona.add_mood`). Cooldown 60 herních min. na (hráč, přestupek).
+- **Co**: `Forestry` sound smyčka (`_process` kácení, jen motorová pila) volá `world.noise.emit` → hluk pily na neděli / svátek
+  8–20 h je přestupek. Neměnil jsem existující svědky kácení (`witness_near`) – jde o druhý, doplňkový kanál.
+- **Co**: `data/zakon.json` – `vyhlasky.nedelni_klid`: místo `povolene_hodiny` [10,12] nově `zakazane_hodiny` [8,20] (zákaz
+  v neděli a o svátcích 8–20 h; roadmapa psala „dopoledních/odpoledních hodinách“ – ověřit OZV). Přestupek
+  `poruseni_nedelniho_klidu` (nový řádek, všechna povinná pole, „ověřit“); `ruseni_nocniho_klidu` rozšířen o hudbu z auta,
+  výstřel, motorovou pilu v `drb` / `poznamka`.
+- **Ukládání**: žádný nový stav – cooldown je jen v paměti (po načtení se může přestupek znovu zapsat). Starý save bez změn.
+- **Nezměněno**: `radio.gd` si má vlastní model hluku (sdílený `World.noise` s ním zatím nesdílí; vytažení je otevřený bod).
+
+### Otevřené body
+- **Zalévání z vodovodu** (kohoutek u domu): ve hře není vodovodní zdroj; `Vyhlasky.zalevani_zakazano()` zatím nikdo nevolá.
+  Samostatný malý krok (interaktivní bod `custom` u domu → `zalevani` → `poruseni_vyhlasky_obce`, když platí `zalevani_zakazano`).
+- **Hromada klestí** („Složit větve na hromadu“): velký objekt ve světě, zůstává otevřený (sušení běží na dávkách v kapse).
+- **Sekačka** neexistuje (roadmapa M4.4 / M3.2); v registru je připravená, nikdo ji zatím nevolá. **Hudba z auta** a **výstřel**
+  jsou v registru bez volajícího (zbraně mají vlastní zákon v `Weapons` / M4.6).
+- **Radio** (`radio.gd`) si drží vlastní model; přesun na `World.noise` až se bude dělat M5.9 (autorádio).
+- **Sousedé** nenahlášený hluk nerozšiřují do drbů ani do úřední desky; vyhlášky poštou a v drbech zůstávají otevřené.
+- **Noční klid** se zatím vyhodnocuje jen pro registrované činnosti (dnes žádná, viz výše).
+- Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl „M4.9b – M4.4 B doplnění“).
+
 ## 2026-10-06 – M4.7 Katastr: koupě a prodej nemovitostí
 
 ### Hotovo (staticky ověřeno čtením kódu a kontrolou `godot --check-only` – ruční test čeká)

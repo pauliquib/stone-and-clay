@@ -9,7 +9,7 @@
  "vyhlasky": [
   {"id": "zakaz_paleni", "nazev": "Zákaz pálení", "mesice": [7, 8], "text": "Od 1. 7. do 31. 8. je v obci zakázáno pálení větví a rostlinného odpadu. Opékání na táboráku (špekáčky) zůstává povoleno. Zjednodušeno – ověřit aktuální znění OZV."},
   {"id": "sucho", "nazev": "Zákaz zalévání a napouštění z vodovodu", "sucho_od": 0.6, "text": "Za sucha se nesmí zalévat zahrady ani napouštět bazény z vodovodu. Ohně v přírodě jsou zakázány mimo vlastní pozemek. Platí do doby, než přijdou deště."},
-  {"id": "nedelni_klid", "nazev": "Nedělní klid", "trvale": true, "dny": [6], "povolene_hodiny": [10, 12], "text": "V neděli a o svátcích se nesmí hlučně pracovat (sekačka, motorová pila, křovinořez) mimo 10–12 h. Noční klid 22–6 h platí ze zákona. Zjednodušeno – ověřit OZV."}
+  {"id": "nedelni_klid", "nazev": "Nedělní klid", "trvale": true, "dny": [6], "zakazane_hodiny": [8, 20], "text": "V neděli a o svátcích se od 8 do 20 h nesmí hlučně pracovat (sekačka, motorová pila, křovinořez). Noční klid 22–6 h platí ze zákona. Zjednodušeno – ověřit OZV."}
  ],
  "prestupky": {
   "alkohol_do_1": {"nazev": "Řízení pod vlivem alkoholu (do 1 ‰)", "drb": "řídil po pár pivech", "karma": -2, "zakon": "361/2000 Sb.", "par": "§ 125c odst. 1 písm. b)",
@@ -36,8 +36,10 @@
   "rizeni_bez_opravneni": {"nazev": "Řízení vozidla bez řidičského oprávnění (skupiny)", "drb": "sedl za volant bez papíru na tenhle stroj", "karma": -2, "zakon": "361/2000 Sb.", "par": "§ 125c odst. 1 písm. e) (ověřit)",
    "pokuta": [5000, 15000], "body": 4, "trestny_cin": false, "misto": "na_miste",
    "poznamka": "Zjednodušeno: vozidlo vyžaduje skupinu (kolo bez skupiny). Opakované jednání do 2 let = trestný čin § 337 TZ – ve hře zatím neřešeno (otevřený bod). Ověřit."},
-  "ruseni_nocniho_klidu": {"nazev": "Rušení nočního klidu", "drb": "řval v noci pod okny", "karma": -1, "zakon": "251/2016 Sb.", "par": "§ 5 odst. 1 (ověřit)",
-   "pokuta": [2000, 2000], "blokova": 2000, "body": 0, "trestny_cin": false, "misto": "na_miste", "poznamka": "ověřit"},
+  "ruseni_nocniho_klidu": {"nazev": "Rušení nočního klidu", "drb": "řval a pouštěl hluk v noci pod okny", "karma": -1, "zakon": "251/2016 Sb.", "par": "§ 5 odst. 1 (ověřit)",
+   "pokuta": [2000, 2000], "blokova": 2000, "body": 0, "trestny_cin": false, "misto": "na_miste", "poznamka": "Hluk v noci: hlasitá hudba z auta či rádia, výstřel, motorová pila (noční klid 22–6 h). Ověřit."},
+  "poruseni_nedelniho_klidu": {"nazev": "Porušení nedělního klidu (hlučná práce)", "drb": "v neděli kvílel sekačkou nebo pilou", "karma": -1, "zakon": "251/2016 Sb.", "par": "§ 4 odst. 2 (ověřit)",
+   "pokuta": [1000, 5000], "body": 0, "trestny_cin": false, "misto": "na_miste", "poznamka": "Porušení obecně závazné vyhlášky o nedělním klidu (sekačka, motorová pila, křovinořez v neděli a o svátcích 8–20 h); výše orientační – ověřit OZV."},
   "urazka_uredni_osoby": {"nazev": "Urážka úřední osoby", "drb": "se pohádal s úřední osobou", "karma": -1, "zakon": "251/2016 Sb.", "par": "§ 5 odst. 1 (ověřit)",
    "pokuta": [1000, 1000], "blokova": 1000, "body": 0, "trestny_cin": false, "misto": "na_miste", "poznamka": "ověřit"},
   "vyhruzka_uredni_osobe": {"nazev": "Vyhrožování úřední osobě", "drb": "vyhrožoval úřední osobě", "karma": -2, "zakon": "40/2009 Sb.", "par": "§ 352, § 353 (ověřit)",

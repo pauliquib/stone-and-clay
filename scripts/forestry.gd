@@ -538,6 +538,8 @@ func _action_sounds(delta: float) -> void:
 			var saw := tool_id == "motorova_pila"
 			world.sound.emit(p.global_position, "saw" if saw else "chop", randf_range(0.9, 1.1), 0.0,
 				HEAR_SAW if saw else HEAR_AXE)
+			if saw:
+				world.noise.emit(id, "motorova_pila", p.global_position)     # M4.4 B: nedělní klid / noční klid
 
 
 # ------------------------------------------------------------------ zákon

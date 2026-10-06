@@ -432,8 +432,8 @@ kroky přehazovat, mezi milníky platí závislosti.
 - [ ] **M4.4 Další přestupky a svědci** – **část A hotová** (jednotný `witness_check`, nenahlášené činy, oživené řádky
   katalogu; zbývá povolení ke kácení). **Část B částečně:** hotovo – vyhlášky na úřední desce (zákaz pálení, sucho,
   nedělní klid), čerstvé vs. suché větve (sušení ~30 dní, kouř u ohně, přestupky), `Weather.drought`. **Zbývá:** hromada
-  klestí jako objekt, zákaz zalévání z vodovodu (vodovodní zdroj neexistuje), hluk a sekačka / nedělní klid (`World.noise`),
-  vyhlášky poštou a v drbech.
+  klestí jako objekt, zákaz zalévání z vodovodu (vodovodní zdroj neexistuje), sekačka a hluk z auta / rádia / výstřelu
+  (registr `World.noise` hotov jen pro motorovou pilu a nedělní klid), vyhlášky poštou a v drbech.
 - [x] **M4.3 Soud a vězení** – trestné činy z katalogu, rejstřík jako pohled na záznamy, tresty, souhrnný časový skok a jeho následky.
 - [x] **M4.5 Nové cesty k pověsti / respektu / karmě** – pomoc sousedům, úklid, vrácení věcí, přátelství
   s postavami, drobné dobré skutky (seznam v 3.5).

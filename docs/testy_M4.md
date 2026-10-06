@@ -140,3 +140,16 @@ Doporučené pořadí testování celé M4: M4.1 → M4.2 → M4.3 → M4.4 A/B 
    bez „Porušení obecně závazné vyhlášky“.
 9. **Panel P:** po koupi povolenky k lovu / rybolovu ukazuje „platí ještě N dní“, po vypršení „PROŠLÁ“.
 10. **Katastr:** inzeráty domů na úřadě nikdy neobsahují budovu statku (M3.2).
+
+## M4.9b – M4.4 B doplnění (hluk a nedělní klid)
+
+1. F2 → Datum: nastav neděli 10:00. V lese pokácej strom motorovou pilou (u cizího stromu) → buď popup „Sousedé slyšeli motorovou pilu a nahlásili to“ + přestupek „Porušení nedělního klidu“ (Počítač → Banka → Pokuty), nebo hláška „Je slyšet motorová pila. Zatím si toho nikdo nevšiml“ (nenahlášený čin; ověř F2 → Hráč / hajný).
+2. Stejná práce ve středu 10:00 → žádná hláška o nedělním klidu.
+3. Neděle 21:00 nebo 7:00 pilou → žádná hláška o nedělním klidu (zákaz je jen 8–20 h).
+4. F2 → Datum: svátek 28. 9. 10:00 (Den české státnosti) pilou → stejné hlášení jako v bodě 1.
+5. Stejný přestupek ze stejného hluku se do 60 herních minut neopakuje (pila v neděli opakovaně → jeden zápis).
+6. Úřední deska (Počítač → Úřední deska): „Nedělní klid“ se ukazuje vždy; v lednu bez „Zákazu pálení“.
+7. Katalog: F2 → Hráč → Pokuty / rejstřík – řádek „Porušení nedělního klidu (hlučná práce)“ se správným zákonem a „ověřit“ v poznámce.
+8. Ulož hru, ukonči a načti (F9) – žádná chyba, hra běží; přestupky z předchozích bodů zůstanou v rejstříku.
+9. Starý save (před touto změnou) se načte bez chyby (F5 / `--load`).
+10. Kontrola: zalévání z vodovodu a hromada klestí se nevyskytují (otevřené body) – nic nehledej; ověř jen, že pálení a sucho z minula fungují jako dřív.
