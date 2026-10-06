@@ -714,3 +714,24 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Kontrola `commit_offense`: všechna literální id ve `scripts/` existují v `zakon.json`; dynamicky skládaná id (`_offense`, `_law_offense`, `_smoke`, `commit_pending`, `police._recent`) pocházejí z literálů, které také existují.
 - Nesrovnalosti k ruční opravě (nebyly měněny): položky `pg_noc`, `pg_mraky`, `ul_noc`, `ul_mraky`, `ul_pristani_mimo`, `ul_bez_pojisteni` mají `par` jen "ověřit" (chybí §); `strelba_v_obci` a `zbran_pod_vlivem` mají "ověřit číslo § v novém zákoně o zbraních"; `vyhlasky` (`sucho`) nemá poznámku. Horní klíče (`body_limit`, `zakaz_za_body_h`, `body_odpocet` …) nemají vlastní poznámku, kryje je `overeno`. Položky `alkohol_do_1`, `ruseni_nocniho_klidu` aj. mají zákon+§ bez ověření.
 - Kontrola překladu se netýká (měněn jen JSON, žádný .gd).
+## 2026-10-06 – M4.4 B zbytek: hromada klestí (zalévání z vodovodu zapsáno jako otevřený bod)
+
+### Hotovo (staticky ověřeno čtením kódu a `godot --check-only` – ruční test čeká)
+- **Co**: nový `scripts/klesti.gd` (`class_name Klesti`, `World.klesti`, instance v inicializaci `World` vedle `vyhlasky`):
+  hromada klestí 3 m vpravo od dveří domu (jen vlastník domu, `Estate.owns_house`), cíl `klesti_hromada` (`World.register_target`,
+  `data.pid`), vizuál z `MeshKit` (suché tmavé, čerstvé světlé). Vzniká líně z `_process` (každé 2 s pro hráče ve `World.players`).
+- **Co**: akce `slozit_vetve` (čerstvé `vetve_cerstve` i suché `vetve` z kapsy na hromadu; čerstvé schnou `Vyhlasky.DRY_DAYS`,
+  za sucha rychleji, za deště pomaleji – stejné ladění jako `Vyhlasky`) a `vzit_vetve` (max. `Klesti.MAX_TAKE` = 20 suchých do kapsy)
+  v `actions.gd` (`DEFS`), handlery a kontroly cíle v `klesti.gd`.
+- **Co**: ukládání klíč `klesti` (`{cerstve: [{n, dny}], suche}`) v `save_game.gd` (výchozí prázdno); poloha se odvozuje z domu.
+- **Kontrola**: `godot --import` a `--check-only` na `klesti`, `actions`, `world`, `save_game` – výstup prázdný.
+
+### Otevřené body
+- **Zalévání z vodovodu** (kohoutek u domu): neřešeno – ve hře není vodovodní zdroj a přidání interaktivního bodu u domu + napojení
+  na `Vyhlasky.zalevani_zakazano()` je samostatný malý krok (`poruseni_vyhlasky_obce`, svědek soused). Zatím bez háčku.
+- **Hromada u bytu**: byt nemá pozemek, hromada tam není (cíl jen pro `owns_house`).
+- **Dávky ve `Vyhlasky`**: fresh dávka v kapse po odložení na hromadu zůstane v `Vyhlasky.batches` a při zrání převede jen
+  kusy, které hráč právě nese (jako dnes) – drobné časové zkreslení, když hráč mezitím nasbírá nové čerstvé větve.
+- **Hromada nehoří sama**: zapálení celé hromady a hlídání velkého pálení (háček M5.3) zůstává otevřené.
+- **Sekačka, hudba z auta, výstřel** v registru hluku bez volajícího (zbytek části B, mimo tento krok).
+- Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl „M4.4 B zbytek – hromada klestí“).

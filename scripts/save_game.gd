@@ -103,6 +103,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 	d["unreported"] = world.unreported.get(id, [])     # nenahlášené činy, společný registr (M4.4)
 	if world.vyhlasky:
 		d["vyhlasky"] = world.vyhlasky.to_dict(id)     # čerstvé větve v sušení (M4.4 část B)
+	if world.klesti:
+		d["klesti"] = world.klesti.to_dict(id)       # klestí na hromadě u domu (M4.4 část B)
 	if world.fire_mgr:
 		d["fire"] = world.fire_mgr.to_dict()           # ohniště (i vyhaslá), stav kamen doma (M2.2)
 	if world.garden:
@@ -341,6 +343,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	world.unreported[id] = (nr as Array).duplicate(true)
 	if world.vyhlasky:
 		world.vyhlasky.restore(id, d.get("vyhlasky", {}))   # starý save bez klíče = žádné čerstvé větve
+	if world.klesti:
+		world.klesti.restore(id, d.get("klesti", {}))   # starý save bez klíče = prázdná hromada
 	if world.fire_mgr:
 		world.fire_mgr.restore(d.get("fire", {}))            # starý save bez klíče = žádná ohniště, studená kamna
 	if world.garden:
