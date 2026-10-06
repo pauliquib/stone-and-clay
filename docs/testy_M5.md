@@ -165,3 +165,16 @@ Cheat: F2 → Teleport (zatím bez položky; přes souřadnice `Studanka.SPRING_
 8. Odejdi od základny (nad 30 m, u proudaře nad 120 m) během pokusu → pokus končí N.P. „odchod od stroje“.
 9. F2 → Datum první sobota v červnu: menu „Soutěž – hrát …“, výsledková tabule s 5 smyšlenými družstvy a tvým pořadím.
 10. Vítězství v soutěži → respekt Hasiči +10, pověst +5; save a načtení zachová formu a osobní rekord (starý save = nulová forma).
+
+## Kříže, poutní místa a kaplička (zadání uživatele)
+Cheat: F2 → Teleport k úřadu; kaplička je 225 m od úřadu (poloha `Krize.chapel_pos()`, data v `data/krize.json`, klíč `kaplicka`).
+1. Jdi k úřadu a dál asi 225 m směrem k souřadnicím kapličky (236, 409) → stojí malá kaple se zvoničkou a křížem, u cesty.
+2. U kapličky E → zpráva „Dveře kapličky jsou pootevřené. Chvilka ticha a klid.“ (dosah 3 m); bez XP a bez změny karmy.
+3. Čtyři kříže v katastru: (116, 509), (237, 337), (−185, 851), (68, −115). Kříže č. 2 a č. 4 jsou kovové, ostatní dřevěné; každý má kamenný podstavec.
+4. F2 → Teleport na (237, 337) → E u kříže → zpráva „Chvilku v tichu u kříže…“.
+5. Kříž stojí na terénu (nepropadá se, nelétá).
+6. Blízko kříže (do 150 m od hráče) jde narazit do podstavce; ve větší vzdálenosti (> 150 m) je jen vizuál – ověř odchodem na 200 m.
+7. F5 / F9 → po načtení kříže i kaple na stejném místě, žádná chyba v logu.
+8. Bez `data/krize.json` hra běží, kříže se nevytvoří, bez SCRIPT ERROR.
+9. Log bez SCRIPT ERROR mimo addony func_godot a godot_state_charts.
+10. Mše v neděli zatím nemění polohu (čeká na napojení na `Krize.chapel_pos()`).

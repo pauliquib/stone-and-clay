@@ -135,6 +135,7 @@ var fire_mgr: FireManager        # oheň a topení (M2.2): ohniště, opékání
 var hasici: Hasici               # M5.3: sbor dobrovolných hasičů – zbrojnice u úřadu, členství, výjezdy k požáru trávy
 var studanka: Studanka           # M5.10: studánka v lese (pití, konev) a skautský tábor na mýtince (červenec)
 var hasici_sport: HasiciSport    # M5.4: požární útok u hřiště – trénink, soutěž, výsledky
+var krize: Krize                 # kříže u cest, poutní místa, kaplička na návsi (data/krize.json)
 var npc_grow: NpcGrow            # M4.8 obsah pro dospělé: záhon zahrádkáře Ladislava (konopí), jen při zapnuté volbě
 var vyhlasky: Vyhlasky           # obecní vyhlášky (pálení, sucho, nedělní klid) a sušení čerstvých větví (M4.4 část B)
 var klesti: Klesti                # hromada klestí u domu (M4.4 část B): čerstvé větve schnou, suché se berou zpět
@@ -1112,6 +1113,10 @@ func _spawn_places() -> void:
 		hasici_sport = HasiciSport.new()
 		add_child(hasici_sport)
 		hasici_sport.setup(self)
+	if krize == null:                             # kříže a kaplička (až po terénu)
+		krize = Krize.new()
+		add_child(krize)
+		krize.setup(self)
 	if places["hospoda"].regulars.size() > 0:
 		npcs["pepa"] = places["hospoda"].regulars[0]
 	# děda Vomáčka na lavičce kousek od usedlosti (místo „domov“ je teď ještě na původním bodu z pois.json;
@@ -2707,6 +2712,8 @@ func interactables(id: int) -> Array:
 		out.append_array(hasici.interactables(id))   # M5.3: vchod zbrojnice SDH (členství)
 	if hasici_sport:
 		out.append_array(hasici_sport.interactables(id))   # M5.4: základna požárního útoku
+	if krize:
+		out.append_array(krize.interactables(id))   # E u kříže / kaple (krátká modlitba)
 	if garden:
 		out.append_array(garden.interactables(id))
 	if farm:

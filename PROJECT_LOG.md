@@ -1225,3 +1225,25 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Souřadnice kapličky pro nedělní mši (M5.5); ověření pily, hřiště a U-rampy na mapě M.
 - ČRo stanice v `data/radia.json` – rozhodnutí o ponechání; streamy pro Rock Pod Kopcem, Beat Hvozdnice, Rock Ve Žlebu.
 - Viz oddíly „Otevřené body“ u jednotlivých kroků výše a `docs/testy_M5.md`.
+
+## 2026-10-07 – Kříže, poutní místa a kaplička (zadání uživatele, mimo milníky)
+
+### Hotovo (staticky ověřeno: `--import` rc 0, `--check-only` na `scripts/krize.gd` a `scripts/world.gd` bez chyb; ruční test čeká)
+- **Co**: nový `data/krize.json` (4 kříže `kriz_1`–`kriz_4`, poutní místa 0, kaplička `kaplicka_navsi`), nový `scripts/krize.gd` (`class_name Krize`) a napojení v `scripts/world.gd` (proměnná `krize`, vytvoření po `hasici_sport`, `interactables` vedle hasičů).
+- **Data z OSM (ODbL, © přispěvatelé OpenStreetMap)**: dotaz přes Overpass v bboxu katastru + 300 m (`historic=wayside_cross|wayside_shrine`, `amenity=place_of_worship`+`religion=christian`, `building=chapel|church`, `pilgrimage`, `tourism=attraction`+`religion`). Nalezeno 8 prvků v bboxu: 4 kříže uvnitř katastru (použity, `node/9910375741`, `node/9910375742`, `node/9910375743`, `node/3782257005`), kaple `way/224455858` uvnitř katastru (použita jako kaplička na návsi), mimo 300 m vynechány 2 kříže (550 m a 1605 m) a kaple `way/168792931` 257 m za hranicí (nemá `amenity=place_of_worship` ani poutní tag). Poutní místa (`pilgrimage`, `tourism`) nenalezena.
+- **Převod souřadnic**: lat/lon → herní souřadnice podle `tools/obce.py` (lat0/lon0 domova, `e = R·Δlon·cos(lat0)`, `n = R·Δlat`, otočení `north_angle_deg` 78.37°, `game z = −scene_y`). Ověřeno: domov `(11.07, −11.82)` se zpětným převodem sedí. Yaw kříže je rovnoběžně s nejbližší silnicí z `data/map.json`.
+- **Kaplička na návsi**: OSM way `224455858` (`building=chapel`) uvnitř katastru, **225 m od úřadu** (ne přímo na návsi; na návsi v OSM kaple není). Poloha `(236.5, 409.0)` v `kaplicka` v `data/krize.json`, v kódu `Krize.chapel_pos()` pro mši M5.5. Mše sama nezměněna (v `village_events.gd` zatím není implementovaná).
+- **Ve hře**: kříž = kamenný podstavec + dřevěný (lichý kříž kovový) kříž; kaple = loď, střechy, zvonička s křížem, dveře. Terén přes `world.terrain.height_at`. Kolize jen u objektů do 150 m od některého hráče (kontrola každé 2 s), jinak jen vizuál. E u objektu (dosah 3 m) = zpráva „pomodlit se“, bez XP a karmy, neukládá se nic.
+- **Názvy**: všechny generické („Kříž u cesty“, „Kříž u pole“, „Kaplička u cesty“). Reálný název kaple z OSM (obsahuje jméno světce) se nepoužil ani neuložil.
+
+### Nesrovnalosti (bez přepisu budov)
+- `data/buildings.json` nemá žádnou budovu typu `church` / `chapel`. OSM kaple (`224455858`, 225 m od úřadu) v něm chybí; nejbližší budova je `shed` 8 m od ní. Budova `public` (9 m od úřadu) je jiný objekt a není kaple.
+- `data/pois.json` kapli nemá (očekáváno, není POI).
+
+### Otevřené body
+- Kaplička je 225 m od úřadu a není přímo na návsi; uživatel může potvrdit, zda ji posunout blíž (souřadnice v `data/krize.json`, klíč `kaplicka`).
+- Mše v kapličce (M5.5) čeká na napojení na `Krize.chapel_pos()`.
+- Kaple u sousední obce (257 m za hranicí, `building=chapel`) vynechána dle filtru; zvážit, zda přidat jako `poutni`.
+- Žádná poutní místa v katastru + 300 m nenalezena; typ `poutni` je v kódu připraven, data prázdná.
+- Orientace křížů je odhad (rovnoběžně se silnicí), ne z OSM.
+- Ruční test čeká (checklist v `docs/testy_M5.md`, oddíl Kříže a kaplička).
