@@ -27,6 +27,15 @@ Každý krok má vlastní oddíl. Testuje uživatel po dokončení vlny; agent h
 9. Ulož (F5), ukonči hru, načti (F9) → rekord zůstane, skateboard zůstane v inventáři, hráč jde pěšky.
 10. Starý save (před M5.7) se musí načíst bez chyby a rekord bude 0.
 
+## M5.9 – Rockové stanice (smyšlené; bez streamu)
+
+Cheat: F2 → Hráč / Teleport. Stream doplní uživatel – dokud není `url`, stanice v nabídce nejsou.
+
+1. Doplň `url` u „Rock Pod Kopcem“ v `data/radia.json`, ulož, spusť hru → doma (E) se stanice objeví v seznamu.
+2. Přepni na ni → hraje (internet a ffmpeg); bez internetu hláška „Stanice nehraje“, hra běží dál.
+3. Hlasitost 8 v noci → sousedé reagují dřív než u ČRo Vltava (noise 0,75).
+4. Bez `url` u některé stanice se v nabídce neobjeví a hra nepadá.
+
 ## M5.9 – Autorádio a vnitřní světlo v autě (body 5–6)
 
 Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kabinou (osobní auto, ne kolo / motorka / traktor).

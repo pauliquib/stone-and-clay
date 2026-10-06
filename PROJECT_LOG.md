@@ -1192,3 +1192,18 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - **Efekty na respekt při soutěži a tréninku** jsou jen v kódu; deník J (oddíl Hasičský sport) a README → Systémy nebyly upraveny (zadání).
 - Výsledky soutěže se nepropisují do kalendáře M5.5 (registrace jen jako položka kalendáře přes `register`).
 - Ruční test čeká (checklist v `docs/testy_M5.md`, oddíl M5.4).
+
+## 2026-10-07 – M5.9 Rockové stanice (smyšlené; stream doplní uživatel)
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Co**: `data/radia.json` – přidány 3 smyšlené rockové stanice se stejnou strukturou jako ČRo záznamy (`name`, `genre`, `noise`) a polem `poznamka`: „Rock Pod Kopcem“ (rock, noise 0.75), „Beat Hvozdnice“ (klasický rock, 0.7), „Rock Ve Žlebu“ (tvrdý rock, 0.8). Pole `url` záměrně chybí – **stream doplní uživatel**; žádná adresa reálného serveru nebyla vymyšlena ani dohledána.
+- **Proč bez URL**: `scripts/radio.gd` (`_ready`, ř. 98) načítá jen záznamy s `url` a `name`, takže zatím se stanice v nabídce neobjeví. Po doplnění `url` se zobrazí bez dalších úprav kódu.
+- **Názvy**: podle pravidla kap. 3 smyšlené. Rychlá web kontrola (jeden dotaz) nenašla shodu s „Rock Pod Kopcem“ ani „Beat Hvozdnice“; „Radio Beat“ a „Rock Zone“ jsou reálné, proto se nepoužily. Název „Rock Zóna 99“ byl kvůli podobnosti s „Rock Zone“ nahrazen za „Rock Ve Žlebu“.
+- **Kód**: `scripts/*.gd` nezměněn, překlad se nekontroloval (žádný .gd soubor se nezměnil). Hra ani testy nespuštěny.
+- **Frekvence**: existující záznamy frekvenci nemají, nové ji také nemají (struktura stejná).
+
+### Otevřené body
+- **Stream u všech tří stanic doplní uživatel** (`url` do `data/radia.json`, pak zapsat do tohoto záznamu zdroj).
+- ČRo stanice v `radia.json` beze změny (čeká na rozhodnutí uživatele).
+- Právní poznámka v README (Právní zásady → Rádio) a vyprázdnění seznamu před veřejným vydáním: zatím nesplněno, netýká se smyšlených stanic.
+- Ruční test čeká (checklist v `docs/testy_M5.md`, oddíl M5.9 – rockové stanice).
