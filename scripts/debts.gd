@@ -19,7 +19,7 @@ const DUE_DAYS := 15
 ## doručení příkazu správního řízení (dny od přestupku, rozmezí)
 const ORDER_DELAY := [1, 3]
 ## druhy dluhů, které počítá a platí „Zaplatit pokuty“ (Computer, úřad)
-const FINE_KINDS := ["pokuta", "naklady_rizeni"]
+const FINE_KINDS := ["pokuta", "naklady_rizeni", "trest"]   # M4.3: peněžitý trest z rozsudku
 const STAGE_NAMES := {"splatne": "splatné", "upominka": "upomínka", "exekuce": "exekuce", "zaplaceno": "zaplaceno"}
 const SENDER := "Správní orgán (smyšlený)"
 

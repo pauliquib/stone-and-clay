@@ -5,6 +5,7 @@
  "zakaz_za_body_h": 8760,
  "body_odpocet": 4,
  "body_odpocet_rok_min": 525600,
+ "tresty": {"poznamka": "M4.3 soud: sazby ORIENTAČNÍ, ověřit (trestní zákoník 40/2009 Sb., zákon o zbraních 90/2024 Sb.). Herní zjednodušení.", "penize": [10000, 200000], "obhajce_kc": 5000, "podminka_roky": [1, 3], "zakaz_rizeni_roky": [1, 10], "opp_h": [50, 300], "opp_lhuta_dni": 365, "nepodminene_mesice": [3, 36], "zkouska_dni": [3, 7], "zatykac_dni": 30, "vezeni_meritko": 1.0, "vezeni_mesic_dni": 30},
  "prestupky": {
   "alkohol_do_1": {"nazev": "Řízení pod vlivem alkoholu (do 1 ‰)", "drb": "řídil po pár pivech", "karma": -2, "zakon": "361/2000 Sb.", "par": "§ 125c odst. 1 písm. b)",
    "pokuta": [10000, 10000], "body": 7, "zakaz_rizeni_h": [24, 24], "trestny_cin": false, "misto": "spravni_rizeni",
