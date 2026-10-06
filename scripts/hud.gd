@@ -408,12 +408,12 @@ func _ready() -> void:
 		+ "V pohled z dronu / za dronem, O nebo LMB fotka,\n" \
 		+ "F přistát / návrat domů. Max 120 m, ne nad lidmi,\n" \
 		+ "na dohled, ne špehovat sousedy – jinak pokuta.\n" \
-		+ "Registrace a test A1/A3: počítač doma → Letectví – ÚCL.\n" \
+		+ "Registrace a test A1/A3: počítač doma → Letectví – ÚVL.\n" \
 		+ "PARAMOTOR (M6.4, inventář → detail → Připravit): čelem\n" \
 		+ "    proti větru rozběh (W) → křídlo nahlas, Shift plyn,\n" \
 		+ "    A/D brzdy do stran, S obě brzdy, Mezerník trimry,\n" \
 		+ "    Ctrl uši; přistání = v ~1 m obě brzdy naplno, E sbalit.\n" \
-		+ "    Průkaz + registrace + pojištění: PC → Letectví – ÚCL.\n" \
+		+ "    Průkaz + registrace + pojištění: PC → Letectví – ÚVL.\n" \
 		+ "ROGALO / TRIKE (M6.5, polní letiště F2 → Teleport):\n" \
 		+ "    Shift/Ctrl páka plynu (drží polohu); na zemi A/D\n" \
 		+ "    příďové kolo + Mezerník brzda; ve vzduchu HRAZDA\n" \
@@ -422,7 +422,7 @@ func _ready() -> void:
 		+ "    proti větru na hlavní kola; jen na letišti, za dne,\n" \
 		+ "    mimo mraky, ne nízko nad obcí/lidmi – jinak pokuta.\n" \
 		+ "    Průkaz ULL (škola 75 000), registrace + pojištění:\n" \
-		+ "    PC → Letectví – ÚCL. Spolujezdec = kamarád (E u triku).\n\n" \
+		+ "    PC → Letectví – ÚVL. Spolujezdec = kamarád (E u triku).\n\n" \
 		+ "Úkoly dávají lidé ve vsi (hospoda, úřad, obchod,\n" \
 		+ "sklep, děda u domu). Pozor: v ČR se za volant\n" \
 		+ "smí jen s 0,00 ‰! Lidé si pamatují, jak se chováš\n" \

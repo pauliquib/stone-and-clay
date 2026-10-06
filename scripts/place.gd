@@ -68,10 +68,10 @@ const OFFERS := {
 		["puska", 18000, "buy"], ["naboje", 40, "buy"],
 		# M2.10 doprava nákladu: ruční vozík (po koupi stojí u domova hráče, DOPLNIT: později stavebniny M5.1) a plachta (schová náklad)
 		["Doprava a náklad", 0, "header"], ["rucni_vozik", 2490, "buy"], ["plachta", 180, "buy"],
-		# M6.1 drony: malý do 250 g (bez zkoušky, jen registrace ÚCL zdarma na PC), velký vyžaduje osvědčení A1/A3
-		# (eTest „drony“). Nabíjení a opravy na počítači doma (Letectví – ÚCL). Ceny odhad (DOPLNIT: elektro M5.x?)
+		# M6.1 drony: malý do 250 g (bez zkoušky, jen registrace ÚVL zdarma na PC), velký vyžaduje osvědčení A1/A3
+		# (eTest „drony“). Nabíjení a opravy na počítači doma (Letectví – ÚVL). Ceny odhad (DOPLNIT: elektro M5.x?)
 		["Drony a technika", 0, "header"], ["dron", 7990, "buy"], ["dron_velky", 32900, "buy"], ["dron_baterie", 1490, "buy"],
-		# M6.4 paramotor: nový (i v eŠuplíku) a ojetý za polovinu; průkaz/registrace na PC → Letectví – ÚCL
+		# M6.4 paramotor: nový (i v eŠuplíku) a ojetý za polovinu; průkaz/registrace na PC → Letectví – ÚVL
 		["Letectví", 0, "header"], ["paramotor", 180000, "buy"], ["paramotor_ojety", 90000, "buy"]],
 	"palenice": [["slivovice", 450, "buy"], ["panak_slivovice", 40, "serve"], ["polena", 30, "sell"]],
 	"sklep": [["vino_bile", 150, "buy"], ["vino_cervene", 170, "buy"], ["vino_sklenka", 40, "serve"],

@@ -94,13 +94,13 @@ var _blackout := {}              # id → true: hráč právě „nevidí“ (ok
 var _cheat_permits := {}         # id → {druh oprávnění: true} – jen ladicí cheat (F2 → Hráč), dokud nejsou doklady (M4.6)
 # M6.1 drony: `drones[pid]` = aktivní dron ve světě (letí / leží / visí ve stromě); `drone_states[pid][model]`
 # = trvalý stav flotily (baterie a poškození se drží i v inventáři). `permits` = registry oprávnění
-# (registrace provozovatele ÚCL, osvědčení A1/A3). Akce z klienta přes `player_action`
+# (registrace provozovatele ÚVL, osvědčení A1/A3). Akce z klienta přes `player_action`
 # ("drone_launch:<model>", "car_enter" = přistát/návrat, "drone_photo" = fotka), HUD telemetrie z `Drone.status()`.
 var drones := {}                # pid → Drone (uzel ve světě, vč. zaparkovaného)
 var drone_states := {}          # pid → {model: {"bat": sekundy letu, "dmg": 0..100}}
 var aircrafts := {}             # M6.3: pid → [Aircraft] – letouny hráče ve světě (jen na katastru)
 var thermals: Thermals          # M6.3: stoupavé bubliny (pole/sídla, poledne, léto) + bouřkové proudy
-var permits: Permits            # registry oprávnění (Permits.KINDS) – ÚCL i budoucí doklady (M4.6)
+var permits: Permits            # registry oprávnění (Permits.KINDS) – ÚVL i budoucí doklady (M4.6)
 var _item_nodes := {}            # pořadí předmětu v map.json → Item (dokud ho nikdo nesebral)
 var _collected := {}             # pořadí předmětu → true: už sebraný (ukládá se)
 var _collected_jd := {}          # pořadí předmětu → juliánský den sběru (znovuvyrůstání sezónních předmětů)
@@ -464,7 +464,7 @@ func add_player(id: int, pos: Vector3, yaw: float) -> Player:
 		add_child(computer)
 		computer.setup(self)
 	computer.add_player(id)
-	if permits == null:           # M6.1: registry oprávnění (ÚCL registrace, A1/A3…; doklady M4.6 použijí stejně)
+	if permits == null:           # M6.1: registry oprávnění (ÚVL registrace, A1/A3…; doklady M4.6 použijí stejně)
 		permits = Permits.new()
 		add_child(permits)
 		permits.setup(self)
@@ -2022,7 +2022,7 @@ const PG_VILLAGE_R := 350.0                              # „obec“ = do této
 const PG_NOISE_R := 800.0                                # svědek hluku motoru (vodorovně)
 const PG_SCHOOL_KC := 35000                              # létací škola (teorie + 5 výcvikových letů)
 const PG_TRAIN_FLIGHTS := 5                              # povinné výcvikové vzlety s instruktorem
-const PG_REG_KC := 500                                   # registrace stroje u ÚCL
+const PG_REG_KC := 500                                   # registrace stroje u ÚVL
 const PG_INSURANCE_KC := 1200                            # pojištění odpovědnosti (rok, zjednodušeně)
 
 
@@ -2208,8 +2208,8 @@ func _pg_try_grant(id: int) -> void:
 		return
 	var no := "PLA-Q%04d" % randi_range(0, 9999)
 	permits.grant(id, "pilot_pg_motor", no)
-	send_mail(id, "Létací škola – ÚCL", "Pilotní průkaz paramotoru",
-		"Gratulujeme!\nSložil jsi teorii a odletěl %d výcvikových letů.\nVydán průkaz: %s\nNezapomeň stroj registrovat a pojistit (Letectví – ÚCL)." % [
+	send_mail(id, "Létací škola – ÚVL", "Pilotní průkaz paramotoru",
+		"Gratulujeme!\nSložil jsi teorii a odletěl %d výcvikových letů.\nVydán průkaz: %s\nNezapomeň stroj registrovat a pojistit (Letectví – ÚVL)." % [
 		PG_TRAIN_FLIGHTS, no])
 	emit_game_event(id, "pg_license_granted", {"no": no})
 	notify(id, "popup", ["Pilotní průkaz paramotoru vydán (%s)!" % no, 6.0])
@@ -2221,7 +2221,7 @@ func pg_register(id: int) -> String:
 		return "Síť je nedostupná."
 	if has_permit(id, "pg_registrace", Vector3.ZERO):
 		return "Stroj už je registrovaný: %s." % permits.number(id, "pg_registrace")
-	if not computer.withdraw_bank(id, PG_REG_KC, "ÚCL – registrace paramotoru"):
+	if not computer.withdraw_bank(id, PG_REG_KC, "ÚVL – registrace paramotoru"):
 		return "Na účtu nemáš %s. Vlož hotovost v bankomatu." % Bazaar.kc(PG_REG_KC)
 	var no := "OK-Q%04d" % randi_range(0, 9999)
 	permits.grant(id, "pg_registrace", no)
@@ -2246,7 +2246,7 @@ func pg_insure(id: int) -> String:
 
 const UL_SCHOOL_KC := 75000                              # UL létací škola (eTest + 10 letů s instruktorem)
 const UL_TRAIN_FLIGHTS := 10                             # povinné výcvikové vzlety triku
-const UL_REG_KC := 1500                                  # registrace UL stroje u ÚCL
+const UL_REG_KC := 1500                                  # registrace UL stroje u ÚVL
 const UL_INSURANCE_KC := 3000                            # pojištění odpovědnosti UL (rok, zjednodušeně)
 const UL_TRIKE_KC := 350000                              # ojeté rogalo z inzerátu u hangáru
 const UL_PAX_FRIEND := 60.0                              # min. přátelství pro „vyhlídkový let“
@@ -2315,8 +2315,8 @@ func _ul_try_grant(id: int) -> void:
 		return
 	var no := "ULA-Q%04d" % randi_range(0, 9999)
 	permits.grant(id, "pilot_ul", no)
-	send_mail(id, "Létací škola – ÚCL", "Pilotní průkaz UL (rogalo)",
-		"Gratulujeme!\nSložil jsi teorii a odletěl %d výcvikových letů na rogalu.\nVydán průkaz: %s\nNezapomeň stroj registrovat a pojistit (Letectví – ÚCL)." % [
+	send_mail(id, "Létací škola – ÚVL", "Pilotní průkaz UL (rogalo)",
+		"Gratulujeme!\nSložil jsi teorii a odletěl %d výcvikových letů na rogalu.\nVydán průkaz: %s\nNezapomeň stroj registrovat a pojistit (Letectví – ÚVL)." % [
 		UL_TRAIN_FLIGHTS, no])
 	emit_game_event(id, "ul_license_granted", {"no": no})
 	notify(id, "popup", ["Pilotní průkaz UL vydán (%s)!" % no, 6.0])
@@ -2328,7 +2328,7 @@ func ul_register(id: int) -> String:
 		return "Síť je nedostupná."
 	if has_permit(id, "ul_registrace", Vector3.ZERO):
 		return "Stroj už je registrovaný: %s." % permits.number(id, "ul_registrace")
-	if not computer.withdraw_bank(id, UL_REG_KC, "ÚCL – registrace UL stroje"):
+	if not computer.withdraw_bank(id, UL_REG_KC, "ÚVL – registrace UL stroje"):
 		return "Na účtu nemáš %s. Vlož hotovost v bankomatu." % Bazaar.kc(UL_REG_KC)
 	var no := "OK-Q%04d" % randi_range(0, 9999)
 	permits.grant(id, "ul_registrace", no)
@@ -3360,7 +3360,7 @@ func cheat(id: int, what: String) -> void:
 					permits.grant(id, "dron_provozovatel", "CZ-DB-%04d" % id)
 				if not permits.has(id, "dron_a1a3"):
 					permits.grant(id, "dron_a1a3", "A1A3-%04d" % id)
-			notify(id, "show_message", ["Máš drony, náhradní baterii, registraci ÚCL i osvědčení A1/A3 (Tab → Vzlétnout).", 4.0])
+			notify(id, "show_message", ["Máš drony, náhradní baterii, registraci ÚVL i osvědčení A1/A3 (Tab → Vzlétnout).", 4.0])
 			p.add_item("dron_baterie")
 		"zbrojni":
 			# M2.8: přepíná ladicí zbrojní oprávnění (has_permit "zbrojni"); po zapnutí dá pušku a náboje
@@ -3550,7 +3550,7 @@ func drone_launch_check(pid: int, model: String, in_menu := false) -> Dictionary
 	elif p.fallen > 0.0:
 		no = "Ležíš na zemi."
 	elif float(_drone_rec(pid, model)["dmg"]) >= Drone.CRASH_DMG:
-		no = "Dron je rozbitý – oprav ho na počítači doma (Letectví – ÚCL)."
+		no = "Dron je rozbitý – oprav ho na počítači doma (Letectví – ÚVL)."
 	elif float(_drone_rec(pid, model)["bat"]) < 60.0:
 		no = "Skoro prázdná baterie – nabij na počítači doma nebo vem náhradní."
 	return {"ok": no == "", "why": no}
@@ -3593,7 +3593,7 @@ func drone_launch(pid: int, model: String) -> void:
 	if bool(sp["needs_a1a3"]) and not has_permit(pid, "dron_a1a3", pos):
 		w.append("bez osvědčení A1/A3")
 	if not w.is_empty():
-		notify(pid, "police_banner", ["Letíš %s – vyřiď si to na počítači (Letectví – ÚCL), když tě uvidí, je pokuta!" % ", ".join(w), 6.0])
+		notify(pid, "police_banner", ["Letíš %s – vyřiď si to na počítači (Letectví – ÚVL), když tě uvidí, je pokuta!" % ", ".join(w), 6.0])
 	emit_game_event(pid, "drone_takeoff", {"model": model})
 
 
@@ -3697,7 +3697,7 @@ func drone_repair(pid: int, model: String) -> String:
 	return "Opraveno za %s – dron je jako nový." % Bazaar.kc(cost)
 
 
-## Registrace provozovatele na ÚCL (zdarma, okamžité). Vrací text pro stavový řádek.
+## Registrace provozovatele na ÚVL (zdarma, okamžité). Vrací text pro stavový řádek.
 func drone_register(pid: int) -> String:
 	if permits == null:
 		return "Síť je nedostupná."
@@ -3705,7 +3705,7 @@ func drone_register(pid: int) -> String:
 		return "Už jsi registrovaný: %s." % permits.number(pid, "dron_provozovatel")
 	var no := "CZ-DB-%04d" % pid
 	permits.grant(pid, "dron_provozovatel", no)
-	send_mail(pid, "ÚCL – portál bezpilotních letů", "Registrace provozovatele potvrzena",
+	send_mail(pid, "ÚVL – portál bezpilotních letů", "Registrace provozovatele potvrzena",
 		"Dobrý den,\nvaše registrace provozovatele UAS byla přijata.\nRegistrační číslo: [b]%s[/b] – vyznačte ho na dronu.\n\n" % no +
 		"Připomínky: dron s kamerou = povinná registrace; nad 250 g test A1/A3; max. 120 m; ne nad lidmi; " +
 		"dohled (VLOS); soukromí na cizích pozemcích.\n(Zjednodušená herní simulace.)")
@@ -3722,7 +3722,7 @@ func drone_pass_test(pid: int) -> String:
 		return "Osvědčení A1/A3 už máš."
 	var no := "A1A3-%04d" % pid
 	permits.grant(pid, "dron_a1a3", no)
-	send_mail(pid, "ÚCL – portál bezpilotních letů", "Osvědčení A1/A3 vystaveno",
+	send_mail(pid, "ÚVL – portál bezpilotních letů", "Osvědčení A1/A3 vystaveno",
 		"Gratulujeme – online test jsi složil.\nOsvědčení: [b]%s[/b] (otevřená podkategorie A1/A3).\n" % no +
 		"Teď smíš legálně létat i s drony nad 250 g – 120 m a pravidla stále platí.\n(Zjednodušená herní simulace.)")
 	notify(pid, "police_banner", ["Osvědčení A1/A3 vystaveno: %s" % no, 4.0])
@@ -3730,7 +3730,7 @@ func drone_pass_test(pid: int) -> String:
 	return "Osvědčení %s vystaveno" % no
 
 
-## Stav flotily pro obrazovku Letectví – ÚCL: [{model, name, bat(0..1), dmg, v_ruce, ve_svete}].
+## Stav flotily pro obrazovku Letectví – ÚVL: [{model, name, bat(0..1), dmg, v_ruce, ve_svete}].
 func drone_fleet(pid: int) -> Array:
 	var p: Player = players.get(pid)
 	var out := []
