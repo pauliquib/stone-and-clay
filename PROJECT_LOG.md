@@ -735,3 +735,25 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - **Hromada nehoří sama**: zapálení celé hromady a hlídání velkého pálení (háček M5.3) zůstává otevřené.
 - **Sekačka, hudba z auta, výstřel** v registru hluku bez volajícího (zbytek části B, mimo tento krok).
 - Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl „M4.4 B zbytek – hromada klestí“).
+## 2026-10-06 – M4.6 zbytek (hajný zabavuje luk a kuši, rybářská stráž hlídá úseky vody; zůstává `[ ]`)
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou `godot --import` + `--check-only` na `scripts/gamekeeper.gd` – výstup prázdný; ruční test čeká)
+- **Co – hajný, luk a kuše**: `Gamekeeper._issues` (role `hajny`): při nelegálním úlovku u hráče, který má v inventáři luk nebo kuši
+  (`_bows`, konstanta `BOWS`), se přestupek `pytlactvi` nahradí přestupkem `pytlactvi_luk_kuse` (jen jeden zápis) a luk / kuše se
+  zabaví přes `_apply` (`remove_item`, položka `zabavit`). Bez úlovku se luk nezabavuje, nelegální není sám o sobě.
+- **Co – pověst a respekt**: `Gamekeeper._bow_seized` (volá se z `_apply` jen při skutečném zabavení luku / kuše hajným) – `Reputation.change(-20)`
+  a `Reputation.change_respect("zemedelci", -20)`; ladicí hodnota `BOW_REP`. Přestupek zůstává přes `World.commit_offense` (karma, rejstřík).
+- **Co – rybářská stráž, úseky vody**: `Gamekeeper._pick_patrol` u role `straz` volá nové `_water_point()` – náhodný bod na
+  `World.water.streams` do `WATER_PATROL_R` (1 200 m) od chaty (`WATER_TRIES` pokusů); když žádný není, stará obchůzka.
+  Kontrola a zabavení udice / úlovku zůstává stejná jako dřív (`_issues`, `_apply`).
+- **Úprava**: `_apply` volá `world.fishing.cancel(id)` jen když hráč skutečně rybaří (`sessions.has(id)`), aby zabavení luku nic nerušilo.
+
+### Otevřené body
+- **Panel P u povolenek**: povolenky nejsou v `hud.gd` `DOC_KINDS` (hud.gd patří M4.7) – nechat otevřené.
+- **Zbraň v kufru**: policejní kontrola kufru (`police.gd`) s puškou / nelegálním úlovkem – nechat otevřené (viz předchozí záznam M4.6 doplnění).
+- **Stráž a rybníky**: obchůzka jde jen po potocích a řece (`streams`), rybníky (`ponds`) a `Water.info_at` se v obchůzce nepoužívají.
+- **Hajný**: zabavení luku bez úlovku (jen držení luku v lese) se nevyvolává; bez zápisu do rejstříku za pouhé nošení luku.
+- **Čeká na ruční test uživatele** (checklist v `docs/testy_M4.md`, oddíl M4.6 zbytek).
+
+### Změněné soubory
+`scripts/gamekeeper.gd`, `docs/testy_M4.md`, `PROJECT_LOG.md`.

@@ -14,6 +14,10 @@ const STRAZ := "straz"
 const WALK_SPEED := 1.4                # m/s obchůzka
 const RUN_SPEED := 3.2                 # m/s k výstřelu / k místu činu
 const PATROL_R := 900.0                # m od chaty – okruh obchůzky
+const WATER_PATROL_R := 1200.0         # m od chaty – stráž hledá úseky potoků a řeky v tomto okruhu
+const WATER_TRIES := 40                # pokusů o náhodný bod na úseku vody, než stráž jde obvyklou obchůzkou
+const BOWS := ["luk", "kuse"]          # zakázané prostředky lovu (zabavují se při pytláctví)
+const BOW_REP := -20.0                 # pověst a respekt zemědělců za zabavený luk / kuši (jedna událost)
 const HEAR_SHOT_R := 1500.0            # m – výstřel, který hajný slyší
 const HEAR_P := 0.7                    # šance, že hajný výstřel vyslechne a vyrazí
 const INVESTIGATE_S := 240.0           # s – jak dlouho hledá místo činu
@@ -81,6 +85,21 @@ func _ensure_center() -> void:
 	_center_set = true
 
 
+## Bod na úseku potoku / řeky do `WATER_PATROL_R` od chaty (stráž chodí podél vody); Vector3.INF = žádný nenalezen.
+func _water_point() -> Vector3:
+	if world.water == null or world.water.streams.is_empty():
+		return Vector3.INF
+	for _k in WATER_TRIES:
+		var st: Dictionary = world.water.streams[_rng.randi() % world.water.streams.size()]
+		var pts: PackedVector3Array = st["pts"]
+		if pts.is_empty():
+			continue
+		var q := pts[_rng.randi() % pts.size()]
+		if Vector2(q.x - _center.x, q.z - _center.z).length() <= WATER_PATROL_R:
+			return Vector3(q.x, 0.0, q.z)
+	return Vector3.INF
+
+
 func _flat_dist(p: Vector3) -> float:
 	return Vector2(p.x - global_position.x, p.z - global_position.z).length()
 
@@ -134,6 +153,11 @@ func _move(delta: float) -> void:
 
 
 func _pick_patrol() -> void:
+	if role == STRAZ:
+		var wp := _water_point()
+		if wp != Vector3.INF:
+			_target = wp
+			return
 	if world.fauna:
 		_target = world.fauna.random_point(_center, PATROL_R, "forest", _rng)
 	else:
@@ -212,8 +236,13 @@ func _issues(id: int) -> Array:
 		return out
 	if role == HAJNY:
 		var cs := _carcasses_near(id, p)
+		var bows := _bows(id)
 		if not cs.is_empty():
-			out.append({"text": "nelegální úlovek (zvěř bez práva)", "offense": "pytlactvi", "seize": false})
+			if bows.is_empty():
+				out.append({"text": "nelegální úlovek (zvěř bez práva)", "offense": "pytlactvi", "seize": false})
+			else:   # luk / kuše u pytláctví = jeden přestupek (pytláctví lukem), zabavení luku / kuše
+				out.append({"text": "nelegální úlovek (zvěř bez práva)", "offense": "", "seize": false})
+				out.append({"text": "luk / kuše u pytláctví", "offense": "pytlactvi_luk_kuse", "seize": false, "zabavit": bows})
 		var gun := p.item_count("puska") > 0 or bool((Weapons.WEAPONS.get(p.equipped, {}) as Dictionary).get("firearm", false))
 		if gun and not world.has_permit(id, "zbrojni", p.global_position):
 			out.append({"text": "zbraň bez zbrojního oprávnění", "offense": "", "seize": true})
@@ -262,16 +291,42 @@ func _apply(id: int, issues: Array) -> void:
 		if bool(i.get("seize", false)) and world.weapons:
 			world.weapons.police_check(id, "hajny")
 		var taken: Array = []
+		var bow_taken := false
 		for w in i.get("zabavit", []):
 			var n := p.item_count(String(w)) if p != null else 0
 			if n > 0 and p.remove_item(String(w), n):
 				taken.append(ItemsDB.name_of(String(w)))
+				bow_taken = bow_taken or BOWS.has(String(w))
 		if not taken.is_empty():
 			texts += "; zabaveno: %s" % ", ".join(taken)
-			if world.fishing != null:
+			if world.fishing != null and world.fishing.sessions.has(id):
 				world.fishing.cancel(id)
 			world.emit_game_event(id, "item_seized", {"items": taken, "by": role})
+		if bow_taken and role == HAJNY:
+			_bow_seized(id)
 	_msg(id, "Zapisuji: %s." % texts, 5.0)
+
+
+## Luk a kuše v inventáři hráče (hajný je zabaví při pytláctví).
+func _bows(id: int) -> Array:
+	var out: Array = []
+	var p: Player = world.players.get(id)
+	if p == null:
+		return out
+	for w in BOWS:
+		if p.item_count(w) > 0:
+			out.append(w)
+	return out
+
+
+## Zabavení luku / kuše hajným: pověst −20 a respekt zemědělců −20 ke stejné události (přes Reputation).
+func _bow_seized(id: int) -> void:
+	var rep: Reputation = world.reputations.get(id)
+	if rep == null:
+		return
+	var why := "hajný zabavil luk / kuši (pytláctví)"
+	rep.change(BOW_REP, why)
+	rep.change_respect("zemedelci", BOW_REP, why)
 
 
 func _show_docs(id: int) -> void:

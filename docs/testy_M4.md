@@ -188,3 +188,14 @@ Doporučené pořadí testování celé M4: M4.1 → M4.2 → M4.3 → M4.4 A/B 
 8. Byt bez pozemku: hromada není ani po odvětvení (F2 → Hráč: větve v kapse, žádný cíl u dveří bytu).
 9. F5 → F9 s naplněnou hromadou → počet čerstvých i suchých se obnoví; starý save bez klíče `klesti` se načte, hromada prázdná.
 10. Zalévání z vodovodu se netestuje – ve hře není vodovodní zdroj (otevřený bod).
+## M4.6 zbytek – hajný se lukem a kuší, rybářská stráž u vody
+1. F2 → Hráč → „zbrojni“ (cheat) nebo kup / vezmi luk (Q); v lese za chatou (podzim / zima, noc 18–23 h) najdi zajíce a vezmi ho do inventáře (nebo F2 → Hráč → nelegální úlovek).
+2. Stůj v dosahu hajného (~15 m) s lukem v ruce a úlovkem u těla → hláška „Zapisuji: nelegální úlovek…; luk / kuše u pytláctví; zabaveno: Luk…“.
+3. Po zásahu v inventáři není luk ani kuše; v deníku J → Zákon přibude `pytlactvi_luk_kuse` (jeden zápis, ne dva).
+4. Stejný zásah: v panelu pověsti pokles o 20 (hláška „hajný zabavil luk / kuši“) a v deníku J → respekt „Zemědělci a myslivci“ o −20.
+5. Kuše (F2 → Hráč → vezmi kuši) s úlovkem: stejné zabavení, stejné dva zápisy (karma / rejstřík + pověst / respekt).
+6. Luk bez úlovku v inventáři před hajným → žádná kontrola, nic se neodebere (není pytláctví).
+7. Rybářská stráž (so / ne, 5–12 h): F2 → Datum na víkend ráno, pak F2 → Teleport k potoku; během ~10 min chození se stráž objeví u různých úseků potoka / řeky (ne jen u chaty).
+8. Rybaření bez lístku u potoka, stráž přijde podél vody → „Zapisuji: … zabaveno: Udice …“, rybaření skončí (stejně jako dřív).
+9. Rybař s lístkem a povolenkou u potoka → „V pořádku, hezký den u vody.“, nic se neodebere.
+10. F5 → F9 uprostřed obchůzky; starý save bez klíče `gamekeeper` se načte bez chyby a stráž se objeví zase na obchůzce.
