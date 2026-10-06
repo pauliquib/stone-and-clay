@@ -49,7 +49,7 @@ const START_BANK := 0                 # nová hra: prázdný účet (peníze jso
 ## Cvičné testy (eTesty): id → [název, soubor s otázkami nebo "" = připravujeme, krok roadmapy].
 const TESTS := {
 	"pravidla_cvicny": ["Pravidla silničního provozu – cvičný", "res://data/testy/pravidla_cvicny.json", ""],
-	"autoskola": ["Autoškola – ostrý test", "", "M4.1"],
+	"autoskola": ["Autoškola – teorie řidičáku (cvičný)", "res://data/testy/autoskola.json", ""],
 	"zbrojni": ["Zbrojní průkaz", "", "M4.6"],
 	"lovecky": ["Lovecký lístek", "", "M4.6"],
 	"rybarsky": ["Rybářský lístek", "", "M4.6"],
@@ -748,6 +748,8 @@ func record_test(pid: int, id: String, score: int, total: int, passed: bool) -> 
 		world.pg_theory_passed(pid)
 	if id == "ul" and passed:         # M6.5: složená teorie létací školy UL (rogalo)
 		world.ul_theory_passed(pid)
+	if id == "autoskola" and passed:  # M4.1: složená teorie autoškoly (řidičák = teorie + výcvikové jízdy)
+		world.auto_theory_passed(pid)
 
 
 func test_stats(pid: int, id: String) -> Dictionary:
@@ -760,6 +762,14 @@ func pg_school(pid: int) -> Dictionary:
 	if not s.has("pg_skola"):
 		s["pg_skola"] = {"zaplaceno": false, "teorie": false, "lety": 0}
 	return s["pg_skola"]
+
+
+## Stav kurzu autoškoly (M4.1): {zaplaceno, skupina, teorie, jizdy, retest}. Ukládá se se `st`.
+func auto_school(pid: int) -> Dictionary:
+	var s := _s(pid)
+	if not s.has("auto_skola"):
+		s["auto_skola"] = {"zaplaceno": false, "skupina": "", "teorie": false, "jizdy": 0, "retest": false}
+	return s["auto_skola"]
 
 
 ## Stav výcviku UL školy (M6.5): {zaplaceno, teorie, lety}. Ukládá se se `st`.
@@ -923,7 +933,7 @@ func to_dict(pid: int) -> Dictionary:
 	return {"bank": p.bank if p else 0, "bank_log": s["bank_log"], "standing_rent": s["standing_rent"], "order_no": s["order_no"],
 		"gossip": s["gossip"], "tests": s["tests"], "games_won": s["games_won"], "deda_jd": s["deda_jd"],
 		"event_mailed": s["event_mailed"], "mail": world.mail.get(pid, []), "orders": world.orders.get(pid, []),
-		"pg_skola": pg_school(pid), "ul_skola": ul_school(pid)}
+		"pg_skola": pg_school(pid), "ul_skola": ul_school(pid), "auto_skola": auto_school(pid)}
 
 
 ## Načtení (starý save bez klíče `pc` = prázdný účet, uvítací pošta, žádné objednávky).
@@ -957,6 +967,9 @@ func from_dict(pid: int, d: Dictionary) -> void:
 	var sk: Dictionary = d.get("pg_skola", {})          # M6.4: starý save bez klíče = žádný výcvik
 	s["pg_skola"] = {"zaplaceno": bool(sk.get("zaplaceno", false)), "teorie": bool(sk.get("teorie", false)),
 		"lety": int(sk.get("lety", 0))}
+	var au: Dictionary = d.get("auto_skola", {})        # M4.1: starý save bez klíče = žádný kurz autoškoly
+	s["auto_skola"] = {"zaplaceno": bool(au.get("zaplaceno", false)), "skupina": String(au.get("skupina", "")),
+		"teorie": bool(au.get("teorie", false)), "jizdy": int(au.get("jizdy", 0)), "retest": bool(au.get("retest", false))}
 	var su: Dictionary = d.get("ul_skola", {})          # M6.5: starý save bez klíče = žádný výcvik
 	s["ul_skola"] = {"zaplaceno": bool(su.get("zaplaceno", false)), "teorie": bool(su.get("teorie", false)),
 		"lety": int(su.get("lety", 0))}

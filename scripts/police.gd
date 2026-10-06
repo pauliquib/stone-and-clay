@@ -342,6 +342,8 @@ func _plan(pl: Player) -> String:
 	var v := _recent(pl.id)
 	if pl.body.promile() >= 0.2 or not license_ok(pl) or (not v.is_empty() and String(v["id"]).is_empty()):
 		return "test"
+	if pl.car and not world.license_check(pl.id, pl.car)["ok"]:      # M4.1: řídí bez skupiny řidičáku
+		return "ticket"
 	if not v.is_empty():
 		return "ticket"
 	return "test" if _rng.randf() < 0.3 else "ok"
@@ -349,10 +351,17 @@ func _plan(pl: Player) -> String:
 
 ## Vystaví pokutu a body za zjištěný přestupek (přes zákon). Vrací výsledek `World.commit_offense`, nebo {}.
 func _ticket(pl: Player) -> Dictionary:
-	var v := _recent(pl.id)
-	if v.is_empty() or String(v["id"]).is_empty():
-		return {}
-	var res: Dictionary = world.commit_offense(pl.id, String(v["id"]), {"severity": float(v["sev"]), "quiet": true})
+	var oid := ""
+	var sev := 1.0
+	if pl.car and not world.license_check(pl.id, pl.car)["ok"]:
+		oid = "rizeni_bez_opravneni"          # M4.1: jízda bez skupiny řidičáku
+	else:
+		var v := _recent(pl.id)
+		if v.is_empty() or String(v["id"]).is_empty():
+			return {}
+		oid = String(v["id"])
+		sev = float(v["sev"])
+	var res: Dictionary = world.commit_offense(pl.id, oid, {"severity": sev, "quiet": true})
 	_viol.erase(pl.id)
 	if not res.get("ok", false):
 		return {}

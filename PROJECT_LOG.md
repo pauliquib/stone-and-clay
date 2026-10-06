@@ -279,3 +279,27 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 
 ### Další krok
 - Úprava promptů M4 podle `docs/audit_vlna0.md` (oddíl Odloženo) a nápadů z `DALSI DOPLNKY.md`, pak M4 po vlnách.
+
+## 2026-10-06 – M4.1 Řidičská oprávnění a autoškola
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou překladu – ruční test čeká)
+- **Co**:
+  - `scripts/permits.gd`: `ridicsky` (skupiny `sub`, `valid_until`, `revoked`), `has(pid, kind, sub)` se zahrnutím (`ZAHRNUJE`: B→AM, A→A2/A1, A2→A1), `revoke / restore / is_revoked / subs / list`, `describe` ukazuje skupiny a odebrání. Nová hra: B + AM. Starý save bez klíče `ridicsky` → B + AM + A (migrace v `from_dict`). Přidány druhy M4.6 do `KINDS`.
+  - `scripts/world.gd`: `license_check(id, car)`, hláška při nasednutí bez skupiny, `_auto_jizda_end` (výcvikové jízdy), autoškola (`auto_enroll`, `auto_theory_passed`, `_auto_try_finish`), 12 bodů → `permits.revoke(…, retest=true)` v `commit_offense`.
+  - `scripts/police.gd`: `_plan` / `_ticket` – vozidlo bez skupiny → přestupek `rizeni_bez_opravneni`.
+  - `scripts/computer.gd` + `computer_ui.gd`: stránka „Autoškola Volant“ (kurzy A1/A2/A/T/AM, přezkoušení skupiny B), eTest `autoskola` (`TESTS` s cestou), stav kurzu `auto_skola` v `to_dict/from_dict` (starý save = bez kurzu).
+  - `data/testy/autoskola.json` (26 vlastních otázek, losuje se 20, práh 85 %), `data/zakon.json` řádek `rizeni_bez_opravneni`.
+  - `scripts/jobs.gd` `can_apply`: `pozadavky.ridicak` kontroluje `Permits` se skupinou + zákaz.
+  - Panel **P** (akce `documents`, `physical_keycode` 80) v `hud.gd` (`open_documents`, `_documents_text`), oddíl „Doklady“ v deníku J, řádek v F1.
+- **Laditelné hodnoty**: `World.AUTO_KURZ_KC`, `AUTO_PREZKOUSENI_KC`, `AUTO_JIZD_NUTNE` (3), `AUTO_JIZDA_MIN_M` (300), `AUTO_CIL_M` (30).
+- **Ukládání**: klíč `auto_skola` v `computer` (výchozí hodnoty při načítání); `permits` beze změny klíče.
+- **Kontrola překladu**: `godot --check-only` na všechny změněné `.gd` – výstup prázdný.
+
+### Otevřené body
+- Zkouška s komisařem (chyby: rychlost > 50 v obci, STOP, srážka) – zatím jen 3 výcvikové jízdy s kontrolou místa nástupu/výstupu (rychlost se nekontroluje).
+- Odtažení auta domů po přestupku `rizeni_bez_opravneni` – zatím jen pokuta a body.
+- Opakované jednání do 2 let (trestný čin § 337 TZ) – neřešeno.
+- Sekce `ridicska_opravneni` v `data/zakon.json` (věkové limity, zahrnutí skupin) – zatím jen konstanta `Permits.ZAHRNUJE`.
+- Přezkoušení po 12 bodech je zjednodušené (stejný kurz jako nová zkouška, skupina B); M4.2 doplní žádost na úřadě.
+- `valid_until` v `Permits` je zatím připravený, nepoužívá se.
+- Pořadí teorie/jízd: jízdy se počítají i před teorií; dokončení vyžaduje obojí.

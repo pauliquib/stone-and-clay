@@ -68,6 +68,7 @@ Vize, pilíře a herní smyčka: [`GAME_DESIGN.md`](GAME_DESIGN.md).
 | G | zvednout/naložit náklad, nebo hvízdnout na koně | – |
 | X (držet) | dalekohled | – |
 | Q, 1–5 | vybrat / přepnout nástroj v ruce | – |
+| P | panel dokladů (řidičák, skupiny, body, zákaz) | – |
 | LMB | kontextová akce (sběr, rybaření, střelba…) | – |
 | RMB (držet) | míření se zbraní v ruce | – |
 | Tab / I / J / K / M / H | inventář / oblečení / deník úkolů / dovednosti / mapa / domů | |

@@ -92,6 +92,7 @@ var ready_done := false
 var sim_radius := 320.0
 var _blackout := {}              # id → true: hráč právě „nevidí“ (okno, spánek, záchytka)
 var _cheat_permits := {}         # id → {druh oprávnění: true} – jen ladicí cheat (F2 → Hráč), dokud nejsou doklady (M4.6)
+var _auto_start := {}            # id → Vector3 místo nástupu do auta (výcvikové jízdy autoškoly, M4.1)
 # M6.1 drony: `drones[pid]` = aktivní dron ve světě (letí / leží / visí ve stromě); `drone_states[pid][model]`
 # = trvalý stav flotily (baterie a poškození se drží i v inventáři). `permits` = registry oprávnění
 # (registrace provozovatele ÚVL, osvědčení A1/A3). Akce z klienta přes `player_action`
@@ -1598,9 +1599,12 @@ func commit_offense(id: int, offense_id: String, data := {}) -> Dictionary:
 		return res
 	emit_game_event(id, "offense", {"id": offense_id, "fine": res["fine"], "points": res["points"],
 		"criminal": res["criminal"]})
+	if res.get("points_ban", false) and permits:   # M4.1: 12 bodů → řidičák odebrán, nutné přezkoušení
+		var ban_jd: int = clock.jd() + int(ceil(Law.setting("zakaz_za_body_h", 8760.0) / 24.0))
+		permits.revoke(id, "ridicsky", "12 bodů", ban_jd, true)
 	if not data.get("quiet", false):
 		if res["points_ban"]:
-			notify(id, "popup", ["12 bodů – zákaz řízení na rok!", 5.0])
+			notify(id, "popup", ["12 bodů – zákaz řízení na rok! Řidičák se odebírá – nutné přezkoušení v autoškole.", 5.0])
 		elif int(res["points"]) > 0:
 			notify(id, "show_message", ["%s: +%d bodů (celkem %d / %d)" % [res["name"], res["points"],
 				res["total_points"], int(Law.setting("body_limit", 12.0))], 4.0])
@@ -1824,7 +1828,11 @@ func enter_car(id: int, c: Car) -> void:
 			(p.license_suspended_until - clock.minutes) / 60.0), 3.0])
 	if p.busy:
 		return
+	var lc := license_check(id, c)            # M4.1: vozidlo vyžaduje skupinu řidičáku (jde to, ale je to přestupek)
+	if not lc["ok"]:
+		notify(id, "show_message", ["Na tohle nemáš řidičák (skupina %s, %s)." % [lc["group"], lc["reason"]], 4.0])
 	p.enter_car(c)
+	_auto_start[id] = p.global_position       # M4.1: nástup – případná výcviková jízda autoškoly
 	play_sfx(id, "door")
 	if c.model.kind == "bike":
 		notify(id, "show_message", ["%s – W šlapat, S brzda (stojíš: couvání), A/D řízení, B zvonek, L dynamo, F sesednout" % c.model.spec["name"], 4.0])
@@ -1876,9 +1884,12 @@ func dismount_horse(id: int) -> void:
 
 
 func exit_car(id: int) -> void:
-	players[id].exit_car()
+	var p: Player = players[id]
+	var c: Car = p.car
+	var out := p.exit_car()
 	play_sfx(id, "door")
 	emit_game_event(id, "exited_car", {})
+	_auto_jizda_end(id, c, out)
 
 
 # ------------------------------------------------------------------ letouny (M6.3)
@@ -2895,6 +2906,124 @@ func sell_items(id: int, item_id: String, unit_price: int, place := "") -> void:
 ## Povolení úřadu (M4.4 / M4.6): `kind` = "kaceni", "zbrojni" (zbrojní oprávnění), "rybarsky_listek", "povolenka_rybolov"…
 ## `pos` = místo. Zatím nikdo žádné nemá (háček pro kácení M2.1, rybaření M2.7, zbraně M2.8), jen ladicí cheat
 ## `cheat(id, "zbrojni")` (F2 → Hráč) – doklady, lístky a jejich platnost doplní M4.6.
+# ------------------------------------------------------------------ řidičák a autoškola (M4.1)
+
+const AUTO_KURZ_KC := {"AM": 3000, "A1": 8900, "A2": 9900, "A": 7900, "T": 6900, "B": 12000}   # orientačně
+const AUTO_PREZKOUSENI_KC := 2500         # přezkoušení po odebrání za 12 bodů (skupina B)
+const AUTO_JIZD_NUTNE := 3                # výcvikové jízdy s instruktorem (každá = odjezd od úřadu a návrat)
+const AUTO_JIZDA_MIN_M := 300.0           # nástup musí být aspoň tak daleko od úřadu
+const AUTO_CIL_M := 30.0                  # výstup musí být nejvýš tak daleko od dveří úřadu
+
+## Stav kurzu autoškoly hráče (computer.gd `auto_skola`): {zaplaceno, skupina, teorie, jizdy, retest}.
+func auto_school(id: int) -> Dictionary:
+	return computer.auto_school(id) if computer else {}
+
+
+## Kontrola řidičáku pro vozidlo: {ok, group, reason}. Kolo / vozidlo bez skupiny = v pořádku.
+func license_check(id: int, c: Car) -> Dictionary:
+	var grp := String(c.model.spec.get("skupina_rp", "")) if c and c.model else ""
+	if grp == "" or permits == null or permits.has(id, "ridicsky", grp):
+		return {"ok": true, "group": grp, "reason": ""}
+	var why := "odebraný řidičák, nutné přezkoušení" if not permits.is_revoked(id, "ridicsky").is_empty() \
+		else "chybí skupina"
+	return {"ok": false, "group": grp, "reason": why}
+
+
+## Zápis do autoškoly (kurz skupiny z AUTO_KURZ_KC; po odebrání za 12 bodů přezkoušení skupiny B).
+func auto_enroll(id: int, skupina: String) -> String:
+	if computer == null or permits == null:
+		return "Síť je nedostupná."
+	var s := auto_school(id)
+	if bool(s.get("zaplaceno", false)):
+		return "Kurz už máš zaplacený (skupina %s) – slož teorii a %d výcvikové jízdy." % [s["skupina"], AUTO_JIZD_NUTNE]
+	var odebrano := not permits.is_revoked(id, "ridicsky").is_empty()
+	var retest := odebrano
+	var grp := "B" if retest else skupina
+	if retest and clock.minutes < float(_license_suspended_until(id)):
+		return "Zákaz řízení ještě běží – přezkoušení až po něm."
+	if not retest and permits.has(id, "ridicsky", grp):
+		return "Skupinu %s už máš." % grp
+	var cena: int = AUTO_PREZKOUSENI_KC if retest else int(AUTO_KURZ_KC.get(grp, 0))
+	if cena <= 0:
+		return "Tuhle skupinu autoškola nenabízí."
+	var nazev := "Autoškola – přezkoušení" if retest else "Autoškola – kurz %s" % grp
+	if not computer.withdraw_bank(id, cena, nazev):
+		return "Na účtu nemáš %s. Vlož hotovost v bankomatu." % Bazaar.kc(cena)
+	s["zaplaceno"] = true
+	s["skupina"] = grp
+	s["teorie"] = false
+	s["jizdy"] = 0
+	s["retest"] = retest
+	emit_game_event(id, "auto_school_enrolled", {"skupina": grp})
+	return "Zaplaceno %s. Teorie: eTest „autoskola“ (tady na PC). Praxe: %d výcvikové jízdy – nasedni do vozidla " % [
+		Bazaar.kc(cena), AUTO_JIZD_NUTNE] + "skupiny %s, odjeď aspoň %d m od úřadu a vrať se k jeho dveřím." % [grp, int(AUTO_JIZDA_MIN_M)]
+
+
+func _license_suspended_until(id: int) -> float:
+	return players[id].license_suspended_until if players.has(id) else -1.0
+
+
+## Složená teorie (volá `Computer.record_test` u eTestu „autoskola“).
+func auto_theory_passed(id: int) -> void:
+	var s := auto_school(id)
+	if not bool(s.get("zaplaceno", false)):
+		return
+	s["teorie"] = true
+	_auto_try_finish(id)
+
+
+## Výcviková jízda: nástup v dálce od úřadu, výstup u úřadu (instruktor hodnotí rádiem).
+func _auto_jizda_end(id: int, c: Car, out: Vector3) -> void:
+	if not _auto_start.has(id):
+		return
+	var start: Vector3 = _auto_start[id]
+	_auto_start.erase(id)
+	var s := auto_school(id)
+	if not bool(s.get("zaplaceno", false)) or c == null or c.model == null:
+		return
+	var grp := String(c.model.spec.get("skupina_rp", ""))
+	if grp == "" or not Permits.skupina_kryje(String(s["skupina"]), grp):
+		return
+	var door: Vector3 = places["urad"].door
+	if Vector2(start.x - door.x, start.z - door.z).length() < AUTO_JIZDA_MIN_M:
+		notify(id, "show_message", ["Instruktor (rádio): „Tohle je krátká jízda, odjeď dál od úřadu.“", 4.0])
+		return
+	if Vector2(out.x - door.x, out.z - door.z).length() > AUTO_CIL_M:
+		notify(id, "show_message", ["Instruktor (rádio): „Vrať se k úřadu, tam končí výcvik.“", 4.0])
+		return
+	s["jizdy"] = int(s.get("jizdy", 0)) + 1
+	notify(id, "show_message", ["Instruktor: „Jízda %d/%d – hezky. Hlídej 50 v obci a STOP značky.“" % [
+		s["jizdy"], AUTO_JIZD_NUTNE], 5.0])
+	_auto_try_finish(id)
+
+
+## Splněno (teorie + všechny jízdy) → řidičák se skupinou, nebo po odebrání obnovení.
+func _auto_try_finish(id: int) -> void:
+	var s := auto_school(id)
+	if not bool(s.get("zaplaceno", false)) or not bool(s.get("teorie", false)) \
+			or int(s.get("jizdy", 0)) < AUTO_JIZD_NUTNE or permits == null:
+		return
+	var grp := String(s["skupina"])
+	var retest := bool(s.get("retest", false))
+	if retest:
+		permits.restore(id, "ridicsky")
+	else:
+		permits.grant(id, "ridicsky", "RP-%04d" % id, grp)
+	s["zaplaceno"] = false
+	s["teorie"] = false
+	s["jizdy"] = 0
+	s["retest"] = false
+	var text := "Přezkoušení složeno – řidičský průkaz je znovu platný." if retest \
+		else "Složil(a) jsi zkoušku – skupina %s je v průkazu." % grp
+	send_mail(id, "Autoškola Volant (smyšlená)", "Výsledek zkoušky", "Gratulujeme!\n%s" % text)
+	if skills.has(id):
+		(skills[id] as Skills).add_xp("rizeni", 100.0, "autoškola")
+	if reputations.has(id):
+		reputations[id].change(1.0, "Složená zkouška z řízení")
+	emit_game_event(id, "auto_license_granted", {"skupina": grp, "retest": retest})
+	notify(id, "popup", ["Řidičský průkaz: %s" % text, 6.0])
+
+
 func has_permit(id: int, kind: String, _pos: Vector3) -> bool:
 	if kind == "kaceni" and les and les.work_permit(id, _pos):
 		return true               # M3.3: lesní dělník na směně kácí vyznačené stromy

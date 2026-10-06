@@ -576,3 +576,12 @@
 - **Katalog přestupků** (`data/zakon.json`): každý přestupek má pole `drb` (věta do drbů na obecním webu, `Computer.on_event`)
   a `karma` (změna skryté karmy; `Reputation.OFFENSE_KARMA` je jen přepis výjimek). `rychlost_obec_20` → `rychlost_obec`
   (starý klíč řeší `Law.ALIASES`). eTesty (`TestUI`): míchané odpovědi, volitelné `pocet` (losování z banku) a `prah_pct`.
+
+### Řidičák a autoškola (M4.1)
+- **Doklady (P):** panel ukazuje řidičák se skupinami (B, AM; nová hra), body `x / 12`, zákaz řízení a stav dokladů.
+- **Skupiny vozidel:** `CarModel.MODELS[*].skupina_rp`. Vozidlo bez skupiny (kolo) jde bez řidičáku. Nasednutí bez skupiny
+  jde, ale hláška upozorní; jízda bez ní je přestupek `rizeni_bez_opravneni` při policejní kontrole.
+- **Autoškola Volant** (počítač doma → vesnet://autoskola-volant/): kurz skupiny z účtu, eTest „autoskola“ (`data/testy/autoskola.json`),
+  3 výcvikové jízdy (nástup ≥ 300 m od úřadu, výstup u úřadu). Složeno → řidičák se skupinou.
+- **12 bodů:** řidičák se odebere (`revoked`) → přezkoušení v autoškole (skupina B, poplatek).
+- Starý save bez klíče `ridicsky` dostane B + AM + A (`Permits.from_dict`).

@@ -385,6 +385,7 @@ func _ready() -> void:
 		+ "T / Enter – říct něco nahlas (odpoví lidé okolo)\n" \
 		+ "F – nastoupit / vystoupit z auta, nasednout na koně\n" \
 		+ "Tab – inventář (pít, jíst, kouřit, obléct)   I – oblečení\n" \
+		+ "P – doklady (řidičák, skupiny, body, zákaz)\n" \
 		+ "J – deník úkolů   K – dovednosti   M – mapa (kolečko – přiblížení,\n" \
 		+ "    tažení – posun)   Z – zobrazit / skrýt panel úkolu   H – domů\n" \
 		+ "L – světla   B – klakson   N – stěrače\n" \
@@ -786,6 +787,7 @@ func _journal_bbcode() -> String:
 	if jb:
 		s += jb.journal_bbcode() + "\n"          # M3.1: oddíl „Práce“
 	s += _skills_bbcode()
+	s += "\n[b]DOKLADY[/b]  (P – panel)\n" + _documents_text() + "\n"      # M4.1: oddíl „Doklady“
 	var b: BodyState = player.body
 	var w: Weather = game.weather
 	if w:
@@ -914,6 +916,51 @@ func _set_menu_mode(on: bool) -> void:
 func _update_mouse_mode() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if (menu_open or chat_open or _map.visible) \
 		else Input.MOUSE_MODE_CAPTURED
+
+
+## Doklady, které panel P ukazuje (i „nemáš“): kind → true.
+const DOC_KINDS := ["ridicsky", "dron_a1a3", "pilot_pg_motor", "pilot_ul", "zbrojni", "lovecky_listek", "rybarsky_listek"]
+
+
+## M4.1 panel dokladů (P): řidičák se skupinami, body a zákaz, drony, létací průkazy; budoucí doklady jako „nemáš“.
+func open_documents() -> void:
+	open_menu("Doklady (P)", _documents_text(), [])
+
+
+## Text dokladů (prostý text – panel i deník). Čte `World.permits` a `World.law`.
+func _documents_text() -> String:
+	var rp: Permits = game.permits
+	if rp == null or player == null:
+		return "Doklady nejsou k dispozici."
+	var pid := player.id
+	var held := {}
+	for d in rp.list(pid):
+		held[d["kind"]] = d
+	var s := ""
+	var lr: Law.LawRecord = game.law.get(pid)
+	if lr:
+		s += "Body: %d / %d\n" % [lr.points, int(Law.setting("body_limit", 12.0))]
+	var zakaz_min: float = player.license_suspended_until - game.clock.minutes
+	if zakaz_min > 0.0:
+		s += "Zákaz řízení ještě %d h\n" % int(zakaz_min / 60.0)
+	s += "\n"
+	for k in DOC_KINDS:
+		var name: String = Permits.KINDS[k][0]
+		if not held.has(k):
+			s += "· %s – nemáš\n" % name
+			continue
+		var d: Dictionary = held[k]
+		var line := "· %s" % name
+		if String(d["no"]) != "":
+			line += " (%s)" % d["no"]
+		if not (d["subs"] as Array).is_empty():
+			line += "\n    skupiny: %s" % ", ".join(PackedStringArray(d["subs"]))
+		var rv: Dictionary = d["revoked"]
+		if not rv.is_empty():
+			line += "\n    ODEBRÁNO (%s) – nutné přezkoušení v autoškole" % String(rv.get("reason", ""))
+		s += line + "\n"
+	s += "\nŘidičák a skupiny: autoškola Volant (počítač doma, Letectví / eTesty)."
+	return s
 
 
 func toggle_inventory() -> void:
@@ -1166,6 +1213,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			close_menu()
 		else:
 			Wardrobe.show_overview(self)      # I – co mám na sobě (převlékání doma / v inventáři)
+	elif event.is_action_pressed("documents"):
+		if menu_open:
+			close_menu()
+		else:
+			open_documents()                  # P – doklady a oprávnění (M4.1)
 	elif event.is_action_pressed("journal"):
 		toggle_journal()
 	elif event.is_action_pressed("skills"):

@@ -425,7 +425,7 @@ kroky přehazovat, mezi milníky platí závislosti.
 - [x] **M3.4 Počítač** – PC doma s UI: e-shop + doručení, bazar, portál práce, bankovnictví, web obce. *Hotovo i pošta, bankomat, eTesty (rámec + cvičný test), Miny; otevřené body v PROJECT_LOG.*
 
 ### M4 – Zákon a společnost
-- [ ] **M4.1 Řidičská oprávnění a autoškola** – rozšíření `Permits` (skupiny, odebrání, přezkoušení), panel dokladů P,
+- [x] **M4.1 Řidičská oprávnění a autoškola** – rozšíření `Permits` (skupiny, odebrání, přezkoušení), panel dokladů P,
   e-test na PC, jízdy, zkouška, jízda bez oprávnění.
 - [ ] **M4.2 Správní řízení na úřadě** – blokové pokuty, příkazy poštou, splatnost, odpor, společný systém dluhů a exekucí
   (`Debts` – použije ho i M4.3 a hypotéka M4.7), schránka, vrácení řidičáku.

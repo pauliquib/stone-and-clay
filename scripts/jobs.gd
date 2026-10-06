@@ -334,8 +334,9 @@ func can_apply(job_id: String) -> Dictionary:
 		checks.append(["%s aspoň %d (máš %d)" % [Skills.skill_name(String(s)), need, have], have >= need])
 	var rid := String(req.get("ridicak", ""))
 	if rid != "":
-		# zjednodušeně do M4.1: platný řidičák = není zákaz řízení (skupiny oprávnění doplní autoškola)
-		var ok_r := game.police == null or game.police.license_ok(player)
+		# M4.1: řidičák se skupinou z Permits (ridicsky) a zároveň bez zákazu řízení
+		var ok_r := (game.permits == null or game.permits.has(pid, "ridicsky", rid)) \
+			and (game.police == null or game.police.license_ok(player))
 		checks.append(["Řidičské oprávnění sk. %s bez zákazu řízení" % rid, ok_r])
 	var tag := String(req.get("obleceni_tag", ""))
 	if tag != "":
