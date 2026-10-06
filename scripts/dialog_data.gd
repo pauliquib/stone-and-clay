@@ -130,7 +130,7 @@ const HOWTO := {
 		"Po výstřelu zvíře najdi, vyvrhni nožem a nech si doklad o původu, jinak zvěřinu neprodáš.",
 		"Nejdřív si zkus střelbu na střelnici u myslivecké chaty. Kolísání mušky závisí na výdrži a dechu, přidrž dech Shiftem."]},
 	"wood": {"words": ["drev", "sekera", "sekeru", "kacet", "pila", "pilu", "polen", "klest", "vetve"], "lines": [
-		"Sekeru (staré i nové) a motorovou pilu koupíš v Potravinách. Kácej jen na vlastní zahradě, jinak je to krádež a přestupek.",
+		"Sekeru (staré i nové) a motorovou pilu koupíš ve stavebninách za vsí, prkna a dříví na pile vedle nich. Kácej jen na vlastní zahradě, jinak je to krádež a přestupek.",
 		"Pokácený strom odvětvi a rozřež na polena. Polena se hodí na topení, nebo se prodávají v Pálenici.",
 		"Při práci s pilou nos helmu a ochranné kalhoty, jinak hrozí úraz.",
 		"Dřevo musí uschnout, mokré hůř hoří. Suché větve jsou nejlepší roznětka."]},
@@ -198,7 +198,7 @@ const HOWTO := {
 		"Dej pozor, ať jídlo nespálíš. Pak už je k ničemu.",
 		"Polévku a guláš máš v hospodě. Kdo chce vařit, potřebuje suroviny z Potravin."]},
 	"buy": {"words": ["koupit", "nakupovat", "obchod", "co koupit", "sehnat"], "lines": [
-		"V Potravinách je skoro všechno: jídlo, pití, nářadí, semena, udice, oblečení, sekera, vozík. Pálenice prodává slivovici, sklep víno, hospoda pivo a jídlo.",
+		"V Potravinách je skoro všechno: jídlo, pití, semena, udice, oblečení, vozík. Sekeru a nářadí mají stavebniny, prkna pila. Pálenice prodává slivovici, sklep víno, hospoda pivo a jídlo.",
 		"Když si nejsi jistý, co potřebuješ, zeptej se, na co: lov, rybaření, zahrada, dřevo…",
 		"Potraviny mají v sobotu jen dopoledne a v neděli zavřeno. Plánuj nákup."]},
 }
@@ -286,7 +286,7 @@ const FOLK := [
 const ASKBACK := {
 	"q_weather_walk": {"text": "Jdeš někam na procházku, nebo jen tak hledíš do nebe?", "yes": ["To je dobře, pohyb je zdraví.", "Tak si ji užij."], "no": ["Taky dobrý, doma je taky hezky.", "Jen tak koukat je taky umění."], "other": ["Aha, tak to je zajímavé.", "No vidíš."], "yes_mood": 0.05},
 	"q_garden": {"text": "Máš taky nějakou zahrádku, nebo jen koukáš, jak roste u sousedů?", "yes": ["Výborně! Zahrada je radost. Jen nezapomeň zalévat.", "Tak to se máš! Zeleninu z vlastní hlíny nic nepřekoná."], "no": ["Tak si ji obdělej. U usedlosti {lot} máš kus zahrady.", "To je škoda. Semínka se dají koupit v Potravinách."], "other": ["Aha, tak to zkusíme jindy.", "Hm, zajímavé."], "yes_mood": 0.08},
-	"q_wood": {"text": "Máš dost dřeva na zimu, nebo zase zjistíš, že je ho málo, až bude mráz?", "yes": ["Chytrý člověk! Dřevo se musí nachystat včas.", "To je dobře. Kdo má dřevo, má klid."], "no": ["Tak se do toho dej. Sekera je v Potravinách.", "Nasekej si, dokud je čas. V zimě je pozdě."], "other": ["No jo, to se musí vyřešit.", "Jak myslíš."], "yes_mood": 0.06},
+	"q_wood": {"text": "Máš dost dřeva na zimu, nebo zase zjistíš, že je ho málo, až bude mráz?", "yes": ["Chytrý člověk! Dřevo se musí nachystat včas.", "To je dobře. Kdo má dřevo, má klid."], "no": ["Tak se do toho dej. Sekeru mají ve stavebninách.", "Nasekej si, dokud je čas. V zimě je pozdě."], "other": ["No jo, to se musí vyřešit.", "Jak myslíš."], "yes_mood": 0.06},
 	"q_pet": {"text": "Máš nějaké zvíře? Psa, kočku, slepice?", "yes": ["To je fajn! Zvířata dělají dům domovem.", "Tak to je dobře. Nezapomeň jim dát vodu."], "no": ["Tak třeba někdy. Kočka je nenáročná.", "Zvíře člověka změní k lepšímu."], "other": ["Aha. Každý má svůj svět.", "Hm."], "yes_mood": 0.07},
 	"q_fish": {"text": "Rybaříš taky, nebo jen občas zajdeš k vodě?", "yes": ["To se mi líbí! Dáš někdy ukázat úlovek.", "Tak to máme společné. U vody je klid."], "no": ["Zkus to. Udici koupíš v Potravinách.", "Škoda, rybaření je skvělé na nervy."], "other": ["Aha, nevadí.", "Hm, no dobře."], "yes_mood": 0.08},
 	"q_hunt": {"text": "Střílíš, nebo jen koukáš, jak to dělají jiní?", "yes": ["Hlavně ať máš papíry a dodržuješ pravidla.", "Tak opatrně. Zbraň je vážná věc."], "no": ["Je to tak lepší. Kdo nestřílí, nemůže minout.", "Sledování zvěře je taky hezké."], "other": ["No jo, každý má svůj názor.", "Hm."], "yes_mood": 0.03},

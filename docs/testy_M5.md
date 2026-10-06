@@ -118,7 +118,7 @@ Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kab
 7. Gól: kop do branky → skóre na ukazateli (Label3D) se změní; po 2 s se míč vrátí na střed.
 8. Míč mimo hřiště (daleko za čarou) se sám vrátí na střed.
 9. Drž nástroj v ruce (Q): LMB ho použije, míč nekopne.
-10. F2 → Datum na 2. neděli v dubnu–říjnu: v seznamu akcí (nástěnka, web obce) je „Fotbalový zápas Hvozdnice – Polanka“; jinak nic.
+10. F2 → Datum na 2. neděli v dubnu–říjnu: v seznamu akcí (nástěnka, web obce) je „Fotbalový zápas Dukelčice – Březouchy“; jinak nic.
 ## M5.3 – Hasiči: zbrojnice, spolek SDH, výjezdy k požárům
 1. F2 → Teleport k úřadu: před úřadem (cca 40–90 m od dveří, mimo silnici) stojí garáž s červenými vrat, věžičkou a sirénou na střeše, cedule „SDH Pod Kopcem“.
 2. U vchodu zbrojnice (do 4 m) se nabídne „zbrojnice, členství a schůze“; bez respektu „hasici“ ≥ 0 nebo s alkoholem (> 0,2 ‰) velitel členství odmítne.
@@ -178,3 +178,11 @@ Cheat: F2 → Teleport k úřadu; kaplička je 225 m od úřadu (poloha `Krize.c
 8. Bez `data/krize.json` hra běží, kříže se nevytvoří, bez SCRIPT ERROR.
 9. Log bez SCRIPT ERROR mimo addony func_godot a godot_state_charts.
 10. Mše v neděli zatím nemění polohu (čeká na napojení na `Krize.chapel_pos()`).
+
+## Závěrečná kontrola M5 – opravené chyby (regrese)
+1. **Kop míče** (M5.6): F2 → Teleport k hřišti, otoč se libovolným směrem a LMB u míče – míč letí tam, kam se díváš (dřív vždy stejným směrem).
+2. **Hasičská soutěž v kalendáři** (M5.4): F2 → Datum na 1. sobotu v červnu – na nástěnce u úřadu a na webu obce je „Hasičská soutěž SDH Pod Kopcem“ (dřív chyběla).
+3. **Respekt za trénink** (M5.4): ve středu 18–19 h jako člen SDH odjeď dva pokusy po sobě – respekt hasičů +0,5 jen jednou za den.
+4. **Fotbal v kalendáři**: 2. neděle v dubnu–říjnu – text „Fotbalový zápas Dukelčice – Březouchy“.
+5. **Skóre skateboardu** (M5.7): po seskoku a novém stoupnutí začíná skóre jízdy od 0, rekord zůstává.
+6. **Rozhovor**: zeptej se vesničana na sekeru / nářadí – odpoví, že je mají stavebniny (ne Potraviny).

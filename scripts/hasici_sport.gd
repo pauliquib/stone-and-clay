@@ -54,6 +54,7 @@ var _pid := -1
 var _form := {}                   # id → počet tréninků (forma)
 var _best := {}                   # id → nejlepší platný čas (s)
 var _soutez_jd := {}              # id → jd poslední účasti v soutěži
+var _trenink_jd := {}             # id → jd tréninku, za který už byl respekt (ne každý pokus – farmení)
 var _record := 0.0                # rekord sboru (s), 0 = zatím žádný
 var _board: Label3D
 var _bar: Label3D
@@ -70,8 +71,7 @@ func setup(w: World) -> void:
 	_base.y = w.terrain.height_at(_base.x, _base.z)
 	position = _base
 	_build()
-	if w.village_events:
-		w.village_events.register("hasici_soutez", Callable(HasiciSport, "soutez_day"), SOUTEZ_TEXT)
+	# soutěž do kalendáře hlásí VillageEvents.setup (kalendář vzniká až po místech, viz World.build)
 
 
 static func _load_cfg() -> Dictionary:
@@ -480,7 +480,8 @@ func _finish() -> void:
 		if sk:
 			sk.add_xp(XP_SKILL, _rng.randf_range(float(xr[0]), float(xr[1])), "požární útok")
 			sk.add_xp(KONDICE_SKILL, _f("xp_kondice", 10.0), "požární útok")
-		if mode == "trenink" and rep:
+		if mode == "trenink" and rep and int(_trenink_jd.get(pid, -1)) != jd:   # respekt jen jednou za trénink (den)
+			_trenink_jd[pid] = jd
 			rep.change_respect("hasici", _f("trenink_respekt", 0.5), "trénink požárního útoku")
 		text = "Čas: %s" % _fmt_t(t)
 		if new_rec:

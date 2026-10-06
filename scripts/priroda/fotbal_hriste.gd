@@ -21,9 +21,9 @@ const KICK_MIN := 5.0                     # m/s při krátkém stisku
 const KICK_MAX := 16.0                    # m/s při držení 1 s
 const KICK_HOLD_S := 1.0
 const RESET_DELAY := 2.0
-const MATCH_TEXT := "Fotbalový zápas Hvozdnice – Polanka · 15 h · hřiště u hospody"
-const TEAM_HOME := "Hvozdnice"
-const TEAM_AWAY := "Polanka"
+const MATCH_TEXT := "Fotbalový zápas Dukelčice – Březouchy · 15 h · hřiště u hospody"
+const TEAM_HOME := "Dukelčice"                # smyšlená ves hry a smyšlený soused z data/obce.json (ne reálné obce)
+const TEAM_AWAY := "Březouchy"
 const LIGHT_NIGHT := 0.35                 # reflektory svítí, když je denní světlo pod tuto hodnotu
 const GRASS := Color(0.27, 0.52, 0.2)
 const LINE := Color(0.95, 0.95, 0.92)
@@ -359,11 +359,8 @@ func _kick(id: int, hold: float) -> void:
 	var pl: Player = world.players[id]
 	if _horizontal_dist(pl.global_position, ball.global_position) > KICK_RANGE + 0.4:
 		return
-	var fwd := -pl.global_transform.basis.z
-	fwd.y = 0.0
-	if fwd.length() < 0.001:
-		return
-	fwd = fwd.normalized()
+	# tělo hráče se neotáčí (otáčí se jen `visual` / `rig` podle `yaw`) → směr kopu z `yaw`, ne z basis těla
+	var fwd := Basis(Vector3.UP, pl.yaw) * Vector3.FORWARD
 	var power := lerpf(KICK_MIN, KICK_MAX, clampf(hold / KICK_HOLD_S, 0.0, 1.0))
 	var lift := 0.25 if hold >= KICK_HOLD_S * 0.6 else 0.05     # držení = vysoký kop
 	var dir := (fwd + Vector3.UP * lift).normalized()

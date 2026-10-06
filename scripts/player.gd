@@ -687,6 +687,7 @@ func board_mount() -> bool:
 		return false
 	board_on = true
 	floor_max_angle = deg_to_rad(BOARD_FLOOR_ANGLE)   # M5.8: přechody U-rampy jsou strmější než chůze
+	board_score = 0                        # nová jízda = nové skóre (rekord `board_best` zůstává)
 	_board_air = 0.0
 	_board_jump_prev = true                # Mezerník, kterým se stoupá, neudělá hned ollie
 	_board_build()

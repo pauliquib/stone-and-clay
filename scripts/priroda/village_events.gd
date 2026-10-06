@@ -99,6 +99,8 @@ func setup(w: World) -> void:
 	refresh()
 	_build_nastenka()
 	register("fotbal", FotbalHriste.match_day, FotbalHriste.MATCH_TEXT)   # M5.6: fotbalový zápas v kalendáři
+	# M5.4: soutěž SDH – tady, ne v HasiciSport.setup (místa a zbrojnice vznikají v World.build dřív než kalendář)
+	register("hasici_soutez", HasiciSport.soutez_day, HasiciSport.SOUTEZ_TEXT)
 
 
 # ------------------------------------------------------------------ kalendář

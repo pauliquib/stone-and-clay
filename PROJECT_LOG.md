@@ -1247,3 +1247,30 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Žádná poutní místa v katastru + 300 m nenalezena; typ `poutni` je v kódu připraven, data prázdná.
 - Orientace křížů je odhad (rovnoběžně se silnicí), ne z OSM.
 - Ruční test čeká (checklist v `docs/testy_M5.md`, oddíl Kříže a kaplička).
+
+## 2026-10-07 – Závěrečná kontrola M5 (Opus 5.5)
+
+### Hotovo (kontrola překladu + čtení kódu – ruční test čeká)
+- **Rozsah:** `git diff 1776444..HEAD -- scripts data` (~3 400 řádků, 27 souborů). Existence a podpisy volaných funkcí ověřeny grepem
+  (autorádio, světlo v kabině, skateboard, hasiči, kalendář, řidiči, voda, studánka, kříže).
+- **Kontrola překladu:** `godot --import` rc 0, `--check-only` všech 165 skriptů bez chyb.
+- **Opravené chyby:**
+  - Fotbal: směr kopu z `basis.z` těla hráče, které se neotáčí (otáčí se `visual` / `rig`) → míč letěl vždy k −Z. Nově z `Player.yaw`.
+  - Hasičský sport: soutěž se hlásila do kalendáře v `HasiciSport.setup`, ale `_spawn_places` běží dřív než vznikne `village_events`
+    → soutěž se v kalendáři nikdy neobjevila. Registrace přesunuta do `VillageEvents.setup` (jako fotbal).
+  - Hasičský sport: respekt za trénink za každý pokus (farmení ~50 za hodinu) → jednou za den (`_trenink_jd`, neukládá se).
+  - Skateboard: `board_score` se nikdy nenuloval → nuluje se při stoupnutí na desku.
+  - Právní zásady: zápas „Hvozdnice – Polanka“ (jména reálných obcí) → „Dukelčice – Březouchy“ (smyšlená ves a soused z `obce.json`);
+    stanice „Beat Hvozdnice“ (reálná obec + blízko „Radio Beat“) → „Kytara Na Návsi“; družstvo „SDH Modrý Dol“ → „SDH Modrá Stráň“.
+  - Rozhovor (`dialog_data.gd`): tři rady „sekera je v Potravinách“ → stavebniny / pila (nářadí se v M5.1 přesunulo).
+- **Ukládání:** nové klíče `skate`, `hasici`, `hasicsport`, `radio` u vozidla se ukládají i načítají s výchozí hodnotou; starý save projde.
+  Koupaliště, U-rampa, osvětlení, studánka, kříže, dvůr a řidiči stav nemají.
+- **Zákon a data:** M5 nepřidala žádné `commit_offense`; `zakon.json` 65 řádků se všemi klíči, `misto` jen povolené hodnoty; všechny `data/*.json` platné.
+
+### Otevřené body (beze změny kódu)
+- Skateboard: přepadnutí „na trávě“ reálně nenastane – silnice i tráva jsou jeden kolizní terén s meta `teren` a `grip_factor` je
+  relativní k suchu. Chce dotaz na `surface.bin` / `asphalt.bin` pod deskou.
+- Koupaliště je vlastní nádrž nad terénem (bez vykopání); registrace do `Water.ponds` znamená i rybaření a zamrzání v nádrži.
+- Hřiště leží na místě hranice čarodějnic (`BONFIRE_POS`); policista u kontroly stojí vedle auta, figurína řidiče sedí dál.
+- Mše v kapličce není napojená (`Krize.chapel_pos()` připraveno); kaplička je 225 m od úřadu podle reálné polohy z OSM.
+- Kroky M5 zůstávají `[ ]` v roadmapě až do ručního testu (většina částečně – viz „Uzavření M5“).
