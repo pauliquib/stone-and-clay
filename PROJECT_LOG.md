@@ -1105,3 +1105,26 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Dialog „fotbal“ (`dialog_data.gd`) se nerozšiřoval.
 - Stromy v půdorysu hřiště se nekácí; kontrola kolizí s objekty v okolí (lavičky, kabina, stožáry) jen na mapě v běhu.
 - Ruční test čeká (checklist v `docs/testy_M5.md`).
+## 2026-10-06 – M5.3 Hasiči: zbrojnice, spolek SDH, výjezdy k požárům
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Co**: nový `scripts/hasici.gd` (`class_name Hasici`, `World.hasici`). Smyšlený spolek „SDH Pod Kopcem“ bez znaku a bez názvu obce.
+  - **Zbrojnice**: procedurální garáž 12 × 7 m (vrata 2 × 3 m, věžička na sušení hadic, siréna na střeše, cedule `Label3D`), kolize `BoxShape3D`. Stojí před úřadem (`places["urad"]`, směr od návsi, 40–90 m, mimo silnice; `dist_to_roads > 8`).
+  - **Členství**: u vchodu (`interactables`, `kind "custom"`) menu: žádost o členství (respekt `hasici` ≥ 0, `promile` ≤ 0,2, příspěvek 200 Kč hned), zaplacení příspěvku (platnost 365 dní), vystoupení. Členem s platným příspěvkem je `is_paid_member(id)`.
+  - **Výjezd**: herní událost `fire_report` (M2.2) → siréna (`Sfx.siren_loop()`, 25 s), popup členům s platným příspěvkem a hráčům do 350 m. Posádka dorazí po `ARRIVE_MIN` = 6 herních minutách a každých 1,5 min zavolá `GrassFire.suppress()` na nejbližší požár do 80 m. Pokud už oheň dohořel, zpráva „přijeli, ale dohořel“.
+  - **Účast a odměna**: člen s platným příspěvkem, v zásahovém obleku (`Wardrobe.has_tag(outfit, "hasic")`), který je do 25 m od ohně během výjezdu, dostane po uhašení respekt `hasici` +5, pověst +3 a XP `hasicina` 50–150. Bez obleku v ohni: zranění 3 a hláška.
+  - **Požár hráče**: `FireManager._end_grass` volá `Hasici.on_caused_fire` → respekt `hasici` −5 (vedle stávajícího přestupku).
+  - **Schůze**: první pátek v měsíci 19:00–20:00, člen do 40 m od zbrojnice → respekt `hasici` +1, jednou za měsíc (klíč `YYYY-MM`).
+- **Napojení**: `scripts/world.gd` – var `hasici`, vytvoření v `_spawn_places` (za dvůr stavebnin), `hasici.on_event` v `emit_game_event`, `hasici.interactables` v `interactables`. `scripts/fire_manager.gd` – jeden řádek v `_end_grass` (přestupek → `on_caused_fire`). `scripts/save_game.gd` – klíč `hasici` per hráč (`d.get("hasici", {})`, starý save = nečlen).
+- **Ladicí konstanty** nahoře v `hasici.gd`: `FEE_KC`, `FEE_DAYS`, `RESPECT_MIN`, `SOBER_MAX`, `ARRIVE_MIN`, `SUPPRESS_EVERY_MIN`, `SIREN_S`, `ON_SCENE_R`, `REWARD_RESPECT`, `REWARD_POVEST`, `XP_MIN/MAX`, `SCHUZE_RESPECT`, `CAUSED_RESPECT`, `STATION_DIST`.
+- **Kontrola překladu** (00_SPOLECNE kap. 6): `--check-only` na `scripts/hasici.gd`, `scripts/world.gd`, `scripts/fire_manager.gd`, `scripts/save_game.gd` – výstup prázdný. `--import` vypršel na 300 s (stejně jako u M5.5), cache importu může být neúplná.
+
+### Otevřené body
+- **Cisterna** (nové vozidlo, skupina C, jízda s posádkou a `set_ai_route`) není. Hráč jede pěšky a hasí existující akcí `hasit` (vodou z kapsy). Zbytek minima (cisterna, přenosná stříkačka PS 12 pro M5.4) je v dalším kroku.
+- **Vizuál posádky**: NPC hasiči ani cisterna se nespawnují; zásah se odehrává jen zprávami, zvukem a zmenšováním ohně. Částice vody a proudnice nejsou.
+- **Příchod hráče do zbrojnice**: nečeká se na něj (5 min z promptu); odměnu dostane jen u ohně.
+- **Tréninky** (středa 18:00 na hřišti, vazba na M5.4) a bonus z tréninku nejsou. Schůze je jen na úrovni respektu.
+- **Hasičský bál / soutěž** (M5.5) nejsou. Zákon o zbrojnici a skutečné sbory nejsou potřeba (smyšlený název).
+- **Umístění zbrojnice** odvozeno z dat (před úřadem, mimo silnice), ale kolize se stavbami a stromy nejsou ověřeny. Ověřit na mapě, případně posunout `STATION_DIST` / `STATION_LAT`.
+- **Respekt a členství** se neukazují v HUD / deníku (J), chybí oddíl „Hasiči“ v `Hud._journal_bbcode()`. Stav je jen v kódu a ve save.
+- `README.md` (Systémy → Hasiči), `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` nebyly upraveny (zadání).

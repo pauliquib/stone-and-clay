@@ -179,6 +179,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["permits"] = world.permits.to_dict(id)        # M6.1: registrace ÚVL, osvědčení A1/A3 (později doklady M4.6)
 	if world.gamekeeper:
 		d["gamekeeper"] = world.gamekeeper.to_dict(id)  # M4.6: zaplacené kurzy u myslivce (starý save = žádné)
+	if world.hasici:
+		d["hasici"] = world.hasici.to_dict(id)          # M5.3: členství v SDH a zaplacený příspěvek (starý save = žádné)
 	if world.favors:
 		d["favors"] = world.favors.to_dict(id)          # M4.5: prosby vesničanů (nabídky, slib, splněno / zklamáno)
 	var f := FileAccess.open(path(slot), FileAccess.WRITE)
@@ -440,6 +442,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		world.permits.from_dict(id, d.get("permits", {})) # M6.1: starý save bez klíče = žádná oprávnění
 	if world.gamekeeper:
 		world.gamekeeper.from_dict(id, d.get("gamekeeper", {}))   # M4.6: starý save bez klíče = žádné kurzy
+	if world.hasici:
+		world.hasici.from_dict(id, d.get("hasici", {}))   # M5.3: starý save bez klíče = nejsi členem
 	if world.favors:
 		world.favors.from_dict(id, d.get("favors", {}))   # M4.5: starý save bez klíče = žádné prosby
 	var cl = world.clients.get(id)
