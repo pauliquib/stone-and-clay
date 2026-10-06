@@ -669,6 +669,8 @@ func calendar(days := 60) -> Array:
 		var h := Clock.holiday_on(j)
 		if h != "":
 			out.append([j, "Státní svátek: %s (Potraviny zavřeno)" % h])
+	if world.village_events:
+		out.append_array(world.village_events.upcoming(days))   # M5.5: taneční zábavy a registrované akce
 	out.sort_custom(func(a, b): return int(a[0]) < int(b[0]))
 	return out
 

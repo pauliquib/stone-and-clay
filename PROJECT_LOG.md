@@ -962,3 +962,34 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
   podvodní zabarvení kamery.
 - Dokumentace: README (Systémy / Ovládání – plavání), `prompts/roadmapa/README.md` a `docs/VIZE_A_ROADMAPA.md`
   neupraveny (zadání: nemenit). Ladicí konstanty: `Player.SWIM_*`, `Koupaliste.CENTER/DEPTH`.
+
+## 2026-10-06 – M5.5 Kalendář událostí a zábava s kapelou
+
+### Hotovo (staticky ověřeno: `--check-only` projde bez chyby; ruční test čeká)
+- **Co**: `scripts/priroda/village_events.gd` (třída `VillageEvents`):
+  - Nová událost `zabava` v `EVENTS` (20–3 h, místo hospoda, v den zábavy otevřená hospoda 10–27 h).
+  - Pravidlo `zabava_day(jd)`: 1. a 3. sobota v měsících `ZABAVA_MONTHS` (1–5, 9–11); v den hodů se nekoná.
+  - Kapela podle data (`band_for`): Traktor Blues, Zlatá Kovadlina, Vesnický Expres, Kulatá Šestka (smyšlené).
+  - `_build_zabava`: pódium a zadní stěna s nápisem kapely, parket, buben, klávesy, 3 barevná světla (blikají),
+    kapela 4 `Humanoid` (kytara, basa s nástrojem v ruce, bicí, klávesy), 14 návštěvníků (dvě třetiny tančí a kývají se
+    k hudbě, zbytek stojí u stolů).
+  - Hudba: `RadioMusic.make("metal")` ve `WorkerThreadPool`, cache v instanci; přehrává se 3D z pódia; střídá
+    hraní (40 s reálně ≈ 20 herních min) a pauzu (20 s ≈ 10 min) přes `stream_paused`.
+  - API: `upcoming(dny)` → `[[jd, text]]`, `register(id, Callable(jd)->bool, text)` pro další akce kalendáře.
+  - Nástěnka u obecního úřadu (`_build_nastenka`, stálá, Label3D): první 3 nadcházející akce, obnovuje se v `refresh`.
+- **Web obce**: `scripts/computer.gd` `calendar()` přidává `village_events.upcoming(days)` (jedna řádka).
+- **Konstanty** (laditelné nahoře v `village_events.gd`): `ZABAVA_*`, `NASTENKA_POS_DIST`.
+- **Mše**: nic nezavedeno (viz otevřené body). Kostel ve Velkém Oříškově je v `data/obce.json` (`church`, mimo katastr).
+- Ukládání beze změny (událost plyne z kalendáře, `save_game.gd` se nemění).
+
+### Otevřené body
+- **Nedělní mše**: v katastru není v datech kaple (`data/buildings.json` nemá `chapel` / `church`) → pravidelná akce v
+  kapličce čeká na souřadnice od uživatele. Kostel ve Velkém Oříškově je mimo mapu: chybí odjezd, `blackout`
+  a interiér kostela, farář, kázání, účast a respekt `komunita`. Rozhodnout, zda mimo mapu (vzor M4.3), nebo k okraji.
+- **Nedokončeno z promptu**: vstupné a pokladna, tanec hráče (klávesa a vyzvání T „zatančíme si?“ – registr kláves
+  nepřidán), rvačka a urovnání, odchod opilých hostů (postupný úbytek návštěvníků), úklid po zábavě a doprovod domů,
+  respekt `mladez` / `stamgasti`, interiérový sál (zatím pod širým nebem u hospody), hasičský bál a tombola (únor).
+- **Web obce a plakáty**: nástěnka je jen u úřadu (chybí plakáty u Potravin a v hospodě); čitelnost Label3D nebyla
+  ověřena v běhu.
+- **Import**: `godot --headless --path . --import` vypršel na 300 s (exit 124), `--check-only` pro oba soubory bez chyby.
+- **Dokumentace**: README (Systémy → Události), `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` neupraveny.
