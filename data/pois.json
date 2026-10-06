@@ -93,5 +93,19 @@
   "park_x": 32.33,
   "park_z": -8.16,
   "park_yaw": 0.0
+ },
+ "stavebniny": {
+  "name": "Stavebniny Cihla a Hřebík",
+  "osm_id": 279052827,
+  "x": -304.99,
+  "z": 756.8,
+  "door_x": -330.26,
+  "door_z": 763.57,
+  "face_yaw": -1.309,
+  "park_x": -333.84,
+  "park_z": 758.31,
+  "park_yaw": -2.88,
+  "road_kind": "service",
+  "road_dist": 31.9
  }
 }

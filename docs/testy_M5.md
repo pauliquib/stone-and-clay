@@ -49,3 +49,11 @@ Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kab
 5. Grafika Nízká: jen svítící hlavice bez pool světel; FPS v obci v pořádku. Vysoká: světla u nejbližších lamp.
 6. Zataženo v noci: nad obcí nasvícené mraky (spodek oblačnosti teplejší).
 7. Ráno a ve dne: lampy zhasnuté, obloha bez smogu.
+
+## M5.1 Stavebniny (místo a nabídka)
+1. F2 → Teleport → Stavebniny: budova (plochá hala) jihozápadně od návsi, cedule „Stavebniny Cihla a Hřebík“, parkoviště u silnice.
+2. Otevírací doba: po–pá 7–17; sobota 7–12; neděle zavřeno (ověř F2 → Datum na sobotu a neděli).
+3. U prodavače Miroslava: nabídka „Nářadí“ – stará sekera 390, sekera 1 290, motorová pila 6 900 Kč (v Potravinách už nejsou).
+4. Kup sekeru a zkus ji použít na kácení (Q do ruky, LMB na strom).
+5. Vesničan / hospoda: prodavač Miroslav mluví k tématu „drby / počasí / zahrada“ (rozhovor T).
+6. Mapa M: značka stavebnin na správném místě (ověř souřadnice oproti červené oblasti).

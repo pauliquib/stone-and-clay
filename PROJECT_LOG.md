@@ -892,3 +892,36 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - **Dokumentace**: README (Systémy → Svět / noc, Ladicí parametry), nápověda, VIZE a `prompts/roadmapa/README.md` nejsou
   upraveny (zadání: neměnit `prompts/roadmapa/README.md` a `docs/VIZE_A_ROADMAPA.md`).
 - Výkon na návsi v noci (FPS) změřit ručně; lampy jsou bez LOD kromě `visibility_range_end`.
+
+## 2026-10-06 – M5.1 Stavebniny (místo a nabídka; kutilské stavby zatím ne)
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou překladu – ruční test čeká)
+- **Co**: nové místo `stavebniny` („Stavebniny Cihla a Hřebík“, smyšlený název, prodavač Miroslav – smyšlená postava):
+  - `data/pois.json` – záznam `stavebniny` (budova OSM 279052827, plochá hala 3 457 m², se sousedy – viz níže).
+  - `scripts/place.gd` – `OFFERS["stavebniny"]` (sekce „Nářadí“: stará sekera, sekera, motorová pila – přesunuto z Potravin,
+    `OFFERS["obchod"]` je bez nich), `HOURS` (7–17), `WEEK_HOURS` (so 7–12, ne 6 = zavřeno), `KEEPERS`, `KEEPER_PERSONA`,
+    `_sign_color`.
+  - `scripts/computer.gd` – přidán do seznamu otevíracích dob (web obce).
+- **Odvození souřadnic** (bez spuštění hry, jen z dat): `data/buildings.json` (budovy OSM v souřadnicích Godotu, `poly`);
+  výběr: hospodářské budovy 800–900 m od návsi (úřad, `(100, 215)` ≈ střed `Estate.centre`) → shluk na jihozápadě
+  (x −240…−420, z 740…900) s největšími halami; zvolena plochá hala `279052827` (3 457 m²).
+  Střed polygonu = `(-305.0, 756.8)` (= `x`, `z` v pois.json). Dveře = bod na obvodu nejblíž silnici posunutý 1,8 m ven,
+  parkování = krajnice silnice `service` (`data/map.json` → `roads`, 31,9 m od středu) – stejný algoritmus jako
+  `tools/pois.py`, který spustit nešlo (chybí `pipeline/data`); výpočet proveden ad hoc skriptem nad `data/*.json`.
+- **Kontrola překladu**: `godot --headless --path . --import` a `--check-only` na `scripts/place.gd` a `scripts/computer.gd` –
+  výstup prázdný.
+
+### Otevřené body
+- **Bývalá pila: v datech není.** `data/`, `tools/`, `docs/`, `PROJECT_LOG.md` ani kód neobsahují záznam o bývalé pile
+  ani o jiné hospodářské stavbě označené jako pila (kromě `les.gd` = motorová pila hráče). Pila proto **není umístěna**
+  na „bývalé místo“; až uživatel upřesní, zapíše se do `pois.json` (nebo se umístí na stejný shluk).
+- **Umístění je odhad z dat, ne ověřené na screenshotu.** Červená oblast uživatele („3 haly s parkovištěm a betonovou
+  plochou u statku“) může být jiná budova téhož shluku; v shluku je navíc Vinný sklep (`279053798`, hala) a největší
+  stodola (`279052827`) není ověřeno jako statek. Ověřit mapou M a případně přepsat `pois.json`.
+- **Kutilské stavby (`BuildingKit`), plán stavby, staveniště, kůlna, plot, branka, kurník, kotec, lavička, záhon**: nejsou.
+- **Doprava materiálu** (prkna, cement, pletivo…) a položky materiálu / zahrady / sportu: nejsou (`ItemsDB` zatím
+  neobsahuje tyto položky; zavádět až s recepty).
+- **Značka ★ na mapě M a teleport F2**: nebyly ověřeny (jdou z `World.places` automaticky, neřešeno ručně).
+- **Nápověda / README / VIZE / prompts/roadmapa/README.md** nejsou upraveny (zadání: `prompts/roadmapa/README.md` a
+  `docs/VIZE_A_ROADMAPA.md` neměnit; README dopsat až po ověření).
+- Rockové stanice: podle rozhodnutí uživatele nepatří do tohoto kroku (M5.9).

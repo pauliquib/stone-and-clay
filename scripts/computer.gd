@@ -681,7 +681,7 @@ func date_text(jd: int) -> String:
 ## Otevírací doby dnes: [[název, text]].
 func opening_hours() -> Array:
 	var out := []
-	for k in ["obchod", "hospoda", "urad", "palenice", "sklep", "chata", "statek"]:
+	for k in ["obchod", "stavebniny", "hospoda", "urad", "palenice", "sklep", "chata", "statek"]:
 		var pl: Place = world.places.get(k)
 		if pl:
 			out.append([String(pl.data.get("name", k)), pl.hours_text(), pl.is_open(world.clock.hour())])

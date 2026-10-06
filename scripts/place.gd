@@ -20,13 +20,13 @@ const OFFERS := {
 		# M2.9 výkup zvěřiny (jen legální, s dokladem o původu – `Hunting.sell_venison`; nelegální bokem u překupníka; DOPLNIT: ceny odhad)
 		["Výkup zvěřiny (s dokladem o původu)", 0, "header"], ["zverina_srnci", 180, "sell"], ["zverina_divocak", 120, "sell"],
 		["zverina_zajic", 150, "sell"], ["trofej_parozky", 100, "sell"]],
+	# M5.1 stavebniny (smyšlené „Stavebniny Cihla a Hřebík“, místo ze `pois.json`): železářství přesunuto z Potravin
+	"stavebniny": [["Nářadí", 0, "header"], ["sekera_stara", 390, "buy"], ["sekera", 1290, "buy"], ["motorova_pila", 6900, "buy"]],
 	"obchod": [["pivo", 25, "buy"], ["nealko", 22, "buy"], ["vino_bile", 129, "buy"], ["vino_cervene", 139, "buy"],
 		["vodka", 229, "buy"], ["rum", 189, "buy"], ["becherovka", 259, "buy"], ["slivovice", 520, "buy"],
 		["voda", 19, "buy"], ["rohlik", 8, "buy"], ["chipsy", 45, "buy"], ["jablko", 6, "buy"],
 		["tlacenka", 49, "buy"], ["parek", 39, "buy"], ["cigarety", 165, "buy"], ["tabak_semena", 45, "buy"], ["papirky", 25, "buy"], ["konopi_semena", 60, "buy"], ["spacak", 890, "buy"],  # M4.8: semena jen při „Obsah pro dospělé“ (ItemsDB.hidden)
 		["sirky", 12, "buy"], ["zapalovac", 39, "buy"], ["burt", 25, "buy"],
-		# „Železářství“ – zatím v Potravinách, do M5.1 (stavebniny) se přesune
-		["sekera_stara", 390, "buy"], ["sekera", 1290, "buy"], ["motorova_pila", 6900, "buy"],
 		# M2.3 oblečení: sekce „Textil“, „Pracovní“, „Slavnostní“ (záhlaví = režim "header", jen text v nabídce)
 		["Textil", 0, "header"], ["triko_modre", 199, "buy"], ["triko_zelene", 199, "buy"], ["mikina_seda", 690, "buy"],
 		["platenka", 249, "buy"], ["vetrovka", 890, "buy"], ["bunda_zimni", 2490, "buy"], ["kratasy", 349, "buy"],
@@ -85,11 +85,12 @@ const OFFERS := {
 	"statek": [["Prodej ze dvora", 0, "header"], ["vejce", 6, "buy"], ["mleko", 22, "buy"], ["seno", 20, "buy"], ["zrni", 12, "buy"]],
 }
 const HOURS := {"hospoda": [10, 26], "obchod": [6, 21], "palenice": [8, 22], "sklep": [12, 24],
-	"chata": [0, 24], "urad": [8, 14], "domov": [0, 24], "statek": [5, 20]}
+	"chata": [0, 24], "urad": [8, 14], "domov": [0, 24], "statek": [5, 20], "stavebniny": [7, 17]}
 ## Výjimky z otevírací doby podle dne v týdnu (0 = pondělí … 6 = neděle): [od, do] nebo [] = zavřeno.
 ## Svátky (Clock.holiday) mají obchod zavřený; svátky a události v obci mění hodiny přes VillageEvents.event_hours.
 const WEEK_HOURS := {
 	"obchod": {5: [7, 11], 6: []},                        # sobota jen dopoledne, v neděli zavřeno
+	"stavebniny": {5: [7, 12], 6: []},                    # M5.1: sobota jen dopoledne, v neděli zavřeno
 	"hospoda": {4: [10, 27], 5: [10, 27], 6: [10, 24]},    # pá a so do 3:00, v neděli do půlnoci
 	# A4-02: obecní úřad má úřední dny – Po a St déle, Út a Čt základní doba, v pátek krátce, víkend zavřeno
 	"urad": {0: [7, 17], 2: [7, 17], 4: [8, 12], 5: [], 6: []},
@@ -107,6 +108,7 @@ const KEEPERS := {
 	"chata": ["Myslivec Franta", "hunter", Color(0.25, 0.32, 0.2)],
 	"urad": ["Starosta Novák", "", Color(0.3, 0.3, 0.45)],
 	"statek": ["Hospodář Vladimír", "", Color(0.35, 0.42, 0.28)],      # M3.2 (smyšlený)
+	"stavebniny": ["Prodavač Miroslav", "", Color(0.6, 0.45, 0.2)],  # M5.1 (smyšlený)
 }
 ## Povaha obsluhy pro rozhovor (Persona / Dialog): [povaha, povolání, věk, o sobě, témata]
 const KEEPER_PERSONA := {
@@ -116,6 +118,7 @@ const KEEPER_PERSONA := {
 	"sklep": ["veselak", "vinař", 55, "Víno je poezie v lahvi.", ["vino", "pocasi", "pole"]],
 	"chata": ["bruclavy", "myslivec", 60, "V lese se chodí potichu, ať nevyplašíš zvěř.", ["les", "zver", "vcely"]],
 	"urad": ["prisny", "starosta obce", 57, "Obec musí mít pořádek i rozpočet.", ["urad", "poradek", "silnice"]],
+	"stavebniny": ["prisny", "prodavač ve Stavebninách Cihla a Hřebík", 49, "Hřebík do zdi, cihla do základu. Plot bez prken nepostavíte.", ["drby", "pocasi", "zahrada"]],
 	"statek": ["bruclavy", "hospodář na Statku Na Kopci", 58, "Kráva nepočká, ta se dojí i na Štědrý den.", ["pole", "zvirata", "pocasi"]],
 }
 const REGULARS_PERSONA := [
@@ -211,6 +214,7 @@ func _sign_color() -> Color:
 	match key:
 		"hospoda": return Color(0.45, 0.25, 0.1)
 		"obchod": return Color(0.1, 0.4, 0.2)
+		"stavebniny": return Color(0.55, 0.4, 0.15)
 		"palenice": return Color(0.35, 0.15, 0.4)
 		"sklep": return Color(0.45, 0.08, 0.15)
 		"chata": return Color(0.25, 0.3, 0.15)
