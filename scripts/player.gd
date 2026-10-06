@@ -82,6 +82,16 @@ var shelter_min := 18.0          # nejnižší pocitová teplota pod střechou /
 var license_suspended_until := -1.0   # zákaz řízení do (herní minuty)
 var wanted_until := -1.0              # hledaný policií do (herní minuty)
 var wade := 0.0                       # hloubka vody, ve které hráč stojí (m) – nastavuje Water
+var water_level := -INF               # hladina vody v místě hráče (m) – nastavuje Water (M5.2)
+var water_temp := 15.0                # teplota vody v místě hráče (°C) – nastavuje Water (M5.2)
+var breath := 15.0                    # dech pod vodou (s); plavání M5.2, obnoví se nad hladinou
+const SWIM_DEPTH := 1.2               # od této hloubky (m) se plave (bez gravitace, vztlak)
+const SWIM_SPEED := 1.2               # m/s plavání (Shift = SWIM_SPRINT, výdrž ubývá rychle)
+const SWIM_SPRINT := 2.0
+const SWIM_VY := 1.4                  # m/s svislý pohyb: Mezerník nahoru, Ctrl (C) potopit
+const BREATH_MAX := 15.0              # s dechu pod hladinou (10–20 s)
+const HEAD_H := 1.6                   # výška hlavy nad nohama (m)
+const DROWN_DPS := 2.0                # ztráta zdraví za sekundu, když dech dojde
 var scope_on := false                 # drží dalekohled (X) – nastavuje LocalClient
 var scope := 0.0                      # 0..1 zapnutí dalekohledu (plynule), zužuje zorný úhel kamery
 var outfit := {}                       # oblečení: slot → id předmětu (M2.3, `Wardrobe`); ukládá se
@@ -1140,6 +1150,11 @@ func _physics_process_impl(delta: float) -> void:
 	if wade > 0.05:
 		# brodění potokem / řekou: voda brzdí (po kolena ~ poloviční rychlost)
 		target_speed *= lerpf(1.0, 0.4, clampf(wade / 0.6, 0.0, 1.0))
+	if _swimming():
+		# plavání (M5.2): pomalé tempo, Shift rychleji za cenu výdrže
+		target_speed = SWIM_SPRINT if sprint_in and stamina > 0.05 else SWIM_SPEED
+		if sprint_in and wish.length() > 0.05:
+			drain_stamina(delta * 0.12)
 	var target := wish * target_speed
 
 	# --- opilost: drift do stran a dopředu/dozadu, i ve stoje
@@ -1183,8 +1198,11 @@ func _physics_process_impl(delta: float) -> void:
 	velocity.x = hvel.x
 	velocity.z = hvel.z
 
-	# --- gravitace
-	if not on_floor:
+	# --- gravitace (plavání M5.2: vztlak, žádná gravitace; Mezerník nahoru, Ctrl potopit)
+	if _swimming():
+		var up := (1.0 if input.jump else 0.0) - (1.0 if input.crouch else 0.0)
+		velocity.y = move_toward(velocity.y, up * SWIM_VY, 9.0 * delta)
+	elif not on_floor:
 		var g := gravity
 		if velocity.y < 0.0:
 			g *= fall_multiplier
@@ -1197,7 +1215,7 @@ func _physics_process_impl(delta: float) -> void:
 			velocity += Vector3(fn.x, 0.0, fn.z).normalized() * gravity * 0.6 * delta
 
 	# --- skok
-	if _jump_buffer > 0.0 and _coyote > 0.0 and _can_stand() and fallen <= 0.0 and not busy:
+	if _jump_buffer > 0.0 and _coyote > 0.0 and _can_stand() and fallen <= 0.0 and not busy and not _swimming():
 		velocity.y = (effective_jump() + (0.6 if _sliding else 0.0)) * body.jump_mult()
 		_jump_buffer = 0.0
 		_coyote = 0.0
@@ -1209,6 +1227,8 @@ func _physics_process_impl(delta: float) -> void:
 
 	_prev_vy = velocity.y
 	move_and_slide()
+
+	_swim_breath(delta)
 
 	# --- strkání do fyzikálních objektů
 	_wall_bump_cool = maxf(_wall_bump_cool - delta, 0.0)
@@ -1328,6 +1348,22 @@ func _weather_msgs() -> void:
 		game_event.emit("warmed", {})
 
 
+## Plave se od hloubky SWIM_DEPTH (ne v autě / na koni / na skateboardu / v letadle).
+func _swimming() -> bool:
+	return wade > SWIM_DEPTH and car == null and horse == null and aircraft == null and not board_on and fallen <= 0.0
+
+
+## Dech pod hladinou (M5.2): pod vodou (Ctrl, nebo hlava pod hladinou) ubývá `breath`; pak se hráč topí (zdraví).
+func _swim_breath(delta: float) -> void:
+	var under := wade > SWIM_DEPTH and (input.crouch or global_position.y + HEAD_H < water_level)
+	if under:
+		breath = maxf(breath - delta, 0.0)
+		if breath <= 0.0:
+			body.hurt(DROWN_DPS * delta, "utopení")
+	else:
+		breath = minf(breath + 3.0 * delta, BREATH_MAX)
+
+
 func _update_body(delta: float, hs: float) -> void:
 	# výdej energie: chůze ~250 kcal/h, sprint ~700 kcal/h (herní hodiny)
 	var act := 0.0
@@ -1352,6 +1388,9 @@ func _update_body(delta: float, hs: float) -> void:
 			"heat": heat, "shelter_min": shelter_min}
 		if wade > 0.2:
 			body.wetness = maxf(body.wetness, minf(wade * 1.5, 1.0))
+			# voda chladí víc než vzduch (M5.2): pocitová teplota nejvýš na teplotu vody
+			if not sheltered:
+				env["temp"] = minf(float(env["temp"]), water_temp)
 	body.update(delta * Clock.TIME_SCALE / 3600.0, act, env)
 	_weather_msgs()
 	# probíhající akce

@@ -49,3 +49,15 @@ Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kab
 5. Grafika Nízká: jen svítící hlavice bez pool světel; FPS v obci v pořádku. Vysoká: světla u nejbližších lamp.
 6. Zataženo v noci: nad obcí nasvícené mraky (spodek oblačnosti teplejší).
 7. Ráno a ve dne: lampy zhasnuté, obloha bez smogu.
+
+## M5.2 – Koupaliště na bývalé hasičské nádrži + plavání
+1. Teleport na potok č. 275 (jihozápadně od Dukelčic, ~620 m od návsi, u silnice na začátku toku): u potoka stojí betonová nádrž 25 × 12 m se schůdky na krátké straně.
+2. Vyleze po schůdcích do nádrže (hladina ~1,5 m): od hloubky 1,2 m se plave, bez pádu ke dnu.
+3. Mezerník = nahoru, Ctrl = dolů; pohyb pomalý (1,2 m/s), Shift rychlejší a výdrž rychle ubývá.
+4. Ctrl a potopit se pod hladinou: dech ~15 s, pak ubývá zdraví (utopení); po vynoření dech přijde zpět.
+5. Skok ve vodě nefunguje (Mezerník jen vynáší); vylezení po schůdcích funguje.
+6. F2 → Datum 15. 7., jasno: plavání stejně; pocitová teplota ve vodě ~22 °C, prochladnutí žádné nebo pomalé.
+7. F2 → Datum 15. 5.: voda ~15 °C → po pár minutách ve vodě roste prochladnutí (HUD „prochlazen“).
+8. Plavání v rybníce v lese (Teleport k rybníku) – stejné ovládání jako v nádrži.
+9. Chůze mimo nádrž po zemi se nezměnila; u potoka (mělčina < 1,2 m) se chodí brodem jako dřív.
+10. Starý save se načte beze změny (žádný nový klíč v `save_game.gd`).

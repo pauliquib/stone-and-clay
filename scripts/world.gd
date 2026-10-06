@@ -63,6 +63,7 @@ var obce: Array = []             # okolní obce z data/obce.json (id, name, cent
 var _obec_bounds := {}           # id obce → Rect2 hranice katastru – počítá obec_bounds() jednou (mapa, obec_at)
 var terrain: Terrain
 var water: Water                 # potoky, řeka, rybníky (OSM / DIBAVOD)
+var koupaliste: Koupaliste       # koupaliště na bývalé hasičské nádrži (M5.2)
 var radio: Radio                 # rádio doma (u vchodu domova, uvnitř na komodě) – hudba a sousedi
 var interiors := {}              # id → Interior (M1.4): oddělené prostory pod mapou, viz enter_interior; M1.8: jen postavené
 var interior_streamer: InteriorStreamer   # M1.8: stavba interiérů zblízka (nejvýš 3), generované interiéry všech budov
@@ -251,6 +252,10 @@ func build() -> void:
 	water.load_data()
 	add_child(water)
 	water.build(self, terrain)
+	koupaliste = Koupaliste.new()          # M5.2: koupaliště na potoku č. 275 (vlastní nádrž, registrace do Water)
+	koupaliste.name = "Koupaliste"
+	add_child(koupaliste)
+	koupaliste.build(self, terrain, water)
 
 	loading.emit("Stromy (51 736)…")
 	await _frames(1)
