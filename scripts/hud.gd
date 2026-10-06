@@ -1400,10 +1400,14 @@ func _process_impl(delta: float) -> void:
 			_mini.queue_redraw()
 	# --- mapa (M)
 	if _map.visible:
-		_map_view.queue_redraw()
-		var gp: Vector3 = game.player_pos(player.id)
-		_map_pos.text = "Poloha: hra x %.1f, z %.1f  ·  Blender x %.1f, y %.1f, z %.1f  (--pos=%d,%d)   ·   přiblížení ×%.1f" % [
-			gp.x, gp.z, gp.x, -gp.z, gp.y, int(gp.x), int(gp.z), _map_zoom]
+		_map_tick -= delta
+		if _map_dirty or _map_tick <= 0.0:       # A1-02: jen při změně pohledu a marker hráče ~4× za sekundu
+			_map_dirty = false
+			_map_tick = 0.25
+			_map_view.queue_redraw()
+			var gp: Vector3 = game.player_pos(player.id)
+			_map_pos.text = "Poloha: hra x %.1f, z %.1f  ·  Blender x %.1f, y %.1f, z %.1f  (--pos=%d,%d)   ·   přiblížení ×%.1f" % [
+				gp.x, gp.z, gp.x, -gp.z, gp.y, int(gp.x), int(gp.z), _map_zoom]
 
 
 func _compass_text(p: float) -> String:
@@ -1526,6 +1530,54 @@ func _w2v(p: Vector3) -> Vector2:
 	return _map_view.size * 0.5 + (Vector2(p.x, p.z) - _map_center) * _map_ppm()
 
 
+## Keš statických vrstev mapy ve světových souřadnicích (A1-02): staví se jednou při prvním kreslení.
+var _mc_ok := false
+var _mc_boundary := PackedVector2Array()
+var _mc_streams := []             # [PackedVector2Array, šířka px, Rect2]
+var _mc_ponds := []               # [PackedVector2Array, Rect2]
+var _mc_roads := []               # {line, aabb, col, w, name, mid}
+var _map_dirty := true            # mapa se překreslí jen při změně (střed, zoom, okno) a 4× za sekundu (značky)
+var _map_tick := 0.0
+
+
+func _map_build_cache() -> void:
+	if _mc_ok:
+		return
+	_mc_ok = true
+	for q in meta["boundary"]:
+		_mc_boundary.append(Vector2(q[0], q[1]))
+	if _mc_boundary.size() > 0:
+		_mc_boundary.append(_mc_boundary[0])
+	if game.water:
+		for st in game.water.streams:
+			var line := PackedVector2Array()
+			for q in st["pts"]:
+				line.append(Vector2(q.x, q.z))
+			if line.size() >= 2:
+				_mc_streams.append([line, 2.5 if st["kind"] == "river" else 1.5, _pts_aabb(line)])
+		for pd in game.water.ponds:
+			var poly := PackedVector2Array()
+			for q in pd["poly"]:
+				poly.append(Vector2(q.x, q.y))
+			if poly.size() >= 3:
+				_mc_ponds.append([poly, _pts_aabb(poly)])
+	for rd in meta.get("roads", []):
+		var line := PackedVector2Array()
+		for q in rd["pts"]:
+			line.append(Vector2(q[0], q[1]))
+		if line.size() >= 2:
+			var st: Array = ROAD_STYLE.get(rd["kind"], ROAD_STYLE["other"])
+			_mc_roads.append({"line": line, "aabb": _pts_aabb(line), "col": st[0], "w": st[1],
+				"name": String(rd.get("name", "")), "mid": line[line.size() / 2]})
+
+
+static func _pts_aabb(pts: PackedVector2Array) -> Rect2:
+	var r := Rect2(pts[0], Vector2.ZERO)
+	for v in pts:
+		r = r.expand(v)
+	return r
+
+
 func _draw_map_view_wrapped() -> void:
 	var __t0 := Tests.prof_t0()
 	_draw_map_view()
@@ -1545,44 +1597,38 @@ func _draw_map_view() -> void:
 				Vector2(float(o["size_x"]), float(o["size_z"])) * ppm), false)
 	var font := ThemeDB.fallback_font
 	var p := player.body.promile()
+	# A1-02: statické vrstvy (hranice, vody, silnice) jsou ve světových souřadnicích v keši a kreslí se
+	# jednou transformací (draw_set_transform); ořez mimo výřez podle AABB každé čáry. Šířky se dělí ppm.
+	_map_build_cache()
+	var half := _map_view.size * 0.5 / maxf(ppm, 0.001)
+	var vrect := Rect2(_map_center - half, half * 2.0).grow(30.0 / maxf(ppm, 0.001))
+	var inv := 1.0 / maxf(ppm, 0.001)
+	_map_view.draw_set_transform(_map_view.size * 0.5 - _map_center * ppm, 0.0, Vector2(ppm, ppm))
 	# hranice katastru
-	var b := PackedVector2Array()
-	for q in meta["boundary"]:
-		b.append(_w2v(Vector3(q[0], 0, q[1])))
-	b.append(b[0])
-	_map_view.draw_polyline(b, Color(1, 1, 1, 0.7), 2.0)
+	_map_view.draw_polyline(_mc_boundary, Color(1, 1, 1, 0.7), 2.0 * inv)
 	# vodní toky a plochy
-	if game.water:
-		for st in game.water.streams:
-			var line := PackedVector2Array()
-			for q in st["pts"]:
-				line.append(_w2v(q))
-			_map_view.draw_polyline(line, Color(0.35, 0.65, 1.0, 0.85), 2.5 if st["kind"] == "river" else 1.5)
-		for pd in game.water.ponds:
-			var poly := PackedVector2Array()
-			for q in pd["poly"]:
-				poly.append(_w2v(Vector3(q.x, 0, q.y)))
-			_map_view.draw_colored_polygon(poly, Color(0.35, 0.65, 1.0, 0.8))
+	for st in _mc_streams:
+		if (st[2] as Rect2).intersects(vrect):
+			_map_view.draw_polyline(st[0], Color(0.35, 0.65, 1.0, 0.85), float(st[1]) * inv)
+	for pd in _mc_ponds:
+		if (pd[1] as Rect2).intersects(vrect):
+			_map_view.draw_colored_polygon(pd[0], Color(0.35, 0.65, 1.0, 0.8))
 	# silnice: nejdřív tmavý lem (čitelnost na ortofotu), pak barva podle druhu
-	var road_lines := []
-	for rd in meta.get("roads", []):
-		var line := PackedVector2Array()
-		for q in rd["pts"]:
-			line.append(_w2v(Vector3(q[0], 0, q[1])))
-		if line.size() >= 2:
-			road_lines.append([rd, line])
-			var st: Array = ROAD_STYLE.get(rd["kind"], ROAD_STYLE["other"])
-			_map_view.draw_polyline(line, Color(0, 0, 0, 0.45), st[1] + 1.8)
-	for rl in road_lines:
-		var rd: Dictionary = rl[0]
-		var line: PackedVector2Array = rl[1]
-		var st: Array = ROAD_STYLE.get(rd["kind"], ROAD_STYLE["other"])
-		_map_view.draw_polyline(line, st[0], st[1])
-		var rn := String(rd.get("name", ""))
+	var road_vis := []
+	for rl in _mc_roads:
+		if (rl["aabb"] as Rect2).intersects(vrect):
+			road_vis.append(rl)
+			_map_view.draw_polyline(rl["line"], Color(0, 0, 0, 0.45), (float(rl["w"]) + 1.8) * inv)
+	for rl in road_vis:
+		_map_view.draw_polyline(rl["line"], rl["col"], float(rl["w"]) * inv)
+	_map_view.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	for rl in road_vis:
+		var rn: String = rl["name"]
 		if rn != "":
-			var rp := line[line.size() / 2] + Vector2(6, -6)
-			_map_view.draw_string_outline(font, rp, rn, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 3, Color(0, 0, 0, 0.85))
-			_map_view.draw_string(font, rp, rn, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, st[0])
+			var rp := _w2v(Vector3(rl["mid"].x, 0, rl["mid"].y)) + Vector2(6, -6)
+			if Rect2(Vector2.ZERO, _map_view.size).has_point(rp):
+				_map_view.draw_string_outline(font, rp, rn, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 3, Color(0, 0, 0, 0.85))
+				_map_view.draw_string(font, rp, rn, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, rl["col"])
 	for it in items_root.get_children():
 		if it is Item and not it._taken and it.active:
 			_map_view.draw_circle(_w2v(it.global_position), 3.0 if it.kind != "zalud" else 6.0, COLORS[it.kind])
@@ -2045,7 +2091,7 @@ func _map_extent() -> Rect2:
 			for ob in w.obce:
 				_map_ext = _map_ext.merge(w.obec_bounds(ob))
 		_map_ext = _map_ext.grow(200.0)
-		_map_ext_ok = true
+		_map_ext_ok = w != null and not w.obce.is_empty()   # A1-18: keš až když jsou obce načtené
 	return _map_ext
 
 
@@ -2071,37 +2117,25 @@ func _draw_map_obce() -> void:
 	var half := canvas.size * 0.5 / maxf(ppm, 0.001)
 	var vrect := Rect2(center - half, half * 2.0).grow(200.0)   # pohled ve světě + rezerva
 	var font := ThemeDB.fallback_font
-	# hranice katastrů tečkovaně + obecní silnice dávkově (dvojice bodů pro draw_multiline)
-	var rbuckets := {}                                          # druh → PackedVector2Array
-	for o in w.obce:
-		if not w.obec_bounds(o).intersects(vrect):
-			continue
-		var bp := PackedVector2Array()
-		for q in o.get("boundary", []):
-			if q is Array and q.size() >= 2:
-				bp.append(w2v.call(Vector2(float(q[0]), float(q[1]))))
-		if bp.size() >= 3:
-			bp.append(bp[0])
-			canvas.draw_multiline(_dash_segments(bp), OBEC_BOUNDARY, 1.4)
-		for rd in o.get("roads", []):
-			var kind := String(rd.get("kind", "other"))
-			if not OBEC_ROAD_STYLE.has(kind):
-				kind = "other"
-			var pts: PackedVector2Array = rbuckets.get(kind, PackedVector2Array())
-			var prev := Vector2.ZERO
-			var has_prev := false
-			for q in rd.get("pts", []):
-				if q is Array and q.size() >= 2:
-					var v: Vector2 = w2v.call(Vector2(float(q[0]), float(q[1])))
-					if has_prev:
-						pts.append(prev)
-						pts.append(v)
-					prev = v
-					has_prev = true
-			rbuckets[kind] = pts
-	for kind in rbuckets:
+	_obce_build_cache(w)
+	var inv := 1.0 / maxf(ppm, 0.001)
+	# hranice katastrů tečkovaně (čárkování v px = přepočet při změně přiblížení) + silnice z keše
+	# (A1-03: jednou, ve světových souřadnicích, bez částí uvnitř domácího katastru) pod jednou transformací
+	if not is_equal_approx(_obce_dash_ppm, ppm):
+		_obce_dash_ppm = ppm
+		_obce_dash.clear()
+		for i in _obce_bounds_pts.size():
+			_obce_dash[i] = _dash_segments(_obce_bounds_pts[i], OBEC_DASH * inv, OBEC_GAP * inv)
+	canvas.draw_set_transform(canvas.size * 0.5 - center * ppm, 0.0, Vector2(ppm, ppm))
+	for i in _obce_dash:
+		if (_obce_bounds_rect[i] as Rect2).intersects(vrect):
+			canvas.draw_multiline(_obce_dash[i], OBEC_BOUNDARY, 1.4 * inv)
+	for kind in _obce_roads:
 		var st: Array = OBEC_ROAD_STYLE[kind]
-		canvas.draw_multiline(rbuckets[kind], st[0], st[1])
+		for chunk in _obce_roads[kind]:
+			if (chunk[1] as Rect2).intersects(vrect):
+				canvas.draw_multiline(chunk[0], st[0], float(st[1]) * inv)
+	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# názvy až nad silnicemi – kotva středu s ◇ značkou (symbol obce v mapě)
 	for o in w.obce:
 		if not w.obec_bounds(o).intersects(vrect):
@@ -2124,6 +2158,65 @@ func _draw_map_obce() -> void:
 	# legenda symbolu obce – vlevo dole vedle údaje o přiblížení
 	var lp := Vector2(120.0, canvas.size.y - 10.0)
 	canvas.draw_string(font, lp, "◇ okolní obce", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, OBEC_NAME)
+
+
+## Keš obcí na mapě (A1-03): hranice (polylines), silnice po druzích v dávkách po obcích (dvojice bodů
+## pro draw_multiline) a AABB pro ořez. Silnice, jejichž oba body leží v domácím katastru, se
+## vynechají – ty už kreslí hlavní vrstva mapy (meta.roads), jinak by se kreslily dvakrát.
+var _obce_cache_ok := false
+var _obce_bounds_pts := []        # PackedVector2Array hranice (uzavřená)
+var _obce_bounds_rect := []       # Rect2 hranice
+var _obce_dash := {}              # index → tečkované úseky při přiblížení _obce_dash_ppm
+var _obce_dash_ppm := -1.0
+var _obce_roads := {}             # druh → [[PackedVector2Array dvojice, Rect2], …]
+
+
+func _obce_build_cache(w: World) -> void:
+	if _obce_cache_ok:
+		return
+	_obce_cache_ok = true
+	var home := PackedVector2Array()
+	for q in meta.get("boundary", []):
+		home.append(Vector2(q[0], q[1]))
+	var home_rect := Rect2()
+	if home.size() >= 3:
+		home_rect = _pts_aabb(home)
+	for o in w.obce:
+		var bp := PackedVector2Array()
+		for q in o.get("boundary", []):
+			if q is Array and q.size() >= 2:
+				bp.append(Vector2(float(q[0]), float(q[1])))
+		if bp.size() >= 3:
+			bp.append(bp[0])
+			_obce_bounds_pts.append(bp)
+			_obce_bounds_rect.append(w.obec_bounds(o).grow(10.0))
+		var per_kind := {}
+		for rd in o.get("roads", []):
+			var kind := String(rd.get("kind", "other"))
+			if not OBEC_ROAD_STYLE.has(kind):
+				kind = "other"
+			var pts: PackedVector2Array = per_kind.get(kind, PackedVector2Array())
+			var prev := Vector2.ZERO
+			var has_prev := false
+			for q in rd.get("pts", []):
+				if q is Array and q.size() >= 2:
+					var v := Vector2(float(q[0]), float(q[1]))
+					if has_prev:
+						var in_home: bool = home.size() >= 3 and home_rect.has_point(v) and home_rect.has_point(prev) \
+							and Geometry2D.is_point_in_polygon(v, home) and Geometry2D.is_point_in_polygon(prev, home)
+						if not in_home:
+							pts.append(prev)
+							pts.append(v)
+					prev = v
+					has_prev = true
+			per_kind[kind] = pts
+		for kind in per_kind:
+			var pts: PackedVector2Array = per_kind[kind]
+			if pts.size() < 2:
+				continue
+			if not _obce_roads.has(kind):
+				_obce_roads[kind] = []
+			_obce_roads[kind].append([pts, _pts_aabb(pts)])
 
 
 ## Lomená čára (px) → dvojice bodů úseků pro draw_multiline = tečkovaná čára (hranice obcí).

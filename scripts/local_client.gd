@@ -331,7 +331,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				inp.add_look(settings.look(event.relative))
 	elif event is InputEventMouseButton and event.pressed:
-		if player.car == null and not hud._map.visible:      # s otevřenou mapou myš ovládá mapu (Hud._input)
+		# s otevřenou mapou myš ovládá mapu (Hud._input); v menu / chatu kolečko kameru nezoomuje (A1-01)
+		if player.car == null and not hud._map.visible and not hud.menu_open and not hud.chat_open:
 			if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not player.controls_locked:
 				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 			elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -588,10 +589,16 @@ func load_game(slot: String) -> void:
 func open_place_menu(key: String) -> void:
 	var q: Quests = world.quests_of(pid)
 	var opts := []
-	for o in q.place_options(key):
-		opts.append(["★ " + o[0], o[1]])
-	for qq in q.available_at(key):
-		opts.append(["★ Úkol: %s%s" % [qq.title, "  (znovu)" if qq.state == "failed" else ""], func(): _offer_quest(qq)])
+	# A1-05 / A4-01: zavřené místo od dveří nenabízí práci, úkoly ani zboží – jen info „Zavřeno, otevřeno …“.
+	# Výplatu a výpověď (Jobs.place_options) schováváme taky: zaměstnavatel tam mimo otevírací dobu není,
+	# nic se neztrácí (výplata zůstává nasbíraná, na účet chodí sama, výpověď jde dát při příští návštěvě).
+	var shut_pl: Place = world.places.get(key)
+	var shut: bool = shut_pl != null and key != "domov" and not shut_pl.is_open(world.clock.hour())
+	if not shut:
+		for o in q.place_options(key):
+			opts.append(["★ " + o[0], o[1]])
+		for qq in q.available_at(key):
+			opts.append(["★ Úkol: %s%s" % [qq.title, "  (znovu)" if qq.state == "failed" else ""], func(): _offer_quest(qq)])
 	var title := ""
 	var text := ""
 	var p := player.body.promile()
@@ -629,7 +636,7 @@ func open_place_menu(key: String) -> void:
 			var keeper := pl.keeper.display_name if pl.keeper else ""
 			text = "%s · otevřeno %s · máš %d Kč" % [keeper, pl.hours_text(), player.money]
 			if not open:
-				text += "\nZAVŘENO – dveře jsou zamčené."
+				text = "Zavřeno, otevřeno %s.\nDveře jsou zamčené. Máš %d Kč." % [pl.hours_text(), player.money]
 			elif key == "hospoda" and p > 2.5:
 				text += "\n„Ty už máš dost, jdi domů!“ (hostinský ti nenalije)"
 			if rep and rep.refused_at(key):

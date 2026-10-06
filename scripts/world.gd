@@ -235,7 +235,7 @@ func build() -> void:
 	add_child(water)
 	water.build(self, terrain)
 
-	loading.emit("Stromy (21 800)…")
+	loading.emit("Stromy (51 736)…")
 	await _frames(1)
 	trees = TreeManager.new()
 	add_child(trees)
@@ -1219,6 +1219,7 @@ func enter_interior(id: int, iid: String, fade := true, force := false) -> void:
 	if not ensure_interior(iid):                         # M1.8: postavený zblízka; když ještě ne, dostaví se hned
 		return
 	var it: Interior = interiors.get(iid)
+	var was_locked := pl.controls_locked             # A1-17: zámek od otevřeného menu / panelu neodemykat
 	if fade:
 		pl.controls_locked = true
 		blackout(id, 0.6)
@@ -1226,8 +1227,9 @@ func enter_interior(id: int, iid: String, fade := true, force := false) -> void:
 		play_sfx(id, "door")
 	interior_mark(pl, iid)
 	pl.teleport(it.inside_door, it.inside_yaw, false)
-	pl.controls_locked = false
+	pl.controls_locked = was_locked
 	emit_game_event(id, "entered_interior", {"id": iid})
+	_check_floor(it.inside_door, "vstup do „%s“" % iid)
 
 
 ## Veřejná budova: zamčeno mimo otevírací dobu, postrach vsi obsluha nepustí (M1.5). Domov a debug (`force`) vždy.
@@ -1249,6 +1251,31 @@ func _may_enter(id: int, iid: String) -> bool:
 	return true
 
 
+## Výška pevné země pod bodem `pos` (raycast na statiku, vrstva 1, shora dolů); bez zásahu `fallback`.
+## Zásah zahodíme, je-li výrazně nad / pod očekávaným terénem (střecha, převis) – pak platí terén.
+func _ground_y(pos: Vector3, fallback: float) -> float:
+	var space := get_world_3d().direct_space_state if is_inside_tree() else null
+	if space == null:
+		return fallback
+	var q := PhysicsRayQueryParameters3D.create(Vector3(pos.x, maxf(pos.y, fallback) + 1.5, pos.z),
+		Vector3(pos.x, minf(pos.y, fallback) - 3.0, pos.z), 1)
+	var hit := space.intersect_ray(q)
+	if hit.is_empty() or (hit["normal"] as Vector3).y < 0.5:
+		return fallback
+	var hy: float = (hit["position"] as Vector3).y
+	return hy if absf(hy - fallback) < 1.2 else fallback
+
+
+## A1-20: po vstupu do interiéru zkontroluje, že pod bodem `pos` je podlaha; jinak jen zapíše varování do logu.
+## Čeká jeden fyzikální snímek – kolize čerstvě postaveného interiéru se do prostoru zapisují až v něm.
+func _check_floor(pos: Vector3, tag: String) -> void:
+	await get_tree().physics_frame
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(pos + Vector3(0, 0.6, 0), pos + Vector3(0, -3.0, 0), 1)
+	if space.intersect_ray(q).is_empty():
+		push_warning("World: %s – pod bodem y=%.2f není podlaha (kontrolní raycast)" % [tag, pos.y])
+
+
 ## Hráč vyjde ven před dveře (otočený od domu).
 func exit_interior(id: int, fade := true) -> void:
 	var pl: Player = players.get(id)
@@ -1257,6 +1284,7 @@ func exit_interior(id: int, fade := true) -> void:
 	var iid := pl.inside
 	if interior_streamer and interior_streamer.exit_to_stairs(id, iid, fade):
 		return                                       # M1.8: z bytu do chodby bytového domu
+	var was_locked := pl.controls_locked             # A1-17: když je otevřené menu (zámek od něj), po výstupu se neodemyká
 	if fade:
 		pl.controls_locked = true
 		blackout(id, 0.6)
@@ -1264,8 +1292,16 @@ func exit_interior(id: int, fade := true) -> void:
 		play_sfx(id, "door")
 	var spot := interior_exit(iid)
 	interior_clear(pl)
-	pl.teleport((spot[0] as Vector3) + Vector3(0, 0.3, 0), spot[1], false)
-	pl.controls_locked = false
+	# A1-10: propad po odchodu z obchodu (příčina nepotvrzena) – výška se ověří raycastem na statiku
+	# (podlaha / práh / terén) a rozdíl proti terénu se zapíše do logu
+	var ep: Vector3 = spot[0]
+	var ty := terrain.height_at(ep.x, ep.z)
+	var gy := _ground_y(ep, ty)
+	if absf(gy - ep.y) > 0.3 or absf(ty - ep.y) > 0.3:
+		print("exit_interior[%s]: uložený bod y=%.2f, terén y=%.2f, raycast y=%.2f → použito %.2f" % [iid, ep.y, ty, gy, gy])
+	ep.y = gy
+	pl.teleport(ep + Vector3(0, 0.3, 0), spot[1], false)
+	pl.controls_locked = was_locked
 	emit_game_event(id, "exited_interior", {"id": iid})
 
 
@@ -2483,6 +2519,8 @@ func personas() -> Dictionary:
 	var i := 0
 	for v in bots_root.get_children():
 		if v is Villager:
+			if v in _extra_villagers:
+				continue            # A4-06: víkendoví hosté se neukládají (přibývají a mizí, indexy by míchaly persony)
 			out["v%d" % i] = v.persona
 			i += 1
 	for k in npcs:
@@ -2623,11 +2661,12 @@ func _talk_context(ctx: Dictionary, id: int, p: Player) -> void:
 		ev.append("event_silvestr")
 	if m == 4 and dd == 30:
 		ev.append("event_carodejnice")
-	var e := Clock.easter_jdn(int(d["year"]))
-	if clock.jd() >= e - 52 and clock.jd() <= e - 47:     # masopustní týden (do úterý před Popeleční středou)
-		ev.append("event_masopust")
-	if m == 9 and dd >= 8 and dd <= 21 and clock.weekday() >= 5:   # smyšlené posvícenské hody (víkendy v polovině září)
-		ev.append("event_hody")
+	# A4-09: masopust a hody podle VillageEvents (jediný zdroj pravdy – dialog „ví“ o nich jen když se opravdu konají)
+	if village_events:
+		if village_events.is_active("masopust"):
+			ev.append("event_masopust")
+		if village_events.is_active("hody"):
+			ev.append("event_hody")
 	ctx["events"] = ev
 	var carry := []
 	var eq := p.equipped
@@ -2785,8 +2824,22 @@ func price_for(id: int, base: int) -> int:
 	return roundi(base * (r.price_mult() if r else 1.0))
 
 
+## A1-05: je místo `place` zavřené? Když ano, hráč dostane zprávu a obchodní akce se zruší.
+## Prázdný klíč, „domov“ a neznámá místa se nehlídají.
+func place_shut(id: int, place: String) -> bool:
+	if place == "" or place == "domov" or not places.has(place):
+		return false
+	var pl: Place = places[place]
+	if pl.is_open(clock.hour()):
+		return false
+	notify(id, "show_message", ["Zavřeno, otevřeno %s." % pl.hours_text(), 2.5])
+	return true
+
+
 func buy(id: int, item_id: String, base_price: int, mode: String, place := "") -> void:
 	var p: Player = players[id]
+	if place_shut(id, place):
+		return
 	if mode == "sell":
 		sell_items(id, item_id, base_price, place)
 		return
@@ -2824,7 +2877,7 @@ func buy(id: int, item_id: String, base_price: int, mode: String, place := "") -
 ## Výkup (M2.1, režim „sell“ v `Place.OFFERS`): prodá všechny kusy `item_id` z inventáře za `unit_price` Kč / ks.
 func sell_items(id: int, item_id: String, unit_price: int, place := "") -> void:
 	var p: Player = players.get(id)
-	if p == null:
+	if p == null or place_shut(id, place):
 		return
 	if hunting and Hunting.is_venison(item_id) and hunting.sell_venison(id, item_id, unit_price, place):
 		return                    # M2.9: zvěřina jen legální a s dokladem o původu (nelegální u překupníka)
@@ -3172,6 +3225,26 @@ func teleport_target(id: int, what: String) -> Array:
 	var from := p.global_position
 	if what == "letiste" and airfield and airfield.ok:
 		return airfield.teleport_spot()
+	if what.begins_with("obec:"):
+		# A1-07: okolní obce jsou jen pohled z dálky (bez kolizí a terénu) – hráč se postaví na okraj
+		# katastru, který je k obci nejblíž, čelem k ní
+		var oid := what.substr(5)
+		for o in obce:
+			if String(o.get("id", o.get("name", ""))) != oid:
+				continue
+			var c: Array = o.get("center", [])
+			if c.size() < 2 or terrain == null:
+				return []
+			var tgt := Vector2(float(c[0]), float(c[1]))
+			var xa := terrain.x0 + 12.0
+			var xb := terrain.x0 + (terrain.w - 1) * terrain.spacing - 12.0
+			var za := terrain.z0 + 12.0
+			var zb := terrain.z0 + (terrain.h - 1) * terrain.spacing - 12.0
+			var edge := Vector2(clampf(tgt.x, xa, xb), clampf(tgt.y, za, zb))
+			var dir := tgt - edge
+			var yaw_o := atan2(-dir.x, -dir.y) if dir.length() > 1.0 else 0.0
+			return [Vector3(edge.x, 0.0, edge.y), yaw_o]
+		return []
 	if what in ["krmelec", "posed", "vybeh", "vcelar"]:
 		var spot := Vector3.INF
 		if what == "krmelec" and hunter and not hunter.feeders.is_empty():
@@ -3382,6 +3455,18 @@ func refresh_season_items() -> void:
 
 # ------------------------------------------------------------------ víkend: víc lidí venku
 
+## Profil víkendového hosta (A4-06): vzhled a řeč podle náhodného vesničana, ale bez jeho jména – jinak by
+## ve vsi chodili dva stejní pojmenovaní lidé. Jméno je obecné; host se neukládá (viz `personas()`).
+func _weekend_guest_profile(rng: RandomNumberGenerator) -> Dictionary:
+	var prof: Dictionary = Characters.profile(rng.randi() % Characters.count()).duplicate(true)
+	var female: bool = bool((prof.get("look", {}) as Dictionary).get("female", false))
+	prof["name"] = "Výletnice" if female else "Výletník"
+	prof["job"] = "návštěvník na víkend"
+	prof["hobby"] = "O víkendu se jezdím na vesnici zotavit z města."
+	prof["topics"] = ["pocasi", "pivo", "drby"]
+	return prof
+
+
 ## Víkend ve dne přibude ~30 % vesničanů (jeden za kontrolu, mimo dohled hráčů); jinak zase ubývají.
 func _crowd_tick() -> void:
 	if bots_root == null or _bot_nodes.is_empty() or clock == null:
@@ -3401,7 +3486,7 @@ func _crowd_tick() -> void:
 			if nearest_player_dist(pos) < 70.0:
 				continue
 			var v := Villager.new()
-			v.setup(graph, terrain, self, nid, 3000 + rng.randi() % 100000, Characters.profile(N_VILLAGERS + _extra_villagers.size()))
+			v.setup(graph, terrain, self, nid, 3000 + rng.randi() % 100000, _weekend_guest_profile(rng))
 			bots_root.add_child(v)
 			_extra_villagers.append(v)
 			break

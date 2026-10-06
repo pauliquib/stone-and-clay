@@ -469,6 +469,9 @@ static func _reset(g: Node, h: float) -> void:
 	p.wanted_until = -1.0
 	g.world.traffic.car_of(1).repair()
 	g.world.clock.minutes = (floor(g.world.clock.minutes / 1440.0) + 1.0) * 1440.0 + h * 60.0
+	# A4-02: úřad má úřední dny (víkend a svátky zavřeno) – testy úkolů se posunou na pracovní den
+	while g.world.clock.weekday() >= 5 or g.world.clock.holiday() != "":
+		g.world.clock.minutes += 1440.0
 	await _frames(g, 2)
 
 

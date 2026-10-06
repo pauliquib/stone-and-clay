@@ -52,3 +52,40 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Prolínání FADE_SELF u dlaždic kreslí okraj dohledu průhledně (transparentní průchod) – kdyby dělalo
   artefakty se stíny / řazením, stačí v `add_chunks` vrátit FADE_DISABLED (ořez zůstane správný).
 - Výkon velké mapy se nově měří přes `--perf` (spouští jen uživatel).
+
+## 2026-10-06 – Vlna 0d: F4 Svět a mapa
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **A1-01** kolečko nezoomuje kameru v menu / chatu / mapě (`LocalClient._unhandled_input`).
+- **A1-02, A1-03, A1-18** mapa M (`hud.gd`): překresluje se jen při změně (zoom, tažení, otevření) a marker hráče
+  + popisek polohy ~4× za s (`_map_dirty`, `_map_tick`). Statické vrstvy (hranice, vody, silnice) v keši ve světových
+  souřadnicích (`_map_build_cache`), kreslí se jednou `draw_set_transform`, šířky čar = px / ppm, ořez podle AABB čar
+  mimo výřez. Obce (`_obce_build_cache`): silnice po druzích v dávkách, segmenty uvnitř domácího katastru se
+  vynechají (už je kreslí hlavní vrstva), tečkované hranice se přepočítají jen při změně zoomu. Zoom ke kurzoru,
+  tažení a minimapa beze změny. `_map_ext_ok` se nastaví až když jsou obce načtené.
+- **A1-04** `SurfaceMap.make_map_image`: výšky se vzorkují jednou do mřížky (1× místo 3× `height_at` na pixel),
+  barvy se zapisují přímo do bajtů, stejný vzhled (krok 8 m).
+- **A1-05 + A4-01** `World.place_shut` hlídá `buy` i `sell_items`; `open_place_menu` zavřenému místu neukazuje
+  práci, úkoly ani zboží (jen „Zavřeno, otevřeno …“). Výplata a výpověď jsou skryté taky (zaměstnavatel tam není,
+  výplata zůstává nasbíraná / jde na účet, výpověď jde příště). Obsluha mimo otevírací dobu zmizí (`HIDDEN_OFFSET`),
+  `Place._process` ji přerozdělí každé 4 s; zahrádka hospody se bez otevřeno nepoužije.
+- **A4-02 + A1-06** úřední dny (`WEEK_HOURS["urad"]`: Po a St 7–17, Út a Čt 8–14, Pá 8–12, So a Ne zavřeno,
+  svátky zavřeno přes `CLOSED_ON_HOLIDAY`), `hours_text()` vypisuje i výjimky podle dne. `tests.gd::_reset` přeskočí
+  víkendy a svátky (úkoly přes úřad); pronájem pole v testu volá `Garden.service` přímo, tedy beze změny.
+- **A1-07** F2 → Teleport: sekce „Okolní obce“ (`teleport_target("obec:<id>")` – okolní obce nemají terén ani kolize,
+  proto se hráč postaví na nejbližší okraj katastru čelem k obci).
+- **A1-08** načtení uložené pozice v neexistujícím interiéru → výstup ke dveřím místa / default spawn + varování v logu.
+- **A1-10, A1-17, A1-20** `exit_interior`: výška bodu výstupu se ověří raycastem na statiku (`_ground_y`), odchylka od
+  uloženého / terénu se tiskne do logu (`exit_interior[...]`); `controls_locked` se vrací na původní hodnotu (menu
+  zůstane zamčené). Vstup do interiéru: kontrolní raycast pod `inside_door` (`_check_floor`, jen varování).
+- **A1-13** text načítání „Stromy (51 736)“.
+- **A4-06** víkendoví hosté mají obecné jméno „Výletník / Výletnice“ (ne kopii pojmenované postavy) a neukládají se
+  (`personas()` je přeskakuje, indexy `v%d` se nemíchají).
+- **A4-09** dialog bere masopust a hody z `VillageEvents.is_active`.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v odpovědi).
+- Příčina propadu po odchodu z obchodu (A1-10) není potvrzena – raycast je jen záplata, log `exit_interior[...]`
+  ukáže, jestli uložený bod nesedí s terénem / podlahou.
+- Odložené z auditu: A1-14, A1-15, A1-16, A1-19, A3-12 (viz `docs/audit_vlna0.md`).
+- Pracovní úkoly na zavřeném místě se od dveří nenabízejí – kdyby směna přesáhla zavírací dobu, bude potřeba výjimka.
