@@ -6,6 +6,8 @@ extends Node3D
 
 const N_AI := 5
 const N_PARKED := 14
+# M5.11: vzhled řidiče policejního auta (uniforma – tmavomodrá košile, tmavé kalhoty)
+const POLICE_DRIVER_LOOK := {"look": {"shirt": Color(0.1, 0.16, 0.36), "pants": Color(0.12, 0.13, 0.18), "hair": Color(0.22, 0.16, 0.1), "style": 0, "skin": 0.4}}
 const COLORS := [Color(0.75, 0.75, 0.78), Color(0.1, 0.1, 0.12), Color(0.15, 0.25, 0.55), Color(0.55, 0.08, 0.06),
 	Color(0.9, 0.9, 0.9), Color(0.3, 0.35, 0.3), Color(0.55, 0.45, 0.3), Color(0.2, 0.4, 0.35)]
 # M1.6: váhy výskytu modelů (hodně osobních, občas dodávka / pickup). Traktor jezdí zvlášť (sezóna, okresky).
@@ -28,6 +30,7 @@ var world: Node                   # World – seznam hráčů
 var player_cars := {}             # id hráče → Car (auto hráče)
 var player_vehicles := {}         # id hráče → [Car] všechna jeho vozidla (auto, dědovo kolo, Jawa)
 var ai_cars: Array[Car] = []
+var _police_cars: Array[Car] = []    # M5.11 policejní vozy (patrol, kontrola) – řidič v uniformě, LOD
 var parked: Array[Car] = []
 var rng := RandomNumberGenerator.new()
 var _stuck := {}
@@ -149,6 +152,9 @@ func make_car(model_id: String, color: Color, police := false, plate_text := "")
 	c.weather = world.weather
 	c.clock = world.clock
 	add_child(c)
+	if police:
+		c.add_ai_driver(POLICE_DRIVER_LOOK)
+		_police_cars.append(c)
 	return c
 
 
@@ -265,6 +271,7 @@ func spawn_ai() -> void:
 	for i in N_AI:
 		var c := make_car(pick_model(AI_WEIGHTS), COLORS[rng.randi() % COLORS.size()])
 		c.name = "AI_%d" % i
+		c.add_ai_driver(Characters.profile(rng.randi() % Characters.count()))
 		ai_cars.append(c)
 		_respawn(c, true)
 
@@ -342,6 +349,7 @@ func _physics_process_impl(delta: float) -> void:
 	if _sleep_t <= 0.0:
 		_sleep_t = 0.4
 		_update_car_sleep()
+		_update_driver_lod()
 	var respawns := 0                  # hledání trasy (A*) je drahé – nejvýš jedno přeplánování za krok
 	for c in ai_cars:
 		if c.drive != Car.Drive.AI:
@@ -376,6 +384,14 @@ func _physics_process_impl(delta: float) -> void:
 			_replan_at[c] = Time.get_ticks_msec()
 			respawn_log.append([Time.get_ticks_msec(), c.name, "přeplánován u hráče"])
 			_replan(c)
+
+
+## M5.11: řidiči AI a policejních aut – zobrazit jen blízko hráče, animovat jen velmi blízko (periodicky).
+func _update_driver_lod() -> void:
+	for arr in [ai_cars, _police_cars]:
+		for c in arr:
+			if c != null and is_instance_valid(c):
+				c.update_driver_lod(world.nearest_player_dist(c.global_position))
 
 
 ## Uspávání vozidel podle vzdálenosti k nejbližšímu hráči (výkon na velké mapě): stojící vozidla

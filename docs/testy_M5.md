@@ -121,3 +121,11 @@ Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kab
 8. Požár způsobený hráčem (přestupek „způsobení požáru“) → respekt hasičů −5 navíc.
 9. Save a načtení: členství a zaplacený příspěvek zůstanou; starý save se načte, hráč je nečlen.
 10. Mimo výjezd (bez požáru) nic neruší: siréna jen při `fire_report`, zbrojnice nic nevypisuje do chatu.
+## M5.11 – Doprava 2: řidiči v autech (částečně)
+1. F2 → Teleport na silnici v obci, počkej na projíždějící AI auta: v kabině sedí řidič (postava v pózě za volantem).
+2. Auta mimo cca 120 m od hráče: řidič není vidět (LOD), ve 40–120 m stojí bez animace.
+3. Policejní vůz (hlídka po hlavních silnicích): řidič je v tmavomodré uniformě.
+4. Zastav policejní vůz u kontroly: policista jde k okénku, řidič zůstává v kabině (zatím – policista vedle auta, bod v logu).
+5. Hráč nasedne do vlastního auta: v sedadle je jen jeho postava, žádný druhý řidič.
+6. F5 / F9 během jízdy: po načtení jsou AI auta s řidičem a žádná postava nezůstala viset ve vzduchu.
+7. F2 → Výkon: 5 AI aut s řidiči v obci – FPS srovnatelné s dřívějškem.

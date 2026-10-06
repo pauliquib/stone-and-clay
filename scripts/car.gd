@@ -183,6 +183,9 @@ var _wangle := 0.0                 # aktuální úhel stěračů
 var _wphase := 0.0
 var _glass_drops: GPUParticles3D   # kapky na čelním skle (vidět z interiéru)
 var _rain_roof: AudioStreamPlayer3D
+const DRIVER_SHOW_M := 120.0           # M5.11: řidič AI / policejního auta se zobrazí jen do této vzdálenosti od hráče
+const DRIVER_ANIM_M := 40.0            # a animuje se jen do této (dál stojí v pózе ride)
+var _ai_driver: Humanoid = null        # M5.11 viditelný řidič (AI a policejní auto; vizuál, bez fyziky a AI)
 
 ## Pružení kol v SI jednotkách (spec["susp"] z modelu je relativní násobek).
 @export var suspension_stiffness := 35000.0   # N/m za kolo (při susp = 26)
@@ -628,7 +631,39 @@ func kinematic_step(dt: float) -> void:
 	_t += dt
 
 
+## M5.11: přidá viditelného řidiče (Humanoid v pózе ride na `seat_pos`, rodič = karoserie). `look` = profil
+## vzhledu (Characters.profile / policejní uniforma). Motorky a kola řidiče nemají.
+func add_ai_driver(look: Dictionary) -> void:
+	if _ai_driver != null or two_wheeler or model == null or vis == null:
+		return
+	_ai_driver = Humanoid.new()
+	Characters.apply_look(_ai_driver, look)
+	vis.add_child(_ai_driver)
+	_ai_driver.position = seat_pos
+	_ai_driver.rotation = Vector3.ZERO
+	_ai_driver.ride = model.rider
+	_ai_driver.pose = "ride"
+	_ai_driver.on_floor = true
+
+
+## M5.11: odstraní řidiče (hráč sedne za volant nebo auto se rozbije).
+func remove_ai_driver() -> void:
+	if _ai_driver != null:
+		_ai_driver.queue_free()
+		_ai_driver = null
+
+
+## M5.11: LOD řidiče podle vzdálenosti k nejbližšímu hráči (volá Traffic periodicky).
+func update_driver_lod(d: float) -> void:
+	if _ai_driver == null:
+		return
+	var show := d < DRIVER_SHOW_M
+	_ai_driver.visible = show
+	_ai_driver.set_process(show and d < DRIVER_ANIM_M)
+
+
 func set_player_driver(p: Player) -> void:
+	remove_ai_driver()             # hráč sedá na místo řidiče – AI figurína by seděla v tom samém sedadle
 	set_asleep(false)
 	drive = Drive.PLAYER
 	body_state = p.body

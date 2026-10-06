@@ -1128,3 +1128,18 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - **Umístění zbrojnice** odvozeno z dat (před úřadem, mimo silnice), ale kolize se stavbami a stromy nejsou ověřeny. Ověřit na mapě, případně posunout `STATION_DIST` / `STATION_LAT`.
 - **Respekt a členství** se neukazují v HUD / deníku (J), chybí oddíl „Hasiči“ v `Hud._journal_bbcode()`. Stav je jen v kódu a ve save.
 - `README.md` (Systémy → Hasiči), `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` nebyly upraveny (zadání).
+## 2026-10-06 – M5.11 Doprava 2: řidiči v autech (částečně)
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Co**: `scripts/car.gd` – `add_ai_driver(look)` (Humanoid v pózе `ride` na `seat_pos`, rodič = karoserie, `model.rider` jako u hráče), `remove_ai_driver()`, `update_driver_lod(d)` (zobrazit do `DRIVER_SHOW_M` = 120 m, animovat do `DRIVER_ANIM_M` = 40 m). `set_player_driver` řidiče AI nejdřív odstraní (hráč sedá na stejné místo).
+- **Co**: `scripts/traffic.gd` – AI auta (`spawn_ai`) dostanou řidiče s vzhledem z `Characters.profile` (rng); policejní auta (`make_car(..., police=true)`) řidiče v uniformě (`POLICE_DRIVER_LOOK`, tmavomodrá). Policejní vozy se evidují v `_police_cars`. `_update_driver_lod()` běží v periodice uspávání (každých 0,4 s).
+- Žádný nový save klíč (řidiči jsou čistě vizuální, vznikají při spawnu).
+- **Kontrola překladu** (00_SPOLECNE kap. 6): `--import` a `--check-only` na `scripts/car.gd`, `scripts/traffic.gd` – výstup prázdný.
+
+### Otevřené body
+- **Vesničané s vlastním autem (2.2) nejsou.** Chybí přiřazení auta k domu, akce v BT (`ai/`, generátor `tools/gen_villager_bt.gd`) a stavový automat nástup / výstup / návrat. Minimum (3 vesničané) tedy nesplněno.
+- **Spolujezdec a prosba „Odvezeš mě?“ (2.3) nejsou.** `scripts/favors.gd` žádnou šablonu „Odvezeš mě“ nemá (M4.5 ji v kódu nemá – šablony jsou zahrada, sníh, nákup), takže není co přepnout na skutečné svezení. Chybí i `pax_pos`, `board_passenger` / `unboard_passenger` v autě hráče.
+- **Policista u kontroly** (`police.gd`) dnes stojí vedle auta jako dřív; nevystupuje z kabiny, takže řidič v policejním voze zůstává v kabině i při zastavení. Sjednotit vyžaduje úpravu `police.gd` (mimo sdílené soubory tohoto kroku).
+- **Autobus (2.4)** nebyl zadán (volitelné).
+- LOD jen podle vzdálenosti od hráče; výkon v obci s 5 AI auty nebyl měřen (nespouštěno).
+- `README.md`, `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` nebyly upraveny (zadání).
