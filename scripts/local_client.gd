@@ -697,7 +697,29 @@ func open_place_menu(key: String) -> void:
 					func(): world.pay_debts_office(pid)])     # M4.2: úřad přijímá hotovost
 			if open and player.inside == "" and world.interiors.has(key):
 				opts.insert(0, ["Vejít dovnitř", func(): world.enter_interior(pid, key)])
+			if open and key == "urad" and world.katastr:      # M4.7: katastr – koupě / prodej domů a parcel
+				opts.append(["Katastr – koupě a prodej nemovitostí", open_katastr_menu])
 	hud.open_menu(title, text, opts)
+
+
+## M4.7: nabídka katastru na úřadě (inzeráty z domácího katastru, moje domy a parcely, rozjednané vklady).
+func open_katastr_menu() -> void:
+	var k: Katastr = world.katastr
+	var opts := []
+	var lines := ["Katastr. Peníze: %d Kč. Nemovitosti jen v domácím katastru." % player.money]
+	for id in k.market_houses():
+		opts.append(["Koupit %s – %s" % [k.house_label(id), Bazaar.kc(k.house_price(id))], func(): k.buy_house(pid, id)])
+	for key in k.market_parcels():
+		opts.append(["Koupit %s – %s" % [k.parcel_label(key), Bazaar.kc(k.parcel_price(key))], func(): k.buy_parcel(pid, key)])
+	for id in k.owned_houses():
+		if world.estate.home_estate(pid) != id:
+			opts.append(["Nastavit %s jako domov" % k.house_label(id), func(): k.set_home_house(pid, id)])
+		opts.append(["Nabídnout %s kupci" % k.house_label(id), func(): k.list_house(pid, id)])
+	for key in k.owned_parcels():
+		opts.append(["Prodat %s obci (%d %%)" % [k.parcel_label(key), roundi(Katastr.OBEC_SHARE * 100.0)],
+			func(): k.sell_parcel_obci(pid, key)])
+	lines.append_array(k.status_lines(pid))
+	hud.open_menu("Katastr (úřad)", "\n".join(lines), opts)
 
 
 ## Rozdělí `Place.OFFERS[key]` na kategorie podle záhlaví ("header", M2.3): [[název, [nabídky]], …].

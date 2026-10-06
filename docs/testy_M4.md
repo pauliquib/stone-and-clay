@@ -82,3 +82,16 @@ Spouští jen uživatel. Stav: staticky ověřeno (kontrola překladu), ruční 
 8. Dlouhé sucho (F2 → Datum, několik dní bez deště, horko) → na desce přibude „Zákaz zalévání a napouštění z vodovodu“; po dešti zmizí.
 9. Starý save (bez klíčů `vyhlasky` a `weather.drought`) se načte bez chyby; čerstvé větve nejsou, sucho = 0.
 10. F5 → F9 po odvětvení: čerstvé větve v kapse i jejich stáří sušení zůstanou.
+
+## M4.7 – Katastr: koupě a prodej nemovitostí
+
+1. Úřad → „Katastr – koupě a prodej nemovitostí“ (F2 → Teleport → Úřad, peníze přes F2 → Hráč): nabídka ukazuje domy a parcely jen v domácí obci, žádná z okolních obcí.
+2. Koupit dům (cheat peníze) → zaplatí se cena + 1 500 Kč; v menu se objeví „Vklad: … zbývá 20 dní“.
+3. Přeskoč 20 dní (F2 → Datum) → přijde pošta „Vklad proveden“ a dům je v menu jako vlastněný.
+4. „Nastavit … jako domov“ → domov (dveře, parkování, cedulka) se přesune do nového domu; spaní vede tam.
+5. Koupit parcelu (pole / louka) → po 20 dnech v poště; parcela je vlastněná, na trhu už není.
+6. „Prodat … obci“ → peníze hned (60 % ceny), parcela zmizí z vlastněných.
+7. „Nabídnout … kupci“ u vlastního (ne domácího) domu → po několika dnech pošta „Prodej proveden“ a peníze v hotovosti.
+8. Domov nejde nabídnout k prodeji (hláška o odstěhování).
+9. Uložit (F5) → načíst (F9): vlastnictví a rozjednané vklady zůstanou; starý save se načte bez chyby (katastr prázdný).
+10. Rozhovor / mapa: parcely a domy na prodej nejsou mimo hranici domácí obce (mapa M, hranice `meta.boundary`).

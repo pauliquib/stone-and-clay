@@ -162,6 +162,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["radio"] = world.radio.to_dict()
 	if world.estate:
 		d["estate"] = world.estate.to_dict(id)          # domov: nemovitost, byt, nájem (M1.7)
+	if world.katastr:
+		d["katastr"] = world.katastr.to_dict()          # M4.7: vlastnictví domů a parcel, vklady a prodeje (globální)
 	d["drones"] = world.drones_to_dict(id)              # M6.1: flotila (baterie, poškození) + dron zaparkovaný ve světě
 	d["aircrafts"] = world.aircrafts_to_dict(id)        # M6.3: letouny (pozice, yaw, palivo, dmg) + „sedí ve stroji“
 	if world.permits:
@@ -221,6 +223,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		else:
 			world.estate.migrate_legacy(id)      # verze 1: vlastní dům (usedlost) místo pevného čísla
 		world.apply_home(id)
+	if world.katastr:                            # M4.7: starý save bez klíče = nikdo nic nevlastní, nic se neprodává
+		world.katastr.from_dict(d.get("katastr", {}))
 	p.teleport(_to_v3(pd.get("pos")) + Vector3(0, 0.1, 0), float(pd.get("yaw", 0.0)), false)
 	var inside_id := String(pd.get("inside", ""))          # starý save bez klíče = venku
 	if inside_id != "" and world.ensure_interior(inside_id):  # M1.8: interiér se staví až teď (zblízka / při načtení)

@@ -113,6 +113,7 @@ var surroundings: Surroundings   # M6.2: levná krajina za katastrem (bez koliz�
 var villages: Villages           # vizuální zástavba 5 okolních vesnic (data/obce.json; jen pohled z dálky)
 var building_details: BuildingDetails   # okna, dveře, vrata a komíny budov (data/buildings.json; null bez dat)
 var estate: Estate               # registr nemovitostí (M1.7): čísla popisná, cedulky, domov = vlastnictví / nájem bytu
+var katastr: Katastr             # M4.7: koupě / prodej domů a parcel v domácím katastru (vklad 20 dní), vlastnictví
 var fields: Fields               # pole a louky (data/landuse.bin) – barvy polí kreslí terén podle kalendáře
 var vegetation: VegetationManager   # Fáze 9: trsy, kopřivy, keře, obilné řádky, plevel (data/vegetation.bin)
 var village_events: VillageEvents   # svátky a události v obci (výzdoba, průvod, oheň, ohňostroj)
@@ -272,6 +273,9 @@ func build() -> void:
 	estate = Estate.new()          # M1.7: po místech, fasádách a interiérech (čte dveře budov a místo „domov“)
 	add_child(estate)
 	estate.setup(self)
+	katastr = Katastr.new()        # M4.7: parcely z pole (fields) a domácí katastr (meta.boundary) – po registru nemovitostí
+	add_child(katastr)
+	katastr.setup(self)
 	interior_streamer.add_estates(estate)     # M1.8: generované interiéry budov s dveřmi (stavějí se až zblízka)
 	if npcs.has("deda") and (npcs["deda"] as Npc).persona:
 		(npcs["deda"] as Npc).persona.profile["job"] = "důchodce, soused z %s" % estate.deda_label()
@@ -1087,6 +1091,11 @@ func home_label(id: int) -> String:
 
 func deda_label() -> String:
 	return estate.deda_label() if estate else "vedle"
+
+
+## M4.7: bod (svět x, z) leží v DOMÁCÍM katastru (`meta.boundary`). Koupě a prodej jen tam (okolní obce ne).
+func in_home_cadastre(pos: Vector3) -> bool:
+	return katastr == null or katastr.in_cadastre(Vector2(pos.x, pos.z))
 
 
 ## Dveře usedlosti (původní dům hráče z podkladů): hospodářství, včelař a překupník se měří odsud,

@@ -77,7 +77,7 @@ Do nové session napiš např.:
 | [x] | M4.3 Soud a vězení | [`M4_zakon/03_soud_a_vezeni.md`](M4_zakon/03_soud_a_vezeni.md) | M4.2 |
 | [x] | M4.5 Dobré skutky a přátelství (`Favors`) | [`M4_zakon/05_povest_respekt_karma_skutky.md`](M4_zakon/05_povest_respekt_karma_skutky.md) | M0.6 · lépe po M4.4 |
 | [ ] | M4.6 Zbraně, lov a rybolov podle zákona | [`M4_zakon/06_zbrane_lov_rybolov_zakon.md`](M4_zakon/06_zbrane_lov_rybolov_zakon.md) | M4.1, M4.3, **M4.4**, M2.7–M2.10 |
-| [ ] | M4.7 Katastr: koupě a prodej domů, bytů, polí, pozemků, lesů (jen domácí katastr) | [`M4_zakon/07_katastr_koupe_prodej_nemovitosti.md`](M4_zakon/07_katastr_koupe_prodej_nemovitosti.md) | M1.7, **M4.2 (`Debts`)**, M3.1 |
+| [x] | M4.7 Katastr: koupě a prodej domů, bytů, polí, pozemků, lesů (jen domácí katastr) | [`M4_zakon/07_katastr_koupe_prodej_nemovitosti.md`](M4_zakon/07_katastr_koupe_prodej_nemovitosti.md) | M1.7, **M4.2 (`Debts`)**, M3.1 |
 | [ ] | M4.8 Návykové látky – tabák, konopí, lysohlávky (**obsah pro dospělé, výchozí vypnuto**) | [`M4_zakon/08_navykove_latky.md`](M4_zakon/08_navykove_latky.md) | M2.4, **M4.4**, (M4.2, M4.3) |
 
 **Pořadí a souběh M4** (sdílené soubory = nedělat zároveň):

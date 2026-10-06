@@ -464,3 +464,29 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Povolení ke kácení (část A, 3.2) stále nedělané.
 - Nenahlášený kouř odhalí hajný / policie až později (zatím jen registr `unreported`).
 - Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.4 část B).
+
+## 2026-10-06 – M4.7 Katastr: koupě a prodej nemovitostí
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou `godot --check-only` – ruční test čeká)
+- **Co**: nový `scripts/katastr.gd` (`class_name Katastr`, `World.katastr`): parcely z `Fields.class_at` na mřížce 100 m
+  uvnitř domácího katastru (`meta.boundary` z `data/map.json`, mimo okolní obce), smyšlená čísla parcel, třídy orná / louka /
+  sad / zahrádky s cenami za m² (tabulka `PARCEL_KC_M2`); domy = rodinné domy z `Estate` (ne usedlost, ne domov, ne byty).
+- **Co**: `World.in_home_cadastre(pos)`; inzeráty se mění po týdnech (deterministický výběr `hash([id, týden])`).
+- **Co**: kupní smlouva = platba ceny + poplatek 1 500 Kč hned, vklad do katastru za 20 herních dní (`pending`, pošta
+  „Vklad proveden“). Prodej parcely obci hned za 60 %. Nabídka vlastního domu kupci: kupec se ozve za 3–20 dní podle ceny,
+  peníze v hotovosti. Domov jde nabídnout jen po odstěhování. „Nastavit jako domov“ = `Estate.set_home` + `World.apply_home`.
+- **Co**: `Estate.set_estate_owner` nastavuje vlastnictví budov; `local_client.gd` → `open_katastr_menu()` z nabídky úřadu
+  (jen když je úřad otevřen).
+- **Ukládání**: globální klíč `katastr` v `save_game.gd` (`houses`, `parcels`, `pending`), výchozí prázdno; starý save bez klíče
+  se načte (nikdo nic nevlastní).
+- **Kontrola**: `godot --import` (výstup jen chybějící textury addonů) a `--check-only` na `katastr`, `world`, `save_game`,
+  `local_client` – výstup prázdný.
+
+### Otevřené body
+- Hypotéka (splátky přes `Debts`, zástava, exekuce zpět za 70 %) není; pronájem domu (nájemník) není.
+- Vlastnictví nemá zatím vliv na kácení, sklizeň ani chov (`Forestry.zone_at`, `Garden`); cizí pozemek = přestupek (M4.4) není.
+- Cedule „Na prodej“ u domů a polí, téma v rozhovoru, zvýraznění parcely na mapě M nejsou.
+- Vklad a prodej nejdou zrušit; prodej domu jen hotovostí; nepřihlašuje se k bance.
+- Parcely jsou mřížka 1 ha bez ohledu na hranice pozemků a budovy; neřeší se překryv s budovami.
+- Výkup obcí a nabídka kupci nemají vliv na pověst / vztahy s vesničany (M7).
+- Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.7).

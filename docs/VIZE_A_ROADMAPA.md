@@ -441,7 +441,7 @@ kroky přehazovat, mezi milníky platí závislosti.
   povolenky (kurzy a zkoušky přes PC / střelnici), hajný a rybářská stráž v terénu, svědci hlásí
   pytláctví, kontroly dokladů a kufru policií, zabavení, trestné činy. *Hotovo, když:* pytlák s úlovkem
   na rameni je dopaden hajným a legální lovec s doklady a úlovkem v kufru projde kontrolou policie.
-- [ ] **M4.7 Katastr: koupě a prodej nemovitostí** (D2) – smyšlené parcely z `landuse`, katastr na úřadě / PC,
+- [x] **M4.7 Katastr: koupě a prodej nemovitostí** (D2) – smyšlené parcely z `landuse`, katastr na úřadě / PC,
   vklad se lhůtou, hypotéka, pronájem, vlastnictví řídí kácení / sklizeň / chov. *Hotovo, když:* hráč koupí dům
   a les, přestěhuje se a v lese smí kácet. Nemovitosti jen v domácím katastru (rozhodnutí 6. 10. 2026).
 - [ ] **M4.8 Návykové látky** (E8) – tabák, konopí, lysohlávky za volbou „Obsah pro dospělé“ (výchozí vypnuto),
