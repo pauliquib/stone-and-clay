@@ -144,3 +144,15 @@ Cheat: F2 → Teleport (zatím bez položky; přes souřadnice `Studanka.SPRING_
 8. Nástěnka / web obce v období 1.–14. 7. hlásí „Skautský tábor v lese“.
 9. F5 / F9 → po načtení je studánka a tábořiště na stejném místě, žádná chyba v logu.
 10. Ověř, že hra běží bez chyby po přechodu přes studánku a tábořiště (log bez SCRIPT ERROR mimo addony).
+
+## M5.4 Hasičský sport: požární útok a soutěž (částečně)
+1. F2 → Teleport k hřišti u hospody, jděte 60 m na západ: základna (mašina červená, káď modrá), dva terče 90 m dál, nad základnou cedule „SDH Pod Kopcem · požární útok“.
+2. Bez členství SDH: u základny menu jen s hláškou „jen pro členy SDH“; člen (M5.3) vidí volby rolí.
+3. F2 → Datum středa 18:00: trénink „hrát strojník“ → výstřel, E v pruhu (cedule `[....O...]`) → motor naskočí; LMB v zelené zóně → tlak 100 %.
+4. Strojník: přehnaný plyn (LMB v červené části) → hláška „hadice se rozpojila“, výsledek N.P.
+5. Role koš / savice / béčko / rozdělovač: E v pruhu → bez zdržení; mimo pruh → hláška „zdržení“ a delší čas.
+6. Proudař levý: běž 70 m od základny, mířením na terč (koukat na něj 2,5 s) → procento terče na Label3D roste do 100 %, světlo se rozsvítí.
+7. Po dokončení: hláška s časem („Čas: 22.4 s“), další pokusy zlepšují čas (forma) a při prvním rekordu „Nový rekord sboru!“.
+8. Odejdi od základny (nad 30 m, u proudaře nad 120 m) během pokusu → pokus končí N.P. „odchod od stroje“.
+9. F2 → Datum první sobota v červnu: menu „Soutěž – hrát …“, výsledková tabule s 5 smyšlenými družstvy a tvým pořadím.
+10. Vítězství v soutěži → respekt Hasiči +10, pověst +5; save a načtení zachová formu a osobní rekord (starý save = nulová forma).

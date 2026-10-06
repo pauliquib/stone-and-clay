@@ -1170,3 +1170,25 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - **Teleport „Studánka“ / „Tábor“** není: položky do `data/pois.json` se nepřidávaly (sdílený soubor). Doplnit po dohodě s M5.1.
 - **Kolize a zem**: stany a stožár nemají kolizi; neověřeno na mapě, zda je mýtinka opravdu rovná (výška jen z `height_at`).
 - `README.md` (Systémy → Les), `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` nebyly upraveny (zadání).
+
+## 2026-10-07 – M5.4 Hasičský sport: požární útok a soutěž (částečně)
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou překladu – ruční test čeká)
+- **Co**: nový `scripts/hasici_sport.gd` (`class_name HasiciSport`, `World.hasici_sport`) a data `data/hasicsky_sport.json`.
+  - **Základna** 60 m západně od středu hřiště (12 m za čárou, `FotbalHriste.CENTER`): podložka 2 × 2 m, mašina PS 12, káď, dva nástřikové terče 90 m dál (kolmo k základně) s Label3D stavem (%) a světlem po naplnění. Cedule a ukazatel pulzu (`[----O===--]`, Label3D nad základnou).
+  - **Pokus** = fáze za sebou: sání (koš, savice 1 a 2), motor (strojník), hadice B (béčko), rozdělovač, plnění hadic (`faze_s.plneni / tlak`), proudy na terče (proudaři). NPC role mají časy ze `faze_s` × forma (−3 % za trénink, min. 75 %) × rozptyl ±10 %. Čas = skutečné sekundy od startu do naplnění.
+  - **QTE hráče podle role**: strojník – E v pruhu (3 pokusy, zdržení 0,8 s), pak LMB v zelené zóně plynu (mimo zónu slabší tlak a zdržení, v červené rozpojená hadice = N.P.); koš/savice/béčko/rozdělovač – E v pruhu (mimo = zdržení 1,5 s); proudař – doběh 70 m a míření kamerou na terč 2,5 s. Timeout 6 s = zdržení 3 s. Odchod od základny (30 m, proudař 120 m) ruší pokus jako N.P.
+  - **Trénink**: středa 18–19 h, člen SDH (`Hasici.is_member`), kdykoli opakovaně; každý platný pokus zvedá formu (max 20), XP `hasicina` 10–30 a `kondice` 10, respekt `hasici` +0,5. Osobní rekord a rekord sboru (hláška „Nový rekord sboru!“).
+  - **Soutěž**: první sobota v červnu (`HasiciSport.soutez_day`, registrace v `VillageEvents.register("hasici_soutez", …)` ze `setup`), jeden pokus za den, pět smyšlených družstev (`tymy` v JSON), výsledková tabule v menu; vítěz → respekt `hasici` +10, pověst +5.
+- **Napojení**: `scripts/world.gd` – var `hasici_sport`, vytvoření za zbrojnicí, `on_click` v `use_tool` za fotbalem (LMB u plynu/proudu), `interactables` za zbrojnicí. `scripts/save_game.gd` – klíč `hasicsport` (`d.get("hasicsport", {})`, starý save = nulová forma). `scripts/hasici.gd` nezměněn (sport je ve vlastním souboru).
+- **Kontrola překladu** (00_SPOLECNE kap. 6): `--check-only` na `scripts/hasici_sport.gd`, `scripts/world.gd`, `scripts/save_game.gd` – výstup prázdný. `--import` vypršel na 300 s (rc 124), cache importu může být neúplná (stejně jako M5.3/M5.5).
+
+### Otevřené body
+- **Diváci, stánek s pivem a klobásou, pohár v klubovně**: nejsou (jen text v tabulce a hláška). Kategorie ženy / muži / veteráni jen jako text („muži“).
+- **Vizuál**: NPC hasiči u základny se nespawnují, hadice a proudnice nejsou vidět (jen časy, ukazatel a terče). Voda jako částice není.
+- **QTE**: béčko má jen E v pruhu, místo běhu s hadicí. Strojník drží plyn jedním stiskem LMB, ne držením.
+- **Umístění základny a terčů** je orientační (západně od hřiště, osa −X); kolize se stromy a stavbami v okolí ověřit v běhu. Terče nemají fyzickou kolizi.
+- **Rekord sboru** se ukládá kopií do každého hráče (`rekord` v klíči save), ne jako samostatný záznam světa.
+- **Efekty na respekt při soutěži a tréninku** jsou jen v kódu; deník J (oddíl Hasičský sport) a README → Systémy nebyly upraveny (zadání).
+- Výsledky soutěže se nepropisují do kalendáře M5.5 (registrace jen jako položka kalendáře přes `register`).
+- Ruční test čeká (checklist v `docs/testy_M5.md`, oddíl M5.4).

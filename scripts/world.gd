@@ -134,6 +134,7 @@ var witness_sources: Array[Callable] = []   # M4.4/M4.6: další zdroje svědků
 var fire_mgr: FireManager        # oheň a topení (M2.2): ohniště, opékání, zákon u lesa, požár trávy, kamna doma
 var hasici: Hasici               # M5.3: sbor dobrovolných hasičů – zbrojnice u úřadu, členství, výjezdy k požáru trávy
 var studanka: Studanka           # M5.10: studánka v lese (pití, konev) a skautský tábor na mýtince (červenec)
+var hasici_sport: HasiciSport    # M5.4: požární útok u hřiště – trénink, soutěž, výsledky
 var npc_grow: NpcGrow            # M4.8 obsah pro dospělé: záhon zahrádkáře Ladislava (konopí), jen při zapnuté volbě
 var vyhlasky: Vyhlasky           # obecní vyhlášky (pálení, sucho, nedělní klid) a sušení čerstvých větví (M4.4 část B)
 var klesti: Klesti                # hromada klestí u domu (M4.4 část B): čerstvé větve schnou, suché se berou zpět
@@ -1107,6 +1108,10 @@ func _spawn_places() -> void:
 		hasici = Hasici.new()
 		add_child(hasici)
 		hasici.setup(self)
+	if hasici_sport == null:                      # M5.4: základna požárního útoku u hřiště (až po terénu a místech)
+		hasici_sport = HasiciSport.new()
+		add_child(hasici_sport)
+		hasici_sport.setup(self)
 	if places["hospoda"].regulars.size() > 0:
 		npcs["pepa"] = places["hospoda"].regulars[0]
 	# děda Vomáčka na lavičce kousek od usedlosti (místo „domov“ je teď ještě na původním bodu z pois.json;
@@ -1982,6 +1987,8 @@ func player_action(id: int, action: String) -> void:
 				return
 			if football and football.on_click(id):     # míč na hřišti, prázdné ruce: kop (M5.6)
 				return
+			if hasici_sport and hasici_sport.on_click(id):   # M5.4: plyn strojníka / proudař (LMB)
+				return
 			if vycep and vycep.on_click(id):           # výčepní u pípy: čepování držením LMB (M3.2)
 				return
 			if palenice and palenice.on_click(id):     # pomocník v pálenici: přiložit poleno pod kotel (M3.3)
@@ -2698,6 +2705,8 @@ func interactables(id: int) -> Array:
 		out.append_array(studanka.interactables(id))   # M5.10: E u studánky (napít se, konev)
 	if hasici:
 		out.append_array(hasici.interactables(id))   # M5.3: vchod zbrojnice SDH (členství)
+	if hasici_sport:
+		out.append_array(hasici_sport.interactables(id))   # M5.4: základna požárního útoku
 	if garden:
 		out.append_array(garden.interactables(id))
 	if farm:
