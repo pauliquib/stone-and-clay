@@ -38,6 +38,7 @@ static var _music_cache := {}          # id → AudioStreamWAV (vyrobená hudba)
 static var _hiss_wav: AudioStreamWAV   # šum mezi stanicemi (vyrobený jednou)
 
 var world: World
+var car_mode := false                  # M5.9: autorádio ve vozidle – bez modelu lampového rádia a bez štítků na stupnici
 var stations: Array = []               # BUILTIN + data/radia.json
 var station := ""                      # id stanice, "" = vypnuto
 var volume := 5                        # 0..10
@@ -97,10 +98,11 @@ func _ready() -> void:
 				if s is Dictionary and s.has("url") and s.has("name"):
 					stations.append({"id": "net:" + String(s["url"]), "name": String(s["name"]), "url": String(s["url"]),
 						"genre": String(s.get("genre", "internetové rádio")), "noise": float(s.get("noise", 0.5))})
-	_build_model()
+	if not car_mode:
+		_build_model()
 	_player = AudioStreamPlayer3D.new()
 	_player.attenuation_filter_cutoff_hz = 7000.0
-	_player.position = Vector3(0, 0.95, 0)
+	_player.position = Vector3(0, 0.95, 0) if not car_mode else Vector3.ZERO
 	add_child(_player)
 	_hiss = AudioStreamPlayer3D.new()
 	_hiss.attenuation_filter_cutoff_hz = 7000.0
@@ -108,7 +110,8 @@ func _ready() -> void:
 	_hiss.stream = _hiss_stream()
 	add_child(_hiss)
 	_apply_volume()
-	_build_dial_labels()
+	if not car_mode:
+		_build_dial_labels()
 	_update_label()
 
 

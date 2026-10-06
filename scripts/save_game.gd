@@ -88,6 +88,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 	for v in veh:
 		var ve := {"model": v.model_id, "pos": _v3(v.global_position), "yaw": v.global_rotation.y, "damage": v.damage,
 			"lights": v.lights_on}
+		if v.has_radio():                 # M5.9 autorádio (stanice, hlasitost, zlost sousedů); starý save bez klíče = bez rádia
+			ve["radio"] = v.radio_to_dict()
 		if world.cargo:
 			var vc := world.cargo.vehicle_to_dict(v)          # náklad v kufru / na ložné ploše / na nosiči (M2.10)
 			if not vc.is_empty():
@@ -322,6 +324,11 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 			v.damage = dmg
 		if bool(vd.get("lights", false)) != v.lights_on:
 			v.toggle_lights()
+		var rd = vd.get("radio", {})      # M5.9 autorádio
+		if rd is Dictionary and not (rd as Dictionary).is_empty():
+			var rad: Radio = v.ensure_radio(world)
+			if rad != null:
+				rad.from_dict(rd)
 	if world.bazaar:
 		for i in vs.size():
 			var vd: Dictionary = vs[i]

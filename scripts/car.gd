@@ -83,6 +83,12 @@ var driver_id := 0                 # id hráče za volantem (0 = nikdo / AI)
 var driver_input: InputState       # vstup hráče za volantem
 var damage := 0.0                  # 0..100 %
 var lights_on := false
+const CABIN_DOOR_S := 10.0             # M5.9: vnitřní světlo po nástupu / výstupu za šera zhasne po této době
+var _radio: Radio                      # M5.9 autorádio (vzniká až při prvním použití, jen auta s kabinou)
+var _cabin: OmniLight3D                # M5.9 stropní světlo v kabině
+var cabin_on := false
+var _cabin_timer := 0.0
+var _cabin_manual := false             # hráč zapnul světlo ručně (nezhasne po čase, jen rozjezdem nebo přepnutím)
 var siren := false
 var owner_id := 0                  # id hráče, kterému auto patří (0 = nikomu)
 var input_locked := false          # řidič "vypnutý" (okno)
@@ -691,6 +697,94 @@ func toggle_lights() -> void:
 	_head_l.visible = lights_on
 	_head_r.visible = lights_on
 	model.head_mat.emission_energy_multiplier = 3.0 if lights_on else 0.3
+
+
+# ------------------------------------------------------------------ M5.9: autorádio a vnitřní světlo
+
+## Autorádio vznikne až poprvé (nastoupení do auta); dvoukolá vozidla a traktor bez kabiny ho nemají.
+func ensure_radio(w: World) -> Radio:
+	if _radio == null and not two_wheeler and model.kind == "car" and model.spec.get("builder", "") != "tractor":
+		_radio = Radio.new()
+		_radio.name = "AutoRadio"
+		_radio.world = w
+		_radio.car_mode = true
+		_radio.position = Vector3(seat_pos.x, 0.8, seat_pos.z - 0.6)     # palubní deska
+		add_child(_radio)
+	return _radio
+
+
+func has_radio() -> bool:
+	return _radio != null
+
+
+## Stav autorádia pro uložení (prázdný slovník = auto rádio nemá).
+func radio_to_dict() -> Dictionary:
+	if _radio == null:
+		return {}
+	return _radio.to_dict()
+
+
+## Akce z World.player_action (hráč za volantem): car_radio_0 = vypnout, car_radio_1..5 = předvolby,
+## car_radio_vol_up / car_radio_vol_down = hlasitost.
+func car_action(pid: int, action: String) -> void:
+	if _radio == null:
+		return
+	match action:
+		"car_radio_0":
+			_radio.tune(pid, "")
+		"car_radio_vol_up":
+			_radio.set_volume(pid, _radio.volume + 1)
+		"car_radio_vol_down":
+			_radio.set_volume(pid, _radio.volume - 1)
+		_:
+			var n := int(action.right(1))
+			if n >= 1 and n <= _radio.stations.size():
+				_radio.tune(pid, String(_radio.stations[n - 1]["id"]))
+	if _radio.world:
+		_radio.world.notify(pid, "show_message", [_radio.describe(), 2.5])
+
+
+func _cabin_light() -> OmniLight3D:
+	if _cabin == null:
+		_cabin = OmniLight3D.new()
+		_cabin.name = "VnitrniSvetlo"
+		_cabin.position = seat_pos + Vector3(0.0, 1.0, 0.0)
+		_cabin.light_color = Color(1.0, 0.85, 0.6)
+		_cabin.light_energy = 0.6
+		_cabin.omni_range = 4.0
+		_cabin.shadow_enabled = false
+		_cabin.visible = false
+		add_child(_cabin)
+	return _cabin
+
+
+## Nástup / výstup za šera a v noci: světlo se rozsvítí na CABIN_DOOR_S sekund.
+func cabin_door_light() -> void:
+	cabin_on = true
+	_cabin_manual = false
+	_cabin_timer = CABIN_DOOR_S
+	_cabin_light().visible = true
+
+
+## Ruční přepnutí (klávesa F4 přes World.player_action).
+func toggle_cabin_light() -> void:
+	cabin_on = not cabin_on
+	_cabin_manual = cabin_on
+	_cabin_timer = 0.0
+	_cabin_light().visible = cabin_on
+
+
+func _cabin_tick(delta: float) -> void:
+	if not cabin_on:
+		return
+	if absf(speed) > 3.0:                   # rozjezd – světlo zhasne (i ruční)
+		cabin_on = false
+		_cabin_manual = false
+	elif not _cabin_manual:
+		_cabin_timer -= delta
+		if _cabin_timer <= 0.0:
+			cabin_on = false
+	_cabin_light().visible = cabin_on
 
 
 func honk() -> void:
@@ -1652,6 +1746,7 @@ func _process(delta: float) -> void:
 
 
 func _process_impl(delta: float) -> void:
+	_cabin_tick(delta)
 	var f := Engine.get_physics_interpolation_fraction()
 	var xf := _prev_xf.interpolate_with(_cur_xf, f)
 	if two_wheeler:
