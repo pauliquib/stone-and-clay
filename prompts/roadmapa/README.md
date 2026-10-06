@@ -72,7 +72,7 @@ Do nové session napiš např.:
 | | Krok | Soubor | Předpoklady |
 |---|---|---|---|
 | [x] | M4.1 Řidičská oprávnění a autoškola (rozšíření `Permits`, klávesa P) | [`M4_zakon/01_ridicska_opravneni_autoskola.md`](M4_zakon/01_ridicska_opravneni_autoskola.md) | M3.4, M1.6, M6.1 |
-| [ ] | M4.2 Správní řízení na úřadě + společné dluhy a exekuce (`Debts`) | [`M4_zakon/02_spravni_rizeni_urad.md`](M4_zakon/02_spravni_rizeni_urad.md) | M4.1 |
+| [x] | M4.2 Správní řízení na úřadě + společné dluhy a exekuce (`Debts`) | [`M4_zakon/02_spravni_rizeni_urad.md`](M4_zakon/02_spravni_rizeni_urad.md) | M4.1 |
 | [ ] | M4.3 Soud a vězení | [`M4_zakon/03_soud_a_vezeni.md`](M4_zakon/03_soud_a_vezeni.md) | M4.2 |
 | [ ] | M4.4 Další přestupky, svědci (`witness_check`), obecní vyhlášky (pálení, sucho, hluk) | [`M4_zakon/04_dalsi_prestupky.md`](M4_zakon/04_dalsi_prestupky.md) | M4.2 · **velký – možná 2 session** |
 | [x] | M4.5 Dobré skutky a přátelství (`Favors`) | [`M4_zakon/05_povest_respekt_karma_skutky.md`](M4_zakon/05_povest_respekt_karma_skutky.md) | M0.6 · lépe po M4.4 |

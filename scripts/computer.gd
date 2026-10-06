@@ -286,23 +286,21 @@ func pay_rent(pid: int, due: int, what := "Nájem") -> bool:
 	return true
 
 
-## Nezaplacené pokuty z rejstříku (Law). Vrací Kč.
+## Nezaplacené pokuty a dluhy z `World.debts` (M4.2). Vrací Kč.
 func unpaid_fines(pid: int) -> int:
-	var lr: Law.LawRecord = world.law.get(pid)
-	return lr.unpaid_fines if lr else 0
+	return world.debts.total(pid, Debts.FINE_KINDS) if world.debts else 0
 
 
-## Zaplatí všechny nezaplacené pokuty z účtu (M4.2 doplní platbu jednotlivě a lhůty).
+## Zaplatí všechny otevřené pokuty z účtu, od nejstarší (M4.2: jednotlivé dluhy v `Debts`).
 func pay_fines(pid: int) -> String:
-	var lr: Law.LawRecord = world.law.get(pid)
-	if lr == null or lr.unpaid_fines <= 0:
+	var due := unpaid_fines(pid)
+	if due <= 0:
 		return "Žádné nezaplacené pokuty."
-	var due := lr.unpaid_fines
-	if not withdraw_bank(pid, due, "Pokuty – úhrada (správní orgán)"):
+	if world.players[pid].bank < due:
 		return "Na účtu nemáš dost peněz (pokuty %s)." % Bazaar.kc(due)
-	lr.unpaid_fines = 0
-	for r in lr.records:
-		r["zaplaceno"] = true
+	for dl in world.debts.list(pid):
+		if Debts.FINE_KINDS.has(dl["kind"]):
+			world.debts.pay(pid, String(dl["id"]), int(dl["kc"]), "bank")
 	world.play_sfx(pid, "cash")
 	world.emit_game_event(pid, "fines_paid", {"kc": due})
 	send_mail(pid, "Správní orgán (smyšlený)", "Potvrzení o zaplacení pokut", "Přijali jsme platbu %s. Děkujeme.\n(Zjednodušená herní simulace.)" % Bazaar.kc(due))
@@ -804,11 +802,11 @@ func on_event(pid: int, kind: String, data: Dictionary) -> void:
 			var what := String(o.get("drb", String(o.get("nazev", "něco provedl")).to_lower()))   # A4-13: věta do drbů z dat
 			if not texts.is_empty():
 				_add_gossip(pid, String(texts[r.randi_range(0, texts.size() - 1)]) % what)
-			var lr: Law.LawRecord = world.law.get(pid)
-			if lr and not lr.records.is_empty() and not bool((lr.records[-1] as Dictionary).get("zaplaceno", true)):
+			var due_kc := unpaid_fines(pid)
+			if due_kc > 0 and String(o.get("misto", "")) != "na_miste":
 				send_mail(pid, "Správní orgán (smyšlený)", "Výzva k zaplacení pokuty",
-					"Za přestupek „%s“ (%s) evidujeme nezaplacenou pokutu. Celkem k úhradě: %s.\nZaplatit můžete v internetovém bankovnictví (Moje banka → Pokuty).\n(Zjednodušená herní simulace – ověřit aktuální znění zákonů.)" % [
-					o.get("nazev", ""), Law.LawRecord._par(o), Bazaar.kc(lr.unpaid_fines)])
+					"Za přestupek „%s“ (%s) evidujeme nezaplacenou pokutu. Celkem k úhradě: %s.\nZaplatit můžete v internetovém bankovnictví (Moje banka → Pokuty) nebo na úřadě.\n(Zjednodušená herní simulace – ověřit aktuální znění zákonů.)" % [
+					o.get("nazev", ""), Law.LawRecord._par(o), Bazaar.kc(due_kc)])
 		"job_hired", "job_fired":
 			var j := Jobs.job(String(data.get("job", "")))
 			var emp := String(j.get("zamestnavatel", "nich"))

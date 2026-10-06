@@ -83,6 +83,7 @@ var talk_recent := {}            # id → {druh herní události → herní minu
 var law := {}                    # id → Law.LawRecord (rejstřík přestupků a body, M0.5)
 var jobs := {}                   # id → Jobs (zaměstnání, směny, docházka, výplata – M3.1, data/prace.json)
 var favors: Favors               # prosby vesničanů a dobré skutky (M4.5), stav per hráč
+var debts: Debts                 # dluhy a pokuty (M4.2): bloková složenka, příkaz poštou, upomínka, exekuce; stav per hráč
 var action_runner: ActionRunner  # výběr cíle a průběh kontextových akcí (M0.4)
 var sleep_spots: Array[SleepSpot] = []
 var clients := {}                # id → LocalClient (jen hráči na tomto počítači)
@@ -474,6 +475,10 @@ func add_player(id: int, pos: Vector3, yaw: float) -> Player:
 	if favors == null:            # M4.5: prosby vesničanů (jedna instance, stav per hráč)
 		favors = Favors.new()
 		favors.setup(self)
+	if debts == null:             # M4.2: dluhy (jedna instance, stav per hráč; denní krok v _process_impl)
+		debts = Debts.new()
+		add_child(debts)
+		debts.setup(self)
 	if fences == null:            # ploty a ohrady (Fáze 7) – až PO výběhu, zahradě i statku: sondy `_find_spot`
 		fences = FenceManager.new()   # hledají jejich místa kolizním kvádrem a na hotový plot by narazily
 		add_child(fences)
@@ -1565,9 +1570,9 @@ func _on_busted(id: int, p: float, reason: String) -> void:
 	if reason.begins_with("řízení přes zákaz"):
 		oid = "rizeni_pres_zakaz"
 	var res := commit_offense(id, oid, {"severity": 1.0 if p >= 1.0 else 0.0, "quiet": true})
-	var text := "ZADRŽEN POLICIÍ\n%s\nPokuta %d Kč (zaplaceno %d Kč), zákaz řízení %d h.\n%s" % [
-		reason, res.get("fine", 0), res.get("paid", 0), int(res.get("ban_h", 0.0)),
-		"Kůň zůstal u cesty." if pl.horse else "Auto odtaženo domů."]
+	var text := "ZADRŽEN POLICIÍ\n%s\nPokuta %d Kč (%s), zákaz řízení %d h.\n%s" % [
+		reason, res.get("fine", 0), "zaplaceno %d Kč" % res.get("paid", 0) if int(res.get("paid", 0)) > 0 else "příkaz k úhradě přijde poštou",
+		int(res.get("ban_h", 0.0)), "Kůň zůstal u cesty." if pl.horse else "Auto odtaženo domů."]
 	if int(res.get("points", 0)) > 0:
 		text += "\n+%d bodů (celkem %d / %d)." % [res["points"], res["total_points"], int(Law.setting("body_limit", 12.0))]
 	if res.get("points_ban", false):
@@ -1593,6 +1598,8 @@ func _on_busted(id: int, p: float, reason: String) -> void:
 
 ## Jediná brána pro tresty (M0.5): zapíše přestupek do rejstříku (Law.LawRecord), vybere pokutu, přičte body,
 ## případně dá zákaz řízení a pošle událost „offense“. data: severity 0..1, quiet (bez zprávy o bodech).
+## M4.2 – platba podle `misto` z katalogu: na_miste = bloková pokuta hned z hotovosti (jinak složenka v `debts`),
+## spravni_rizeni = příkaz poštou za 1–3 dny (pak dluh se splatností), soud = dluh rovnou (do M4.3).
 func commit_offense(id: int, offense_id: String, data := {}) -> Dictionary:
 	var lr: Law.LawRecord = law.get(id)
 	var pl: Player = players.get(id)
@@ -1603,6 +1610,28 @@ func commit_offense(id: int, offense_id: String, data := {}) -> Dictionary:
 	var res := lr.commit(offense_id, d, clock.minutes)
 	if not res.get("ok", false):
 		return res
+	var fine: int = int(res["fine"])
+	var jd := clock.jd()
+	var rec: Dictionary = lr.records[-1] if not lr.records.is_empty() else {}
+	match String(res.get("misto", "na_miste")):
+		"na_miste":
+			if fine > 0 and pl.money >= fine:
+				pl.money -= fine
+				res["paid"] = fine
+				rec["zaplaceno"] = true
+				rec["stav"] = "zaplaceno"
+				play_sfx(id, "cash")
+			elif fine > 0:
+				debts.add(id, "pokuta", fine, jd + Debts.DUE_DAYS, "%s (bloková pokuta)" % res["name"], offense_id)
+				rec["stav"] = "splatne"
+		"spravni_rizeni":
+			if fine > 0:
+				debts.queue_order(id, fine, jd, "%s (%s)" % [res["name"], res["par"]], offense_id)
+				rec["stav"] = "prikaz"
+		_:
+			if fine > 0:
+				debts.add(id, "pokuta", fine, jd + Debts.DUE_DAYS, "%s (soud – zjednodušeně)" % res["name"], offense_id)
+				rec["stav"] = "splatne"
 	emit_game_event(id, "offense", {"id": offense_id, "fine": res["fine"], "points": res["points"],
 		"criminal": res["criminal"]})
 	if res.get("points_ban", false) and permits:   # M4.1: 12 bodů → řidičák odebrán, nutné přezkoušení
@@ -1615,6 +1644,20 @@ func commit_offense(id: int, offense_id: String, data := {}) -> Dictionary:
 			notify(id, "show_message", ["%s: +%d bodů (celkem %d / %d)" % [res["name"], res["points"],
 				res["total_points"], int(Law.setting("body_limit", 12.0))], 4.0])
 	return res
+
+
+## M4.2 úřad: zaplatí otevřené pokuty a dluhy z hotovosti (od nejstarší). Vrací zaplacenou částku.
+func pay_debts_office(id: int) -> int:
+	var due := debts.total(id, Debts.FINE_KINDS)
+	if due <= 0:
+		notify(id, "show_message", ["Na úřadě nemáš žádné nezaplacené pokuty.", 2.5])
+		return 0
+	var paid := debts.pay_fines_cash(id)
+	if paid > 0:
+		play_sfx(id, "cash")
+	var left := debts.total(id, Debts.FINE_KINDS)
+	notify(id, "show_message", ["Na úřadě zaplaceno %s. Zbývá k úhradě: %s." % [Bazaar.kc(paid), Bazaar.kc(left)], 4.0])
+	return paid
 
 
 static func _thousands(n: int) -> String:
@@ -1673,6 +1716,8 @@ func _on_knocked_out(reason: String, id: int) -> void:
 ## (V multiplayeru se čas posouvat nebude – viz GAME_DESIGN 6.5; řeší úkol 03+.)
 func skip_time(id: int, hours: float, sleeping: bool) -> void:
 	clock.skip_hours(hours)
+	if debts:
+		debts.advance_to(clock.jd())   # M4.2: dluhy dohnat po dnech (ne jedním skokem)
 	for p in players.values():
 		p.body.skip_hours(hours, sleeping and p.id == id)
 	var pl: Player = players.get(id)
@@ -3539,6 +3584,8 @@ func _process_impl(_delta: float) -> void:
 			if player_pos(id).distance_to(police.checkpoint_pos) < 120.0:
 				police.checkpoint_seen[id] = true
 
+	if clock and debts:           # M4.2: denní krok dluhů (upomínky, exekuce, doručení příkazů)
+		debts.advance_to(clock.jd())
 	_season_t -= _delta
 	if _season_t <= 0.0:
 		_season_t = SEASON_CHECK_S

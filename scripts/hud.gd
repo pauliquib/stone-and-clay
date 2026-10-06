@@ -750,9 +750,16 @@ func _law_bbcode() -> String:
 	lr.refresh(game.clock.minutes)
 	var lim := int(Law.setting("body_limit", 12.0))
 	var s := "\n\n[b]ÚŘEDNÍ ZÁZNAMY[/b]   body [color=#%s]%d / %d[/color]" % ["f99" if lr.points >= lim - 4 else "ccc", lr.points, lim]
-	if lr.unpaid_fines > 0:
-		s += "   nezaplacené pokuty [color=#f66]%d Kč[/color]" % lr.unpaid_fines
+	var dluhy: int = game.debts.total(player.id) if game.debts else 0
+	if dluhy > 0:
+		s += "   dluhy a pokuty [color=#f66]%d Kč[/color]" % dluhy
 	s += "\n"
+	if game.debts:                          # M4.2: otevřené dluhy se stavem (splatné / upomínka / exekuce)
+		for dl in game.debts.list(player.id):
+			s += "• %s – [color=#f99]%s[/color] (%s)\n" % [dl["text"], Bazaar.kc(int(dl["kc"])),
+				Debts.STAGE_NAMES.get(String(dl["stage"]), String(dl["stage"]))]
+		for o in game.debts.orders(player.id):
+			s += "• příkaz na cestě poštou – %s\n" % Bazaar.kc(int(o["kc"]))
 	if lr.records.is_empty():
 		return s + "Bez záznamu.\n"
 	var last: Array = lr.records.slice(maxi(lr.records.size() - 10, 0))

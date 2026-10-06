@@ -692,6 +692,9 @@ func open_place_menu(key: String) -> void:
 						if not row.is_empty():
 							opts.append(row)
 			# M1.5: dovnitř (zamčeno mimo otevírací dobu / pro postrach vsi řeší World._may_enter); nabídku od dveří jsme nechali
+			if open and key == "urad" and world.debts and world.debts.total(pid, Debts.FINE_KINDS) > 0:
+				opts.append(["Zaplatit pokuty a dluhy z hotovosti (%s)" % Bazaar.kc(world.debts.total(pid, Debts.FINE_KINDS)),
+					func(): world.pay_debts_office(pid)])     # M4.2: úřad přijímá hotovost
 			if open and player.inside == "" and world.interiors.has(key):
 				opts.insert(0, ["Vejít dovnitř", func(): world.enter_interior(pid, key)])
 	hud.open_menu(title, text, opts)

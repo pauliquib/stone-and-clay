@@ -136,6 +136,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 	var lr: Law.LawRecord = world.law.get(id)
 	if lr:
 		d["law"] = lr.to_dict()
+	if world.debts:
+		d["debts"] = world.debts.to_dict(id)           # dluhy, příkazy na cestě, upomínky, exekuce (M4.2)
 	var jb: Jobs = world.jobs.get(id)
 	if jb:
 		d["jobs"] = jb.to_dict()                       # zaměstnání, docházka, napomenutí, nevyplacená mzda, rozdělaná směna (M3.1)
@@ -375,6 +377,14 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	var lr: Law.LawRecord = world.law.get(id)
 	if lr:
 		lr.from_dict(d.get("law", {}))         # starý save bez klíče = 0 bodů, prázdný rejstřík
+	if world.debts:
+		if d.has("debts"):
+			world.debts.from_dict(id, d["debts"])
+		if lr and lr.unpaid_fines > 0:         # M4.2 migrace: starý save – nezaplacené pokuty → jeden dluh
+			world.debts.add(id, "pokuta", lr.unpaid_fines, world.clock.jd() + Debts.DUE_DAYS,
+				"Nezaplacené pokuty (starší)")
+			lr.unpaid_fines = 0
+		world.debts.reset_clock(world.clock.jd())
 	var jb: Jobs = world.jobs.get(id)
 	if jb:
 		jb.from_dict(d.get("jobs", {}))        # starý save bez klíče = bez zaměstnání (M3.1)

@@ -29,3 +29,18 @@ Spouští jen uživatel. Stav: staticky ověřeno (kontrola překladu), ruční 
 8. Starý save (bez klíče `favors`) se musí načíst bez chyby; prosby mají být prázdné.
 9. F5 → F9 (uložit / načíst) uprostřed dne: nabídky a stav přijatých proseb zůstanou.
 10. Deník J / F1 – zkontroluj, že se nic nerozbilo (E u vesničanů stále otevírá rozhovor přes „Promluvit“).
+
+## M4.2 – Správní řízení na úřadě, dluhy a exekuce
+
+Spouští jen uživatel. Stav: staticky ověřeno (kontrola překladu), ruční test čeká.
+
+1. Rychlost v obci (na místě, `rychlost_obec`) → policista: s hotovostí pokuta hned zmizí z peněz (hláška „zaplaceno“); bez hotovosti vznikne dluh „bloková pokuta“ (F2 → Hráč: peníze 0, pak deník J → Úřední záznamy).
+2. Řízení pod vlivem do 1 ‰ (`alkohol_do_1`, správní řízení) → hláška „příkaz přijde poštou“; za 1–3 herní dny e-mail „Příkaz k úhradě pokuty“ a dluh v deníku se splatností.
+3. Na úřadě (v úředních hodinách, Po/St 7–17) E u úřednice → „Zaplatit pokuty a dluhy z hotovosti“ → peníze klesnou, dluh zmizí. Mimo hodiny nabídka není.
+4. Počítač doma → Banka → Pokuty: seznam dluhů se stavem a splatností, „Zaplatit z účtu“ vybere z účtu.
+5. F2 → Datum: posuň o 16 dní po splatnosti → e-mail „Upomínka“, dluh +1 000 Kč (stav upomínka).
+6. Další F2 → Datum +30 dní → e-mail „Exekuční příkaz“, z účtu se strhne částka, pověst −5 (stav exekuce).
+7. Skok přes víc měsíců (F2 → Datum) → dluhy se dohání po dnech, žádný dluh nezmizí ani nezdvojí.
+8. Starý save s nezaplacenými pokutami (klíč `law.unpaid` > 0) se načte bez chyby: jeden dluh „Nezaplacené pokuty (starší)“, částka v bance i v deníku stejná.
+9. Hráč s M4.1: 12 bodů / odebrání řidičáku se chová jako dřív (nic se nerozbilo).
+10. F5 → F9 uprostřed dne: dluhy, upomínky, čekající příkazy a jejich dny zůstanou.

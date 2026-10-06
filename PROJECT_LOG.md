@@ -327,3 +327,31 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Prosby plní „zahrada“ a „sníh“ jakákoli sklizeň / úklid, nerozlišují zadavatele.
 - README.md (Ovládání / Systémy) a `docs/CONTROLS.md` zatím nemají nový text E u vesničana – doplnit.
 - Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.5).
+
+## 2026-10-06 – M4.2 Správní řízení na úřadě, dluhy a exekuce
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou `godot --check-only` – ruční test čeká)
+- **Co**: nový `scripts/debts.gd` (`class_name Debts`, `World.debts`): společná evidence dluhů per hráč – položky
+  `{id, kind, text, kc, paid, due_jd, stage, upominka_jd, creditor, ref}`, stavy splatné / upomínka / exekuce / zaplaceno.
+  Upomínka po splatnosti (+`REMINDER_FEE` 1 000 Kč, e-mail), exekuce po `ENFORCE_DAYS` 30: strhne z účtu, +`ENFORCE_COST`
+  3 000 Kč náklady, pověst −5. Denní krok `advance_to(jd)` z `World._process_impl` i po `skip_time` (po dnech).
+- **Co**: `law.gd` `LawRecord.commit` už **nestrhává** pokutu (jen záznam, body, zákaz; `misto` v návratu).
+  `World.commit_offense` platí podle `misto`: `na_miste` = bloková pokuta hned z hotovosti, bez hotovosti složenka
+  v `Debts` (15 dní); `spravni_rizeni` = příkaz přijde poštou za 1–3 dny (pak dluh se splatností 15 dní); `soud` = dluh
+  rovnou. `_on_busted` hlásí, zda je zaplaceno, nebo se příkaz pošle poštou.
+- **Co**: úřad – E u úřednice v úředních hodinách „Zaplatit pokuty a dluhy z hotovosti“ (`World.pay_debts_office`).
+  Počítač: Banka → Pokuty = seznam dluhů se stavem a splatností, „Zaplatit z účtu“ platí přes `Debts.pay(…, "bank")`.
+  Deník J → Úřední záznamy: součet dluhů, otevřené dluhy se stavem, příkazy na cestě.
+- **Ukládání**: `save_game.gd` klíč `debts` (per hráč). Migrace: starý `law.unpaid` > 0 → jeden dluh „Nezaplacené
+  pokuty (starší)“ se splatností 15 dní od načtení; po načtení `Debts.reset_clock` (nedohání dny z doby uložení).
+- **Opraveno proti zadání**: `Computer.unpaid_fines` a deník čtou dluhy z `Debts` (ne z `LawRecord`), takže banka
+  a HUD ukazují stejnou částku.
+
+### Otevřené body
+- Odpor (8 dní), ústní jednání na úřadě a minihra argumentů – nejsou.
+- Papírový dopis do schránky (byt `mailbox`, schránka u rodinného domu) – nejsou; příkaz jde jen e-mailem.
+- Bloková pokuta bez volby „Nesouhlasím – správní řízení“ (zatím vždy hotovost, jinak složenka).
+- Exekuce: srážka z výplaty (háček v `Jobs`) a „sepsání věci“ vozidla nejsou; strhává se jen z účtu.
+- Nahlédnutí do spisu, žádosti na úřadě (vrácení řidičáku, kácení, ohlášení chovu) – nejsou.
+- `Debts.pay` a `list` jsou připravené pro M4.3 (trest soudu) a M4.7 (hypotéka, splátky) – zatím se nevolají.
+- Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.2).

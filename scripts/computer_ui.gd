@@ -492,24 +492,22 @@ func _p_banka(pc: Computer) -> void:
 			_show("banka"))
 	else:
 		_text("Bydlíš ve vlastním – nájem neplatíš.", DIM)
-	_h2("Pokuty")
+	_h2("Pokuty a dluhy")
 	var due := pc.unpaid_fines(pid)
 	if due <= 0:
 		_text("Žádné nezaplacené pokuty.", DIM)
 	else:
-		var lr: Law.LawRecord = world.law.get(pid)
-		if lr:
-			for r in lr.records:
-				if not bool(r.get("zaplaceno", true)):
-					var o := Law.offense(String(r["id"]))
-					_text("• %s – pokuta %s (%s)" % [o.get("nazev", r["id"]), Bazaar.kc(int(r["pokuta"])), Law.LawRecord._par(o)])
+		for dl in world.debts.list(pid):
+			_text("• %s – %s (splatnost %s, stav: %s)" % [dl["text"], Bazaar.kc(int(dl["kc"])),
+				_jd_text(int(dl["due_jd"])),
+				Debts.STAGE_NAMES.get(String(dl["stage"]), String(dl["stage"]))])
 		var row := _row()
 		_label(row, "Nezaplaceno celkem: %s  " % Bazaar.kc(due), FONT).add_theme_color_override("font_color", BAD_COL)
 		var b := _btn(row, "Zaplatit z účtu", func():
 			_say(pc.pay_fines(pid))
 			_show("banka"))
-		b.disabled = player.bank < due
-		_text("Zjednodušená herní simulace – lhůty, splátky a exekuce doplní M4.2.", DIM)
+		b.disabled = player.bank <= 0
+		_text("Zaplatit jde i na úřadě (hotovost). Při nezaplacení: upomínka (+%s), po %d dnech exekuce z účtu." % [Bazaar.kc(Debts.REMINDER_FEE), Debts.ENFORCE_DAYS], DIM)
 	var jb: Jobs = world.jobs.get(pid)
 	if jb and jb.current != "" and not Jobs.is_contract(Jobs.job(jb.current)):
 		_h2("Výplata z práce")
@@ -1037,3 +1035,9 @@ func _desk_icon(parent: Node, caption: String, col: Color, cb: Callable) -> void
 static func _hm(t: float) -> String:
 	var m := int(fmod(t, 1440.0))
 	return "%02d:%02d" % [m / 60, m % 60]
+
+
+## Datum splatnosti z juliánského dne (M4.2 – pokuty a dluhy).
+func _jd_text(j: int) -> String:
+	var d := Clock.from_jdn(j)
+	return "%d. %d. %d" % [int(d["day"]), int(d["month"]), int(d["year"])]
