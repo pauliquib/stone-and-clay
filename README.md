@@ -169,5 +169,7 @@ Shrnutí z [`PRAVNI_DOPORUCENI.md`](PRAVNI_DOPORUCENI.md) – platí pro všeche
 - **Rádio:** vlastní stanice ve hře jsou smyšlené a hudba je generovaná. Internetové stanice v `data/radia.json`
   jsou jen odkazy na veřejné streamy Českého rozhlasu, které hra přehrává u hráče jako běžný internetový
   přijímač (nic nenahrává ani nešíří, žádná loga). Názvy stanic jsou ochranné známky provozovatele – před
-  veřejným šířením hry je vhodné `radia.json` vyprázdnit, nebo si vyžádat souhlas.
+  veřejným šířením hry je vhodné `radia.json` vyprázdnit, nebo si vyžádat souhlas. Stejné pravidlo platí pro
+  případné další stanice (Rock Radio, Radio Beat, Rock Zone): zatím nejsou přidány, dokud nebude souhlas provozovatelů
+  nebo jiné ověřené řešení. Hra je přehrává jen u hráče, nic nenahrává ani nešíří.
 - **Doložka:** úvodní obrazovka, nápověda F1 a začátek tohoto README (`Hud.DISCLAIMER`).

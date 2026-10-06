@@ -792,3 +792,24 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Kontrola překladu nad celým `main`: `godot --import` rc 0, `--check-only` na všech `scripts/*.gd` bez chyb.
 - M4.4, M4.6, M4.8 zůstávají `[ ]` s otevřenými body (vodovod, panel P u povolenek, zbraň v kufru, ubalení / sušák bez objektu,
   zákonná čísla NEOVĚŘENO). Ruční test čeká spolu s M5 (uživatel testuje až po celé M5).
+
+## 2026-10-06 – M5.9 Rocková rádia (částečně; zůstává `[ ]`)
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Co**: `README.md` → Právní zásady → Rádio: doplněna poznámka, že další stanice (Rock Radio, Radio Beat, Rock Zone) se
+  zatím nepřidávají, dokud nebude souhlas provozovatelů nebo jiné ověřené řešení. `data/radia.json` a `scripts/radio.gd` beze změny.
+- **Ověřeno čtením**: `radio.gd` `_ready()` načítá jen záznamy s `url` a `name`; `genre` a `noise` mají výchozí hodnoty;
+  stanice bez funkční URL nespadne, `_start_stream` jen spustí ffmpeg, a když stream nejde, `_pump_stream` po ~12 s přehrávání
+  ukončí (bez výjimky). Chybějící ffmpeg hlásí `world.notify` (existující hláška).
+
+### Otevřené body
+- **Nově přidané stanice nejsou.** Zadání zakazuje reálné názvy rádií a smyšlená stanice nemá veřejný stream, takže Rock Radio,
+  Radio Beat ani Rock Zone nebyly zapsány do `data/radia.json`, ani nebylo dohledáno jejich URL. Rozhodnutí: uživatel buď
+  povolí reálné názvy s ověřenými URL (a souhlas / právní poznámka), nebo se stanice nahradí smyšlenými s vlastním zdrojem zvuku.
+- Stávající záznamy ČRo v `data/radia.json` zůstávají beze změny (mimo tento krok); k rozhodnutí podle právní poznámky.
+- **Autorádio (bod 5 zadání) nezpracováno** – sdílení `Radio.stations` / přehrávání do `car.gd`, ovládání 1–5 / 0, hlasitost,
+  hluk v noci, ukládání stavu auta. Vyžaduje samostatné okno (`radio.gd` 757 ř., `car.gd` ~1600 ř., ověření kláves v `local_client.gd`).
+- **Vnitřní světlo v autě (bod 6 zadání) nezpracováno** – `OmniLight3D` v kabině, dveře `World.enter_car` / `exit_car`, ruční klávesa `car_lights`.
+- Nesahalo se do `world.gd` ani `save_game.gd` (žádný nový stav ukládán).
+- Ruční test: rádio doma (ČRo stanice) a chování bez internetu – čeká na uživatele (checklist v `docs/testy_M5.md`).
+- Kontrola překladu: `godot --import` (viz odpověď subagenta); žádné změněné `.gd`, `--check-only` tedy nebyl potřeba.
