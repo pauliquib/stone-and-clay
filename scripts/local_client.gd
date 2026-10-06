@@ -332,7 +332,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				inp.add_look(settings.look(event.relative))
 	elif event is InputEventMouseButton and event.pressed:
 		# s otevřenou mapou myš ovládá mapu (Hud._input); v menu / chatu kolečko kameru nezoomuje (A1-01)
-		if player.car == null and not hud._map.visible and not hud.menu_open and not hud.chat_open:
+		if player.car != null and event.shift_pressed and (event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN):
+			# M5.9: Shift + kolečko v autě = hlasitost autorádia (kamera v autě nezoomuje)
+			world.player_action(pid, "car_radio_vol_up" if event.button_index == MOUSE_BUTTON_WHEEL_UP else "car_radio_vol_down")
+		elif player.car == null and not hud._map.visible and not hud.menu_open and not hud.chat_open:
 			if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not player.controls_locked:
 				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 			elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -378,6 +381,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("interact"):
 		_interact()
+	elif event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F4 and player.car != null:
+		world.player_action(pid, "car_cabin_light")      # M5.9: vnitřní světlo v autě
 	elif event.is_action_pressed("car_enter"):
 		world.player_action(pid, "car_enter")
 	elif event.is_action_pressed("car_lights"):
@@ -403,11 +408,23 @@ func _unhandled_input(event: InputEvent) -> void:
 			world.player_action(pid, "drone_photo")    # M6.1: i levé tlačítko fotí za letu
 		elif was_captured and freecam == null and player.car == null and player.horse == null and player.aircraft == null:
 			world.player_action(pid, "use_tool")
+	elif player.car != null and _car_radio_digit(event) >= 0:
+		world.player_action(pid, "car_radio_%d" % _car_radio_digit(event))   # M5.9: za volantem 0–5 = autorádio
 	else:
 		for n in range(1, 6):
 			if event.is_action_pressed("equip_slot_%d" % n):
 				world.player_action(pid, "equip_slot_%d" % n)
 				break
+
+
+## M5.9: číslice 0–5 stisknutá (ne echo) → 0–5; jinak -1. Za volantem jsou to předvolby autorádia.
+func _car_radio_digit(event: InputEvent) -> int:
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return -1
+	var k: int = event.physical_keycode
+	if k < KEY_0 or k > KEY_5:
+		return -1
+	return k - KEY_0
 
 
 func _interact() -> void:

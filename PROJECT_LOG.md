@@ -832,3 +832,31 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Nákup v e-shopu / stavebninách (M3.4 / M5.1) není napojen; test přes F2 → Hráč.
 - README (Systémy → Skateboard, Ovládání), `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` neaktualizovány (ponecháno pro společný commit / kolizi s M5.9).
 - Čeká na ruční test uživatele: `docs/testy_M5.md`, oddíl „M5.7“.
+
+## 2026-10-06 – M5.9 Autorádio a vnitřní světlo v autě (body 5–6 kroku; zůstává `[ ]` kvůli rockovým stanicím)
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu – ruční test čeká)
+- **Co – autorádio**: `radio.gd` má nový příznak `car_mode` (bez modelu lampového rádia, bez štítků na stupnici, zvuk
+  z palubní desky). Stejná třída `Radio` (stejné stanice `stations`, ffmpeg stream, šum, hudba, zlost sousedů)
+  – auto nemá vlastní kopii logiky. `car.gd`: `ensure_radio(w)` vytvoří rádio až při nástupu do auta s kabinou
+  (ne kolo, motorka, traktor – `two_wheeler`, `model.kind`, `builder == "tractor"`); uzel `AutoRadio` na palubní desce.
+- **Ovládání za volantem** (`local_client.gd` → `World.player_action` → `Car.car_action`): **1–5** = předvolby
+  (první pět stanic seznamu), **0** = vypnout, **Shift + kolečko** = hlasitost ±1. Klávesy 1–5 jsou za volantem
+  předvolby (jinak rychlé sloty opasku beze změny). Mimo auto zůstává kolečko kamery a 0 nedělá nic.
+- **Co – vnitřní světlo**: `car.gd` `OmniLight3D` „VnitrniSvetlo“ (teplá barva, dosah 4 m, bez stínů), vzniká až při
+  prvním použití. `World.enter_car` / `exit_car`: za šera a v noci (`clock.daylight() < 0.5`, tj. slunce pod ~−1°)
+  se rozsvítí na `Car.CABIN_DOOR_S` = 10 s. Ruční přepnutí **F4** (`car_cabin_light`, `toggle_cabin_light`):
+  zůstane svítit, dokud ji hráč nevypne nebo nerozjede auto (> 3 m/s, i ruční světlo zhasne).
+- **Uložení**: `save_game.gd` – u vozidla nový klíč `radio` (jen pokud auto rádio má); při načtení se rádio vytvoří
+  a `Radio.from_dict`. Starý save bez klíče = bez rádia. `SaveGame.VERSION` beze změny.
+- **Kontrola překladu**: `godot --headless --path . --import` (rc 0) a `--check-only` na `radio.gd`, `car.gd`,
+  `world.gd`, `local_client.gd`, `save_game.gd` – výstup prázdný.
+
+### Otevřené body
+- **Rockové stanice** dál nejsou přidány (čeká na rozhodnutí uživatele – viz předchozí záznam M5.9).
+- **Dokumentace**: README → Ovládání (F4, 0–5 za volantem, Shift+kolečko), nápověda F1 (`hud.gd`) a registr kláves
+  (`00_SPOLECNE` kap. 5.7: F4 a 0 zabrány) zatím nejsou upraveny – nebylo součástí zadání „nic dalšího neměň“.
+- Vnitřní světlo a rádio se nezobrazují na jiných vozidlech (AI traffic, cizí hráči) – auto rádio vzniká jen u auta, které
+  hráč řídil. Hlasitost autorádia při jízdě obcí v noci je napojena na stávající model hluku (`_consequences`), ruční test chybí.
+- Hlášky o ovládání po nástupu (`enter_car`) nerozšířeny o nové klávesy; checklist v `docs/testy_M5.md`.
+- Nepouští se ffmpeg ani hra; test přehrávání v autě a noční hluk ověří uživatel.

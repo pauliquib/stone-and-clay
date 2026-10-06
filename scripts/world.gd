@@ -1928,6 +1928,12 @@ func player_action(id: int, action: String) -> void:
 		"car_wipers":
 			if p.car and not p.car.two_wheeler:
 				p.car.toggle_wipers()
+		"car_cabin_light":                      # M5.9: F4 – vnitřní světlo v autě
+			if p.car:
+				p.car.toggle_cabin_light()
+		"car_radio_0", "car_radio_1", "car_radio_2", "car_radio_3", "car_radio_4", "car_radio_5", "car_radio_vol_up", "car_radio_vol_down":   # M5.9: autorádio (1–5 předvolby, 0 vypnout, Shift+kolečko)
+			if p.car:
+				p.car.car_action(id, action)
 		"car_horn":
 			if p.car:
 				p.car.honk()
@@ -2021,6 +2027,9 @@ func enter_car(id: int, c: Car) -> void:
 	if not lc["ok"]:
 		notify(id, "show_message", ["Na tohle nemáš řidičák (skupina %s, %s)." % [lc["group"], lc["reason"]], 4.0])
 	p.enter_car(c)
+	c.ensure_radio(self)                      # M5.9 autorádio (jen auta s kabinou)
+	if clock.daylight() < 0.5:                # M5.9 vnitřní světlo: nástup za šera a v noci
+		c.cabin_door_light()
 	_auto_start[id] = p.global_position       # M4.1: nástup – případná výcviková jízda autoškoly
 	play_sfx(id, "door")
 	if c.model.kind == "bike":
@@ -2075,6 +2084,8 @@ func dismount_horse(id: int) -> void:
 func exit_car(id: int) -> void:
 	var p: Player = players[id]
 	var c: Car = p.car
+	if c != null and clock.daylight() < 0.5:  # M5.9 výstup za šera a v noci: světlo v kabině na chvíli
+		c.cabin_door_light()
 	var out := p.exit_car()
 	play_sfx(id, "door")
 	emit_game_event(id, "exited_car", {})

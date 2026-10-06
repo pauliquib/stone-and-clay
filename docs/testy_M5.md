@@ -26,3 +26,17 @@ Každý krok má vlastní oddíl. Testuje uživatel po dokončení vlny; agent h
 8. F při rychlosti pod 2 m/s → seskok; při vyšší rychlosti hláška „Nejdřív zpomal“.
 9. Ulož (F5), ukonči hru, načti (F9) → rekord zůstane, skateboard zůstane v inventáři, hráč jde pěšky.
 10. Starý save (před M5.7) se musí načíst bez chyby a rekord bude 0.
+
+## M5.9 – Autorádio a vnitřní světlo v autě (body 5–6)
+
+Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kabinou (osobní auto, ne kolo / motorka / traktor).
+
+1. Nasedni do auta (F) → za volantem zmáčkni **1** → hraje první předvolba (Rádio Kovadlina); hlášení s názvem stanice.
+2. Předvolba **2** (Rádio Pohoda) → hraje klidná hudba; **0** → rádio vypnuto (hláška „vypnuto“).
+3. Za volantem **Shift + kolečko** nahoru/dolů → hlasitost se mění (hláška „hlasitost x/10“); bez Shift kolečko kamera nepřibližuje.
+4. Mimo auto (za hry) klávesy 1–5 pořád přepínají rychlé sloty opasku, 0 nic nedělá.
+5. Hlasitě (hlasitost 10, Rádio Kovadlina) v noci jezdi obcí → sousedé si stěžují dřív než u tiché hudby.
+6. Nastup v noci (Datum 23:00) → v kabině se rozsvítí teplé světlo; po ~10 s stojícího auta zhasne.
+7. Stiskni **F4** → světlo svítí i po 10 s; F4 znovu → zhasne. Při rozjezdu se světlo vypne.
+8. Ve dne (Datum 12:00) při nástupu světlo nesvítí; F4 ho přesto zapne ručně.
+9. Ulož hru (F5), zapni rádio v autě na stanici, načti (F9) → rádio ve stejné stanici a hlasitosti.
