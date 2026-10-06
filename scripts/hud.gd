@@ -416,9 +416,9 @@ func _ready() -> void:
 		+ "    Průkaz + registrace + pojištění: PC → Letectví – ÚVL.\n" \
 		+ "ROGALO / TRIKE (M6.5, polní letiště F2 → Teleport):\n" \
 		+ "    Shift/Ctrl páka plynu (drží polohu); na zemi A/D\n" \
-		+ "    příďové kolo + Mezerník brzda; ve vzduchu HRAZDA\n" \
-		+ "    obráceně: S nos nahoru, W klesat, A/D zatáčí naopak\n" \
-		+ "    (intuitivní režim: Esc → Nastavení). Přistát ~65 km/h\n" \
+		+ "    příďové kolo + Mezerník brzda; ve vzduchu W nos\n" \
+		+ "    nahoru, S dolů, A/D zatáčení (realistické řízení\n" \
+		+ "    hrazdou: Esc → Nastavení). Přistát ~65 km/h\n" \
 		+ "    proti větru na hlavní kola; jen na letišti, za dne,\n" \
 		+ "    mimo mraky, ne nízko nad obcí/lidmi – jinak pokuta.\n" \
 		+ "    Průkaz ULL (škola 75 000), registrace + pojištění:\n" \
