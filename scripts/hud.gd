@@ -3,7 +3,7 @@
 ## zprávy, výzvy k interakci, nabídky míst (tlačítka), inventář (Tab), deník úkolů (J),
 ## nápověda (F1), rotující minimapa s kompasem (vpravo nahoře) a mapa katastru (M – kolečko přibližuje,
 ## tažení posouvá) z ortofota s místy, pověst v obci (Reputation), rozhovor na ulici
-## (T / Enter – řádek pro psaní a záznam posledních replik). Panel úkolu ukazuje klávesa P.
+## (T / Enter – řádek pro psaní a záznam posledních replik). Panel úkolu ukazuje klávesa Z (QWERTZ; fyzicky Y).
 ## Patří LocalClient: zobrazuje stav lokálního hráče (`player`), svět čte z `game` (World).
 class_name Hud
 extends CanvasLayer
@@ -70,7 +70,7 @@ var _mini_t := 0.0                # minipauza mezi překresleními minimapy (ne 
 var _mini_built := false          # keš statických vrstev minimapy hotová?
 var _mini_lines: Array = []       # [světové body (x,z), střed, ohraničující poloměr, barva, šířka]
 var _mini_dir_w: Array = []       # šířky textů kompasu (kompas texty se nemění – shape jednou)
-var _quest_pinned := false        # P – panel úkolu přišpendlený (jinak skrytý)
+var _quest_pinned := false        # Z – panel úkolu přišpendlený (jinak skrytý)
 var _cross: Label
 var _scope: TextureRect          # tmavé okraje dalekohledu (X)
 var _fps: Label
@@ -351,7 +351,7 @@ func _ready() -> void:
 	_flash.visible = false
 	root.add_child(_flash)
 
-	# ---------------- úkol (vpravo pod minimapou, zobrazuje klávesa P)
+	# ---------------- úkol (vpravo pod minimapou, zobrazuje klávesa Z)
 	_quest_panel = _panel(root, Color(0, 0, 0, 0.42))
 	_quest_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	_quest_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
@@ -386,7 +386,7 @@ func _ready() -> void:
 		+ "F – nastoupit / vystoupit z auta, nasednout na koně\n" \
 		+ "Tab – inventář (pít, jíst, kouřit, obléct)   I – oblečení\n" \
 		+ "J – deník úkolů   K – dovednosti   M – mapa (kolečko – přiblížení,\n" \
-		+ "    tažení – posun)   P – zobrazit / skrýt panel úkolu   H – domů\n" \
+		+ "    tažení – posun)   Z – zobrazit / skrýt panel úkolu   H – domů\n" \
 		+ "L – světla   B – klakson   N – stěrače\n" \
 		+ "R – postavit auto   U – vysvobodit ze zaseknutí\n" \
 		+ "F1 – nápověda   F2 – herní menu   Esc – pauza a nabídka\n" \
@@ -1382,7 +1382,7 @@ func _process_impl(delta: float) -> void:
 		_help_t -= delta
 		if _help_t <= 0.0:
 			_help.visible = false
-	# --- úkol (panel jen po přišpendlení klávesou P – jinak je vpravo nahoře minimapa)
+	# --- úkol (panel jen po přišpendlení klávesou Z – jinak je vpravo nahoře minimapa)
 	var qt := _quest_text()
 	var jt := _job_text()               # M3.1: směna nahoře nad úkolem
 	if jt != "":

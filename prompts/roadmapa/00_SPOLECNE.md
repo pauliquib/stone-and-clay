@@ -34,7 +34,7 @@
    2. aktualizuj `README.md` (Systémy / Ovládání / Ladicí parametry) a jiné dotčené návody,
    3. odškrtni krok v `docs/VIZE_A_ROADMAPA.md` (`[ ]` → `[x]`) a v `prompts/roadmapa/README.md`,
    4. záznam do `PROJECT_LOG.md` (v kořeni repozitáře, formát kap. 7),
-   5. záznam do deníku efektivity AI podle `CLAUDE.md` v kořeni repozitáře,
+   5. (deník efektivity AI se nevede – `CLAUDE.md` v repozitáři není; krok vynech),
    6. commit (jen tvoje změny – viz bod 8),
    7. vypiš uživateli **checklist ručních testů (max. 10 bodů)**: co spustit, kam ve hře jít
       (F2 → Teleport / Datum / Počasí / Hráč), co udělat, co má být vidět. Pak **skonči a čekej**.
@@ -45,7 +45,7 @@
 8. **Commity:** v repozitáři může pracovat i jiná session. Commituj jen své soubory; u sdílených souborů
    jen své hunky (`git add -p` neumíš → `git diff soubor > /tmp/p.patch`, uprav patch, `git apply --cached`).
    Zprávu commitu piš česky ve stylu historie („M0.2 Jednotný katalog předmětů: …“).
-9. **Kontext šetři:** velké soubory (`world.gd` 1640 ř., `car.gd` 1270, `hud.gd` 980, `player.gd` 910)
+9. **Kontext šetři:** velké soubory (`world.gd` ~3750 ř., `hud.gd` ~2150, `jobs.gd` ~1740, `car.gd` ~1600, `player.gd` ~1230)
    nečti celé – najdi místo přes `grep -n` a čti výřez (`Read` s `offset/limit`).
 
 ## 3. Právní zásady obsahu (platí pro všechno nové)
@@ -136,7 +136,7 @@ zákon, respekt…) se na `emit_game_event` napojí stejně. **Nevolej HUD pří
 
 | Obsazeno | Rezervováno pro roadmapu |
 |---|---|
-| WASD, myš, Shift, Mezerník, Ctrl/C, V, kolečko, E, T/Enter, F, L, B, N, R, H, X (dalekohled), Tab, J, M, F1, F2, F5, F9, Esc, Backspace (deník), hvízdnutí na koně (viz `project.godot`; **G je sdílené s nákladem**, M2.10) | **Q** = nástroj / zbraň do ruky (cyklus), **1–5** = rychlé sloty opasku, **levé tlačítko myši** = použít nástroj / vystřelit (pěšky), **pravé tlačítko** = mířit, **G** = zvednout / položit / naložit náklad (**sdílená klávesa**: `Cargo.on_g` nejdřív zkusí náklad v dosahu nebo nesený, jinak hvízdnutí na koně – `World.player_action("whistle")`), **K** = dovednosti (záložka deníku), **I** = oblečení / šatník (mimo domov jen prohlížení), **P** = doklady a oprávnění, **O** = volné, **Z / Y** = volné (pozor na QWERTZ – `physical_keycode`) |
+| WASD, myš, Shift, Mezerník, Ctrl/C, V, kolečko, E, T/Enter, F, L, B, N, R, H, U (vyproštění), X (dalekohled), O (fotka dronem – jen za letu), **Z** (fyzicky Y – panel úkolu), Tab, J, M, F1, F2, F5, F9, Esc, Backspace (deník), hvízdnutí na koně (viz `project.godot`; **G je sdílené s nákladem**, M2.10) | **Q** = nástroj / zbraň do ruky (cyklus), **1–5** = rychlé sloty opasku, **levé tlačítko myši** = použít nástroj / vystřelit (pěšky), **pravé tlačítko** = mířit, **G** = zvednout / položit / naložit náklad (**sdílená klávesa**: `Cargo.on_g` nejdřív zkusí náklad v dosahu nebo nesený, jinak hvízdnutí na koně – `World.player_action("whistle")`), **K** = dovednosti (záložka deníku), **I** = oblečení / šatník (mimo domov jen prohlížení), **P** = doklady a oprávnění, **F3, F4, F6–F8, 6–0** = volné (pozor na QWERTZ – `physical_keycode`) |
 
 8. **Nápověda:** každá nová klávesa do F1 (`hud.gd`, text nápovědy) a do README → Ovládání.
 9. **Deník J:** nové přehledy (dovednosti, doklady, respekt, práce…) jako oddíly v `Hud._journal_bbcode()`.
