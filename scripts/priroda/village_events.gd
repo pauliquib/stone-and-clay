@@ -98,6 +98,7 @@ func setup(w: World) -> void:
 	clock = w.clock
 	refresh()
 	_build_nastenka()
+	register("fotbal", FotbalHriste.match_day, FotbalHriste.MATCH_TEXT)   # M5.6: fotbalový zápas v kalendáři
 
 
 # ------------------------------------------------------------------ kalendář

@@ -140,6 +140,7 @@ var garden: Garden             # zahrada u domu a pronajaté pole (M2.4): záhon
 var fences: FenceManager       # ploty a ohrady (Fáze 7): obvody výběhu, zahrady a pole + hráčské úseky
 var farm: Farm                   # hospodářská zvířata u usedlosti (M2.6): výběh, kurník, chlívek, přístřešek
 var fishing: Fishing             # rybaření (M2.7): nahození, záběr, zdolávání, úlovek, zákon (háčky)
+var football: FotbalHriste        # fotbalové hřiště u hospody (M5.6): míč, kop, branky, skóre
 var weapons: Weapons             # zbraně a střelba (M2.8): luk, kuše, puška, balistika, střelnice u chaty, zákon o zbraních
 var cargo: Cargo                # náklad a přeprava (M2.10): rameno, kufr, nosič, ruční vozík (G, E u vozíku)
 var statek: Statek               # M3.2: Statek Na Kopci – pracoviště pomocníka na farmě (místo „statek“, výběh, stodola, záhony)
@@ -324,6 +325,10 @@ func build() -> void:
 	village_events.name = "Udalosti"
 	add_child(village_events)
 	village_events.setup(self)
+	football = FotbalHriste.new()
+	football.name = "Fotbal"
+	add_child(football)
+	football.setup(self)
 	tracks = Tracks.new()
 	tracks.name = "Stopy"
 	add_child(tracks)
@@ -1963,6 +1968,8 @@ func player_action(id: int, action: String) -> void:
 			if weapons and weapons.on_click(id):        # zbraň v ruce: luk natáhnout, kuši / pušku vystřelit (M2.8)
 				return
 			if fishing and fishing.on_click(id):       # nahozená udice: stáhnout / zaseknout (M2.7)
+				return
+			if football and football.on_click(id):     # míč na hřišti, prázdné ruce: kop (M5.6)
 				return
 			if vycep and vycep.on_click(id):           # výčepní u pípy: čepování držením LMB (M3.2)
 				return

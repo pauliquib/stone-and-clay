@@ -98,3 +98,15 @@ Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kab
 8. Stromy kolem rampy (cca 6 m od středu) nejsou v půdorysu; kolize s kmeny nepřekáží.
 9. Save a načtení: starý save se načte beze změny (rampa je statický objekt, nic se neukládá).
 10. Teleport k cestě / budově v okolí: nic neblokuje, pohyb a zvuky jinde beze změny.
+
+## M5.6 Fotbalové hřiště a hraní fotbalu (částečně)
+1. F2 → Teleport na střed hřiště (u hospody, stejné místo jako hranice čarodějnic): travnatá plocha, bílé čáry, střední kruh, vápna.
+2. Branky na obou koncích: tyče, příčka, síť; míč se do sítě nezaboří a zastaví se na zadní síti.
+3. Lavičky u postranní čáry, tribuna (tři řady) na jižní straně, kabina za severní brankou.
+4. Stožáry s reflektory: večer (F2 → Datum, 21 h) se rozsvítí, přes den nesvítí.
+5. Míč: stoupni si k míči (do cca 1 m), prázdné ruce, LMB krátce → lehký kop; držení 1 s → silný kop; držení nad 0,6 s → vyšší kop.
+6. Dribling: běh s míčem u nohy – míč se lehce posouvá před tebou; po zastavení se zpomalí.
+7. Gól: kop do branky → skóre na ukazateli (Label3D) se změní; po 2 s se míč vrátí na střed.
+8. Míč mimo hřiště (daleko za čarou) se sám vrátí na střed.
+9. Drž nástroj v ruce (Q): LMB ho použije, míč nekopne.
+10. F2 → Datum na 2. neděli v dubnu–říjnu: v seznamu akcí (nástěnka, web obce) je „Fotbalový zápas Hvozdnice – Polanka“; jinak nic.

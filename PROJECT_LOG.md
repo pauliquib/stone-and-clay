@@ -1073,3 +1073,35 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - README nemá oddíl „Systémy“, takže ho nebylo co aktualizovat. `prompts/roadmapa/README.md` a
   `docs/VIZE_A_ROADMAPA.md` neupraveny (zadání).
 - Příběhové využití rampy zatím není (rozhodnutí uživatele).
+
+## 2026-10-06 – M5.6 Fotbalové hřiště a hraní fotbalu (částečně)
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou překladu – ruční test čeká)
+- **Co**: nový `scripts/priroda/fotbal_hriste.gd` (`class_name FotbalHriste`): travnatá plocha 90 × 55 m podle terénu
+  (mřížka), bílé čáry (postranní, středová, střední kruh, vápna, malá vápna), rohové praporky, branky (tyče a příčka
+  s kolizí, síť jako zadní kolizní stěna a vizuál), zóna gólu (`Area3D` za čarou), dvě lavičky, tribuna se třemi
+  řadami (30 míst), kabina bez interiéru, čtyři stožáry s reflektory (zapnuté při tmě), ukazatel skóre (`Label3D`).
+- **Míč**: `RigidBody3D` 0,43 kg, ø 22 cm, střed = `VillageEvents.BONFIRE_POS`. LMB s prázdnýma rukama a míčem do
+  1,1 m = nabíjení kopu (0–1 s → 5–16 m/s, držení ≥ 0,6 s = vyšší kop). Dribling: hráč běžící s míčem u něj ho lehce
+  popostrkuje. Míč mimo hřiště nebo za hranicí se vrátí na střed.
+- **Kalendář**: `match_day(jd)` = 2. neděle v dubnu–červnu a srpnu–říjnu, `MATCH_TEXT` „Fotbalový zápas Hvozdnice –
+  Polanka · 15 h“. Registrace přes `register("fotbal", …)` v `village_events.gd` (`setup`), výpis v `upcoming()`.
+- **Napojení**: `scripts/world.gd` – var `football`, vytvoření za `village_events.setup`, a v `use_tool` jeden
+  řádek `football.on_click(id)` za rybařením (nástroj v ruce má přednost – `on_click` vrací false).
+- **Kontrola překladu** (00_SPOLECNE kap. 6): `--import` a `--check-only` na `scripts/priroda/fotbal_hriste.gd`,
+  `scripts/priroda/village_events.gd`, `scripts/world.gd` – výstup prázdný.
+
+### Otevřené body
+- **Data hřiště v OSM nejsou**: v `data/map.json` ani `tools/` není žádný `leisure=pitch`. Hřiště je proto
+  orientačně na `BONFIRE_POS` (střed hřiště = hranice čarodějnic, která tak stojí uprostřed hřiště, ne v brance).
+  Ke schválení: případně posunout hranici na okraj nebo doplnit OSM data hřiště.
+- Terén: hřiště kopíruje terén mřížkou, čáry jsou rovné úsečky nad terénem; větší svah než 1 m nebyl ověřen
+  (zarovnání v Blenderu není).
+- **Nedokončeno z M5.6** (oproti promptu): volná hra 2–6 kluků s NPC AI v létě, penalty (minihra s brankářem),
+  tréninky u trenéra (čtvrtek 18 h), respekt `fotbal` a pověst, XP `kondice` za běh a góly, zápas jako simulace
+  s hráči AI, rozhodčím a diváky (20–40 vesničanů, bubliny „Do toho!“), stánek s pivem a klobásou, oslava v hospodě.
+  Skóre na ukazateli je zatím jen počítadlo gólů do obou branek (volná hra), ne výsledek zápasu.
+- Déšť (míč těžší) a sníh (brzdění) nejsou napojené na `Weather`.
+- Dialog „fotbal“ (`dialog_data.gd`) se nerozšiřoval.
+- Stromy v půdorysu hřiště se nekácí; kontrola kolizí s objekty v okolí (lavičky, kabina, stožáry) jen na mapě v běhu.
+- Ruční test čeká (checklist v `docs/testy_M5.md`).
