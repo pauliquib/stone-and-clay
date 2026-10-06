@@ -548,7 +548,7 @@ func _p_obec(pc: Computer) -> void:
 	for h in pc.opening_hours():
 		_text("• %s: %s%s" % [h[0], h[1], "  [color=#1a7f2a](teď otevřeno)[/color]" if h[2] else "  [color=#8a8a8a](teď zavřeno)[/color]"])
 	_h2("Úřední deska")
-	for n in Computer.NOTICE_BOARD:
+	for n in Computer.NOTICE_BOARD + (world.vyhlasky.board_lines() if world.vyhlasky else []):
 		_text("• [b]%s[/b] – %s" % [n[0], n[1]])
 	_h2("Diskuse – co se povídá")
 	_text("Příspěvky jsou anonymní, obec za ně neodpovídá.", DIM)

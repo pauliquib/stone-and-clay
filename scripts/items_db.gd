@@ -130,6 +130,7 @@ const ITEMS := {
 	"trava": {"name": "Tráva (svazek)", "short": "Tráva", "type": "material", "kg": 0.1, "price": 0, "stack": 50, "color": Color(0.35, 0.6, 0.2)},
 	"polena": {"name": "Polena", "short": "Polena", "type": "material", "kg": 1.5, "price": 30, "stack": 50, "color": Color(0.55, 0.38, 0.2)},
 	"vetve": {"name": "Větve (klestí)", "short": "Větve", "type": "material", "kg": 0.8, "price": 0, "stack": 50, "color": Color(0.4, 0.3, 0.18)},
+	"vetve_cerstve": {"name": "Čerstvé větve (klestí)", "short": "Čerstvé větve", "type": "material", "kg": 0.8, "price": 0, "stack": 50, "color": Color(0.45, 0.4, 0.22)},
 	"klesti": {"name": "Kleště", "short": "Kleště", "type": "tool", "kg": 0.5, "price": 180, "durability": 300, "color": Color(0.5, 0.5, 0.55)},
 	"spalek": {"name": "Špalek na štípání", "short": "Špalek", "type": "tool", "hold": false, "kg": 12.0, "price": 0, "color": Color(0.5, 0.35, 0.2)},
 	"lopata": {"name": "Lopata", "short": "Lopata", "type": "tool", "kg": 2.0, "price": 320, "durability": 250, "color": Color(0.5, 0.5, 0.5)},

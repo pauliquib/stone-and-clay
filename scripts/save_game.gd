@@ -101,6 +101,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 	if world.forestry:
 		d["forestry"] = world.forestry.to_dict(id)     # pokácené stromy, padlé kmeny, špalky (M2.1)
 	d["unreported"] = world.unreported.get(id, [])     # nenahlášené činy, společný registr (M4.4)
+	if world.vyhlasky:
+		d["vyhlasky"] = world.vyhlasky.to_dict(id)     # čerstvé větve v sušení (M4.4 část B)
 	if world.fire_mgr:
 		d["fire"] = world.fire_mgr.to_dict()           # ohniště (i vyhaslá), stav kamen doma (M2.2)
 	if world.garden:
@@ -205,7 +207,7 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	var w := world.weather
 	if wd.has("kind") and Weather.TYPES.has(wd["kind"]):
 		w._set_kind(String(wd["kind"]))
-	for k in ["cloud", "rain", "fog", "wind", "wind_bearing", "temp", "snow_cover", "wetness", "storm", "kind_left_h"]:
+	for k in ["cloud", "rain", "fog", "wind", "wind_bearing", "temp", "snow_cover", "wetness", "storm", "kind_left_h", "drought"]:
 		if wd.has(k):
 			w.set(k, float(wd[k]))
 	w.forced = bool(wd.get("forced", false))
@@ -327,6 +329,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	# M4.4: nenahlášené činy; starý save je měl v klíči `forestry` → migrace (výchozí = prázdno)
 	var nr = d.get("unreported", (d.get("forestry", {}) as Dictionary).get("unreported", []))
 	world.unreported[id] = (nr as Array).duplicate(true)
+	if world.vyhlasky:
+		world.vyhlasky.restore(id, d.get("vyhlasky", {}))   # starý save bez klíče = žádné čerstvé větve
 	if world.fire_mgr:
 		world.fire_mgr.restore(d.get("fire", {}))            # starý save bez klíče = žádná ohniště, studená kamna
 	if world.garden:

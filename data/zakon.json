@@ -6,6 +6,11 @@
  "body_odpocet": 4,
  "body_odpocet_rok_min": 525600,
  "tresty": {"poznamka": "M4.3 soud: sazby ORIENTAČNÍ, ověřit (trestní zákoník 40/2009 Sb., zákon o zbraních 90/2024 Sb.). Herní zjednodušení.", "penize": [10000, 200000], "obhajce_kc": 5000, "podminka_roky": [1, 3], "zakaz_rizeni_roky": [1, 10], "opp_h": [50, 300], "opp_lhuta_dni": 365, "nepodminene_mesice": [3, 36], "zkouska_dni": [3, 7], "zatykac_dni": 30, "vezeni_meritko": 1.0, "vezeni_mesic_dni": 30},
+ "vyhlasky": [
+  {"id": "zakaz_paleni", "nazev": "Zákaz pálení", "mesice": [7, 8], "text": "Od 1. 7. do 31. 8. je v obci zakázáno pálení větví a rostlinného odpadu. Opékání na táboráku (špekáčky) zůstává povoleno. Zjednodušeno – ověřit aktuální znění OZV."},
+  {"id": "sucho", "nazev": "Zákaz zalévání a napouštění z vodovodu", "sucho_od": 0.6, "text": "Za sucha se nesmí zalévat zahrady ani napouštět bazény z vodovodu. Ohně v přírodě jsou zakázány mimo vlastní pozemek. Platí do doby, než přijdou deště."},
+  {"id": "nedelni_klid", "nazev": "Nedělní klid", "trvale": true, "dny": [6], "povolene_hodiny": [10, 12], "text": "V neděli a o svátcích se nesmí hlučně pracovat (sekačka, motorová pila, křovinořez) mimo 10–12 h. Noční klid 22–6 h platí ze zákona. Zjednodušeno – ověřit OZV."}
+ ],
  "prestupky": {
   "alkohol_do_1": {"nazev": "Řízení pod vlivem alkoholu (do 1 ‰)", "drb": "řídil po pár pivech", "karma": -2, "zakon": "361/2000 Sb.", "par": "§ 125c odst. 1 písm. b)",
    "pokuta": [10000, 10000], "body": 7, "zakaz_rizeni_h": [24, 24], "trestny_cin": false, "misto": "spravni_rizeni",
@@ -83,6 +88,12 @@
   "zpusobeni_pozaru": {"nazev": "Způsobení požáru (nehlídaný oheň přeskočil na trávu)", "drb": "způsobil požár", "karma": -1, "zakon": "133/1985 Sb.", "par": "§ 78 (ověřit)",
    "pokuta": [5000, 50000], "body": 0, "trestny_cin": false, "misto": "spravni_rizeni",
    "poznamka": "Zákon o požární ochraně – porušení povinností při vzniku požáru; reálně může jít i o obecné ohrožení (40/2009 Sb., § 272–273). Herní zjednodušení – ověřit aktuální znění."},
+  "paleni_mokreho_odpadu": {"nazev": "Pálení čerstvých (mokrých) větví – hustý kouř", "drb": "pálil mokré větve, kouř bylo vidět až do vsi", "karma": -2, "zakon": "201/2012 Sb.", "par": "§ 38 odst. 1 (ověřit)",
+   "pokuta": [1000, 10000], "body": 0, "trestny_cin": false, "misto": "spravni_rizeni",
+   "poznamka": "Zákon o ochraně ovzduší – spalování mokrých rostlinných zbytků a odpadu mimo povolené případy; herní zjednodušení, výše orientační – ověřit aktuální znění."},
+  "poruseni_vyhlasky_obce": {"nazev": "Porušení obecně závazné vyhlášky obce (pálení, sucho)", "drb": "porušil obecní vyhlášku", "karma": -1, "zakon": "251/2016 Sb.", "par": "§ 4 odst. 2 (ověřit)",
+   "pokuta": [1000, 20000], "body": 0, "trestny_cin": false, "misto": "spravni_rizeni",
+   "poznamka": "Obecně závazná vyhláška obce (zákaz pálení, sucho) – přestupek dle § 4 odst. 2 zákona o přestupcích; výše pokuty orientační, herní zjednodušení – ověřit OZV."},
   "tyrani_zvirat": {"nazev": "Týrání / zanedbání hospodářského zvířete", "drb": "zanedbal svá zvířata", "karma": -4, "zakon": "246/1992 Sb.", "par": "§ 4 (ověřit)",
    "pokuta": [3000, 50000], "body": 0, "trestny_cin": false, "misto": "spravni_rizeni",
    "poznamka": "Zákon na ochranu zvířat proti týrání – zjednodušeně dlouhodobé nekrmení / nenapájení (M2.6) nebo zranění bez porážky; herní zjednodušení, výše pokuty orientační – ověřit aktuální znění."},

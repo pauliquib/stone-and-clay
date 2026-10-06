@@ -425,7 +425,7 @@ func open_fire_menu(id: int, f: Fire) -> void:
 		_:
 			text = "Vyhaslé ohniště. Zapálíš ho sirkami / zapalovačem v ruce (Q) a levým tlačítkem (potřeba 2× větve a 2× polena, nebo 4× větve)."
 	var opts := []
-	for item in ["polena", "vetve"]:
+	for item in ["polena", "vetve", "vetve_cerstve"]:
 		var n := p.item_count(item)
 		opts.append(["Přiložit: %s (máš %d)" % [ItemsDB.name_of(item), n], add_fuel.bind(id, f, item), n > 0 and f.fuel < Fire.MAX_FUEL - 1.0])
 	for item in cookables(p):
@@ -447,6 +447,8 @@ func add_fuel(id: int, f: Fire, item: String) -> void:
 	p.remove_item(item)
 	world.play_sfx(id, "pickup")
 	world.notify(id, "show_message", ["Přiloženo: %s (dříví na %s)." % [ItemsDB.name_of(item), _hm(f.fuel)], 2.2])
+	if world.vyhlasky:
+		world.vyhlasky.on_fuel(id, f, item)             # kouř z čerstvých větví, zákaz pálení (M4.4 část B)
 
 
 func start_cook(id: int, f: Fire, item: String) -> void:

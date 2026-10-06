@@ -431,3 +431,36 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Zákaz řízení po rozsudku: konec zákazu přes `until_jd` v Permits bez přezkoušení (ověřit v ruční hře).
 - Háček pro M4.4 (svědci) a M4.6 (pytláctví, nedovolené ozbrojování jako trestné činy) – katalog už `misto: soud`, přes Court projde.
 - Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.3).
+
+## 2026-10-06 – M4.4 část B: vyhlášky, pálení větví, sucho (částečně)
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou `godot --check-only` – ruční test čeká)
+- **Co**: nový `scripts/vyhlasky.gd` (`class_name Vyhlasky`, `World.vyhlasky`): platnost vyhlášek z katalogu, dávky
+  čerstvých větví (`add_fresh`, sušení ~30 dní, za sucha rychleji, za deště pomaleji → `vetve`), `on_fuel` (kouř
+  z čerstvých větví → `paleni_mokreho_odpadu`; suché větve za zákazu pálení / sucha mimo dům → `poruseni_vyhlasky_obce`),
+  svědek kouře přes `witness_reported` (dohled 200 m), jinak `add_unreported`.
+- **Co**: `data/zakon.json` – klíč `vyhlasky` (zakaz_paleni 7–8, sucho od 0,6, nedelni_klid trvale) a přestupky
+  `paleni_mokreho_odpadu`, `poruseni_vyhlasky_obce` (s `drb`, `karma`, „ověřit“).
+- **Co**: `Forestry._on_lop` dává `vetve_cerstve` (nová položka v `ItemsDB`, hoří 3 min/kus, kouří); `FireManager.add_fuel`
+  volá `on_fuel`, nabídka u ohně nabízí i čerstvé větve; `fire.gd` `WOOD_MIN`.
+- **Co**: `Weather.drought` (0..1; roste ~0,04/den + 0,01/°C nad 20 °C, klesá deštěm), ve `state()`, uložené v `weather`.
+- **Co**: úřední deska (`computer_ui`) = `Computer.NOTICE_BOARD` + platné vyhlášky z `world.vyhlasky.board_lines()`.
+- **Ukládání**: klíč `vyhlasky` v záznamu hráče (`{"cerstve": [{n, dny}]}`), výchozí prázdno; `weather.drought` výchozí 0.
+- **Kontrola**: `godot --import` (výstup jen chybějící textury addonů, žádná chyba skriptu hry) a `--check-only` na všech
+  9 změněných `.gd` (`vyhlasky`, `forestry`, `fire_manager`, `fire`, `items_db`, `weather`, `save_game`, `world`,
+  `computer_ui`) – výstup prázdný.
+
+### Otevřené body
+- **Hromada klestí** („Složit větve na hromadu“, objekt ve světě) není: sušení běží na dávkách v kapse; dávka nesleduje
+  konkrétní kusy (po použití se odečítá od kapsy jen zhruba).
+- **Zákaz zalévání z vodovodu**: vodovodní zdroj ve hře není; `Vyhlasky.zalevani_zakazano()` zatím nikdo nevolá.
+  Studna a sud s dešťovkou se nemají omezovat (zatím bez háčku).
+- **Sucho**: zákaz ohňů mimo pozemek platí jen pro přiložení větví, ne pro zapálení nového ohně; `GrassFire` se za sucha
+  zatím nezrychluje; NPC o suchu nemluví (`dialog_themes.gd`).
+- **Hluk a nedělní klid**: sdílený `World.noise` (vytažení z `radio.gd`) není, sekačka neexistuje, `nedelni_klid` je
+  jen text na desce bez mechaniky.
+- **Velké pálení hromady** (povinnost ohlásit hasičům, háček M5.3) není.
+- Vyhlášení / zrušení vyhlášky přes poštu a do drbů není.
+- Povolení ke kácení (část A, 3.2) stále nedělané.
+- Nenahlášený kouř odhalí hajný / policie až později (zatím jen registr `unreported`).
+- Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.4 část B).

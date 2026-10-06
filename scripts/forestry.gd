@@ -416,8 +416,10 @@ func _on_lop(id: int, _def: Dictionary, aim: Dictionary, ok: bool) -> void:
 		(cs.shape as CylinderShape3D).height = lg.use_length()
 		cs.position = Vector3(0, lg.use_length() * 0.5, 0)
 	var n := clampi(int(lg.crown_r * 2.0) + 2, 3, 10)
-	p.add_item("vetve", n)
-	world.notify(id, "show_message", ["Máš: %d× %s" % [n, ItemsDB.name_of("vetve")], 2.5])
+	p.add_item(Vyhlasky.FRESH_ITEM, n)              # čerstvé větve: schnou ~30 dní (Vyhlasky)
+	if world.vyhlasky:
+		world.vyhlasky.add_fresh(id, n)
+	world.notify(id, "show_message", ["Máš: %d× %s" % [n, ItemsDB.name_of(Vyhlasky.FRESH_ITEM)], 2.5])
 	world.emit_game_event(id, "log_lopped", {"pos": lg.base_point(), "length": lg.use_length()})     # M3.3 lesní dělník
 
 

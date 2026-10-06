@@ -69,3 +69,16 @@ Spouští jen uživatel. Stav: staticky ověřeno (kontrola překladu), ruční 
 8. Práce s požadavkem „čistý rejstřík“ (`rejstrik_cisty`) tě nevezme, dokud tě soud neodsoudí; obvinění samo o sobě nevadí.
 9. Starý save (bez klíče `court`) se načte bez chyby; případy jsou prázdné.
 10. F5 → F9 uprostřed předvolání (před jednáním): případ, termín a stav „předvolán“ zůstanou.
+
+## M4.4 část B – Vyhlášky, pálení, sucho
+
+1. Úřední deska (Počítač → Úřední deska) ukazuje „Nedělní klid“ vždy; „Zákaz pálení“ jen v červenci a srpnu (F2 → Datum).
+2. Pokácení stromu v lese → v kapse přibude „Čerstvé větve (klestí)“, ne suché „Větve (klestí)“.
+3. Přeskoč ~30 dní (F2 → Datum) → čerstvé větve se změní na „Větve (klestí)“; za sucha a horka proschnou dřív.
+4. Přiložení čerstvých větví do ohniště → kouř; vesničan v dohledu → popup „Někdo tě viděl a nahlásil kouř z ohně“ a přestupek „Pálení čerstvých (mokrých) větví“ (Počítač → Banka → Pokuty); bez svědka jen hláška o kouři a záznam v nenahlášených.
+5. V červenci přiložit suché větve do ohně dál než 30 m od domu, před vesničanem → přestupek „Porušení obecně závazné vyhlášky obce“; u domu → žádný přestupek.
+6. V červenci přiložit polena (ne větve) → žádná vyhláška, oheň funguje jako dřív.
+7. Opékání špekáčků na táboráku v červenci u domu → bez přestupku.
+8. Dlouhé sucho (F2 → Datum, několik dní bez deště, horko) → na desce přibude „Zákaz zalévání a napouštění z vodovodu“; po dešti zmizí.
+9. Starý save (bez klíčů `vyhlasky` a `weather.drought`) se načte bez chyby; čerstvé větve nejsou, sucho = 0.
+10. F5 → F9 po odvětvení: čerstvé větve v kapse i jejich stáří sušení zůstanou.
