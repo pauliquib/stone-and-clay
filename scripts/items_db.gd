@@ -133,6 +133,9 @@ const ITEMS := {
 	# ------------------------------------------------------------ vybavení
 	"spacak": {"name": "Spacák a karimatka (vyspíš se kdekoli venku)", "short": "Spacák", "type": "gear", "kg": 1.5, "price": 890,
 		"color": Color(0.8, 0.3, 0.1)},
+	# M5.7 skateboard: F = stoupnout / seskočit (Player.board_mount / board_dismount); jízda W/S/A/D, ollie Mezerník
+	"skateboard": {"name": "Skateboard (F = stoupnout na prkno)", "short": "Skateboard", "type": "gear", "kg": 2.5, "price": 1890,
+		"color": Color(0.9, 0.6, 0.2)},
 	# ---- M6.1 drony (stavy baterie a poškození drží `World.drone_states`, modely `DroneModel.MODELS`;
 	# start z inventáře → `World.drone_launch`; opravy a nabíjení na počítači doma, stránka Letectví – ÚVL)
 	"dron": {"name": "Dron Ptáček Mini (249 g, kamera, ~12 min letu)", "short": "Dron Mini", "type": "gear", "kg": 0.45,

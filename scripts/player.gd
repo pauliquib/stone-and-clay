@@ -92,6 +92,27 @@ var beekeeper_suit: bool:
 		return Wardrobe.has_tag(outfit, "vcelar")
 	set(v):
 		Wardrobe.set_beekeeper(self, v)
+# --- skateboard (M5.7): režim pohybu – deska pod nohama, `board_on`; jízdu řeší `_board_step`
+const BOARD_PUSH := 1.5                 # m/s – přídavek rychlosti jedním odrazem (W)
+const BOARD_PUSH_CD := 0.45             # s – minimální rozestup odrazů
+const BOARD_MAX_FLAT := 6.0             # m/s – nejvyšší rychlost odrazem po rovině (z kopce víc)
+const BOARD_DRAG := 0.35                # m/s² – valivý odpor na asfaltu
+const BOARD_BRAKE := 7.0                # m/s² – brzda patou (S)
+const BOARD_TURN := 1.9                 # rad/s – zatáčení (A/D) při plné rychlosti
+const BOARD_G := 9.8                    # m/s² – gravitace pro jízdu z kopce
+const BOARD_OLLIE_VY := 3.2             # m/s – vertikální rychlost ollie (~0,5 m)
+const BOARD_OLLIE_PTS := 10             # body za čistý ollie (dopad rovně)
+const BOARD_WOBBLE_V := 12.0            # m/s – od této rychlosti deska kmitá
+const BOARD_FALL_V := 15.0              # m/s – nad touto rychlostí pád
+const BOARD_WALL_V := 3.0               # m/s – náraz do zdi nad touto rychlostí = pád
+var board_on := false                   # hráč stojí na skateboardu
+var board_score := 0                    # body z aktuální jízdy (ollie)
+var board_best := 0                     # rekord (ukládá SaveGame, klíč skate)
+var _board_push_cd := 0.0
+var _board_jump_prev := false
+var _board_air := 0.0                   # s ve vzduchu od ollie (pro bodování dopadu)
+var _board_node: Node3D
+
 const SCOPE_FOV := 12.0               # zorný úhel dalekohledu (°)
 const SCOPE_SENS := 0.22              # citlivost myši v dalekohledu (násobek)
 # M2.8 míření se zbraní (pravé tlačítko): `Weapons` nastavuje `aim_on` / `aim_fov` / `aim_optic` / `aim_sway` / `weapon_status`
@@ -647,6 +668,145 @@ func fall(duration: float, reason: String) -> void:
 			break
 
 
+# ------------------------------------------------------------------ skateboard (M5.7)
+
+## Stoupnutí na skateboard (F, když hráč nic nejede). Deska zůstává v inventáři.
+func board_mount() -> bool:
+	if board_on or item_count("skateboard") <= 0 or car != null or horse != null or aircraft != null or busy or fallen > 0.0:
+		return false
+	board_on = true
+	_board_air = 0.0
+	_board_jump_prev = true                # Mezerník, kterým se stoupá, neudělá hned ollie
+	_board_build()
+	_board_node.visible = true
+	visual.pose = "stand"
+	return true
+
+
+## Seskok (F). Při rychlosti nad 2 m/s hlídá volání (World) – tady jen sundání desky.
+func board_dismount() -> void:
+	board_on = false
+	if _board_node:
+		_board_node.visible = false
+	velocity.x = 0.0
+	velocity.z = 0.0
+
+
+func _board_build() -> void:
+	if _board_node != null:
+		return
+	_board_node = Node3D.new()
+	_board_node.top_level = true
+	add_child(_board_node)
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.72, 0.52, 0.28)
+	wood.roughness = 0.7
+	var wheel := StandardMaterial3D.new()
+	wheel.albedo_color = Color(0.93, 0.9, 0.82)
+	wheel.roughness = 0.5
+	var deck := MeshInstance3D.new()
+	var dm := BoxMesh.new()
+	dm.size = Vector3(0.2, 0.015, 0.8)     # deska 80 × 20 cm (šířka 20 cm, délka 80 cm)
+	deck.mesh = dm
+	deck.material_override = wood
+	deck.position = Vector3(0, 0.07, 0)
+	_board_node.add_child(deck)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var w := MeshInstance3D.new()
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.03
+			cm.bottom_radius = 0.03
+			cm.height = 0.035
+			w.mesh = cm
+			w.material_override = wheel
+			w.rotation_degrees = Vector3(0, 0, 90)
+			w.position = Vector3(sx * 0.09, 0.03, sz * 0.27)
+			_board_node.add_child(w)
+	_board_node.visible = false
+
+
+## Jízda: W = odraz, S = brzda, A/D = zatáčení, Mezerník = ollie, F = seskok (řeší World).
+func _board_step(delta: float) -> void:
+	var inp := _read_input()
+	var move_in: Vector2 = inp[0]
+	var jump_edge: bool = bool(inp[3]) and not _board_jump_prev
+	_board_jump_prev = bool(inp[3])
+	var on_floor := is_on_floor()
+	_board_push_cd = maxf(_board_push_cd - delta, 0.0)
+	# zatáčení podle rychlosti (stojící deska se netočí)
+	var hv := Vector3(velocity.x, 0.0, velocity.z)
+	var spd := hv.length()
+	if not controls_locked and absf(move_in.x) > 0.05:
+		yaw -= move_in.x * BOARD_TURN * clampf(spd / 2.5, 0.0, 1.0) * delta
+	var fwd := Basis(Vector3.UP, yaw) * Vector3.FORWARD
+	var right := Basis(Vector3.UP, yaw) * Vector3.RIGHT
+	var s := hv.dot(fwd)                   # rychlost ve směru desky
+	var lat := hv - fwd * s                # boční skluz se rychle utlumí (deska nejede do stran)
+	lat = lat.move_toward(Vector3.ZERO, 8.0 * delta)
+	var grip := _ground_traction()
+	var acc := 0.0
+	if on_floor:
+		var n := get_floor_normal()
+		var g_t := Vector3(0.0, -BOARD_G, 0.0) - n * Vector3(0.0, -BOARD_G, 0.0).dot(n)
+		acc += g_t.dot(fwd)                # svah: z kopce zrychluje, do kopce zpomaluje
+		var drag := BOARD_DRAG + (1.0 - grip) * 6.0    # mokro / tráva brzdí víc
+		if absf(s) > 0.02:
+			acc -= signf(s) * drag
+		if move_in.y > 0.1:                # S = brzda patou
+			acc -= (signf(s) * BOARD_BRAKE if absf(s) > 0.02 else 0.0)
+		if move_in.y < -0.1 and _board_push_cd <= 0.0 and s < BOARD_MAX_FLAT:
+			s += BOARD_PUSH * clampf(grip, 0.3, 1.0)
+			_board_push_cd = BOARD_PUSH_CD
+		s += acc * delta
+		if absf(s) < 0.05 and absf(acc) < 0.5:
+			s = 0.0
+		# jednou za čas kmitne jen při vysoké rychlosti
+		if absf(s) > BOARD_WOBBLE_V:
+			lat += right * sin(_t * 14.0) * 1.6 * delta
+		# jízda po nerovném povrchu (tráva, bahno, mokro): přepadneš dopředu
+		if absf(s) > 2.5 and grip < 0.45:
+			board_dismount()
+			fall(1.2, "pad_skate")
+			return
+		velocity.y = minf(velocity.y, 0.0)
+		_board_air = 0.0
+	else:
+		_board_air += delta
+	if jump_edge and on_floor and fallen <= 0.0 and not busy:
+		velocity.y = BOARD_OLLIE_VY
+		_board_air = 0.0001
+	elif not on_floor:
+		velocity.y = maxf(velocity.y - gravity * delta, -55.0)
+	if absf(s) > BOARD_FALL_V:
+		board_dismount()
+		fall(1.5, "pad_skate")
+		return
+	velocity.x = fwd.x * s + lat.x
+	velocity.z = fwd.z * s + lat.z
+	var was_air := _board_air
+	var sprev := absf(s)
+	_prev_vy = velocity.y
+	move_and_slide()
+	# náraz do zdi nebo obrubníku rychlostí = pád
+	if is_on_wall() and sprev > BOARD_WALL_V:
+		board_dismount()
+		fall(1.5, "pad_skate")
+		return
+	# čistý ollie: dopad rovně, deska pod nohama (natočení dopadu do 25°)
+	if not on_floor and is_on_floor() and was_air > 0.2:
+		if get_floor_normal().angle_to(Vector3.UP) < deg_to_rad(25.0):
+			board_score += BOARD_OLLIE_PTS
+			board_best = maxi(board_best, board_score)
+			game_event.emit("skate_trick", {"name": "ollie", "pts": BOARD_OLLIE_PTS, "score": board_score})
+	_update_body(delta, absf(s))
+	_board_node.global_transform = Transform3D(Basis(Vector3.UP, yaw), global_position)
+	_prev_pos = global_position
+	_cur_pos = global_position
+	if is_on_floor():
+		_air_top_y = global_position.y
+
+
 # ------------------------------------------------------------------ auto
 
 func enter_car(c: Car) -> void:
@@ -883,6 +1043,9 @@ func _physics_process_impl(delta: float) -> void:
 		_cur_pos = global_position
 		_air_top_y = global_position.y
 		_update_body(delta, 0.0)
+		return
+	if board_on:
+		_board_step(delta)
 		return
 	if _exit_settle > 0:
 		_exit_settle -= 1

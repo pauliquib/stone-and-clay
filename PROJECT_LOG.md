@@ -792,3 +792,23 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Kontrola překladu nad celým `main`: `godot --import` rc 0, `--check-only` na všech `scripts/*.gd` bez chyb.
 - M4.4, M4.6, M4.8 zůstávají `[ ]` s otevřenými body (vodovod, panel P u povolenek, zbraň v kufru, ubalení / sušák bez objektu,
   zákonná čísla NEOVĚŘENO). Ruční test čeká spolu s M5 (uživatel testuje až po celé M5).
+
+## 2026-10-06 – M5.7 Skateboard s animacemi (část: jízda, ollie, pády, uložení)
+
+### Hotovo (staticky ověřeno kontrolou překladu – ruční test čeká)
+- **Co**: skateboard jako režim pohybu hráče (`Player.board_on`, B varianta z promptu), nová položka `skateboard` (typ `gear`, 1 890 Kč, 2,5 kg) v `items_db.gd`.
+- **Ovládání**: F (když hráč nic nejede a má desku v inventáři) = stoupnout; znovu F = seskok (jen při rychlosti pod 2 m/s, jinak hláška). W = odraz (+1,5 m/s, do 6 m/s po rovině, z kopce víc), S = brzda patou, A/D = zatáčení podle rychlosti, Mezerník = ollie (vertikální 3,2 m/s). Klávesy beze změny registru (F, W/S/A/D, Mezerník jsou obsazené už dřív).
+- **Fyzika** (`player.gd`: `_board_step`, `board_mount`, `board_dismount`, `_board_build`): jízda z kopce přes složku tíhové síly na svahu, valivý odpor a horší brzdění na mokru / trávě (`_ground_traction`), boční skluz se utlumí, nad 12 m/s kmitání, nad 15 m/s pád (`fall(1.5, "pad_skate")`), náraz do zdi nad 3 m/s pád, přepadnutí dopředu na nekluzkém povrchu při rychlosti nad 2,5 m/s.
+- **Skóre**: čistý ollie (dopad rovně, svah do 25°) +10 b., `board_score` / rekord `board_best`; signál `game_event` „skate_trick“ (kind `skate_trick`, data `name`, `pts`, `score`).
+- **Model**: procedurální deska 80 × 20 cm se čtyřmi kolečky (BoxMesh / CylinderMesh), `top_level`, sleduje nohy hráče.
+- **Uložení** (`save_game.gd`): klíč `skate` = `{best}`, výchozí 0 při načtení starého savu. Stav „na desce“ se po načtení nezachovává (hráč jde pěšky).
+- **World** (`world.gd`, `player_action("car_enter")`): větev seskoku / stoupnutí před existující větví pro koně, auto a letoun (stoupnutí jen tehdy, když žádné vozidlo ani kůň v dosahu).
+
+### Otevřené body
+- Triky kickflip, shove-it, manual, grind a 180 nejsou (jen ollie); skóre se zatím nezobrazuje v HUD (jen signál `skate_trick`).
+- Animace hráče na desce (odraz, balanc paží, póza na desce, IK nohou na desce) nejsou – hráč stojí normálně, deska je pod ním.
+- Deska ležící ve světě (F u ležícího prkna, položení před sebe) není – deska zůstává v inventáři.
+- Dovednost `skateboarding` (M0.3) v kódu není, takže XP se nepřipisuje. Stížnosti sousedů (hluk v noci, jízda mezi lidmi) nejsou.
+- Nákup v e-shopu / stavebninách (M3.4 / M5.1) není napojen; test přes F2 → Hráč.
+- README (Systémy → Skateboard, Ovládání), `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` neaktualizovány (ponecháno pro společný commit / kolizi s M5.9).
+- Čeká na ruční test uživatele: `docs/testy_M5.md`, oddíl „M5.7“.
