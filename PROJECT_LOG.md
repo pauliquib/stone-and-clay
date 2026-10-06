@@ -695,3 +695,15 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - **Sušák** bez objektu a bez vlhkosti / plísně (zjednodušeno).
 - **Zákonná čísla** nejsou ověřena v úředním znění (`poznamka` v `zakon.json`).
 - **Čeká na ruční test uživatele**: `docs/testy_M4.md`, oddíl „M4.9c – M4.8 a zahrádkář“.
+
+## 2026-10-06 – M4.9 Dokončení částí M4 (uzavření)
+
+- Sloučeno do `main`: M4.4 B doplnění (`849273f`, hluk a nedělní klid), M4.6 doplnění (`6540889`, kufr policie, zabavení udice,
+  posudek a zkouška střelbou), M4.8 zbytek a zahrádkář Ladislav (`1fe35a8`, konopí na záhonu jen za volbou pro dospělé, sušák,
+  test na drogy, držení v kufru, obraz psilocybinu).
+- Cheat menu (F2 → Hráč → „Cheat: libovolný předmět z katalogu…“), skryté adult položky se nabízejí jen při zapnuté volbě (`13ef33b`).
+- Kontrola překladu všech 155 skriptů: `godot --import` rc 0, `--check-only` bez chyb.
+- Stav milníků: M4.1, M4.2, M4.3, M4.5, M4.7 hotové. M4.4, M4.6, M4.8 zůstávají `[ ]` s přesným zbytkem (viz výše a oddíly v `docs/testy_M4.md`).
+- Otevřené body: zalévání z vodovodu (není vodovodní zdroj), hromada klestí, sekačka, ubalení, sběr lysohlávek, samostatný přepínač efektů obrazu,
+  následky nahlášení u zahrádkáře, zákonná čísla NEOVĚŘENO, hajný bez zabavení luku/kuše.
+- Ruční testy: podle `docs/testy_M4.md` (všechny oddíly M4.1–M4.9c). Regresní oddíl „Závěrečná kontrola M4“ na konci.
