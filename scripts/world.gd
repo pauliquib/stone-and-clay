@@ -64,6 +64,7 @@ var _obec_bounds := {}           # id obce → Rect2 hranice katastru – počí
 var terrain: Terrain
 var water: Water                 # potoky, řeka, rybníky (OSM / DIBAVOD)
 var koupaliste: Koupaliste       # koupaliště na bývalé hasičské nádrži (M5.2)
+var u_rampa: URampa              # U-rampa na mýtince SV od obce (M5.8)
 var radio: Radio                 # rádio doma (u vchodu domova, uvnitř na komodě) – hudba a sousedi
 var interiors := {}              # id → Interior (M1.4): oddělené prostory pod mapou, viz enter_interior; M1.8: jen postavené
 var interior_streamer: InteriorStreamer   # M1.8: stavba interiérů zblízka (nejvýš 3), generované interiéry všech budov
@@ -256,6 +257,10 @@ func build() -> void:
 	koupaliste.name = "Koupaliste"
 	add_child(koupaliste)
 	koupaliste.build(self, terrain, water)
+	u_rampa = URampa.new()                 # M5.8: U-rampa na mýtince SV od obce (vlastní mesh a kolize)
+	u_rampa.name = "URampa"
+	add_child(u_rampa)
+	u_rampa.build(self, terrain)
 
 	loading.emit("Stromy (51 736)…")
 	await _frames(1)

@@ -1022,3 +1022,54 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
   ověřena v běhu.
 - **Import**: `godot --headless --path . --import` vypršel na 300 s (exit 124), `--check-only` pro oba soubory bez chyby.
 - **Dokumentace**: README (Systémy → Události), `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` neupraveny.
+## 2026-10-06 – M5.8 U-rampa na mýtince severovýchodně od obce
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou překladu – ruční test čeká)
+- **Rozhodnutí uživatele (závazné)**: rampa je hotová od začátku (ne stavba ze stavebnin); dřevěná konstrukce na
+  betonových patkách; umístění na mýtince v zalesněném svahu severovýchodně od obce, cca 100–200 m od návsi, nad
+  zástavbou. Příběhové využití zatím není.
+- **Odvození souřadnic (z dat, ne z hlavy; modrou značku ze screenshotu jsem neviděl)**:
+  1. Střed náves = dveře úřadu: `data/pois.json` → `urad` (door 88,52; 230,87); stejně bere `estate.gd` (`centre = urad.door`).
+  2. Směry světa: `north_angle_deg` 78,37 (`data/map.json`) a `Clock.enu_to_world` → sever (−0,979; −0,205),
+     východ (0,202; −0,979), severovýchod (−0,549; −0,836).
+  3. Kandidáti: rastr 2 m z `data/buildings.json` (polygony), `data/map.json` (silnice, šířka podle typu),
+     `data/water.json` (rybníky); vzdálenost přes `scipy` distance transform. Stromy z `data/trees.bin`
+     (11 float32, header 8 B, poloměr koruny ≈ sx·0,5 + 0,3). Třída povrchu z `data/surface.bin` (class 4 = dvůr/zahrada,
+     0 = travnatý terén, 3 = les; 4 m rastr). Výška terénu z `data/terrain_height.bin` (stejný vzorec jako `Terrain.height_at`).
+  4. Vyfiltrováno: 100–200 m od návsi, ±25° od SV, všech 9 vzorků půdorysu 9,5 × 5,5 m na třídě 0/4,
+     vzdálenost od budovy/silnice/vody ≥ 12 m, vzdálenost od koruny stromu ≥ 6 m.
+  5. Zvoleno **střed (−52,0; 118,0)**: 180 m od náves, 18° od SV, 12,8 m od nejbližší budovy/silnice/vody,
+     6,4 m od nejbližšího stromu; výška terénu 1,17 m, spád napříč ~0,27 (vrstevnice = osa jízdy, `YAW_DEG` 112,9°).
+     Nejbližší tok (`water.json` streams) cca 295 m. Kandidát (−56; 118) měl spád 0,35 a 7 m od stromů (horší).
+- **Rampa** (`scripts/u_rampa.gd`, class `URampa`, Node3D): šířka 4,8 m napříč, stěny (coping) 1,5 m, přechod
+  kruh R 2,4 m (vodorovný průmět 2,22 m), rovný střed 2,4 m, plošiny 1,2 m hluboké ve výši copingu, zábradlí 0,9 m
+  na zadní hraně plošin, žebřík na boku (+X) u jedné plošiny. Mesh: jeden ArrayMesh (MeshKit, barvy vrcholů, bez
+  culling), překližka + trámky + sloupky + coping ø 6 cm. Patky: betonové bloky (0,5 × 0,5 m) od pod terénu po
+  PAD_TOP; podlaha 0,15 m nad nejvyšším bodem půdorysu, takže rampa nevisí a terén se nemění.
+  Kolize: `ConcavePolygonShape3D` z trojúhelníků riding povrchu a bočních stěn (`backface_collision` = true), plošiny
+  jako `BoxShape3D`; povrch má meta `surface` = „rampa“ (vrstva 1).
+- **Jízda** (`scripts/player.gd`, M5.7 větev): při stoupnutí na desku `floor_max_angle` 75° (přechody ~68° jsou
+  „podlaha“, ne „zeď“; při seskoku zpět 46°); deska se natáčí podle normály povrchu (`get_floor_normal`), na rovině
+  zůstává vodorovně. Gravitace podél povrchu, zpomalení do kopce a zrychlení z kopce, pády a náraz do zdi zůstávají z M5.7.
+- **Napojení**: `scripts/world.gd` – var `u_rampa` a vytvoření za `koupaliste.build` (4 řádky). Nic se neukládá
+  (`save_game.gd` beze změny). Ladicí konstanty: `URampa.CENTER / YAW_DEG / W / WALL_H / R / FLAT`,
+  `Player.BOARD_FLOOR_ANGLE`.
+- **Kontrola překladu** (00_SPOLECNE kap. 6): `godot --headless --path . --import` a `--check-only` na
+  `scripts/u_rampa.gd`, `scripts/world.gd`, `scripts/player.gd` – výstup prázdný (SCRIPT ERROR z addonů ignorován).
+
+### Otevřené body
+- Ověřit umístění na mapě proti modré značce uživatele; případně posunout `URampa.CENTER` a `YAW_DEG`.
+- Interpretace rozměrů: „šířka 4,8 m“ je napříč (rozteč stěn), přechod R 2,4 m je kruhový oblouk až do výše 1,5 m
+  (vodorovný průmět 2,22 m), celkový půdorys ~9,3 × 4,8 m. Ke schválení.
+- Spodní strana rampy na svahu: patky až ~2,5 m na spodní straně, boční stěny nemají obložení pod podlahou.
+  Terén se nevyrovnával (pokud chce uživatel rovné místo, je to jiné umístění nebo zarovnání terénu).
+- Nedokončeno z bodů 3–4 promptu (jen základ jízdy): pumpování (Shift dole / vstát nahoře), vert a air assist,
+  triky na rampě (rock-to-fakie, 50-50 stall na copingu, air s grabem E), kontrola dopadu ±30° a pád / sjetí,
+  session 2 min (skóre, rekord, XP `skateboarding` × 1,5 na rampě).
+- Bod 5 (noční klid, M4.4) a NPC kamarádi u rampy (mládež, respekt `mladez`) nejsou.
+- Stromy v půdorysu nejsou káceny (půdorys je bez stromů jen podle středů a poloměrů z trees.bin, ověřeno
+  výpočtem); na okraji může kmen zasahovat do patky, ověřit v běhu.
+- Rezervace `RAMP_SIZE` u domu (`scripts/garden.gd`, M2.4) zůstává nevyužitá; rozhodnutí o zahradě nebylo měněno.
+- README nemá oddíl „Systémy“, takže ho nebylo co aktualizovat. `prompts/roadmapa/README.md` a
+  `docs/VIZE_A_ROADMAPA.md` neupraveny (zadání).
+- Příběhové využití rampy zatím není (rozhodnutí uživatele).

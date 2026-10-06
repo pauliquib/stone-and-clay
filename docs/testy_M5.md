@@ -87,3 +87,14 @@ Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kab
 8. V den hodů (3. sobota → neděle hodů v říjnu) zábava není, jen hody.
 9. F2 → Datum: po půlnoci (≈ 2 h) zábava ještě běží, po 3 h zmizí pódium.
 10. Starý save se načte beze změny; zábava není uložena (plyne z kalendáře).
+## M5.8 – U-rampa na mýtince severovýchodně od obce
+1. Teleport na U-rampu (mýtinka v lese na SV okraji obce, ~180 m od návsi, mezi domy a horní cestou): stojí hotová dřevěná U-rampa na betonových patkách, žebřík na boku u plošiny.
+2. Rampa stojí na patkách, nevisí ve vzduchu a neprolíná se s terénem (na spodní straně svahu jsou patky vyšší).
+3. Výstup žebříkem na plošinu, zábradlí na vnější (zadní) hraně; skateboard F → drop-in ze plošiny do přechodu, jízda tam a zpět.
+4. Deska se na přechodu natáčí podle povrchu; přechody (i strmé u copingu) jsou jízdní, nespadneš na rovném místě mezi nimi.
+5. Coping (kovová trubka) a rovný střed jsou vidět; stěny z překližky, trámky a sloupky odpovídají konstrukci.
+6. Chůze pěšky k rampě: plošina a přechody jsou pro chodce neprůchodné nad cca 0,7 m (chůze se nezměnila).
+7. Po seskoku (F) na rovině se deska vrátí do vodorovné polohy; po sjetí z rampy normální jízda po terénu a cestě beze změny.
+8. Stromy kolem rampy (cca 6 m od středu) nejsou v půdorysu; kolize s kmeny nepřekáží.
+9. Save a načtení: starý save se načte beze změny (rampa je statický objekt, nic se neukládá).
+10. Teleport k cestě / budově v okolí: nic neblokuje, pohyb a zvuky jinde beze změny.
