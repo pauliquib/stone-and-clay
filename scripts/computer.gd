@@ -358,6 +358,8 @@ func catalog() -> Array:
 	for o in Place.OFFERS.get("obchod", []):
 		var id := String(o[0])
 		var mode := String(o[2])
+		if mode != "header" and ItemsDB.hidden(id):
+			continue     # M4.8: obsah pro dospělé vypnutý – semena nejsou ani v eŠuplíku
 		if mode == "header":
 			if not rows.is_empty():
 				out.append([sec, rows])

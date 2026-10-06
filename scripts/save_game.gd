@@ -21,7 +21,7 @@ const SLOT_NAMES := {"rychly": "Rychlé uložení (F5)", "auto": "Automaticky (p
 	"2": "Pozice 2", "3": "Pozice 3"}
 const BODY_KEYS := ["weight", "stomach_alc", "body_alc", "stomach_kcal", "nicotine", "tar", "craving", "ever_smoked",
 	"caffeine", "nausea", "health", "alive", "total_alc_g", "total_kcal", "cigarettes_smoked", "drinks",
-	"wetness", "cold", "addiction", "_smoke_rate"]
+	"wetness", "cold", "addiction", "_smoke_rate", "thc", "psilo"]
 
 
 static func path(slot: String) -> String:

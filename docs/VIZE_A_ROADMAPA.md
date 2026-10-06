@@ -444,7 +444,7 @@ kroky přehazovat, mezi milníky platí závislosti.
 - [x] **M4.7 Katastr: koupě a prodej nemovitostí** (D2) – smyšlené parcely z `landuse`, katastr na úřadě / PC,
   vklad se lhůtou, hypotéka, pronájem, vlastnictví řídí kácení / sklizeň / chov. *Hotovo, když:* hráč koupí dům
   a les, přestěhuje se a v lese smí kácet. Nemovitosti jen v domácím katastru (rozhodnutí 6. 10. 2026).
-- [ ] **M4.8 Návykové látky** (E8) – tabák, konopí, lysohlávky za volbou „Obsah pro dospělé“ (výchozí vypnuto),
+- [ ] **M4.8 Návykové látky** (E8, částečně – viz PROJECT_LOG) – tabák, konopí, lysohlávky za volbou „Obsah pro dospělé“ (výchozí vypnuto),
   pěstování, sušení, zpracování, stavy v `BodyState`, zákony a důsledky bez glorifikace. *Hotovo, když:* s vypnutou volbou
   obsah ve hře není; se zapnutou má každý krok právní i tělesné důsledky.
 

@@ -523,3 +523,47 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - **Povolenky** nejsou v panelu P (`hud.gd` `DOC_KINDS` jen základní doklady – hud.gd patří M4.7, nechal jsem ho být).
 - **Vizuál**: NPC je zatím jednoduchá procedurální kapsle (ne `Humanoid`); bez animací a bez raycastu na zdi při vidění.
 - **Čeká na ruční test uživatele** (checklist v `docs/testy_M4.md`, oddíl M4.6).
+
+## 2026-10-06 – M4.8 Návykové látky (obsah pro dospělé; částečně)
+
+### Hotovo (staticky ověřeno: `godot --import` + `--check-only` na každý změněný skript, bez chyb; ruční test čeká)
+- **Co – brána obsahu**: `GameSettings.adult_content` (`nastaveni.cfg`, sekce `obsah`, klíč `dospeli`, výchozí vypnuto),
+  zaškrtávátko v `pause_menu.gd` (`_set_adult` → `ItemsDB.adult_on`), `World.adult_ok()`. `ItemsDB.hidden(id)` skryje
+  předměty s `adult: true` (`exists`, `by_type`, `use_item`, řádky obchodu v `local_client._shop_item_row`, eŠuplík přes
+  `computer.gd` eŠuplík přeskakuje skryté položky z OFFERS).
+- **Co – předměty** (`items_db.gd`, oddíl M4.8): `tabak_semena`, `tabak_susene` (typ `smoke`, 1 cigareta, nikotin),
+  `konopi_semena` (průmyslová odrůda, nízké THC), `konopi_kvety` (typ `smoke`, klíč `thc`), `lysohlavky` (typ `food`, klíč `psilo`).
+- **Co – zahrada** (`garden.gd`): plodiny `tabak` (výsev IV–V, 90 dní) a `konopi` (IV–V, 110 dní) v `CROPS` s `adult: true`,
+  `crop_visible(k)` filtruje výsev a nabídku cedule. Při výsevu konopí `World.witness_reported(…, "pestovani", 25 m)` →
+  `commit_offense(id, "nedovolene_pestovani")`.
+- **Co – obchod** (`place.gd`): `tabak_semena` 45 Kč, `konopi_semena` 60 Kč v Potravinách (jen při volbě). Cigarety zůstávají jen v Potravinách.
+- **Co – tělo** (`body_state.gd`): `thc` a `psilo` (poločas 1,5 h / 3 h, `THC_SPEED` = zpomalení v `speed_mult`, nevolnost
+  při vysoké hladině), `smoke_thc()`, `dose_psilo()` (volá `eat()` přes klíč `psilo`). `player._begin` volí `smoke_thc`
+  u položek s `thc`, jinak nikotin. Uložení: `save_game.gd` BODY_KEYS `thc`, `psilo` (starý save → 0).
+- **Co – HUD** (`hud.gd`): řádek „Pod vlivem THC – …“ / „psilocybinu – …“ v přehledu těla.
+- **Co – zákon** (`data/zakon.json`, `prestupky`): `nedovolene_pestovani`, `prechovavani_navykove_latky`,
+  `rizeni_pod_vlivem_navykove_latky` – čísla s poznámkou „NEOVĚŘENO – ověřit“.
+- **Zdroj právního stavu (ověřeno WebSearch 2026-10-06, sekundární zdroje, neověřeno v úředním znění)**: novela
+  207/2025 Sb. (účinnost 1. 1. 2026) mění 40/2009 Sb.: držení doma do 100 g sušiny legální, 100–200 g přestupek, nad 200 g trestný
+  čin; mimo domov do 25 g legální, 25–50 g přestupek, nad 50 g trestný čin; pěstování do 3 rostlin legální (THC > 1 %),
+  4–5 rostlin přestupek, nad 5 trestný čin. Zdroje: energozrouti.cz (článek „Pravidla pro pěstování konopí se od letoška
+  změnila“), cnn.iprima.cz („Konopí už není trestný čin… přehled změn od roku 2026“). Úřední znění ještě neověřeno.
+- **Dokumentace**: `docs/testy_M4.md` (oddíl M4.8, 10 bodů), `README.md` (doložka „Obsah pro dospělé“).
+
+### Otevřené body (M4.8 zůstává `[ ]`)
+- **Sušák** (objekt v kůlně / na půdě, vlhkost, plíseň) chybí: sušený tabák a konopí se dostanou přímo ze sklizně.
+- **Ubalení** (akce „ubalit“ z papírků) chybí; konopí jako jedlá varianta (pečení) chybí.
+- **Lysohlávky – sběr** (sezónní předmět v lese, vzor `hrib`, riziko záměny s jedovatou houbou, dovednost) chybí: ve hře se nedají sehnat.
+- **Držení konopí při prohlídce** (M4.6 kufr/kapsy) a **test na drogy** v `police.gd` (`breath_test`) nejsou napojené;
+  `rizeni_pod_vlivem_navykove_latky` je jen v datech.
+- **Efekty obrazu** psilocybinu (`DrunkFx`, nové uniformy v `drunk.gdshader`, vypínatelné) nejsou; HUD ukazuje jen stav.
+- **Zákonná čísla** nejsou ověřena v úředním znění; `poznamka` v `zakon.json` to říká.
+- **Dluhy a pokuta** za `nedovolene_pestovani` jdou přes `commit_offense` (místo úřad); zatím neověřeno hrou.
+- Prodej látek NPC záměrně neimplementován (hra nenabádá).
+
+### Změněné soubory
+`scripts/game_settings.gd`, `scripts/pause_menu.gd`, `scripts/items_db.gd`, `scripts/garden.gd`, `scripts/place.gd`,
+`scripts/local_client.gd`, `scripts/body_state.gd`, `scripts/player.gd`, `scripts/save_game.gd`, `scripts/world.gd`,
+`scripts/hud.gd`, `scripts/computer.gd`, `data/zakon.json`, `docs/testy_M4.md`, `README.md`, `PROJECT_LOG.md`.
+
+### Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.8).

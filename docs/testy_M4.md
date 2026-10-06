@@ -106,3 +106,14 @@ Spouští jen uživatel. Stav: staticky ověřeno (kontrola překladu), ruční 
 8. Rybaření bez lístku o víkendu ráno (sobota/neděle, 5–12 h) → rybářská stráž u hráče při kontrole zapíše přestupek „rybářské pytláctví“ a hlášku „Zapisuji: rybaření bez lístku a povolenky“.
 9. Starý save (bez klíče `gamekeeper`) se načte bez chyby, kurzy jsou prázdné; F5 → F9 zachová zaplacené kurzy a doklady s platností.
 10. Povolenka k lovu po uplynutí 30 dnů (F2 → Datum +31 dní) přestane platit (`has` vrací false) a jde koupit znovu.
+## M4.8 – Návykové látky (obsah pro dospělé; částečně, viz PROJECT_LOG)
+1. Nová hra (volba výchozí vypnuta): Potraviny nenabízí semena tabáku ani konopí; F1 a deník J bez zmínek o látkách.
+2. Esc → Nastavení → zaškrtnout „Obsah pro dospělé“ → Potraviny: semena tabáku (45 Kč) a semena konopí (60 Kč) jsou v nabídce.
+3. Zasadit tabák a konopí na zahradě (duben, F2 → Datum: duben); F2 posun času o ~3 měsíce → sklizeň.
+4. Sušený tabák z úrody zapálit → HUD ukáže nikotin a chuť na cigaretu (ne „Pod vlivem THC“).
+5. Sušené květy konopí zapálit → HUD „Pod vlivem THC – slabé/střední“, krátké zpomalení, po pár hodinách odezní.
+6. Soused nebo hlídka u plotu uvidí konopí při sázení → přestupek „Nedovolené pěstování konopí“ (zakon.json, NEOVĚŘENO) se objeví v rejstříku / dluzích.
+7. Vypnout volbu → semena a látky zmizí z inventáře a z nabídek obchodu; znovu zapnout → vrátí se.
+8. F5 → F9 zachová THC a stav zahrady; starý save bez klíčů `thc` / `psilo` se načte bez chyby.
+9. Lysohlávky: ve hře zatím nejdou sehnat (sběr chybí, viz otevřené body); ověřit jen, že se předmět neobjeví s vypnutou volbou.
+10. Zákonné řádky v `data/zakon.json` (`nedovolene_pestovani`, `prechovavani_navykove_latky`, `rizeni_pod_vlivem_navykove_latky`) mají poznámku „NEOVĚŘENO“ – přečíst a ověřit čísla proti zdroji.

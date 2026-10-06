@@ -320,6 +320,8 @@ func _show_settings() -> void:
 		func(on): settings.trike_realistic = on)
 	_slider("Zorné pole (FOV)", 55.0, 95.0, 1.0, settings.fov, func(x): settings.fov = x, "%d°")
 	_check("Třes obrazu (abstinence, zima)", settings.withdrawal_shake, func(on): settings.withdrawal_shake = on)
+	_check("Obsah pro dospělé (návykové látky) – výchozí vypnuto; vypnuto = v hře není", settings.adult_content,
+		_set_adult)
 	_header("Zvuk")
 	_slider("Hlasitost", 0.0, 1.0, 0.05, settings.volume, func(x): settings.volume = x, "", true)
 	_header("Výkon")
@@ -438,6 +440,12 @@ func _slider(text: String, lo: float, hi: float, step: float, val: float, setter
 		setter.call(x)
 		show_val.call(x)
 		settings.apply(client))
+
+
+## M4.8: přepnutí „Obsah pro dospělé“ – hned se projeví v katalogu (předměty a plodiny s `adult` zmizí / vrátí se).
+func _set_adult(on: bool) -> void:
+	settings.adult_content = on
+	ItemsDB.adult_on = on
 
 
 func _check(text: String, on: bool, setter: Callable) -> void:

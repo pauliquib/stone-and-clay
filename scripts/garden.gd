@@ -100,8 +100,20 @@ const CROPS := {
 	"cesnek": {"name": "Česnek", "item": "cesnek", "seed": "semena_cesnek", "sow_months": [10, 11], "days": 160,
 		"water_need": 5, "frost_kill": -22.0, "yield": [4, 8], "xp": 10.0, "feed": 0.0, "min_temp": -8.0, "cold_ok": true,
 		"leaf": Color(0.4, 0.62, 0.28), "ripe": Color(0.75, 0.68, 0.3), "h": 0.45, "wid": 0.03, "lean": 0.05},
+	# M4.8: obsah pro dospělé (jen při zapnuté volbě, viz crop_visible)
+	"tabak": {"name": "Tabák", "item": "tabak_susene", "seed": "tabak_semena", "sow_months": [4, 5], "days": 90,
+		"water_need": 3, "frost_kill": -2.0, "yield": [6, 12], "xp": 8.0, "feed": 0.0, "min_temp": 8.0, "adult": true,
+		"leaf": Color(0.3, 0.55, 0.22), "ripe": Color(0.45, 0.5, 0.2), "h": 0.9, "wid": 0.1, "lean": 0.15},
+	"konopi": {"name": "Konopí", "item": "konopi_kvety", "seed": "konopi_semena", "sow_months": [4, 5], "days": 110,
+		"water_need": 3, "frost_kill": -2.0, "yield": [4, 8], "xp": 10.0, "feed": 0.0, "min_temp": 8.0, "adult": true,
+		"leaf": Color(0.22, 0.5, 0.2), "ripe": Color(0.4, 0.5, 0.22), "h": 1.6, "wid": 0.06, "lean": 0.1},
 }
-const CROP_ORDER := ["brambory", "mrkev", "cibule", "salat", "rajcata", "dyne", "cesnek"]
+const CROP_ORDER := ["brambory", "mrkev", "cibule", "salat", "rajcata", "dyne", "cesnek", "tabak", "konopi"]
+
+## Plodina je k dispozici (není dospělý obsah, nebo je volba zapnutá).
+static func crop_visible(k: String) -> bool:
+	return CROPS.has(k) and (not bool(CROPS[k].get("adult", false)) or ItemsDB.adult_on)
+
 
 const S_ZRYTO := 1
 const S_ZASETO := 2
@@ -590,7 +602,7 @@ func pick_crop(id: int) -> String:
 	var month := world.clock.month()
 	var first := ""
 	for k in CROP_ORDER:
-		if p.item_count(String(CROPS[k]["seed"])) <= 0:
+		if not crop_visible(k) or p.item_count(String(CROPS[k]["seed"])) <= 0:
 			continue
 		if first == "":
 			first = k
@@ -726,6 +738,9 @@ func _on_sow(id: int, _def: Dictionary, aim: Dictionary, ok_: bool) -> void:
 	var crop := pick_crop(id)
 	if crop == "" or not p.remove_item(String(CROPS[crop]["seed"]), 1):
 		return
+	# M4.8: konopí je vidět na zahradě → svědci (soused, drbna, policie) mohou nahlásit nedovolené pěstování
+	if crop == "konopi" and world.witness_reported(id, p.global_position, "pestovani", 25.0):
+		world.commit_offense(id, "nedovolene_pestovani", {})
 	var pl: Plot = aim["plot"]
 	pl.cells[aim["cell"]] = {"s": S_ZASETO, "c": crop, "g": 0.0, "dry": 0, "m": 0.0, "w": float(c.get("w", 0.0)), "h": 1.0, "o": 0,
 		"f": float(c.get("f", 0.0))}        # hnojivo v zrytém záhonu výsev přežije – kbelík hnoje nepřijde nazmar
@@ -941,7 +956,7 @@ func open_sign_menu(id: int, pl: Plot) -> void:
 	for k in CROP_ORDER:
 		var seed_id := String(CROPS[k]["seed"])
 		var n := p.item_count(seed_id)
-		if n <= 0:
+		if n <= 0 or not crop_visible(k):
 			continue
 		seeds += 1
 		opts.append(["Sít: %s (máš %d; sází se %s)" % [_crop_name(k), n, months_text(CROPS[k]["sow_months"])], pick_seed.bind(id, k)])

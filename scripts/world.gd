@@ -4078,6 +4078,11 @@ func _witness_light() -> float:
 	return f
 
 
+## M4.8: brána „Obsah pro dospělé“ (Esc → Nastavení, výchozí vypnuto). Nové látky se registrují jen přes ni.
+func adult_ok() -> bool:
+	return ItemsDB.adult_on
+
+
 ## Kdo čin uvidí / uslyší. Vrací [{node, name, persona, sees, hears, reports}] jen pro ty, kdo vidí nebo slyší.
 ## Vidí: vzdálenost ≤ see_r × světlo a zorný kužel (NPC zhruba dopředu). Slyší: ≤ hear_r, bez kuželu.
 ## Nahlásí: podle povahy (`Weapons.CALL_P`), přítele (≥ 60) skoro nikdy; policejní hlídka vždy.

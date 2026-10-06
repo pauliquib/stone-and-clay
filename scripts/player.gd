@@ -497,6 +497,8 @@ func is_stamina_locked() -> bool:
 
 ## Použije předmět z inventáře (napije se / sní / zapálí si). Vrací false, když nejde.
 func use_item(id: String) -> bool:
+	if ItemsDB.hidden(id):
+		return false     # M4.8: obsah pro dospělé vypnutý – předmět ve hře není
 	if busy or car != null or horse != null or aircraft != null or drone_flying() or fallen > 0.0:
 		return false
 	var info := Consumables.info(id)
@@ -553,7 +555,11 @@ func _begin(act: String, id: String, ml: float) -> void:
 			_action_len = 1.0
 			visual.start_action("smoke")
 			_smoke_t = 14.0
-			body.smoke()
+			var thc_s := float(Consumables.info(id).get("thc", 0.0))   # M4.8: konopí = THC, ostatní = nikotin
+			if thc_s > 0.0:
+				body.smoke_thc(thc_s)
+			else:
+				body.smoke()
 			game_event.emit("sfx", {"name": "lighter"})
 			game_event.emit("smoked", {"id": id})
 

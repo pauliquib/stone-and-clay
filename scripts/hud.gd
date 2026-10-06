@@ -1352,6 +1352,11 @@ func _process_impl(delta: float) -> void:
 	var bmi := b.bmi()
 	var bmi_t := "normální" if bmi < 25.0 else ("nadváha" if bmi < 30.0 else "obezita")
 	var extra := "Hmotnost %.1f kg · BMI %.1f (%s)" % [b.weight, bmi, bmi_t]
+	# M4.8: stav látek jen věcně (obsah pro dospělé; hodnoty jsou 0, když je volba vypnutá)
+	if b.thc > 0.05:
+		extra += "\nPod vlivem THC – %s" % ("slabé" if b.thc < 0.5 else ("střední" if b.thc < 1.2 else "silné"))
+	if b.psilo > 0.05:
+		extra += "\nPod vlivem psilocybinu – %s" % ("slabé" if b.psilo < 0.5 else ("střední" if b.psilo < 1.2 else "silné"))
 	if b.ever_smoked:
 		extra += "\nNikotin %.1f mg · chuť na cigaretu %d %%" % [b.nicotine, int(b.craving * 100.0)]
 		if b.tar > 3.0:

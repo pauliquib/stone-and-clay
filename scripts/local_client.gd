@@ -747,6 +747,8 @@ func _offer_sections(key: String) -> Array:
 ## Jeden řádek nabídky (koupě / natočení / výkup) pro Hud.open_menu, nebo [], má-li se přeskočit
 ## (podnapilému hospoda alkohol nenalije).
 func _shop_item_row(key: String, o: Array) -> Array:
+	if ItemsDB.hidden(String(o[0])):
+		return []     # M4.8: obsah pro dospělé vypnutý – položka v nabídce není
 	var id: String = o[0]
 	var base: int = o[1]
 	var mode: String = o[2]

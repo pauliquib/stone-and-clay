@@ -101,6 +101,18 @@ const ITEMS := {
 	# ------------------------------------------------------------ tabák
 	"cigarety": {"name": "Cigarety (krabička 20 ks)", "short": "Cigarety", "type": "smoke", "kg": 0.03, "count": 20, "price": 165,
 		"color": Color(0.9, 0.9, 0.88)},
+	# ---- M4.8 obsah pro dospělé (`adult: true`): vidí se jen při zapnuté volbě (`ItemsDB.adult_on`), jinak nejsou ve hře.
+	# Oficiální text: zjednodušená herní simulace, nejde o návod. Úroveň THC / psilocybinu v `BodyState`.
+	"tabak_semena": {"name": "Semena tabáku (sáček)", "short": "Semena tabáku", "type": "seed", "kg": 0.01, "stack": 99,
+		"price": 45, "adult": true, "color": Color(0.7, 0.75, 0.5)},
+	"tabak_susene": {"name": "Sušený tabák (ruční cigarety z papírků)", "short": "Sušený tabák", "type": "smoke", "kg": 0.05,
+		"count": 1, "stack": 99, "price": 0, "adult": true, "color": Color(0.5, 0.36, 0.18)},
+	"konopi_semena": {"name": "Semena konopí (průmyslová odrůda, nízké THC)", "short": "Semena konopí", "type": "seed",
+		"kg": 0.01, "stack": 99, "price": 60, "adult": true, "color": Color(0.55, 0.6, 0.35)},
+	"konopi_kvety": {"name": "Sušené květy konopí (1 dávka)", "short": "Konopí", "type": "smoke", "kg": 0.05, "count": 1,
+		"stack": 99, "price": 0, "adult": true, "thc": 1.0, "color": Color(0.42, 0.52, 0.22)},
+	"lysohlavky": {"name": "Lysohlávky (čerstvé, záměna s jedovatou houbou možná)", "short": "Lysohlávky", "type": "food",
+		"kg": 0.05, "kcal": 20, "price": 0, "adult": true, "psilo": 1.0, "color": Color(0.8, 0.75, 0.6)},
 	# ------------------------------------------------------------ vybavení
 	"spacak": {"name": "Spacák a karimatka (vyspíš se kdekoli venku)", "short": "Spacák", "type": "gear", "kg": 1.5, "price": 890,
 		"color": Color(0.8, 0.3, 0.1)},
@@ -322,8 +334,17 @@ const ITEMS := {
 }
 
 
+## M4.8: „Obsah pro dospělé“ (Esc → Nastavení). Nastavuje `GameSettings` / `PauseMenu`; výchozí vypnuto.
+static var adult_on := false
+
+
+## Předmět s klíčem `adult` je ve hře jen při zapnuté volbě (vypnuto = neexistuje, ani v nabídkách).
+static func hidden(id: String) -> bool:
+	return ITEMS.has(id) and bool(ITEMS[id].get("adult", false)) and not adult_on
+
+
 static func exists(id: String) -> bool:
-	return ITEMS.has(id)
+	return ITEMS.has(id) and not hidden(id)
 
 
 static func info(id: String) -> Dictionary:
@@ -360,7 +381,7 @@ static func burnt_to(id: String) -> String:
 static func by_type(t: String) -> Array[String]:
 	var out: Array[String] = []
 	for id in ITEMS:
-		if ITEMS[id]["type"] == t:
+		if ITEMS[id]["type"] == t and not hidden(id):
 			out.append(id)
 	return out
 
