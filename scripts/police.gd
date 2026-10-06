@@ -685,7 +685,7 @@ func _walk_back(delta: float) -> void:
 ## M4.8: počet kusů návykových látek u hráče (klíče z ItemsDB, jen při zapnuté volbě pro dospělé).
 func _drugs_carried(pl: Player) -> int:
 	var n := 0
-	for k in ["konopi_kvety", "tabak_susene", "lysohlavky"]:
+	for k in ["konopi_kvety", "tabak_susene", "lysohlavky", "konopi_susene", "tabak_list", "konopne_pecivo"]:
 		n += pl.item_count(k)
 	return n
 

@@ -3,8 +3,8 @@
 ## - Jen při zapnuté volbě „Obsah pro dospělé“ (`ItemsDB.adult_on`). Vypnuto = žádný záhon, žádný růst, nic v dialogu.
 ## - Záhon je pozemek NPC: výsev v dubnu / květnu jednou za rok, sklizeň po `DAYS` dnech. Sklizeň je jen počet rostlin
 ##   v `state` – nic nejde do inventáře, nic se neprodává, hráč s ním nemá žádnou interakci.
-## - Svědci: při výsevu se hráče v okruhu zeptá `World.witness_reported` (vidí a nahlásí). Následky pro NPC zatím nejsou
-##   (otevřený bod) – zapíše se jen příznak `nahlaseno` a hráč dostane informativní hlášku.
+## - Svědci: při výsevu se hráče v okruhu zeptá `World.witness_reported` (vidí a nahlásí). Následek: zabavení rostlin
+##   z záhonu (`zabaveno`, rostliny 0, záhon zůstane prázdný). Pokuta NPC by vyžadovala jeho rejstřík zákona (otevřený bod).
 ## - Ukládání: klíč `npc_grow` na úrovni světa (starý save bez klíče = žádný záhon).
 class_name NpcGrow
 extends Node3D
@@ -21,7 +21,7 @@ const PLOT_SIZE := Vector2(3.0, 2.0)
 const LEAF := Color(0.22, 0.5, 0.2)
 
 var world: World
-var state := {}                        # {"rok": int, "vysety": bool, "rostliny": int, "dny": float, "sklizeno": int, "nahlaseno": bool}
+var state := {}                        # {"rok": int, "vysety": bool, "rostliny": int, "dny": float, "sklizeno": int, "nahlaseno": bool, "zabaveno": bool}
 var _last_jd := -1
 var _patch: Node3D
 
@@ -50,7 +50,7 @@ func _advance(dd: int) -> void:
 		return
 	var y := world.clock.year()
 	if int(state.get("rok", -1)) != y:
-		state = {"rok": y, "vysety": false, "rostliny": 0, "dny": 0.0, "sklizeno": 0, "nahlaseno": false}
+		state = {"rok": y, "vysety": false, "rostliny": 0, "dny": 0.0, "sklizeno": 0, "nahlaseno": false, "zabaveno": false}
 	if not bool(state["vysety"]):
 		if world.clock.month() in SOW_MONTHS:
 			_sow()          # první den v sezóně výsevu (jednou za rok)
@@ -67,6 +67,7 @@ func _sow() -> void:
 	state["vysety"] = true
 	state["rostliny"] = rng.randi_range(PLANTS_MIN, PLANTS_MAX)
 	state["dny"] = 0.0
+	state["zabaveno"] = false
 	var pos := plot_pos()
 	# svědci: kdo z hráčů záhon vidí a nahlásí (příznak, bez následků pro NPC – otevřený bod)
 	for pid in world.players.keys():
@@ -75,7 +76,9 @@ func _sow() -> void:
 			continue
 		if world.witness_reported(int(pid), pos, "pestovani", SEE_R):
 			state["nahlaseno"] = true
-			world.notify(int(pid), "show_message", ["Na okraji lesa někdo nahlásil konopí na záhonu.", 3.0])
+			state["zabaveno"] = true
+			state["rostliny"] = 0       # následek: rostliny ze záhonu se zabaví
+			world.notify(int(pid), "show_message", ["Na okraji lesa někdo nahlásil konopí na záhonu. Rostliny byly zabaveny.", 4.0])
 			break
 
 
@@ -92,7 +95,8 @@ func plot_pos() -> Vector3:
 
 ## Vizuál: zelený záhon s rostlinami jen při zapnuté volbě a po výsevu v letošním roce.
 func _update_visual() -> void:
-	var show := ItemsDB.adult_on and bool(state.get("vysety", false)) and int(state.get("sklizeno", 0)) == 0
+	var show := (ItemsDB.adult_on and bool(state.get("vysety", false)) and int(state.get("sklizeno", 0)) == 0
+		and not bool(state.get("zabaveno", false)))
 	if not show:
 		if _patch:
 			_patch.visible = false

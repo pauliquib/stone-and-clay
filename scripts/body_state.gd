@@ -44,6 +44,8 @@ const OVERHEAT_RATE := 0.6         # /h za (°C nad limit × izolace nad limit)
 const OVERHEAT_STAMINA := 0.2      # o tolik přehřátí (1,0) snižuje maximální výdrž
 # --- M4.8 návykové látky (jen při „Obsah pro dospělé“): THC (konopí) a psilocybin (lysohlávky) – mírné, nepříjemné efekty
 const THC_HALF_H := 1.5            # h – poločas THC v krvi (kouření: rychlý nástup, krátké)
+const EDIBLE_THC_DELAY_H := 1.0  # h – nástup THC po snědení (pomalejší než kouření)
+const MUSHROOM_TOXIC_HP := 12.0    # zdraví ztracené při otravě muchomůrkou (× síla jedu) – ladit
 const PSILO_HALF_H := 3.0          # h – poločas psilocybinu (snědení: pomalý nástup, déle)
 const THC_SPEED := 0.12            # zpomalení reakce (speed_mult) na 1,0 THC
 const THC_NAUSEA := 0.02           # nevolnost za hodinu nad THC 1,5
@@ -67,6 +69,7 @@ var ever_smoked := false
 var addiction := 0.0               # 0..1 skutečná závislost (klouzavý průměr kouření, ne jen poslední cigareta)
 var _smoke_rate := 0.0             # interní akumulátor pro `addiction` (viz ADDICTION_NORM)
 var thc := 0.0                     # M4.8: THC v krvi (0..~2), konopí; výchozí 0 = starý save bez klíče
+var _thc_later: Array = []          # M4.8: snědené THC, které ještě nezačalo působit [zbývá h, síla] (neukládá se)
 var psilo := 0.0                   # M4.8: psilocybin (0..~2), lysohlávky; výchozí 0
 var caffeine := 0.0                # 0..1
 var nausea := 0.0                  # 0..1 → zvracení
@@ -221,6 +224,13 @@ func drink(id: String, ml: float) -> float:
 func eat(id: String) -> void:
 	var kcal := float(Consumables.info(id)["kcal"])
 	dose_psilo(float(Consumables.info(id).get("psilo", 0.0)))   # M4.8: lysohlávky (0 u běžného jídla)
+	var te := float(Consumables.info(id).get("thc_eat", 0.0))   # M4.8: konopné pečivo – THC nastoupí až po EDIBLE_THC_DELAY_H
+	if te > 0.0:
+		_thc_later.append([EDIBLE_THC_DELAY_H, te])
+	var tox := float(Consumables.info(id).get("toxic", 0.0))     # M4.8: muchomůrka – otrava (nevolnost, zdraví)
+	if tox > 0.0:
+		nausea = minf(nausea + 0.5 * tox, 1.0)
+		hurt(MUSHROOM_TOXIC_HP * tox, "otrava houbou")
 	stomach_kcal += kcal
 	total_kcal += kcal
 	_add_energy(kcal)
@@ -362,6 +372,14 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 	addiction = clampf(_smoke_rate / ADDICTION_NORM, 0.0, 1.0)
 	caffeine = maxf(caffeine - dt_h * 0.25, 0.0)
 	# --- M4.8: THC a psilocybin odeznívají; při vyšší hladině nevolnost (žádné bonusy)
+	var keep := []
+	for e in _thc_later:
+		e[0] = float(e[0]) - dt_h
+		if float(e[0]) <= 0.0:
+			thc += float(e[1])
+		else:
+			keep.append(e)
+	_thc_later = keep
 	thc *= exp(-dt_h * log(2.0) / THC_HALF_H)
 	psilo *= exp(-dt_h * log(2.0) / PSILO_HALF_H)
 	if thc > 1.5:

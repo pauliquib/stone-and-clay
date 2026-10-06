@@ -23,7 +23,7 @@ const OFFERS := {
 	"obchod": [["pivo", 25, "buy"], ["nealko", 22, "buy"], ["vino_bile", 129, "buy"], ["vino_cervene", 139, "buy"],
 		["vodka", 229, "buy"], ["rum", 189, "buy"], ["becherovka", 259, "buy"], ["slivovice", 520, "buy"],
 		["voda", 19, "buy"], ["rohlik", 8, "buy"], ["chipsy", 45, "buy"], ["jablko", 6, "buy"],
-		["tlacenka", 49, "buy"], ["parek", 39, "buy"], ["cigarety", 165, "buy"], ["tabak_semena", 45, "buy"], ["konopi_semena", 60, "buy"], ["spacak", 890, "buy"],  # M4.8: semena jen při „Obsah pro dospělé“ (ItemsDB.hidden)
+		["tlacenka", 49, "buy"], ["parek", 39, "buy"], ["cigarety", 165, "buy"], ["tabak_semena", 45, "buy"], ["papirky", 25, "buy"], ["konopi_semena", 60, "buy"], ["spacak", 890, "buy"],  # M4.8: semena jen při „Obsah pro dospělé“ (ItemsDB.hidden)
 		["sirky", 12, "buy"], ["zapalovac", 39, "buy"], ["burt", 25, "buy"],
 		# „Železářství“ – zatím v Potravinách, do M5.1 (stavebniny) se přesune
 		["sekera_stara", 390, "buy"], ["sekera", 1290, "buy"], ["motorova_pila", 6900, "buy"],

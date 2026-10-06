@@ -43,7 +43,7 @@ var items_root: Node
 var meta: Dictionary
 var game: Node                   # World
 var totals := {}
-var counts := {"hrib": 0, "jablko": 0, "sipek": 0, "dukat": 0, "zalud": 0}
+var counts := {"hrib": 0, "jablko": 0, "sipek": 0, "dukat": 0, "zalud": 0, "lysohlavky": 0}
 var score := 0
 var menu_open := false
 var show_fps := true              # počítadlo FPS (Esc → Nastavení)
@@ -676,7 +676,7 @@ func on_collected(item: Item) -> void:
 	var extra := ""
 	if item.kind == "dukat":
 		extra = "  (+100 Kč)"
-	elif item.kind in ["jablko", "hrib", "sipek"]:
+	elif item.kind in ["jablko", "hrib", "sipek", "lysohlavky"]:
 		extra = "  → inventář"
 	show_message("+%d  %s  (%d/%d)%s" % [int(ItemsDB.info(item.kind)["points"]), name, counts[item.kind], totals[item.kind], extra], 2.0)
 
@@ -1131,6 +1131,17 @@ func _show_item_detail(id: String) -> void:
 	if info["type"] == "clothing":
 		Wardrobe.add_row_button(self, _inv_detail_actions, id)      # M2.3: Obléct / Svléct (5 s)
 		return
+	for rec in ItemsDB.RECIPES.get(id, []):     # M4.8: ubalení / pečení (ItemsDB.RECIPES)
+		var br := Button.new()
+		br.text = String(rec["name"])
+		br.disabled = not player.craft_ok(id, rec)
+		_menu_button_style(br)
+		br.pressed.connect(func():
+			if player.craft(id, rec):
+				show_message("Hotovo: %s." % ItemsDB.name_of(String(rec["out"])), 2.5)
+				_rebuild_inventory()
+				_show_item_detail(id))
+		_inv_detail_actions.add_child(br)
 	var actions := {"drink": "Napít se", "food": "Sníst", "smoke": "Zapálit si", "gear": "Rozložit a vyspat se"}
 	var act: String = actions.get(info["type"], "")
 	if id != "spacak" and info["type"] == "gear":

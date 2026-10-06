@@ -320,6 +320,7 @@ func _show_settings() -> void:
 		func(on): settings.trike_realistic = on)
 	_slider("Zorné pole (FOV)", 55.0, 95.0, 1.0, settings.fov, func(x): settings.fov = x, "%d°")
 	_check("Třes obrazu (abstinence, zima)", settings.withdrawal_shake, func(on): settings.withdrawal_shake = on)
+	_check("Efekty obrazu (opilost, látky, zranění) – nezávisle na obsahu pro dospělé", settings.image_fx, _set_image_fx)
 	_check("Obsah pro dospělé (návykové látky) – výchozí vypnuto; vypnuto = v hře není", settings.adult_content,
 		_set_adult)
 	_header("Zvuk")
@@ -440,6 +441,12 @@ func _slider(text: String, lo: float, hi: float, step: float, val: float, setter
 		setter.call(x)
 		show_val.call(x)
 		settings.apply(client))
+
+
+## M4.8: přepnutí „Efekty obrazu“ – DrunkFx hned přestane (nebo začne) kreslit.
+func _set_image_fx(on: bool) -> void:
+	settings.image_fx = on
+	DrunkFx.enabled = on
 
 
 ## M4.8: přepnutí „Obsah pro dospělé“ – hned se projeví v katalogu (předměty a plodiny s `adult` zmizí / vrátí se).

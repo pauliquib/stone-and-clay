@@ -27,6 +27,7 @@ var vsync := 0               # index do VSYNC_MODES
 var trike_realistic := false # M6.5 / vlna 0d: realistické obrácené řízení rogala hrazdou; výchozí intuitivní (W = nahoru, A = vlevo)
 var show_fps := true
 var withdrawal_shake := true # třes obrazu při abstinenci a zimě (Esc → Nastavení → Třes obrazu)
+var image_fx := true        # M4.8: Efekty obrazu (opilost, látky, zranění) – nezávisle na obsahu pro dospělé; ovládá DrunkFx
 var adult_content := false   # M4.8: obsah pro dospělé (návykové látky) – výchozí vypnuto; vypnuto = obsah ve hře není (Esc → Nastavení)
 var vsync_from_args := false # --vsync / --novsync na příkazové řádce má přednost před uloženým nastavením
 var maxfps_from_args := false
@@ -91,6 +92,8 @@ func load_file() -> void:
 	vsync = clampi(int(cf.get_value("obraz", "vsync", vsync)), 0, VSYNC_MODES.size() - 1)
 	show_fps = bool(cf.get_value("obraz", "fps", show_fps))
 	withdrawal_shake = bool(cf.get_value("obraz", "tres", withdrawal_shake))
+	image_fx = bool(cf.get_value("obraz", "efekty", image_fx))
+	DrunkFx.enabled = image_fx     # M4.8: DrunkFx ví, jestli kreslit efekty
 	adult_content = bool(cf.get_value("obsah", "dospeli", adult_content))
 	ItemsDB.adult_on = adult_content     # M4.8: katalog hned ví, jestli je obsah pro dospělé zapnutý
 	volume = clampf(float(cf.get_value("zvuk", "hlasitost", volume)), 0.0, 1.0)
@@ -114,6 +117,7 @@ func save_file() -> void:
 	cf.set_value("obraz", "vsync", vsync)
 	cf.set_value("obraz", "fps", show_fps)
 	cf.set_value("obraz", "tres", withdrawal_shake)
+	cf.set_value("obraz", "efekty", image_fx)
 	cf.set_value("obsah", "dospeli", adult_content)
 	cf.set_value("zvuk", "hlasitost", volume)
 	cf.set_value("grafika", "predvolba", preset)

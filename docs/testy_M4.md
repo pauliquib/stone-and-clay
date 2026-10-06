@@ -176,3 +176,15 @@ Doporučené pořadí testování celé M4: M4.1 → M4.2 → M4.3 → M4.4 A/B 
 8. Kufr auta s konopím / tabákem (zapnutá volba) při kontrole kufru → zápis „Držení návykové látky“ (prechovavani_navykove_latky, NEOVĚŘENO) a hlášení „látky“.
 9. Snědení lysohlávek (pokud je nějaké v inventáři, např. F2 → Hráč) → lehce zvlněný obraz; vypnutá volba → obraz bez změn, předměty zmizí.
 10. F5 → F9 a načtení starého save bez klíče `npc_grow` a bez `psilo` / `thc` projde bez chyby; záhon Ladislava se po načtení obnoví.
+
+## M4.8 zbytek – ubalení, lysohlávky, efekty obrazu, zabavení na záhonu (obsah pro dospělé)
+1. Nová hra (volba vypnuta): v Potravinách nejsou papírky ani semena; v inventáři ani na mapě žádné lysohlávky (září–listopad, F2 → Datum: září).
+2. Esc → Nastavení → „Obsah pro dospělé“ zapnout → v Potravinách koupit papírky (25 Kč) → v inventáři u sušeného tabáku / konopí tlačítko „Ubalit“ (joint / cigareta).
+3. Sušák: sklidit tabák nebo konopí, po ~14 dnech (F2) v inventáři „Sušený tabák (na ubalení)“ / „Sušené květy konopí (na ubalení a pečení)“; tlačítko „Upéct konopné pečivo“ vyžaduje rohlík.
+4. Snědené konopné pečivo: THC se projeví až zhruba o hodinu později (F2 → Hráč: stav v přehledu těla); řízení pod vlivem = přestupek při kontrole.
+5. Les v září / říjnu (F2 → Datum): lysohlávky u některých hřibových míst; sběr dává XP „Myslivost“ (+4), někdy místo nich přijde muchomůrka – snědení zhorší nevolnost a zdraví.
+6. Lysohlávky v Nastavení nezávisle: „Efekty obrazu“ vypnout → při psilocybinu i opilosti žádný shader; zapnout zpět → efekty se vrátí. Volba pro dospělé zůstává zapnutá.
+7. Vypnout „Obsah pro dospělé“ → papírky, lysohlávky, konopné pečivo i záhon zahrádkáře zmizí; znovu zapnout → vrátí se (do ~10 s).
+8. Zahrádkář: při výsevu konopí s hráčem v dohledu (~25 m) hlášení „Rostliny byly zabaveny“; záhon zůstane prázdný.
+9. Na záhonu bez svědka (hráč daleko) zůstanou rostliny a sklizeň proběhne jako dřív.
+10. F5 → F9 a načtení starého save bez klíčů `zabaveno` / `thc` / `psilo` projde bez chyby; „Efekty obrazu“ se ukládají do `nastaveni.cfg` (sekce obraz).

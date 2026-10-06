@@ -32,8 +32,12 @@ const SEASON_ITEMS := {
 	"hrib": {"from": 182, "to": 305, "regrow": 3},       # červenec–říjen
 	"jablko": {"from": 213, "to": 305, "regrow": 5},     # srpen–říjen
 	"sipek": {"from": 305, "to": 60, "regrow": 7},       # listopad–únor
+	"lysohlavky": {"from": 244, "to": 320, "regrow": 10},  # M4.8 září–listopad, vzácné
 }
 const HRIB_DRY := 0.25
+## M4.8 (obsah pro dospělé): lysohlávky – září–listopad, vzácné; u části hřibů. Mimo volbu jsou neaktivní (`_item_present`).
+## Záměna s muchomůrkou: šance klesá s dovedností `myslivost` (znalost lesa); správný nález dává XP.
+const LYSOHLAVKY_ZAMENA_P := 0.3
 ## Srážka auta se zvěří: poškození auta v % = HIT_DAMAGE_K × hmotnost (kg) × rychlost² (m/s)² – zajíc ~2 %,
 ## srnec při 70 km/h ~15 %, divočák při 50 km/h ~28 %. Kůň (550 kg) je nižší a pružnější → násobek HIT_HORSE_K.
 ## Jolt (2024): přesnější kolize → práh poškození ~+15 % v rychlosti → K = 0,0022 / 1,15² ≈ 0,00166.
@@ -772,6 +776,7 @@ func _spawn_items() -> void:
 	add_child(items_root)
 	var items: Array = meta["items"]
 	_add_hips(items)
+	_add_lysohlavky(items)
 	for i in items.size():
 		_spawn_item(i)
 		item_totals[items[i]["type"]] = item_totals.get(items[i]["type"], 0) + 1
@@ -825,6 +830,8 @@ func _on_collected(item: Item, by: Player) -> void:
 			by.money += 100
 		"jablko", "hrib", "sipek":
 			by.add_item(item.kind)
+		"lysohlavky":
+			by.add_item(_houba_druh(by))
 	emit_game_event(by.id, "collected", {"item": item, "kind": item.kind})
 
 
@@ -854,6 +861,41 @@ func _add_hips(items: Array) -> void:
 		if terrain.contains(x, z, 30.0):
 			extra.append({"type": "sipek", "x": snappedf(x, 0.01), "z": snappedf(z, 0.01)})
 	items.append_array(extra)
+
+
+## M4.8: lysohlávky u části hřibových míst (každé 4. hřib), deterministicky, na konec `meta["items"]` (jako šípky).
+func _add_lysohlavky(items: Array) -> void:
+	for it in items:
+		if it["type"] == "lysohlavky":
+			return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1704
+	var extra := []
+	var n_hrib := 0
+	for it in items:
+		if it["type"] != "hrib":
+			continue
+		n_hrib += 1
+		if n_hrib % 4 != 1:
+			continue
+		var a := rng.randf() * TAU
+		var d := rng.randf_range(4.0, 9.0)
+		var x := float(it["x"]) + cos(a) * d
+		var z := float(it["z"]) + sin(a) * d
+		if terrain.contains(x, z, 30.0):
+			extra.append({"type": "lysohlavky", "x": snappedf(x, 0.01), "z": snappedf(z, 0.01)})
+	items.append_array(extra)
+
+
+## M4.8: při sběru lysohlávky – někdy je to muchomůrka (záměna). Dovednost `myslivost` snižuje šanci.
+func _houba_druh(by: Player) -> String:
+	var sk: Skills = skills.get(by.id)
+	var lvl := sk.level("myslivost") if sk else 0
+	var p := LYSOHLAVKY_ZAMENA_P * (1.0 - clampf(float(lvl) / 20.0, 0.0, 1.0) * 0.8)
+	if randf() < p:
+		return "muchomurka"
+	give_xp(by.id, "myslivost", 4.0, "lysohlavky")
+	return "lysohlavky"
 
 
 func _spawn_bots() -> void:
@@ -3697,6 +3739,8 @@ static func in_season(kind: String, doy: int) -> bool:
 
 ## Je i-tý předmět právě k mání (sezóna, u hřibů navíc vlhko z posledních dnů)?
 func _item_present(i: int, kind: String, doy: int, rain_recent: float) -> bool:
+	if ItemsDB.hidden(kind):
+		return false      # M4.8: obsah pro dospělé vypnutý – předmět ve hře není
 	if not in_season(kind, doy):
 		return false
 	if kind == "hrib":
