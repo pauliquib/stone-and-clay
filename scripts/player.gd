@@ -115,6 +115,7 @@ const BOARD_OLLIE_PTS := 10             # body za čistý ollie (dopad rovně)
 const BOARD_WOBBLE_V := 12.0            # m/s – od této rychlosti deska kmitá
 const BOARD_FALL_V := 15.0              # m/s – nad touto rychlostí pád
 const BOARD_WALL_V := 3.0               # m/s – náraz do zdi nad touto rychlostí = pád
+const BOARD_FLOOR_ANGLE := 75.0         # ° – nejstrmější povrch, který je ještě „podlaha“ (přechod U-rampy ~68°)
 var board_on := false                   # hráč stojí na skateboardu
 var board_score := 0                    # body z aktuální jízdy (ollie)
 var board_best := 0                     # rekord (ukládá SaveGame, klíč skate)
@@ -685,6 +686,7 @@ func board_mount() -> bool:
 	if board_on or item_count("skateboard") <= 0 or car != null or horse != null or aircraft != null or busy or fallen > 0.0:
 		return false
 	board_on = true
+	floor_max_angle = deg_to_rad(BOARD_FLOOR_ANGLE)   # M5.8: přechody U-rampy jsou strmější než chůze
 	_board_air = 0.0
 	_board_jump_prev = true                # Mezerník, kterým se stoupá, neudělá hned ollie
 	_board_build()
@@ -696,6 +698,7 @@ func board_mount() -> bool:
 ## Seskok (F). Při rychlosti nad 2 m/s hlídá volání (World) – tady jen sundání desky.
 func board_dismount() -> void:
 	board_on = false
+	floor_max_angle = deg_to_rad(46.0)     # jako při chůzi (viz _ready)
 	if _board_node:
 		_board_node.visible = false
 	velocity.x = 0.0
@@ -810,7 +813,12 @@ func _board_step(delta: float) -> void:
 			board_best = maxi(board_best, board_score)
 			game_event.emit("skate_trick", {"name": "ollie", "pts": BOARD_OLLIE_PTS, "score": board_score})
 	_update_body(delta, absf(s))
-	_board_node.global_transform = Transform3D(Basis(Vector3.UP, yaw), global_position)
+	# deska se natáčí podle povrchu pod ní (rampa, svah); na rovině zůstává vodorovně
+	var up := Vector3.UP
+	if is_on_floor():
+		up = get_floor_normal()
+	var tilt := Basis(Quaternion(Vector3.UP, up))
+	_board_node.global_transform = Transform3D(tilt * Basis(Vector3.UP, yaw), global_position)
 	_prev_pos = global_position
 	_cur_pos = global_position
 	if is_on_floor():
