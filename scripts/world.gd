@@ -1877,6 +1877,18 @@ func player_action(id: int, action: String) -> void:
 		return                              # ostatní akce při pilotování neplatí (E, nástroje, equip, respawn…)
 	match action:
 		"car_enter":
+			if p.board_on:                   # M5.7: seskok z desky (jen v pomalé jízdě)
+				if absf(Vector2(p.velocity.x, p.velocity.z).length()) < 2.0:
+					p.board_dismount()
+				else:
+					notify(id, "show_message", ["Nejdřív zpomal, z desky nevyskakuj za jízdy.", 1.5])
+				return
+			if p.car == null and p.horse == null and p.aircraft == null and p.item_count("skateboard") > 0 \
+					and nearest_enterable_car(id) == null and nearest_mountable_horse(id) == null \
+					and nearest_enterable_aircraft(id) == null:
+				if p.board_mount():          # M5.7: stoupnutí na skateboard z inventáře
+					notify(id, "show_message", ["Stoupl jsi na skateboard. W odraz, S brzda, A/D zatáčení, Mezerník ollie.", 3.0])
+				return
 			if p.horse:
 				if absf(p.horse.speed) < 1.5:
 					dismount_horse(id)

@@ -150,6 +150,9 @@ static func save(world: World, id: int, slot: String) -> bool:
 	var jb: Jobs = world.jobs.get(id)
 	if jb:
 		d["jobs"] = jb.to_dict()                       # zaměstnání, docházka, napomenutí, nevyplacená mzda, rozdělaná směna (M3.1)
+	var skp: Player = world.players.get(id)
+	if skp:
+		d["skate"] = {"best": skp.board_best}           # M5.7: rekord na skateboardu (starý save bez klíče = 0)
 	if world.computer:
 		d["pc"] = world.computer.to_dict(id)           # účet, pohyby, trvalý příkaz, pošta, objednávky, drby, eTesty (M3.4)
 	if world.nature_log:
@@ -415,6 +418,10 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	var jb: Jobs = world.jobs.get(id)
 	if jb:
 		jb.from_dict(d.get("jobs", {}))        # starý save bez klíče = bez zaměstnání (M3.1)
+	var skl: Player = world.players.get(id)
+	if skl:
+		var skd: Dictionary = d.get("skate", {})
+		skl.board_best = int(skd.get("best", 0))      # starý save bez klíče = rekord 0
 	if world.computer:
 		world.computer.from_dict(id, d.get("pc", {}))   # starý save bez klíče = prázdný účet, uvítací pošta (M3.4)
 	if world.nature_log:
