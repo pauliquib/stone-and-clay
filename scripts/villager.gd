@@ -317,7 +317,7 @@ func _physics_process(delta: float) -> void:
 
 func _physics_impl(delta) -> void:
 	var player: Player = world.nearest_player(global_position)
-	var to_player := world.player_world_pos(player) - global_position if player else Vector3(INF, 0, 0)
+	var to_player: Vector3 = world.player_world_pos(player) - global_position if player else Vector3(INF, 0, 0)
 	var dist := to_player.length()
 	# --- simulační pásma okolo hráče (plynulá bublina): <simr plná fyzika+kolize+BT,
 	# simr…1.7×simr MID = viditelný vizuál, ale pohyb jen kinematicky bez kolizí (každý frame

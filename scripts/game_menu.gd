@@ -220,7 +220,7 @@ func open_teleport() -> void:
 	if not world.obce.is_empty():
 		opts.append(hdr("Okolní obce (na okraj katastru, pohled z dálky)"))
 		for o in world.obce:
-			opts.append([String(o.get("name", "obec")), _tp.bind("obec:" + String(o.get("id", o.get("name", "")))))
+			opts.append([String(o.get("name", "obec")), _tp.bind("obec:" + String(o.get("id", o.get("name", ""))))])
 	opts.append(hdr("Zvěř a příroda"))
 	opts.append(["Ke srncům", _tp.bind("zver:srnec")])
 	opts.append(["K divočákům", _tp.bind("zver:divocak")])

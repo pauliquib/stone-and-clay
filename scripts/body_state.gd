@@ -332,10 +332,10 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 	nicotine *= exp(-dt_h * 0.35)
 	tar = maxf(tar - dt_h * 0.04, 0.0)
 	if ever_smoked and nicotine < CRAVING_NICOTINE_MIN:
-		var cap := CRAVING_BASE_CAP + (1.0 - CRAVING_BASE_CAP) * addiction
+		var crave_cap := CRAVING_BASE_CAP + (1.0 - CRAVING_BASE_CAP) * addiction
 		var grow := CRAVING_RATE * (CRAVING_SLEEP_K if sleeping else 1.0)
-		if craving < cap:
-			craving = minf(craving + dt_h * grow, cap)
+		if craving < crave_cap:
+			craving = minf(craving + dt_h * grow, crave_cap)
 	_smoke_rate *= exp(-dt_h * ADDICTION_DECAY_K)
 	addiction = clampf(_smoke_rate / ADDICTION_NORM, 0.0, 1.0)
 	caffeine = maxf(caffeine - dt_h * 0.25, 0.0)
