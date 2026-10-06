@@ -58,7 +58,17 @@ const WIPER_X := [0.55, 0.0]            # x os stěračů (řidič, spolujezdec)
 const WIPER_SPEED := 4.2                # rad/s (≈ cyklus tam a zpět za 3 s)
 const AI_SLOW := 0.45                   # AI řidič v plném dešti / mlze / sněhu zpomalí na ~55 %
 const AI_GAP := 0.8                     # a drží ~o tolik delší rozestup
-const AI_SHARP := 0.7                   # lom trasy větší než ~40° = ostrá zatáčka (AI zpomalí, míří na roh, ne za něj)
+const AI_SHARP := 0.7                   # lom trasy větší než ~40° = ostrá zatáčka (AI zpomalí, cíl za rohem se zkracuje)
+const AI_LOOK_K := 0.6                  # pure pursuit: cílový bod L = clamp(AI_LOOK_K·v + AI_LOOK_BASE, MIN, MAX) před autem po trase
+const AI_LOOK_BASE := 3.0
+const AI_LOOK_MIN := 4.0
+const AI_LOOK_MAX := 14.0
+const AI_PASS_R := 2.5                  # bod trasy blíž než tohle je odbavený vždy (jinak až za rovinou rohu)
+const AI_BRAKE := 2.5                   # plánované zpomalení před zatáčkou (m/s²)
+const AI_REACT := 0.4                   # reakční rezerva řidiče + zpoždění regulátoru (s) – brzdí o kus dřív
+const AI_PASS_LEN := 20.0               # objíždění stojící překážky protisměrem na délce ~tolik m trasy
+const AI_STATIC_LIFT := 1.3            # střed kvádru hledání statické překážky nad pruhem (m) – nad hrboly terénu
+const AI_GROUND := ["teren", "asfalt", "sterk"]   # vrstva 1, která překážkou není (povrch pod koly)
 const ROOF_DB_IN := -7.0                # déšť na střeše uvnitř auta
 const ROOF_DB_OUT := -24.0              # vnější tlumený
 
@@ -663,6 +673,17 @@ func set_ai_route(points: PackedVector3Array, limit_ms := 13.9) -> void:
 	ai_speed_limit = limit_ms
 	ai_direct_target = Vector3.INF
 	sleeping = false
+
+
+## Nová trasa za jízdy (přeplánování policie, zaseknuté auto u hráče): body, které auto už minulo,
+## se hned odbaví – auto se nevrací k začátku trasy za sebou (dřív kličkovalo).
+func reroute(points: PackedVector3Array) -> void:
+	ai_path = points
+	ai_i = 0
+	_ai_pass_until = -1
+	_ai_stuck = 0.0
+	if points.size() >= 2:
+		_ai_advance(global_position)
 
 
 func toggle_lights() -> void:
@@ -1293,25 +1314,21 @@ func _ai_drive(delta: float) -> void:
 		var dist := Vector2(target.x - pos.x, target.z - pos.z).length()
 		want = minf(want, maxf(dist * 0.7, 0.0))
 	elif ai_path.size() >= 2:
-		# posun po trase
-		# u ostrého lomu se bod trasy odbavuje blíž, aby auto nepřeskočilo roh dřív, než ho projede
-		while ai_i < ai_path.size() - 1 and Vector2(ai_path[ai_i].x - pos.x, ai_path[ai_i].z - pos.z).length() < (3.0 if _path_turn(ai_i) > AI_SHARP else 7.0):
-			ai_i += 1
+		# posun po trase: bod se odbaví, až ho auto opravdu mine (rovina rohu), ne už na 7 m –
+		# při seříznutí rohu tak cíl nezůstane za autem (dřív kroužilo / couvalo)
+		_ai_advance(pos)
 		if _ai_pass_until >= 0 and ai_i > _ai_pass_until:
 			_ai_pass_until = -1
 		_ai_offset = move_toward(_ai_offset, 2.9 if _ai_pass_until >= 0 else 0.0, delta * 1.5)
-		var look := clampf(absf(speed) * 0.8, 6.0, 18.0)
-		var k := ai_i
-		# předvídání se nezastaví za rohem: míří na vrchol ostré zatáčky a teprve pak na další úsek
-		while k < ai_path.size() - 1 and Vector2(ai_path[k].x - pos.x, ai_path[k].z - pos.z).length() < look:
-			if k > ai_i and _path_turn(k) > AI_SHARP:
-				break
-			k += 1
-		target = _lane_pt(k)
-		# rychlost podle poloměru zatáček v následujících ~70 m (boční zrychlení ≤ 3,5 m/s², plánované brzdění 2,5 m/s²):
-		# v každém lomu trasy oblouk tečný k oběma úsekům (tečné body v půlce kratšího úseku)
+		# pure pursuit na bod trasy interpolovaný L metrů před průmětem auta (ne na vrchol trasy za autem)
+		var look := clampf(AI_LOOK_K * absf(speed) + AI_LOOK_BASE, AI_LOOK_MIN, AI_LOOK_MAX)
+		target = _ai_carrot(pos, look)
+		# rychlost podle poloměru zatáček v následujících ~70 m: v každém lomu trasy oblouk tečný k oběma
+		# úsekům (tečné body v půlce kratšího úseku); na rychlost oblouku musí auto zpomalit už v tečném bodě,
+		# s reakční rezervou AI_REACT a plánovaným zpomalením AI_BRAKE
 		want = ai_speed_limit
 		var dist := 0.0
+		var react := absf(speed) * AI_REACT
 		for j in range(maxi(ai_i - 1, 1), ai_path.size() - 1):
 			var pj := Vector2(ai_path[j].x, ai_path[j].z)
 			if j == ai_i:
@@ -1322,17 +1339,19 @@ func _ai_drive(delta: float) -> void:
 				break
 			var d0 := pj - Vector2(ai_path[j - 1].x, ai_path[j - 1].z)
 			var d1 := Vector2(ai_path[j + 1].x, ai_path[j + 1].z) - pj
-			if d0.length() < 0.5 or d1.length() < 0.5:
+			if d0.length() < 0.3 or d1.length() < 0.3:
 				continue
 			var ang := absf(d0.angle_to(d1))
 			if ang < 0.04:
 				continue
-			var r := maxf(minf(d0.length(), d1.length()) * 0.5 / tan(minf(ang, 3.0) * 0.5), 3.0)
-			# ostřejší lom = menší boční zrychlení → hlubší zpomalení (mírná zatáčka ~3,5 m/s², hairpin ~2 m/s²)
-			var a_lat := 3.5 if ang < AI_SHARP else (2.8 if ang < 1.3 else 2.0)
+			var half := minf(d0.length(), d1.length()) * 0.5
+			var r := maxf(half / tan(minf(ang, 3.0) * 0.5), 3.0)
+			# těsnější oblouk = menší boční zrychlení → hlubší zpomalení (široká zatáčka ~3,5 m/s², vlásenka ~2 m/s²)
+			var a_lat := lerpf(2.0, 3.5, clampf((r - 4.0) / 20.0, 0.0, 1.0))
 			# na kluzkém povrchu projede zatáčku s menším bočním zrychlením
 			var v_curve := sqrt(maxf(a_lat - caution * 1.8, 1.0) * r)
-			want = minf(want, sqrt(v_curve * v_curve + 2.0 * 2.5 * dist))
+			var to_tangent := maxf((dist - half if j >= ai_i else 0.0) - react, 0.0)
+			want = minf(want, sqrt(v_curve * v_curve + 2.0 * AI_BRAKE * to_tangent))
 		want = maxf(want, 2.0)
 		if _ai_offset > 0.3:
 			want = minf(want, 5.0)     # objíždí → pomalu
@@ -1373,9 +1392,10 @@ func _ai_drive(delta: float) -> void:
 		var ang := atan2(local.x, maxf(local.z, 0.5))
 		var L := maxf(Vector2(local.x, local.z).length(), 3.0)
 		var wb: float = model.spec["wb"]
-		var max_steer := lerpf(0.6, 0.09, clampf(absf(speed) / 33.0, 0.0, 1.0))
-		s = clampf(atan2(2.0 * wb * sin(ang), L) / max_steer, -1.0, 1.0)
+		# rejd přepočtený stejným vzorcem jako řízení hráče (steer_hi / steer_v z modelu, ne pevné 0,09 / 33)
+		s = clampf(atan2(2.0 * wb * sin(ang), L) / _max_steer_at(speed), -1.0, 1.0)
 		if local.z < 0.0:
+			# cíl za autem (otočka, vlásenka po přejetí) – plný rejd na stranu cíle
 			s = signf(local.x) if local.x != 0.0 else 1.0
 	# zaseknutí (terénní hrana, obrubník) → vycouvat s opačným rejdem
 	if _ai_reverse > 0.0:
@@ -1421,6 +1441,82 @@ func _path_turn(j: int) -> float:
 	return absf(d0.angle_to(d1))
 
 
+## Odbaví body trasy, které auto už minulo: bod je za autem, když auto překročilo rovinu rohu
+## (osa lomu – na rovném úseku kolmice k trase, ve vlásence podle příjezdu), nebo je blíž než AI_PASS_R.
+## Funguje i po seříznutí rohu nebo objíždění (auto bod „netrefí“, ale mine ho).
+func _ai_advance(pos: Vector3) -> void:
+	var p := Vector2(pos.x, pos.z)
+	while ai_i < ai_path.size() - 1:
+		var c := Vector2(ai_path[ai_i].x, ai_path[ai_i].z)
+		if p.distance_to(c) < AI_PASS_R or _ai_passed(ai_i, p, c):
+			ai_i += 1
+		else:
+			break
+
+
+func _ai_passed(j: int, p: Vector2, c: Vector2) -> bool:
+	var d0 := Vector2.ZERO
+	var d1 := Vector2.ZERO
+	if j > 0:
+		d0 = (c - Vector2(ai_path[j - 1].x, ai_path[j - 1].z)).normalized()
+	if j < ai_path.size() - 1:
+		d1 = (Vector2(ai_path[j + 1].x, ai_path[j + 1].z) - c).normalized()
+	var axis := d0 + d1
+	if axis.length() < 0.1:
+		axis = d0          # otočka o ~180° – rozhoduje příjezdový směr
+	if axis == Vector2.ZERO:
+		return false
+	return (p - c).dot(axis) > 0.0
+
+
+## Cílový bod pure pursuit: bod trasy `look` metrů za průmětem auta na právě jetý úsek (interpolovaný,
+## posunutý o `_ai_offset` při objíždění). Za ostrým lomem se zbytek vzdálenosti zkracuje na polovinu,
+## aby auto roh neseřízlo do zahrad.
+func _ai_carrot(pos: Vector3, look: float) -> Vector3:
+	var j := ai_i
+	var a := ai_path[maxi(j - 1, 0)]
+	var b := ai_path[j]
+	var ab := Vector2(b.x - a.x, b.z - a.z)
+	var t := 0.0
+	if ab.length_squared() > 0.01:
+		t = clampf(Vector2(pos.x - a.x, pos.z - a.z).dot(ab) / ab.length_squared(), 0.0, 1.0)
+	var seg_a := a.lerp(b, t)
+	var left := look
+	while j < ai_path.size() - 1:
+		var seg_b := ai_path[j]
+		var l := Vector2(seg_b.x - seg_a.x, seg_b.z - seg_a.z).length()
+		if l >= left and l > 0.001:
+			return _ai_shift(seg_a.lerp(seg_b, left / l), seg_a, seg_b)
+		left -= l
+		if _path_turn(j) > AI_SHARP:
+			left *= 0.5
+		seg_a = seg_b
+		j += 1
+	# poslední úsek – cíl nejdál v koncovém bodě trasy
+	var last := ai_path[ai_path.size() - 1]
+	var ll := Vector2(last.x - seg_a.x, last.z - seg_a.z).length()
+	return _ai_shift(seg_a.lerp(last, clampf(left / maxf(ll, 0.001), 0.0, 1.0)), seg_a, last)
+
+
+## Bod `tp` na úseku seg_a → seg_b posunutý doleva o `_ai_offset` (objíždění).
+func _ai_shift(tp: Vector3, seg_a: Vector3, seg_b: Vector3) -> Vector3:
+	var d := Vector2(seg_b.x - seg_a.x, seg_b.z - seg_a.z)
+	if _ai_offset < 0.05 or d.length() < 0.01:
+		return tp
+	d = d.normalized()
+	# vlevo od směru jízdy (pravý pruh je vpravo od osy → objíždí se do protisměru)
+	return tp + Vector3(d.y, 0, -d.x) * _ai_offset
+
+
+## Největší natočení kol (rad) při rychlosti `v` – stejný vzorec, jakým _powertrain / _pedal_force
+## přepočítává vstup řízení na rejd (AI pak trefí úhel, který spočítala).
+func _max_steer_at(v: float) -> float:
+	var spec := model.spec
+	if model.kind == "bike":
+		return lerpf(0.6, float(spec.get("steer_hi", 0.12)), clampf(absf(v) / float(spec.get("steer_v", 12.0)), 0.0, 1.0))
+	return lerpf(0.6, float(spec.get("steer_hi", 0.09)), clampf(absf(v) / float(spec.get("steer_v", 33.0)), 0.0, 1.0))
+
+
 ## Bod trasy `k` posunutý doleva o `_ai_offset` (objíždění).
 func _lane_pt(k: int) -> Vector3:
 	var p := ai_path[k]
@@ -1433,6 +1529,10 @@ func _lane_pt(k: int) -> Vector3:
 	return p + Vector3(d.y, 0, -d.x) * _ai_offset
 
 
+## Překážka v pruhu před autem do vzdálenosti `reach` (m) → {"d", "collider", "static"} nebo {}.
+## Kvádr šířky auta se posouvá po bodech trasy: nejdřív pohyblivé věci (auta, lidi, psi, bedny),
+## pak statika z vrstvy 1 (budovy, stromy, ploty) – kvádr výš nad pruhem a bez terénu a vozovky
+## (`AI_GROUND`), takže hrbol silnice překážkou není, ale dům zasahující do silnice ano.
 func _obstacle_ahead(reach: float) -> Dictionary:
 	var space := get_world_3d().direct_space_state
 	var q := PhysicsShapeQueryParameters3D.new()
@@ -1455,6 +1555,31 @@ func _obstacle_ahead(reach: float) -> Dictionary:
 				break
 	else:
 		pts.append(pts[0] + global_transform.basis.z * reach)
+	var hit := _cast_path(space, q, pts, reach, false)
+	# statika: vrstva 1 bez povrchu pod koly, o něco užší kvádr (zrcátka se o fasádu neotřou)
+	var sbox := BoxShape3D.new()
+	sbox.size = Vector3(model.half_width * 1.5, 1.0, 0.6)
+	q.shape = sbox
+	q.collision_mask = 1
+	q.exclude = [get_rid()]
+	var up := Vector3(0, AI_STATIC_LIFT - lift.y, 0)
+	var spts: Array[Vector3] = []
+	for p in pts:
+		spts.append(p + up)
+	var sreach: float = reach if hit.is_empty() else float(hit["d"])
+	var s_hit := _cast_path(space, q, spts, sreach, true)
+	if not s_hit.is_empty():
+		s_hit["static"] = true
+		return s_hit
+	if not hit.is_empty():
+		hit["static"] = false
+	return hit
+
+
+## Posune kvádr `q` po lomené čáře `pts` (nejvýš `reach` m) → první zásah {"d", "collider"} nebo {}.
+## `skip_ground`: zásah terénu / vozovky se vyřadí z dotazu a úsek se zkusí znovu.
+func _cast_path(space: PhysicsDirectSpaceState3D, q: PhysicsShapeQueryParameters3D, pts: Array[Vector3],
+		reach: float, skip_ground: bool) -> Dictionary:
 	var acc := 0.0
 	for k in pts.size() - 1:
 		var a := pts[k]
@@ -1465,16 +1590,26 @@ func _obstacle_ahead(reach: float) -> Dictionary:
 		if acc + ln > reach:
 			seg *= (reach - acc) / ln
 			ln = reach - acc
+		if ln < 0.05:
+			break
 		var dir := seg / ln
-		q.transform = Transform3D(Basis.looking_at(dir, Vector3.UP), a)
-		q.motion = seg
-		var r := space.cast_motion(q)
-		if r[0] < 1.0:
-			q.transform.origin = a + seg * r[1]
+		var xf := Transform3D(Basis.looking_at(dir, Vector3.UP), a)
+		for _attempt in 4:
+			q.transform = xf
+			q.motion = seg
+			var r := space.cast_motion(q)
+			if r[0] >= 1.0:
+				break
+			q.transform = Transform3D(xf.basis, a + seg * r[1])
 			q.motion = Vector3.ZERO
 			var info := space.get_rest_info(q)
 			var col: Object = instance_from_id(info["collider_id"]) if info.has("collider_id") else null
 			if col == null:
+				break
+			if skip_ground and String(col.get_meta("surface", "")) in AI_GROUND:
+				var ex := q.exclude
+				ex.append(info["rid"])
+				q.exclude = ex
 				continue
 			return {"d": acc + ln * r[0], "collider": col}
 		acc += ln
@@ -1495,7 +1630,13 @@ func _resolve_block() -> void:
 	if b is CharacterBody3D and not (b is Player):
 		moving = true      # chodec / pes odejde sám
 	if ai_blocked > 4.0 and not moving and _ai_pass_until < 0 and ai_path.size() > 2:
-		_ai_pass_until = mini(ai_i + 4, ai_path.size() - 1)
+		# objíždí ~AI_PASS_LEN m trasy (body jsou v zaoblených zatáčkách hustší – počet bodů nestačí)
+		var k := ai_i
+		var acc := 0.0
+		while k < ai_path.size() - 1 and acc < AI_PASS_LEN:
+			acc += Vector2(ai_path[k + 1].x - ai_path[k].x, ai_path[k + 1].z - ai_path[k].z).length()
+			k += 1
+		_ai_pass_until = maxi(k, mini(ai_i + 2, ai_path.size() - 1))
 
 
 func ai_done() -> bool:

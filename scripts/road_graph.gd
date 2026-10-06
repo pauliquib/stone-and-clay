@@ -3,6 +3,17 @@ class_name RoadGraph
 extends RefCounted
 
 const CAR_KINDS := ["secondary", "tertiary", "unclassified", "residential", "service", "living_street"]
+## Koncové body tras AI aut (start, cíl) – ne na účelových cestách (service = vjezdy do dvorů,
+## garáží a areálů, často slepé; auta jimi jen projíždějí).
+const END_KINDS := ["secondary", "tertiary", "unclassified", "residential", "living_street"]
+# jízdní pruh: offset od osy silnice vpravo (m)
+const LANE_OFFSET := {"secondary": 1.6, "tertiary": 1.6, "residential": 1.0, "unclassified": 1.0}
+const LANE_OFFSET_DEFAULT := 0.8
+const LANE_MITRE_MAX := 2.0        # mitre korekce offsetu v rohu nejvýš 2× (lom ~120°)
+# zaoblení ostrých lomů osy (místo mazání „vlásenek“)
+const ROUND_MIN_TURN := 0.6        # lom ostřejší než ~35° se zaoblí (rad)
+const ROUND_R := 7.0               # cílový poloměr oblouku na ose (m) – omezený délkou sousedních úseků
+const ROUND_STEPS := 4             # počet dílků oblouku
 const SPEED := {"secondary": 19.4, "tertiary": 16.7, "unclassified": 13.9, "residential": 12.5,
 	"service": 8.3, "living_street": 5.5, "track": 7.0}
 
@@ -146,41 +157,78 @@ func car_node_near(p: Vector2, kinds_ok: Array = CAR_KINDS) -> int:
 
 
 ## Z posloupnosti uzlů udělá body jízdního pruhu (vpravo od osy silnice) ve 3D.
+## Ostré lomy osy se nejdřív zaoblí (`_round_corners` – dřív se „vlásenky“ mazaly a trasa pak
+## seřízla roh přes zahrady), pruh se pak posune o offset podle druhu silnice s mitre korekcí
+## 1/cos(θ/2) – v rohu zůstane pruh rovnoběžný s osou (bez korekce se v zatáčce přibližoval ose).
 func lane_points(ids_in: PackedInt64Array, terrain: Terrain) -> PackedVector3Array:
-	var ids := _cut_hairpins(ids_in)
-	var out := PackedVector3Array()
-	var n := ids.size()
+	var n := ids_in.size()
+	var axis := PackedVector2Array()
+	var ks := PackedStringArray()       # druh úseku, který z bodu vychází (poslední bod: příjezdový)
 	for k in n:
-		var p := nodes[ids[k]]
-		var d := Vector2.ZERO
+		axis.append(nodes[ids_in[k]])
 		if k < n - 1:
-			d += (nodes[ids[k + 1]] - p).normalized()
-		if k > 0:
-			d += (p - nodes[ids[k - 1]]).normalized()
+			ks.append(edge(ids_in[k], ids_in[k + 1]))
+		else:
+			ks.append(edge(ids_in[k - 1], ids_in[k]) if k > 0 else "")
+	var rounded := _round_corners(axis, ks)
+	var pts: PackedVector2Array = rounded[0]
+	var kinds_at: PackedStringArray = rounded[1]
+	var out := PackedVector3Array()
+	var m := pts.size()
+	for k in m:
+		var p := pts[k]
+		var d0 := (p - pts[k - 1]).normalized() if k > 0 else Vector2.ZERO
+		var d1 := (pts[k + 1] - p).normalized() if k < m - 1 else Vector2.ZERO
+		var d := d0 + d1
+		if d.length() < 0.05:
+			d = d0 if d0 != Vector2.ZERO else d1      # otočka o 180° – posun podle příjezdu
 		d = d.normalized()
-		var kind := edge(ids[k], ids[mini(k + 1, n - 1)]) if k < n - 1 else edge(ids[k - 1], ids[k]) if k > 0 else ""
 		# i na úzkých účelových cestách jezdí auta vpravo, aby se dvě protijedoucí vyhnula
-		var off := 1.6 if kind in ["secondary", "tertiary"] else (1.0 if kind in ["residential", "unclassified"] else 0.8)
+		var off: float = LANE_OFFSET.get(kinds_at[k], LANE_OFFSET_DEFAULT)
+		if d0 != Vector2.ZERO and d1 != Vector2.ZERO:
+			# mitre: cos(θ/2) = průmět směru úseku do osy rohu
+			off /= maxf(d.dot(d1), 1.0 / LANE_MITRE_MAX)
 		var q := p + Vector2(-d.y, d.x) * off
 		out.append(Vector3(q.x, terrain.height_at(q.x, q.y) + 0.1, q.y))
 	return out
 
 
-## Odbočka do „Y“: A* dojede do uzlu a hned se vrací druhou větví (lom > 125°) – auto takový
-## lom neprojede, tak se roh vynechá (řidič odbočí rovnou). Opakuje se, dokud nějaký zbývá.
-func _cut_hairpins(ids_in: PackedInt64Array) -> PackedInt64Array:
-	var ids := ids_in.duplicate()
-	var again := true
-	while again and ids.size() > 3:
-		again = false
-		for k in range(1, ids.size() - 1):
-			var d0 := nodes[ids[k]] - nodes[ids[k - 1]]
-			var d1 := nodes[ids[k + 1]] - nodes[ids[k]]
-			if d0.length() < 0.1 or d1.length() < 0.1 or absf(d0.angle_to(d1)) > 2.2:
-				ids.remove_at(k)
-				again = true
-				break
-	return ids
+## Zaoblí lomy osy ostřejší než `ROUND_MIN_TURN`: roh se nahradí kvadratickou Bézierovou křivkou
+## tečnou k oběma úsekům (tečné body ve vzdálenosti ROUND_R·tan(θ/2), nejvýš 45 % kratšího úseku –
+## sousední roh má svůj oblouk). Pokrývá i „Y“ odbočky, kde A* dojede do uzlu a vrací se druhou větví.
+## Vrací [body, druhy úseků].
+func _round_corners(pts: PackedVector2Array, ks: PackedStringArray) -> Array:
+	var out_p := PackedVector2Array()
+	var out_k := PackedStringArray()
+	var m := pts.size()
+	for k in m:
+		var p := pts[k]
+		if k == 0 or k == m - 1:
+			out_p.append(p)
+			out_k.append(ks[k])
+			continue
+		var l0 := pts[k - 1].distance_to(p)
+		var l1 := p.distance_to(pts[k + 1])
+		if l0 < 0.1 or l1 < 0.1:
+			if l0 >= 0.1:            # zdvojený bod – stačí jeden
+				out_p.append(p)
+				out_k.append(ks[k])
+			continue
+		var u0 := (p - pts[k - 1]) / l0
+		var u1 := (pts[k + 1] - p) / l1
+		var th := absf(u0.angle_to(u1))
+		if th < ROUND_MIN_TURN:
+			out_p.append(p)
+			out_k.append(ks[k])
+			continue
+		var t := minf(ROUND_R * tan(minf(th, 3.0) * 0.5), 0.45 * minf(l0, l1))
+		var a := p - u0 * t
+		var b := p + u1 * t
+		for i in ROUND_STEPS + 1:
+			var f := float(i) / ROUND_STEPS
+			out_p.append(a.lerp(p, f).lerp(p.lerp(b, f), f))
+			out_k.append(ks[k - 1] if f < 0.5 else ks[k])
+	return [out_p, out_k]
 
 
 ## Rychlostní limit úseku (m/s) – v obci max. 50 km/h.

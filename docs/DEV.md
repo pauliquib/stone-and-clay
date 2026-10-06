@@ -41,7 +41,12 @@ mřížky – index, nová výška, normála RGB8; `Terrain` je aplikuje při na
 `terrain_*.bin` zůstávají beze změny.
 
 `clean_road_clashes.py` vyřadí chybně umístěné budovy a stromy, které stojí ve vozovce (síť silnic
-sedí na ortofotu, tyto objekty ne); originály nechá v `data/orig/`. Ruční úpravy v Blenderu
+sedí na ortofotu, tyto objekty ne); originály nechá v `data/orig/`. Navíc (vlna 0d) měří budovy proti
+**ose** silnic z `data/map.json`: dům, jehož půdorys zasahuje ≥ 1 m² do pásu `AXIS_BUF` (residential /
+unclassified 2,0 m, secondary / tertiary 2,6 m, service jen 0,75 m bez posledních 4 m – vjezdy), se vyřadí;
+místa (`poi`) a dům hráče se jen vypíšou. Stromy blíž ose než `TREE_AXIS_BUF` taky. Výpis „blízko osy
+(ponechána)“ = budovy pod prahem k ruční kontrole. Vyřazené záznamy zmizí i z `data/buildings.json`
+(id vypíše – doplnit do `EXCLUDE` v `tools/buildings.py`). Ruční úpravy v Blenderu
 patří do kolekcí `HRA_*` (viz `BLENDER_UPRAVY.md`), exportér je přidá.
 
 ### Rozšíření detailní mapy na okolní obce (union mřížka)

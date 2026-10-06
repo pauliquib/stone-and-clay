@@ -95,6 +95,7 @@ func spawn_patrol() -> void:
 
 func _new_patrol_route(first := false) -> void:
 	var a := graph.astar(RoadGraph.CAR_KINDS)
+	var ends := graph.astar(RoadGraph.END_KINDS)     # start / cíl ne na účelové cestě (vjezd do dvora)
 	var near: Node3D = null if first else world.nearest_player(patrol.global_position)
 	var anchor: Vector3 = world.player_world_pos(near as Player) if near else world.player_anchor(0)
 	var pp := Vector2(anchor.x, anchor.z)
@@ -103,10 +104,14 @@ func _new_patrol_route(first := false) -> void:
 		var ang := _rng.randf() * TAU
 		var s: int
 		if far:
-			s = a.get_closest_point(pp + Vector2(cos(ang), sin(ang)) * _rng.randf_range(250.0, 600.0))
+			s = ends.get_closest_point(pp + Vector2(cos(ang), sin(ang)) * _rng.randf_range(250.0, 600.0))
+			if s < 0 or not a.has_point(s):
+				continue
 		else:
 			s = a.get_closest_point(Vector2(patrol.global_position.x, patrol.global_position.z))
-		var e := a.get_closest_point(graph.nodes[s] + Vector2(cos(ang + 1.0), sin(ang + 1.0)) * _rng.randf_range(600.0, 1500.0))
+		var e := ends.get_closest_point(graph.nodes[s] + Vector2(cos(ang + 1.0), sin(ang + 1.0)) * _rng.randf_range(600.0, 1500.0))
+		if e < 0 or not a.has_point(e):
+			continue
 		var ids := a.get_id_path(s, e)
 		if ids.size() < 6:
 			continue
@@ -115,6 +120,8 @@ func _new_patrol_route(first := false) -> void:
 			var d := Vector2(pts[1].x - pts[0].x, pts[1].z - pts[0].z)
 			traffic.place_car(patrol, Vector2(pts[0].x, pts[0].z), atan2(d.x, d.y))
 		patrol.set_ai_route(pts, 15.0)
+		if not far:
+			patrol.reroute(pts)       # jede odtud, kde stojí – body za autem přeskočit
 		return
 
 
@@ -401,8 +408,8 @@ func _chase(delta: float) -> void:
 			var ids := graph.route(Vector2(chaser.global_position.x, chaser.global_position.z), Vector2(tpos.x, tpos.z),
 				RoadGraph.CAR_KINDS + ["track"])
 			if ids.size() >= 2:
-				chaser.ai_path = graph.lane_points(ids, terrain)
-				chaser.ai_i = 0
+				# trasa začíná v nejbližším uzlu (často za autem) – body za autem se rovnou odbaví
+				chaser.reroute(graph.lane_points(ids, terrain))
 		chaser.ai_speed_limit = 33.0
 	# zastavil? / vystoupil z auta poblíž?
 	var stopped := (pcar != null and absf(pcar.speed) < 1.5 and d < 16.0) or (pcar == null and d < 25.0)
