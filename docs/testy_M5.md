@@ -40,3 +40,12 @@ Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kab
 7. Stiskni **F4** → světlo svítí i po 10 s; F4 znovu → zhasne. Při rozjezdu se světlo vypne.
 8. Ve dne (Datum 12:00) při nástupu světlo nesvítí; F4 ho přesto zapne ručně.
 9. Ulož hru (F5), zapni rádio v autě na stanici, načti (F9) → rádio ve stejné stanici a hlasitosti.
+
+## M5.12 – Pouliční osvětlení a světelný smog
+1. F2 → Čas 21:00, jasno, náves: lampy podél silnic svítí, světlo na silnici u nejbližších lamp, málo hvězd.
+2. Teleport do lesa ~1 km od obce: hvězd výrazně víc; nad obcí při horizontu teplý opar.
+3. Svítání (F2 → Čas ~6:00): lampy postupně zhasnou, každá s jiným zpožděním.
+4. Čas 1:00: úsporný režim – každá druhá lampa zhasnutá (lichá pořadí).
+5. Grafika Nízká: jen svítící hlavice bez pool světel; FPS v obci v pořádku. Vysoká: světla u nejbližších lamp.
+6. Zataženo v noci: nad obcí nasvícené mraky (spodek oblačnosti teplejší).
+7. Ráno a ve dne: lampy zhasnuté, obloha bez smogu.

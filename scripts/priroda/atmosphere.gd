@@ -27,6 +27,8 @@ var terrain: Terrain               # M6.2: pro výšku kamery nad terénem (dohl
 var north_deg := 78.37
 var indoor := false                  # hráč je v interiéru (M1.4): tlumené světlo prostředí, bez padajících srážek, tlumený déšť a vítr
 var _indoor_s := 0.0
+var light_pollution := 0.0           # M5.12: cílový světelný smog 0..1 (StreetLights.pollution podle kamery); obloha ho plynule přebírá
+var _lp := 0.0
 
 var sky_mat: ShaderMaterial
 var _rain: GPUParticles3D
@@ -216,6 +218,8 @@ func update(delta: float) -> void:
 	sky_mat.set_shader_parameter("cloud_dark", dark)
 	sky_mat.set_shader_parameter("cloud_offset", _cloud_off)
 	sky_mat.set_shader_parameter("haze", clampf(fog * 0.9 + rain * 0.35, 0.0, 1.0))
+	_lp = move_toward(_lp, light_pollution, delta * 0.4)
+	sky_mat.set_shader_parameter("light_pollution", _lp)
 	_update_flash(delta)
 	sky_mat.set_shader_parameter("flash", _flash)
 

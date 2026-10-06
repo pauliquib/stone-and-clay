@@ -860,3 +860,35 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
   hráč řídil. Hlasitost autorádia při jízdě obcí v noci je napojena na stávající model hluku (`_consequences`), ruční test chybí.
 - Hlášky o ovládání po nástupu (`enter_car`) nerozšířeny o nové klávesy; checklist v `docs/testy_M5.md`.
 - Nepouští se ffmpeg ani hra; test přehrávání v autě a noční hluk ověří uživatel.
+
+## 2026-10-06 – M5.12 Pouliční osvětlení a světelný smog
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Co**: nový klientský `scripts/priroda/street_lights.gd` (`StreetLights`, vzniká v `LocalClient.attach` po `World.build()`):
+  - lampy podél silnic v obci (`residential`, `tertiary`, `unclassified`, `living_street`; `service` a `track` ne), ~35 m,
+    střídavě po stranách, deterministicky (seed 12), mimo křižovatky (`JUNCTION_GAP` 9 m) a mimo ostatní silnice
+    (`World.dist_to_roads`), max. 320 lamp; model `PropModels.street_lamp()` v MultiMesh, bez stínů a bez kolize
+    (rozhodnutí: lampy jsou jen vizuál, žádná kolize).
+  - svítící hlavice: MultiMesh s jasem v instance custom data, shader `EMISSION = barva * jas * 5` (vidět z dálky).
+  - pool `OmniLight3D` (16 kusů, bez stínů) jen u nejbližších svítících lamp k kameře do 620 m; počet podle předvolby
+    `GameSettings.preset`: 0 → 0, 1 → 8, 2–3 → 16.
+  - rozsvícení při `Clock.is_night()`, zhasnutí za svítání; přechod 3 s reálného času, každá lampa s náhodným zpožděním
+    0–20 s; úsporný režim 0–4 h: každá lichá lampa zhasnutá (konstanty `NIGHT_SAVE_FROM/TO`).
+  - index světelného smogu `pollution` (Gaussova jádra σ 170 m kolem kamery z jasu lamp, normalizováno k návsi = 1).
+- **Obloha**: `shaders/sky.gdshader` – uniform `light_pollution`: vyšší práh hvězd a slabší hvězdy, teplý opar při
+  horizontu v noci, nasvícení zataženého neba zespodu. `scripts/priroda/atmosphere.gd` – `light_pollution` (cíl) se
+  plynule přebírá (`_lp`, 0,4 za s).
+- **Napojení**: `scripts/local_client.gd` – var `street_lights`, vytvoření v `attach`, předání `pollution` do `Atmosphere`
+  v `_update_daylight`. `world.gd` a `save_game.gd` beze změny (stav lamp plyne z hodin a seedu, nic se neukládá).
+- **Kontrola překladu**: `godot --headless --path . --import` (rc 0; první pokus s limitem 300 s vypršel, druhý s 900 s
+  prošel) a `--check-only` na `street_lights.gd`, `atmosphere.gd`, `local_client.gd` – výstup prázdný.
+
+### Otevřené body
+- **Rozbitá lampa** (zásah zbraní / kamenem, `Prop.damaged`, svědek M4.4, oprava obcí za pár dní) není hotová.
+- **Světelný smog**: nezapočítávají se svítící okna domů; příspěvek okolních obcí (`World.obce`, nad obcemi světlý
+  opar na horizontu) není; Mléčná dráha (pás hvězd) není.
+- **F2 → Počasí** přepínač „Světelný smog ×0 / ×1 / ×2“ není; grafická volba počtu světel je jen podle předvolby.
+- **Drb / hláška vesničana** o Mléčné dráze není.
+- **Dokumentace**: README (Systémy → Svět / noc, Ladicí parametry), nápověda, VIZE a `prompts/roadmapa/README.md` nejsou
+  upraveny (zadání: neměnit `prompts/roadmapa/README.md` a `docs/VIZE_A_ROADMAPA.md`).
+- Výkon na návsi v noci (FPS) změřit ručně; lampy jsou bez LOD kromě `visibility_range_end`.

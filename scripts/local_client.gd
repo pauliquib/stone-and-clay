@@ -18,6 +18,7 @@ var env: Environment
 var sun: DirectionalLight3D
 var moon: DirectionalLight3D
 var atmosphere: Atmosphere
+var street_lights: StreetLights     # M5.12: pouliční osvětlení obce a světelný smog (klient, vzniká v attach)
 var chimney_smoke: ChimneySmoke   # kouř z komínů podle teploty (M1.3)
 var season_fx: SeasonFx           # pole podle kalendáře, květy v trávě, ovoce a padané listí
 var game_menu: GameMenu          # F2 – roční období, čas, počasí, vozidla, teleport
@@ -62,6 +63,11 @@ func attach(p: Player) -> void:
 	p.make_local()
 	hud.meta = world.meta
 	atmosphere.north_deg = float(world.meta.get("north_angle_deg", 78.37))
+	if street_lights == null:   # M5.12: lampy vznikají až po World.build() (graf silnic)
+		street_lights = StreetLights.new()
+		street_lights.name = "VerejneOsvetleni"
+		add_child(street_lights)
+		street_lights.setup(world, settings)
 	hud.items_root = world.items_root
 	hud.totals = world.item_totals
 	hud.player = p
@@ -180,6 +186,8 @@ func build_environment() -> void:
 
 func _update_daylight(delta: float) -> void:
 	atmosphere.indoor = player.inside != ""
+	if street_lights:
+		atmosphere.light_pollution = street_lights.pollution
 	atmosphere.update(delta)
 
 
