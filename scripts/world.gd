@@ -132,6 +132,7 @@ var forestry: Forestry           # kácení a zpracování dřeva (M2.1): pád s
 var unreported := {}             # M4.4: id hráče → [{...}] činy, které nikdo neviděl (sdílený registr, viz `add_unreported`)
 var witness_sources: Array[Callable] = []   # M4.4/M4.6: další zdroje svědků (hajný, stráže) – `add_witness_source`
 var fire_mgr: FireManager        # oheň a topení (M2.2): ohniště, opékání, zákon u lesa, požár trávy, kamna doma
+var hasici: Hasici               # M5.3: sbor dobrovolných hasičů – zbrojnice u úřadu, členství, výjezdy k požáru trávy
 var npc_grow: NpcGrow            # M4.8 obsah pro dospělé: záhon zahrádkáře Ladislava (konopí), jen při zapnuté volbě
 var vyhlasky: Vyhlasky           # obecní vyhlášky (pálení, sucho, nedělní klid) a sušení čerstvých větví (M4.4 část B)
 var klesti: Klesti                # hromada klestí u domu (M4.4 část B): čerstvé větve schnou, suché se berou zpět
@@ -1093,6 +1094,10 @@ func _spawn_places() -> void:
 		if pl.keeper:
 			npcs[k] = pl.keeper
 	root.add_child(DvurStavebnin.build(terrain))  # M5.1 pokračování: dvůr stavebnin a pily (hromady materiálu)
+	if hasici == null:                            # M5.3: zbrojnice SDH u úřadu (až po místech a terénu)
+		hasici = Hasici.new()
+		add_child(hasici)
+		hasici.setup(self)
 	if places["hospoda"].regulars.size() > 0:
 		npcs["pepa"] = places["hospoda"].regulars[0]
 	# děda Vomáčka na lavičce kousek od usedlosti (místo „domov“ je teď ještě na původním bodu z pois.json;
@@ -1556,6 +1561,8 @@ func emit_game_event(id: int, kind: String, data: Dictionary) -> void:
 		cl.on_game_event(kind, data)
 	if gamekeeper:
 		gamekeeper.on_event(id, kind, data)   # M4.6: hajný slyší výstřely a pytlácké činy
+	if hasici:
+		hasici.on_event(id, kind, data)       # M5.3: fire_report → výjezd SDH
 	var q: Quests = quests.get(id)
 	if q:
 		q.on_event(kind, data)
@@ -2676,6 +2683,8 @@ func interactables(id: int) -> Array:
 		out.append_array(bazaar.interactables(id))
 	if fire_mgr:
 		out.append_array(fire_mgr.interactables(id))
+	if hasici:
+		out.append_array(hasici.interactables(id))   # M5.3: vchod zbrojnice SDH (členství)
 	if garden:
 		out.append_array(garden.interactables(id))
 	if farm:

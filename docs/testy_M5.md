@@ -98,3 +98,14 @@ Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kab
 8. Stromy kolem rampy (cca 6 m od středu) nejsou v půdorysu; kolize s kmeny nepřekáží.
 9. Save a načtení: starý save se načte beze změny (rampa je statický objekt, nic se neukládá).
 10. Teleport k cestě / budově v okolí: nic neblokuje, pohyb a zvuky jinde beze změny.
+## M5.3 – Hasiči: zbrojnice, spolek SDH, výjezdy k požárům
+1. F2 → Teleport k úřadu: před úřadem (cca 40–90 m od dveří, mimo silnici) stojí garáž s červenými vrat, věžičkou a sirénou na střeše, cedule „SDH Pod Kopcem“.
+2. U vchodu zbrojnice (do 4 m) se nabídne „zbrojnice, členství a schůze“; bez respektu „hasici“ ≥ 0 nebo s alkoholem (> 0,2 ‰) velitel členství odmítne.
+3. Žádost o členství (200 Kč) → zpráva „Vítej v SDH“; druhé zaplacení nejde, dokud příspěvek platí; „Vystoupit“ členství zruší.
+4. F2 → Datum: nastav první pátek v měsíci 19:00 a jdi do zbrojnice (do 40 m) → respekt hasičů +1, další schůze stejný měsíc už ne.
+5. F2 → cheat „požár trávy“ (nebo oheň v suchu a větru) → siréna slyšitelná, popup členům „Výjezd! … dojdi do zbrojnice“.
+6. Po cca 6 herních minutách hlášky „Hasiči jsou na místě, hasí“; nejbližší požár se postupně zmenšuje (každých cca 1,5 min) a zhasne.
+7. Člen v zásahovém obleku (I) stojí u ohně do 25 m a dohoření / uhašení → respekt hasičů +5, pověst +3, XP Hasičina 50–150; bez obleku v ohni ubývá zdraví a přijde hláška.
+8. Požár způsobený hráčem (přestupek „způsobení požáru“) → respekt hasičů −5 navíc.
+9. Save a načtení: členství a zaplacený příspěvek zůstanou; starý save se načte, hráč je nečlen.
+10. Mimo výjezd (bez požáru) nic neruší: siréna jen při `fire_report`, zbrojnice nic nevypisuje do chatu.

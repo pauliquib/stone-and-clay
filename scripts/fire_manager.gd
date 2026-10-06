@@ -632,6 +632,8 @@ func _end_grass(g: GrassFire) -> void:
 		world.emit_game_event(rid, "fire_out", {"pos": g.global_position, "peak": g.peak_r})
 	if world.players.has(id) and g.peak_r >= OFFENSE_MIN_R:
 		world.commit_offense(id, "zpusobeni_pozaru", {"severity": clampf(g.peak_r / GrassFire.MAX_R, 0.0, 1.0)})
+		if world.hasici:
+			world.hasici.on_caused_fire(id)      # M5.3: respekt hasičů −5 za požár, který způsobil hráč
 		var rep: Reputation = world.reputations.get(id)
 		if rep:
 			rep.change_karma(KARMA_FIRE, "způsobil požár")
