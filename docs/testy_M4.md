@@ -44,3 +44,16 @@ Spouští jen uživatel. Stav: staticky ověřeno (kontrola překladu), ruční 
 8. Starý save s nezaplacenými pokutami (klíč `law.unpaid` > 0) se načte bez chyby: jeden dluh „Nezaplacené pokuty (starší)“, částka v bance i v deníku stejná.
 9. Hráč s M4.1: 12 bodů / odebrání řidičáku se chová jako dřív (nic se nerozbilo).
 10. F5 → F9 uprostřed dne: dluhy, upomínky, čekající příkazy a jejich dny zůstanou.
+
+## M4.4 část A – Svědci a nenahlášené činy
+
+1. Pokácení stromu v lese za dne přímo před vesničanem (do ~10 m, čelem) → většinou popup „Někdo tě při kácení viděl!“ a přestupek; bez vesničana v dohledu (pár set metrů) → žádný popup.
+2. Stejné kácení v noci (F2 → Datum/čas na půlnoc) před vesničanem ve stejné vzdálenosti → svědek vidí podstatně méně často (noc = ¼ dohledu).
+3. Kácení před vesničanem s přátelstvím ≥ 60 (ověř přes rozhovor / dary) → přestupek skoro nikdy nevznikne; před cizím „přísným“ vesničanem ano.
+4. Kácení v cizím lese bez svědků → žádný popup ani přestupek; záznam zůstane v nenahlášených (přežije F5 → F9).
+5. Výstřel z pušky (bez zbrojního oprávnění) nebo střelba pod vlivem u vesničana v dohledu → hlášení „Někdo tě viděl…“; za stěnou / v mlze (F2 → Počasí, mlha) méně.
+6. Oheň u lesa (ohniště u okraje lesa) před obsluhou místa → popup a přestupek; v noci bez svědků jen varování a karma.
+7. Nehoda autem před hlídkou (F2 → Teleport k silnici, najet do stromu před policií) → přestupek „Dopravní nehoda se škodou“ v pokutách (Počítač → Banka → Pokuty); srážka chodce → „Srážení chodce“ a pokuta 10 000–40 000 Kč (orientační).
+8. Nehoda bez svědků (mimo obec, v noci) → žádné hlášení; zpráva o nenahlášeném činu se neobjeví ve hře, jen v uložené pozici (ověř přes F5 → F9 bez pádu).
+9. Starý save (před M4.4, s klíčem `forestry.unreported`, pokud existuje) se načte bez chyby; pokácené stromy a pařezy zůstanou.
+10. Pověst: po kácení/střelbě u vesničanů se pověst mění stejně jako dřív (`_witnesses` v pověsti počítá jen ty, kdo vidí); nic nehlásí v prázdné pustině.

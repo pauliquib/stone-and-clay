@@ -6,7 +6,7 @@
 ##
 ## Zákon: kde smíš kácet (vlastní zahrada = `OWN_GARDEN_R` kolem dveří vlastního domu; nájemník bytu jen na pronajaté
 ## zahradě `Garden` + `RENTED_MARGIN`, M1.7), co je přestupek (cizí zahrada, les, silnice)
-## a kdo to vidí / slyší (`HEAR_*`). Bez svědků se čin uloží do `unreported` (háček pro M4.6 – `pending_offenses`, `commit_pending`).
+## a kdo to vidí / slyší (`HEAR_*`). Bez svědků se čin uloží do společného registru `World.unreported` (M4.4 – `World.add_unreported`, `pending_offenses`, `commit_pending`).
 ## Povolení ke kácení (úřad, M4.4): `World.has_permit(id, "kaceni", pos)`. Ochranné pomůcky (M2.3): `has_gear(id)`.
 ##
 ## Poznámka k „fyzice“: strom padá po vypočtené dráze (zrychlené naklápění kolem paty kmene), ne jako RigidBody3D –
@@ -52,7 +52,6 @@ var world: World
 var trees: TreeManager
 var logs: Array = []                     # Log (padlé kmeny)
 var blocks: Array = []                   # StaticBody3D špalků
-var unreported := {}                     # id hráče → [{...}] činy, které nikdo neviděl (M4.6)
 var daily_value := {}                    # id hráče → {"day": int, "sum": int} – hodnota dřeva pokáceného v cizím za den
 
 var _falls: Array = []                   # padající stromy
@@ -551,20 +550,9 @@ func zone_at(pos: Vector3, id := 1) -> String:
 
 
 ## Někdo, kdo pokácení uvidí / uslyší do `r` m: vesničan, obsluha míst (myslivec), hlídka policie.
-func witness_near(pos: Vector3, r: float) -> bool:
-	if world.bots_root:
-		for v in world.bots_root.get_children():
-			if v is Villager and v.global_position.distance_to(pos) < r:
-				return true
-	for k in world.places:
-		var pl: Place = world.places[k]
-		if pl.keeper != null and is_instance_valid(pl.keeper) and not pl.player_inside \
-				and pl.keeper.global_position.distance_to(pos) < r:
-			return true
-	if world.police and world.police.patrol != null and is_instance_valid(world.police.patrol) \
-			and world.police.patrol.global_position.distance_to(pos) < r:
-		return true
-	return false
+## (M4.4: tenký obal nad `World.witness_reported` – nahlásí-li někdo čin; `id` = pachatel, pro přátelství.)
+func witness_near(pos: Vector3, r: float, id := -1) -> bool:
+	return world.witness_reported(id, pos, "les", r, r)
 
 
 ## Které přestupky by pokácení na místě způsobilo: [id přestupku, …]. Vlastní zahrada = nic.
@@ -605,38 +593,28 @@ func _check_law(id: int, pos: Vector3, tool_id: String, value: int) -> void:
 	var sev := clampf(float(value) / SEVERITY_VALUE_KC, 0.0, 1.0)
 	var rep: Reputation = world.reputations.get(id)
 	var hear := HEAR_SAW if tool_id == "motorova_pila" else HEAR_AXE
-	if witness_near(pos, hear):
+	if witness_near(pos, hear, id):
 		world.notify(id, "popup", ["Někdo tě při kácení viděl!", 3.0])
 		for oid in offs:
 			world.commit_offense(id, oid, {"severity": sev})
 		if rep:
 			rep.change(-4.0, "pokácel cizí strom", "kácení cizího stromu")
 	else:
-		var list: Array = unreported.get(id, [])
-		list.append({"kind": "kaceni", "offenses": offs, "pos": [pos.x, pos.y, pos.z], "t": world.clock.minutes,
+		world.add_unreported(id, {"kind": "kaceni", "offenses": offs, "pos": [pos.x, pos.y, pos.z], "t": world.clock.minutes,
 			"value": value, "severity": sev, "tool": tool_id, "discover_p": 0.3})
-		if list.size() > 50:
-			list = list.slice(list.size() - 50)
-		unreported[id] = list
 		if rep:
 			rep.change_karma(KARMA_UNSEEN, "kácení v cizím")
 
 
 ## Nenahlášené činy hráče (M4.6: hajný / policie je později zjistí). Položky viz `_check_law`.
+## (M4.4: registr je společný ve `World` – tyto funkce jsou obaly.)
 func pending_offenses(id: int) -> Array:
-	return unreported.get(id, [])
+	return world.pending_offenses(id)
 
 
 ## Uplatní nenahlášený čin číslo `idx` (zjištěn): zapíše přestupky a čin odstraní.
 func commit_pending(id: int, idx: int) -> void:
-	var list: Array = unreported.get(id, [])
-	if idx < 0 or idx >= list.size():
-		return
-	var e: Dictionary = list[idx]
-	list.remove_at(idx)
-	unreported[id] = list
-	for oid in e.get("offenses", []):
-		world.commit_offense(id, String(oid), {"severity": float(e.get("severity", 0.0))})
+	world.commit_pending(id, idx)
 
 
 # ------------------------------------------------------------------ ukládání
@@ -662,7 +640,6 @@ func to_dict(id: int) -> Dictionary:
 		if is_instance_valid(b):
 			bs.append({"pos": _v3(b.position), "r": float(b.get_meta("r", 0.2))})
 	d["blocks"] = bs
-	d["unreported"] = unreported.get(id, [])
 	d["daily"] = daily_value.get(id, {})
 	return d
 
@@ -690,5 +667,4 @@ func restore(d: Dictionary, id: int) -> void:
 	for e in d.get("blocks", []):
 		var q := _to_v3(e.get("pos"))
 		_make_block(q, float(e.get("r", 0.2)))
-	unreported[id] = (d.get("unreported", []) as Array).duplicate(true)
 	daily_value[id] = (d.get("daily", {}) as Dictionary).duplicate(true)

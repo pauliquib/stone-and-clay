@@ -233,7 +233,7 @@ func _poach_shot(id: int, a: Animal, weapon: String, reasons: Array, at: Vector3
 		_msg_cd[id] = t + 20.0
 		_msg(id, "Střílíš na zvěř bez práva – je to pytláctví. (%s)" % String(reasons[0]), 4.0)
 	var r := float(SHOT_WITNESS_R.get(weapon, SHOT_WITNESS_DEFAULT_R))
-	if world.forestry != null and world.forestry.witness_near(at, r):
+	if world.witness_reported(id, at, "pytlacka", r, r):
 		if not bool(a.shot_by.get("reported", false)):
 			a.shot_by["reported"] = true
 			_commit_poaching(id, weapon)
@@ -445,7 +445,7 @@ func _witness_carcass(c: Carcass) -> void:
 	var near := c.carried_by == c.owner_id or p.global_position.distance_to(c.pos) < NEAR_CARCASS_R
 	if not near:
 		return
-	if world.forestry.witness_near(p.global_position, SEE_CARCASS_R):
+	if world.witness_reported(c.owner_id, p.global_position, "pytlacka", SEE_CARCASS_R, SEE_CARCASS_R):
 		c.reported = true
 		_commit_poaching(c.owner_id, c.weapon)
 		_msg(c.owner_id, "Někdo tě viděl s nelegálním úlovkem!", 3.5)

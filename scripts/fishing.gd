@@ -555,7 +555,7 @@ func _keep(id: int) -> void:
 	_msg(id, "Ponecháno: %s %d cm." % [String(sp.get("nazev", sid)), roundi(float(c["cm"]))], 3.0)
 	var miera := float(sp.get("lovna_miera", 0.0))
 	var bad := (miera > 0.0 and float(c["cm"]) < miera) or in_closed_season(sp, world.clock.month(), int(world.clock.date()["day"]))
-	if bad and world.forestry != null and world.forestry.witness_near(p.global_position, WITNESS_R):
+	if bad and world.witness_reported(id, p.global_position, "rybolov", WITNESS_R, WITNESS_R):
 		world.commit_offense(id, "rybolov_mira_hajeni", {"severity": randf_range(0.0, 0.6)})
 		_msg(id, "Někdo tě viděl – ryba pod mírou / v hájení!", 4.0)
 
@@ -587,7 +587,7 @@ func _poach_check(id: int, s: Dictionary) -> void:
 	if world.has_permit(id, "rybarsky_listek", pos) and world.has_permit(id, "povolenka_rybolov", pos):
 		return
 	var p := _player(id)
-	if p == null or world.forestry == null or not world.forestry.witness_near(p.global_position, WITNESS_R):
+	if p == null or not world.witness_reported(id, p.global_position, "rybolov", WITNESS_R, WITNESS_R):
 		return
 	var now: float = world.clock.minutes
 	if now - float(_last_fine.get(id, -1.0e9)) < FINE_COOLDOWN_MIN:

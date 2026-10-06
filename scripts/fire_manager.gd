@@ -255,7 +255,7 @@ func _check_law(id: int, f: Fire) -> void:
 	if not near_forest(f.global_position):
 		return
 	f.illegal = true
-	var seen: bool = world.forestry != null and world.forestry.witness_near(f.global_position, WITNESS_R)
+	var seen: bool = world.witness_reported(id, f.global_position, "ohen", WITNESS_R, WITNESS_R)
 	if seen:
 		world.notify(id, "popup", ["Někdo tě u ohně u lesa viděl!", 3.0])
 		_report(f, true)

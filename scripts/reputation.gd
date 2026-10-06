@@ -337,11 +337,8 @@ func on_event(kind: String, data: Dictionary) -> void:
 func _witnesses(r: float) -> int:
 	var n := 0
 	var pos := game.player_pos(pid)
-	for v in game.bots_root.get_children():
-		if v is Villager and v.global_position.distance_to(pos) < r:
-			n += 1
-	for k in game.npcs:
-		if is_instance_valid(game.npcs[k]) and game.npcs[k].global_position.distance_to(pos) < r:
+	for w in game.witness_check(pid, pos, "pověst", r):      # M4.4: jednotné svědky (vidí = počítá se)
+		if w["sees"]:
 			n += 1
 	return n
 

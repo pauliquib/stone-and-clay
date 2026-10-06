@@ -99,7 +99,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 	if world.bazaar:
 		d["bazaar"] = world.bazaar.to_dict()
 	if world.forestry:
-		d["forestry"] = world.forestry.to_dict(id)     # pokácené stromy, padlé kmeny, špalky, nenahlášené činy (M2.1)
+		d["forestry"] = world.forestry.to_dict(id)     # pokácené stromy, padlé kmeny, špalky (M2.1)
+	d["unreported"] = world.unreported.get(id, [])     # nenahlášené činy, společný registr (M4.4)
 	if world.fire_mgr:
 		d["fire"] = world.fire_mgr.to_dict()           # ohniště (i vyhaslá), stav kamen doma (M2.2)
 	if world.garden:
@@ -321,6 +322,9 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 			mapped[i] = nc
 	if world.forestry:
 		world.forestry.restore(d.get("forestry", {}), id)   # starý save bez klíče = žádný pokácený strom
+	# M4.4: nenahlášené činy; starý save je měl v klíči `forestry` → migrace (výchozí = prázdno)
+	var nr = d.get("unreported", (d.get("forestry", {}) as Dictionary).get("unreported", []))
+	world.unreported[id] = (nr as Array).duplicate(true)
 	if world.fire_mgr:
 		world.fire_mgr.restore(d.get("fire", {}))            # starý save bez klíče = žádná ohniště, studená kamna
 	if world.garden:

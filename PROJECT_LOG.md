@@ -355,3 +355,42 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Nahlédnutí do spisu, žádosti na úřadě (vrácení řidičáku, kácení, ohlášení chovu) – nejsou.
 - `Debts.pay` a `list` jsou připravené pro M4.3 (trest soudu) a M4.7 (hypotéka, splátky) – zatím se nevolají.
 - Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.2).
+
+## 2026-10-06 – M4.4 část A: svědci (`witness_check`), nenahlášené činy, oživené řádky
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou `godot --check-only` – ruční test čeká)
+- **Co**: `World.witness_check(id, pos, kind, see_r, hear_r)` (`world.gd`, sekce „svědci (M4.4)“) → kandidáti
+  `{node, name, persona, sees, hears, reports}`: vesničané, obsluhy míst, policejní hlídka + zdroje z
+  `World.add_witness_source(Callable)` (háček pro M4.6). Vidí: vzdálenost ≤ `see_r` × světlo (den 1 / šero 0,5 /
+  noc 0,25) × mlha, zorný kužel ±80°. Slyší: ≤ `hear_r` bez kuželu. Nahlásí: `Weapons.CALL_P` podle povahy,
+  přítel ≥ 60 → 5 %, policie vždy. Zkratky `witness_seen` (vidí) a `witness_reported` (nahlásí).
+- **Co**: převedeno na jednotný svědek: `Forestry.witness_near` (tenký obal, nově s `id`), `Weapons._witness(id, …)`
+  (4 místa), `Cargo._seen_tick` (`witness_seen`), `FireManager._check_law`, `Hunting` (střelba, úlovek), `Fishing`
+  (2 místa, s `id`), `Reputation._witnesses` (počítá jen `sees`; npcs loop vypuštěn – keepers jsou v `places`),
+  `World.drone_witnessed` (vesničané/obsluhy přes `witness_seen`; hlídka 400 m a kontrola 200 m zůstávají).
+- **Co**: nenahlášené činy přesunuty do společného `World.unreported` (`add_unreported`, `pending_offenses`,
+  `commit_pending`); `Forestry.pending_offenses / commit_pending` jsou obaly, `Forestry._check_law` píše přes
+  `world.add_unreported`. Limit 50 položek na hráče. Nově i nehoda bez svědka (`Police.report_crash`).
+- **Co**: oživené řádky `data/zakon.json`: `nehoda_skoda` (2 000–20 000 Kč, 2 body) a `srazeni_chodce` (10 000–40 000 Kč,
+  4 body) – uděluje `police.gd` (`report_crash` / `report_hit_person`); `ujeti_policii` má pokutu a body, ale zatím
+  se neuděluje. Nové řádky (bez háčku, zatím neudělují): `kradez_uroda`, `vstup_na_cizi_pozemek`,
+  `jizda_na_koni_opily`, `chuze_opily_po_silnici`. Všechny s `drb`, `karma`, `par`, „ověřit“.
+- **Ukládání**: per-hráč klíč `unreported` na úrovni záznamu hráče (`save_game.gd`); migrace: chybí-li, vezme se
+  `forestry.unreported` ze starého save; `forestry` už tento klíč nezapisuje.
+- **Kontrola**: `godot --import` (výstup jen šum addonů limboai / state_charts / func_godot bez chyb ve skriptech
+  hry, rc 0) a `--check-only` na všech 11 změněných `.gd` – výstup prázdný.
+
+### Otevřené body
+- **Část B (vyhlášky: pálení větví, sucho, hluk a nedělní klid) – čeká na vlnu 4.** Úřední deska, vyhlášky,
+  vlhkost větví, `Weather.drought`, `World.noise` nejsou.
+- Povolení ke kácení (3.2: žádost na úřadě, značka stromu, `permits.grant` s vazbou na strom) – nedělané, navazuje na
+  úřad z M4.2; `has_permit(id, "kaceni", pos)` zatím kontroluje jen pozici zóny.
+- Raycast na zdi (vrstva 1) v `witness_check` není – dotaz do fyziky mimo fyzikální krok by nebyl bezpečný;
+  dohled tedy neblokují budovy.
+- `drbna` roznáší drb bez úředního záznamu – zatím jen jako běžný svědek s vyšší šancí nahlášení.
+- Hajný a stráže (M4.6) – háček `add_witness_source` je, zdroj zatím není zaregistrován.
+- Dohled za šera / v noci snižuje i svědky dronu (dřív pevných 150 m) – záměrné, ale ověřit při hře.
+- `ujeti_policii` (konec honičky útěkem v `_end_chase`) a ostatní nové řádky zatím nemají háček (rozlišit útěk).
+- `ruseni_nocniho_klidu` rozšířit na motorovou pilu / střelbu / hudbu z auta – nedělané (část B, hluk).
+- Nenahlášené činy nejsou ve hře vidět (jen v uložené pozici a v registru) – hajný / policie je později odhalí (M4.6).
+- Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.4 část A).

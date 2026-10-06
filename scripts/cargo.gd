@@ -1033,7 +1033,7 @@ func _seen_tick() -> void:
 		if tag == "" or t < float(_seen_cd.get(id, 0.0)):
 			continue
 		var p := _player(id)
-		if p == null or not world.forestry.witness_near(p.global_position, SEEN_R):
+		if p == null or not world.witness_seen(id, p.global_position, "naklad", SEEN_R):
 			continue
 		_seen_cd[id] = t + SEEN_COOLDOWN_S
 		world.emit_game_event(id, "cargo_seen", {"tag": tag, "kg": carried_kg(id), "pos": p.global_position})

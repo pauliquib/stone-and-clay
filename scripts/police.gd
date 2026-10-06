@@ -297,8 +297,16 @@ func report_crash(pos: Vector3, what: String, pl: Player) -> void:
 	for cop in [patrol, checkpoint_car]:
 		if cop and is_instance_valid(cop) and cop.global_position.distance_to(pos) < 90.0 and pl.car:
 			if _los(cop.global_position + Vector3(0, 1.3, 0), pos + Vector3(0, 1.0, 0)):
+				world.commit_offense(pl.id, "nehoda_skoda", {"severity": 0.5})     # M4.4: oživený přestupek
 				start_chase(cop, "nehoda (%s)" % what, pl)
 				return
+	# nikdo z policie: svědek z vesnice nehodu nahlásí, jinak zůstane nenahlášená (M4.4)
+	if pl.car:
+		if world.witness_reported(pl.id, pos, "nehoda", 60.0, 60.0):
+			world.commit_offense(pl.id, "nehoda_skoda", {"severity": 0.5})
+		else:
+			world.add_unreported(pl.id, {"kind": "nehoda", "offenses": ["nehoda_skoda"], "pos": [pos.x, pos.y, pos.z],
+				"t": world.clock.minutes, "value": 0, "severity": 0.5, "tool": what, "discover_p": 0.3})
 
 
 func report_hit_person(pos: Vector3, pl: Player) -> void:
@@ -309,6 +317,7 @@ func report_hit_person(pos: Vector3, pl: Player) -> void:
 			var s := a.get_closest_point(Vector2(pos.x, pos.z) + Vector2(250, 0).rotated(_rng.randf() * TAU))
 			var sp := graph.nodes[s]
 			traffic.place_car(patrol, sp, 0.0)
+		world.commit_offense(pl.id, "srazeni_chodce", {"severity": 1.0})     # M4.4: policie přijede vždy
 		start_chase(patrol, "sražení chodce", pl)
 
 

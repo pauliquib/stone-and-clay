@@ -121,6 +121,8 @@ var bazaar: Bazaar               # bazar vozidel u silnice (M1.6): nabídka na t
 var airfield: Airfield           # M6.5: polní letiště – trávníková dráha, větrný rukáv, hangár triku
 var trees: TreeManager           # stromy za běhu (M2.1): index instancí, pokácené stromy, pařezy
 var forestry: Forestry           # kácení a zpracování dřeva (M2.1): pád stromu, kmeny, špalky, zákon
+var unreported := {}             # M4.4: id hráče → [{...}] činy, které nikdo neviděl (sdílený registr, viz `add_unreported`)
+var witness_sources: Array[Callable] = []   # M4.4/M4.6: další zdroje svědků (hajný, stráže) – `add_witness_source`
 var fire_mgr: FireManager        # oheň a topení (M2.2): ohniště, opékání, zákon u lesa, požár trávy, kamna doma
 var garden: Garden             # zahrada u domu a pronajaté pole (M2.4): záhony, růst podle dnů, sklizeň
 var fences: FenceManager       # ploty a ohrady (Fáze 7): obvody výběhu, zahrady a pole + hráčské úseky
@@ -3977,20 +3979,135 @@ func drones_from_dict(pid: int, d: Dictionary) -> void:
 		drones[pid] = dr
 
 
+# ------------------------------------------------------------------ svědci (M4.4)
+
+## Jednotný systém svědků (M4.4): `witness_check` vrací kandidáty, kteří čin vidí nebo slyší, a zda ho nahlásí.
+## Zkratky `witness_seen` (někdo vidí) a `witness_reported` (někdo nahlásí). Další zdroje (hajný, stráže – M4.6)
+## přidá `add_witness_source(fn)`, `fn(id, pos, see_r, hear_r) -> Array` vrací kandidáty `{node, name, persona, role}`.
+const WITNESS_CONE_COS := 0.17           # cos 80° – NPC vidí zhruba do přední poloviny (±80°)
+const WITNESS_FOG_K := 0.6               # plná mlha sníží dohled o tolik (podíl)
+const WITNESS_FRIEND_MIN := 60.0         # přátelství, od kterého skoro nikdy nenahlásí
+const WITNESS_FRIEND_P := 0.05           # šance nahlášení u přítele
+const WITNESS_DEFAULT_P := 0.4           # šance nahlášení, když povaha není v Weapons.CALL_P
+const UNREPORTED_MAX := 50               # nenahlášených činů na hráče (nejstarší se zahazují)
+
+
+## Dohled podle denní doby (den 1,0 / šero 0,5 / noc 0,25) × mlha.
+func _witness_light() -> float:
+	var f := 1.0
+	if clock:
+		var d := clock.daylight()
+		f = 1.0 if d >= 0.8 else (0.5 if d >= 0.35 else 0.25)
+	if weather:
+		f *= 1.0 - WITNESS_FOG_K * clampf(weather.fog, 0.0, 1.0)
+	return f
+
+
+## Kdo čin uvidí / uslyší. Vrací [{node, name, persona, sees, hears, reports}] jen pro ty, kdo vidí nebo slyší.
+## Vidí: vzdálenost ≤ see_r × světlo a zorný kužel (NPC zhruba dopředu). Slyší: ≤ hear_r, bez kuželu.
+## Nahlásí: podle povahy (`Weapons.CALL_P`), přítele (≥ 60) skoro nikdy; policejní hlídka vždy.
+## Zatím bez raycastu na zdi (dotaz do fyziky mimo fyzikální krok není bezpečný) – viz otevřené body.
+func witness_check(id: int, pos: Vector3, kind: String, see_r: float, hear_r := 0.0) -> Array:
+	var cands: Array = []
+	if bots_root:
+		for v in bots_root.get_children():
+			if v is Villager:
+				var vp: Persona = (v as Villager).persona
+				cands.append({"node": v, "name": vp.display_name() if vp else "vesničan", "persona": vp, "role": "vesnice"})
+	for k in places:
+		var pl: Place = places[k]
+		if pl.keeper != null and is_instance_valid(pl.keeper) and not pl.player_inside:
+			cands.append({"node": pl.keeper, "name": "obsluha (%s)" % String(k), "persona": pl.keeper.persona, "role": "obsluha"})
+	if police and police.patrol != null and is_instance_valid(police.patrol):
+		cands.append({"node": police.patrol, "name": "policejní hlídka", "persona": null, "role": "policie"})
+	for src in witness_sources:
+		if src.is_valid():
+			cands.append_array(src.call(id, pos, see_r, hear_r))
+	var light := _witness_light()
+	var out: Array = []
+	for c in cands:
+		var n: Node3D = c.get("node")
+		if n == null or not is_instance_valid(n):
+			continue
+		var to := pos - n.global_position
+		var sees := false
+		if to.length() <= see_r * light:
+			var f2 := Vector2(-n.global_transform.basis.z.x, -n.global_transform.basis.z.z)
+			var t2 := Vector2(to.x, to.z)
+			sees = t2.length() < 1.0 or f2.length() < 0.01 or f2.normalized().dot(t2.normalized()) >= WITNESS_CONE_COS
+		var hears := to.length() <= hear_r
+		if not sees and not hears:
+			continue
+		var persona: Persona = c.get("persona")
+		var reports := false
+		if String(c.get("role", "")) == "policie":
+			reports = true
+		else:
+			var p := WITNESS_DEFAULT_P
+			if persona:
+				p = float(Weapons.CALL_P.get(String(persona.profile.get("trait", "")), WITNESS_DEFAULT_P))
+				if persona.get_friendship(id) >= WITNESS_FRIEND_MIN:
+					p = WITNESS_FRIEND_P
+			reports = randf() < p
+		out.append({"node": n, "name": String(c.get("name", "")), "persona": persona, "sees": sees, "hears": hears, "reports": reports})
+	return out
+
+
+## Někdo čin vidí (kandidát se `sees`).
+func witness_seen(id: int, pos: Vector3, kind: String, see_r: float, hear_r := 0.0) -> bool:
+	for w in witness_check(id, pos, kind, see_r, hear_r):
+		if w["sees"]:
+			return true
+	return false
+
+
+## Někdo čin nahlásí (kandidát se `reports`) – vede k přestupku hned, jinak zůstane nenahlášený.
+func witness_reported(id: int, pos: Vector3, kind: String, see_r: float, hear_r := 0.0) -> bool:
+	for w in witness_check(id, pos, kind, see_r, hear_r):
+		if w["reports"]:
+			return true
+	return false
+
+
+## Přidá zdroj svědků (M4.6: hajný, stráže). `fn(id, pos, see_r, hear_r) -> Array` vrací kandidáty ve tvaru výše.
+func add_witness_source(fn: Callable) -> void:
+	if not witness_sources.has(fn):
+		witness_sources.append(fn)
+
+
+## Zapíše nenahlášený čin hráče (zjistí ho později hajný / policie přes `pending_offenses`).
+func add_unreported(id: int, entry: Dictionary) -> void:
+	var list: Array = unreported.get(id, [])
+	list.append(entry)
+	if list.size() > UNREPORTED_MAX:
+		list = list.slice(list.size() - UNREPORTED_MAX)
+	unreported[id] = list
+
+
+## Nenahlášené činy hráče (položky jako v `Forestry._check_law`).
+func pending_offenses(id: int) -> Array:
+	return unreported.get(id, [])
+
+
+## Uplatní nenahlášený čin `idx` (zjištěn): zapíše přestupky přes `commit_offense` a čin odstraní.
+func commit_pending(id: int, idx: int) -> void:
+	var list: Array = unreported.get(id, [])
+	if idx < 0 or idx >= list.size():
+		return
+	var e: Dictionary = list[idx]
+	list.remove_at(idx)
+	unreported[id] = list
+	for oid in e.get("offenses", []):
+		commit_offense(id, String(oid), {"severity": float(e.get("severity", 0.0))})
+
+
 ## Svědek, kdo dronu uvidí/uslyší (vesničané, obsluhy míst, hlídka, jiní hráči) do ~150 m vodorovně.
 ## Využívá `Drone._offense` – přestupek se píše jen když dron někoho upoutal. `ignore_pid` = vlastní pilot
 ## (letí sám u sebe – sám sebe za svědka nepočítá, jinak by přestupek padl vždy).
 func drone_witnessed(pos: Vector3, ignore_pid := -1) -> bool:
 	var p2 := Vector2(pos.x, pos.z)
-	if bots_root:
-		for v in bots_root.get_children():
-			if v is Villager and Vector2(v.global_position.x, v.global_position.z).distance_to(p2) < 150.0:
-				return true
-	for k in places:
-		var pl: Place = places[k]
-		if pl.keeper != null and is_instance_valid(pl.keeper) \
-				and Vector2(pl.keeper.global_position.x, pl.keeper.global_position.z).distance_to(p2) < 120.0:
-			return true
+	if witness_seen(ignore_pid, pos, "dron", 150.0):     # vesničané a obsluhy míst (M4.4 witness_check)
+		return true
 	if police and police.patrol != null and is_instance_valid(police.patrol) \
 			and Vector2(police.patrol.global_position.x, police.patrol.global_position.z).distance_to(p2) < 400.0:
 		return true
