@@ -38,6 +38,12 @@ func setup(w: World, p: Player) -> void:
 
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("seasonfx", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	_t -= delta
 	if _t > 0.0 or world == null or world.clock == null or world.terrain == null:
 		return

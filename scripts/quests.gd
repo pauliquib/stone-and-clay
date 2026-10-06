@@ -79,6 +79,12 @@ func abandon() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("quests", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if not hit_report.is_empty() and game.clock.minutes > float(hit_report["deadline"]):
 		_hit_expired()
 	if active:

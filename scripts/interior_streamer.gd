@@ -137,6 +137,12 @@ func built_count() -> int:
 # ------------------------------------------------------------------ stavba a rušení
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("interior", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if world == null:
 		return
 	if _building != null:

@@ -86,6 +86,10 @@ var action_runner: ActionRunner  # výběr cíle a průběh kontextových akcí 
 var sleep_spots: Array[SleepSpot] = []
 var clients := {}                # id → LocalClient (jen hráči na tomto počítači)
 var ready_done := false
+## Simulační bublina kolem nejbližšího hráče (m) – za její hranicí přejdou vesničané, psi, NPC
+## a AI auta do levného režimu (kinematika ~2 Hz, schovaný vizuál) nebo zamraznou. Nastavuje
+## GameSettings dle volby „Aktivita světa“ (0 = bez omezení – vše běží jako dřív).
+var sim_radius := 320.0
 var _blackout := {}              # id → true: hráč právě „nevidí“ (okno, spánek, záchytka)
 var _cheat_permits := {}         # id → {druh oprávnění: true} – jen ladicí cheat (F2 → Hráč), dokud nejsou doklady (M4.6)
 # M6.1 drony: `drones[pid]` = aktivní dron ve světě (letí / leží / visí ve stromě); `drone_states[pid][model]`
@@ -214,10 +218,12 @@ func build() -> void:
 	m_grav.set_shader_parameter("snow_amount", 0.8)
 	m_asph.set_shader_parameter("wet_boost", 1.6)      # Fáze 9: mokrý asfalt znatelně lesklejší (§12.3)
 	m_grav.set_shader_parameter("wet_boost", 1.25)
-	MapLoader.add_chunks(map_root, "Budovy_steny", MapLoader.load_chunks("res://data/walls.bin", m_wall), true, 0.0, "budova")
-	MapLoader.add_chunks(map_root, "Budovy_strechy", MapLoader.load_chunks("res://data/roofs.bin", m_roof), true, 0.0, "budova")
+	# zdi/střechy mají konečný dohled – dosah dost velký, aby domy byly vidět i při Dohlednosti
+	# „Krátká“ (násobič 0.6 → reálně ~960/1020 m); dláždice se mimo dosah skipují po chunkách
+	MapLoader.add_chunks(map_root, "Budovy_steny", MapLoader.load_chunks("res://data/walls.bin", m_wall), true, 1600.0, "budova")
+	MapLoader.add_chunks(map_root, "Budovy_strechy", MapLoader.load_chunks("res://data/roofs.bin", m_roof), true, 1700.0, "budova")
 	MapLoader.add_chunks(map_root, "Silnice", MapLoader.load_chunks("res://data/asphalt.bin", m_asph, terrain, 0.1), true, 1800.0, "asfalt")
-	MapLoader.add_chunks(map_root, "Cesty", MapLoader.load_chunks("res://data/gravel.bin", m_grav, terrain, 0.09), true, 1200.0, "sterk")
+	MapLoader.add_chunks(map_root, "Cesty", MapLoader.load_chunks("res://data/gravel.bin", m_grav, terrain, 0.09), true, 1400.0, "sterk")
 
 	loading.emit("Potoky a rybníky…")
 	await _frames(1)
@@ -3300,6 +3306,12 @@ func cheat(id: int, what: String) -> void:
 # ------------------------------------------------------------------ smyčka
 
 func _process(_delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(_delta)
+	Tests.prof_add("world", __t0)
+
+
+func _process_impl(_delta: float) -> void:
 	if not ready_done:
 		return
 	# policie – silniční kontrolu hráč uvidí, až je blízko

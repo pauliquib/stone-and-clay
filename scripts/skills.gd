@@ -181,6 +181,12 @@ func on_event(kind: String, data: Dictionary) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("skills", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if game == null or not game.ready_done or not is_instance_valid(player):
 		return
 	var c := player.car

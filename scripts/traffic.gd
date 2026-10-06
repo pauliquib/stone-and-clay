@@ -29,6 +29,7 @@ var rng := RandomNumberGenerator.new()
 var _stuck := {}
 var _plate_n := 1000
 var _tractor_t := 0.0
+var _sleep_t := 0.0             # periodika uspávání / probouzení vozidel podle vzdálenosti hráčů
 var _zones: Array = []           # [Vector3(x, z, r)] zóny „v obci“ – Dukelčice + katastry z obce.json
 var respawn_log: Array = []      # [čas ms, auto, důvod] – pro --traffictest
 
@@ -83,6 +84,7 @@ func place_car(c: Car, pos: Vector2, yaw: float) -> void:
 	c._prev_xf = c.global_transform
 	c._cur_xf = c.global_transform
 	c._prev_vel = Vector3.ZERO
+	c.set_asleep(false)
 
 
 ## Vážený náhodný výběr modelu z tabulky {id: váha}.
@@ -289,14 +291,26 @@ func _respawn(c: Car, first := false) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("traffic", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if world.players.is_empty():
 		return
 	_update_tractor(delta)
+	_sleep_t -= delta
+	if _sleep_t <= 0.0:
+		_sleep_t = 0.4
+		_update_car_sleep()
 	var respawns := 0                  # hledání trasy (A*) je drahé – nejvýš jedno přeplánování za krok
 	for c in ai_cars:
 		if c.drive != Car.Drive.AI:
 			continue
 		var d: float = world.nearest_player_dist(c.global_position)
+		if c.kinematic:
+			c.kinematic_step(delta)      # mimo simulační bublinu – posun po trase bez fyziky
 		# rychlostní limit podle obce (Dukelčice + katastry okolních obcí)
 		var v_obci := in_village(Vector2(c.global_position.x, c.global_position.z))
 		c.ai_speed_limit = minf(13.9 if v_obci else 19.0, float(c.model.spec.get("ai_vmax", 99.0)))
@@ -314,5 +328,37 @@ func _physics_process(delta: float) -> void:
 				respawn_log.append([Time.get_ticks_msec(), c.name, why])
 				c.repair()
 				_respawn(c)
-		# daleko od hráče → uspat fyziku kol (šetří výkon), ale jen když nestojí na trase
-		c.set_physics_process(true)
+
+
+## Uspávání vozidel podle vzdálenosti k nejbližšímu hráči (výkon na velké mapě): stojící vozidla
+## (zaparkovaná + hráčská bez řidiče) za ~170 m zamraznou – kolize zůstává (jde do nich nabourat
+## i nastoupit), ale raycastová kola, _process ani zvuky už neběží. AI auta mimo simulační
+## bublinu (World.sim_radius) přejdou na levný kinematický posun po trase. Policie se nespí –
+## hlídka a pronásledování potřebují plnou fyziku.
+func _update_car_sleep() -> void:
+	for c in parked:
+		_sleep_still(c)
+	for arr in player_vehicles.values():
+		for c in arr:
+			_sleep_still(c)
+	var simr: float = world.sim_radius
+	for c in ai_cars:
+		if c == null or not is_instance_valid(c) or c.drive != Car.Drive.AI or c.is_police \
+				or c.ai_direct_target != Vector3.INF:
+			continue
+		var d: float = world.nearest_player_dist(c.global_position)
+		if not c._asleep and d > simr:
+			c.set_asleep(true, true)
+		elif c._asleep and d < simr * 0.7:
+			c.set_asleep(false)
+
+
+func _sleep_still(c: Car) -> void:
+	if c == null or not is_instance_valid(c) or c.drive != Car.Drive.NONE:
+		return
+	var d: float = world.nearest_player_dist(c.global_position)
+	if c._asleep:
+		if d < 110.0:
+			c.set_asleep(false)
+	elif d > 170.0:
+		c.set_asleep(true)

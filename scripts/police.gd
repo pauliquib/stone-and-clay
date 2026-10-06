@@ -206,6 +206,12 @@ func release(pl: Player) -> void:
 # ------------------------------------------------------------------ hlavní smyčka
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("police", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if patrol == null or world.players.is_empty():
 		return
 	_checked_recently = maxf(_checked_recently - delta, 0.0)
@@ -417,8 +423,8 @@ func _chase(delta: float) -> void:
 			escaped.emit(who.id)
 	else:
 		_lost_t = 0.0
-	# policie se převrátila / zničila
-	if chaser.damage >= 100.0:
+	# policie se převrátila / zničila (chaser může být null po _end_chase výše)
+	if chaser != null and chaser.damage >= 100.0:
 		_end_chase()
 
 

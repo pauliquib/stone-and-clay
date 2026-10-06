@@ -360,6 +360,12 @@ static func _pm(p: float) -> String:
 # ------------------------------------------------------------------ průběžně (jízda, opilost, zapomínání)
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("reputation", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if game == null or not game.ready_done or not is_instance_valid(player):
 		return
 	_speed_cool = maxf(_speed_cool - delta, 0.0)

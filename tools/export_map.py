@@ -1,6 +1,7 @@
-"""Herní verze mapy – úprava mapa_okoli.blend a export dat pro Godot.
+"""Herní verze mapy – úprava blend/mapa_okoli.blend a export dat pro Godot.
 
-1. Otevře mapa_okoli.blend (celý katastr Dukelčic).
+1. Otevře blend/mapa_okoli.blend (celý katastr Dukelčic; zdroj = výstup
+   pipeline/scripts/phase13_build_full.py, v repu není – viz .gitignore).
 2. ODEBERE detailní model domu hráče (všechny kolekce mimo OKOLI_*)
    a místo něj postaví dům ve stejném zjednodušeném stylu jako ostatní budovy
    (tools/out/domov_hrace.json z tools/domov_hrace.py). Terén jádra pod bývalým
@@ -34,23 +35,38 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.dirname(HERE)
-ROOT = os.path.dirname(GAME)
-SRC_BLEND = os.path.join(ROOT, "mapa_okoli.blend")
+PIPE = os.path.join(GAME, "pipeline")
+PDATA = os.path.join(PIPE, "data")
+GEO = os.path.join(GAME, "geodata")
+SRC_BLEND = os.path.join(GAME, "blend", "mapa_okoli.blend")
 OUT_BLEND = os.path.join(GAME, "blend", "mapa.blend")
 DATA = os.path.join(GAME, "data")
 TEX = os.path.join(GAME, "textures")
 CHUNK = 256.0
 
+# Ve hře nesmí figurovat reálné názvy obcí/míst → fiktivní názvy (geometrie zůstává z OSM)
+FICTIONAL_NAMES = {
+    "Březnice": "Břehatice",
+    "Černý potok": "Blatný potok",
+    "Kaňovický potok": "Havraní potok",
+    "Neradovský potok": "Sojčí potok",
+    "Oskorušný potok": "Jeřabinový potok",
+    "Zlámanecký potok": "Sokolí potok",
+    # reálné názvy ulic (place-uzlový filtr je nechytnul) – viz tools/obce.py
+    "Švambovce": "Štambovce",
+    "Březovská": "Březoucká",
+}
+
 
 def jload(rel):
-    return json.load(open(os.path.join(ROOT, rel)))
+    return json.load(open(os.path.join(PDATA, rel)))
 
 
-ref = jload("data/scene_reference.json")
-H_ref = jload("data/terrain_ref.json")["H_ref"]
-meta_c = jload("data/geodata_meta.json")
-meta = jload("data/geodata_meta_full.json")
-admin = jload("data/obec_admin_boundary.json")
+ref = jload("scene_reference.json")
+H_ref = jload("terrain_ref.json")["H_ref"]
+meta_c = jload("geodata_meta.json")
+meta = jload("geodata_meta_full.json")
+admin = jload("doubravy_admin_boundary.json")
 HX, HY = ref["house_scene_xy"]
 X0, Y1, RES, GW, GH = meta["grid_x0"], meta["grid_y1"], meta["dem_res"], meta["dem_w"], meta["dem_h"]
 
@@ -143,7 +159,7 @@ def remove_house_model():
 def restore_core_terrain():
     """Jádro mělo terén snížený pod pozemek modelu – ve hře tam stojí jednoduchý dům, vrátit DMR."""
     ob = bpy.data.objects["OKOLI_Teren_DMR5G"]
-    dtm = np.load(os.path.join(ROOT, "geodata", "dtm_scene.npy")).astype(np.float64) - H_ref
+    dtm = np.load(os.path.join(GEO, "dtm_scene.npy")).astype(np.float64) - H_ref
     me = ob.data
     co = np.empty(len(me.vertices) * 3, np.float32)
     me.vertices.foreach_get("co", co)
@@ -349,7 +365,7 @@ def main():
     print(f"SAVED {OUT_BLEND}")
 
     # ---------------- výšková mapa (DMR 5G, 2 m) – jedna pravda pro kolizi i vzhled
-    hm = np.load(os.path.join(ROOT, "geodata", "dtm_full_scene.npy")).astype(np.float64) - H_ref
+    hm = np.load(os.path.join(GEO, "dtm_full_scene.npy")).astype(np.float64) - H_ref
 
     def hsample(x, y):
         return bilinear(hm, X0, Y1, RES, x, y)
@@ -480,7 +496,7 @@ def main():
     print(f"WROTE trees.bin: {len(out)} trees")
 
     # ---------------- silnice jako graf (pro boty), předměty, spawn
-    gj = jload("data/okoli_full_local.geojson")
+    gj = jload("okoli_full_local.geojson")
     roads = []
     for ft in gj["features"]:
         p = ft["properties"]
@@ -489,11 +505,11 @@ def main():
         pts = ft["geometry"]["coordinates"]
         if not point_in_poly([q[0] for q in pts], [q[1] for q in pts], admin["scene_poly"]).any():
             continue
-        roads.append({"kind": p.get("highway", ""), "name": p.get("name", ""),
+        roads.append({"kind": p.get("highway", ""), "name": FICTIONAL_NAMES.get(p.get("name", ""), p.get("name", "")),
                       "pts": [[round(q[0], 2), round(-q[1], 2)] for q in pts]})
     print(f"ROADS for bots: {len(roads)} polylines")
 
-    fm = np.load(os.path.join(ROOT, "data", "forest_mask_full.npz"))
+    fm = np.load(os.path.join(PDATA, "forest_mask_full.npz"))
     forest = fm["forest"]
     rng = random.Random(122)
     items = []
@@ -515,7 +531,7 @@ def main():
         i = rng.choice(near_forest)
         if far_enough(fx[i], fy[i], 70):
             items.append({"type": "hrib", "x": round(float(fx[i]), 2), "z": round(float(-fy[i]), 2)})
-    core_trees = [t for t in jload("data/trees_ndsm.json") if math.hypot(t["x"] - HX, t["y"] - HY) < 450
+    core_trees = [t for t in jload("trees_ndsm.json") if math.hypot(t["x"] - HX, t["y"] - HY) < 450
                   and t.get("type", "dec") == "dec"]
     rng.shuffle(core_trees)
     for t in core_trees:
@@ -555,7 +571,7 @@ def main():
 
     mp = {
         "version": 1,
-        "source": "mapa_okoli.blend → blend/mapa.blend",
+        "source": "blend/mapa_okoli.blend → blend/mapa.blend",
         "license": "Geodata © ČÚZK (CC BY 4.0), OSM © přispěvatelé OpenStreetMap (ODbL), textury Poly Haven (CC0)",
         "height": {"file": "terrain_height.bin", "w": GW, "h": GH, "spacing": RES,
                    "x0": X0 + RES / 2, "z0": -Y1 + RES / 2, "chunk_cells": CH, "ncx": ncx, "ncz": ncz},
@@ -574,13 +590,13 @@ def main():
     print("WROTE map.json")
 
     # ---------------- textury
-    shutil.copy(os.path.join(ROOT, "geodata", "ortho_full_scene.jpg"), os.path.join(TEX, "ortho_full.jpg"))
-    shutil.copy(os.path.join(ROOT, "geodata", "ortho_scene.jpg"), os.path.join(TEX, "ortho_core.jpg"))
+    shutil.copy(os.path.join(GEO, "ortho_full_scene.jpg"), os.path.join(TEX, "ortho_full.jpg"))
+    shutil.copy(os.path.join(GEO, "ortho_scene.jpg"), os.path.join(TEX, "ortho_core.jpg"))
     for tid in ("beige_wall_001", "clay_roof_tiles_02", "asphalt_02", "gravel_road", "bark_brown_02"):
-        d = os.path.join(ROOT, "assets", "materials", f"ph_{tid}")
+        d = os.path.join(PIPE, "assets", "materials", f"ph_{tid}")
         for fn in os.listdir(d):
             shutil.copy(os.path.join(d, fn), os.path.join(TEX, fn))
-    shutil.copy(os.path.join(ROOT, "assets", "hdrs", "ph_kloofendal_48d_partly_cloudy_puresky",
+    shutil.copy(os.path.join(PIPE, "assets", "hdrs", "ph_kloofendal_48d_partly_cloudy_puresky",
                              "kloofendal_48d_partly_cloudy_puresky_4k.hdr"), os.path.join(TEX, "sky.hdr"))
     print("TEXTURES copied")
 

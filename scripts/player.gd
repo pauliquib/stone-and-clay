@@ -756,6 +756,12 @@ func _read_input() -> Array:
 # ------------------------------------------------------------------ fyzika
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("player_phys", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	_t += delta
 	if car != null or horse != null or aircraft != null:
 		# poloha v autě / na koni / v letounu (vozidlo posouvá hráč jen následuje)
@@ -1131,6 +1137,12 @@ func say(text: String, dur := 4.0) -> void:
 
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("player", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if _say_t > 0.0:
 		_say_t -= delta
 	_say_label.visible = _say_t > 0.0 and not (camera != null and first_person and car == null)

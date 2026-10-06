@@ -368,6 +368,12 @@ func _blood_tick(dt_game_min: float) -> void:
 # ------------------------------------------------------------------ smyčka
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("hunting", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if world == null or not world.ready_done:
 		return
 	_carry_follow(delta)

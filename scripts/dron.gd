@@ -510,6 +510,12 @@ func _scare_wildlife() -> void:
 # ------------------------------------------------------------------ nárazy
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("dron_phys", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if mode == "strom":
 		_stuck_t -= delta
 		if _stuck_t <= 0.0:
@@ -681,6 +687,12 @@ func status() -> Dictionary:
 # ------------------------------------------------------------------ vizuál (interpolace + kamera + rotor)
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("dron", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	var f := Engine.get_physics_interpolation_fraction()
 	var pos := _prev_pos.lerp(_cur_pos, f)
 	var tb := Basis(Vector3.UP, lerp_angle(_prev_yaw, _cur_yaw, f))

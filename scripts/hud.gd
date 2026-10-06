@@ -1,8 +1,9 @@
 ## HUD: stav hráče (promile, fáze opilosti, žaludek, hmotnost/BMI, nikotin, zdraví, výdrž),
 ## hodiny a peníze, tachometr auta, aktivní úkol s podmínkami, kompas (k cíli úkolu nebo předmětu),
 ## zprávy, výzvy k interakci, nabídky míst (tlačítka), inventář (Tab), deník úkolů (J),
-## nápověda (F1) a mapa katastru (M) z ortofota s místy, pověst v obci (Reputation), rozhovor na ulici
-## (T / Enter – řádek pro psaní a záznam posledních replik).
+## nápověda (F1), rotující minimapa s kompasem (vpravo nahoře) a mapa katastru (M – kolečko přibližuje,
+## tažení posouvá) z ortofota s místy, pověst v obci (Reputation), rozhovor na ulici
+## (T / Enter – řádek pro psaní a záznam posledních replik). Panel úkolu ukazuje klávesa P.
 ## Patří LocalClient: zobrazuje stav lokálního hráče (`player`), svět čte z `game` (World).
 class_name Hud
 extends CanvasLayer
@@ -19,6 +20,23 @@ const CREDITS := "Geodata a ortofoto © ČÚZK (CC BY 4.0) · Mapová data © p�
 ## Jednotný vzhled nabídek (F2, obchody, pauza…): lesní zelená jako doprovodná barva obce.
 const ACCENT := Color(0.55, 0.85, 0.5)
 const MENU_BG := Color(0.07, 0.08, 0.07, 0.95)
+## Minimapa: velikost v px a světová šířka pohledu v metrech.
+const MINI_SIZE := 240.0
+const MINI_RANGE_M := 420.0
+## Mapa (M): největší přiblížení kolečkem; 1 = celý katastr v okně.
+const MAP_ZOOM_MAX := 16.0
+## Vzhled silnic na mapě podle druhu (OSM highway → [barva, šířka px]).
+const ROAD_STYLE := {
+	"secondary": [Color(0.95, 0.8, 0.4), 3.5],
+	"tertiary": [Color(0.92, 0.92, 0.88), 2.8],
+	"residential": [Color(0.85, 0.85, 0.82), 2.0],
+	"unclassified": [Color(0.85, 0.85, 0.82), 2.0],
+	"service": [Color(0.72, 0.72, 0.7), 1.5],
+	"track": [Color(0.6, 0.48, 0.32), 1.5],
+	"path": [Color(0.55, 0.45, 0.32), 1.0],
+	"footway": [Color(0.55, 0.45, 0.32), 1.0],
+	"other": [Color(0.8, 0.8, 0.8), 2.0],
+}
 
 var player: Player               # lokální hráč
 var items_root: Node
@@ -41,9 +59,18 @@ var _msg_t := 0.0
 var _help: PanelContainer
 var _help_t := 14.0
 var _map: Control
-var _map_tex: TextureRect
-var _map_overlay: Control
+var _map_view: Control            # podklad + značky mapy (M) – vlastní kreslení s přiblížením
+var _map_img: Texture2D           # podklad mapy: ortofoto nebo třídy povrchu (World.map_texture)
 var _map_pos: Label               # souřadnice hráče (hra i Blender) – pro úpravy mapy
+var _map_zoom := 1.0              # přiblížení mapy (1 = celý katastr v okně)
+var _map_center := Vector2.ZERO   # střed pohledu mapy ve světových souřadnicích (x, z)
+var _map_drag := false            # hráč táhne mapu levým tlačítkem
+var _mini: Control                # minimapa s kompasem (vpravo nahoře)
+var _mini_t := 0.0                # minipauza mezi překresleními minimapy (ne každý frame – je drahá)
+var _mini_built := false          # keš statických vrstev minimapy hotová?
+var _mini_lines: Array = []       # [světové body (x,z), střed, ohraničující poloměr, barva, šířka]
+var _mini_dir_w: Array = []       # šířky textů kompasu (kompas texty se nemění – shape jednou)
+var _quest_pinned := false        # P – panel úkolu přišpendlený (jinak skrytý)
 var _cross: Label
 var _scope: TextureRect          # tmavé okraje dalekohledu (X)
 var _fps: Label
@@ -283,8 +310,8 @@ func _ready() -> void:
 
 	_fps = _label(root, "", 13)
 	_fps.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	_fps.offset_left = -90
-	_fps.offset_top = 6
+	_fps.offset_left = -110
+	_fps.offset_top = MINI_SIZE + 24
 
 	# ---------------- auto (vpravo dole)
 	_car_panel = _panel(root, Color(0, 0, 0, 0.45))
@@ -324,12 +351,12 @@ func _ready() -> void:
 	_flash.visible = false
 	root.add_child(_flash)
 
-	# ---------------- úkol (vpravo nahoře)
+	# ---------------- úkol (vpravo pod minimapou, zobrazuje klávesa P)
 	_quest_panel = _panel(root, Color(0, 0, 0, 0.42))
 	_quest_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	_quest_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_quest_panel.offset_right = -16
-	_quest_panel.offset_top = 30
+	_quest_panel.offset_top = MINI_SIZE + 52
 	_quest_panel.custom_minimum_size = Vector2(380, 0)
 	_quest_label = RichTextLabel.new()
 	_quest_label.bbcode_enabled = true
@@ -358,7 +385,8 @@ func _ready() -> void:
 		+ "T / Enter – říct něco nahlas (odpoví lidé okolo)\n" \
 		+ "F – nastoupit / vystoupit z auta, nasednout na koně\n" \
 		+ "Tab – inventář (pít, jíst, kouřit, obléct)   I – oblečení\n" \
-		+ "J – deník úkolů   K – dovednosti   M – mapa     H – domů\n" \
+		+ "J – deník úkolů   K – dovednosti   M – mapa (kolečko – přiblížení,\n" \
+		+ "    tažení – posun)   P – zobrazit / skrýt panel úkolu   H – domů\n" \
 		+ "L – světla   B – klakson   N – stěrače\n" \
 		+ "R – postavit auto   U – vysvobodit ze zaseknutí\n" \
 		+ "F1 – nápověda   F2 – herní menu   Esc – pauza a nabídka\n" \
@@ -405,31 +433,41 @@ func _ready() -> void:
 		+ "Zákony jsou ve hře zjednodušené – nejde o právní radu.\n" \
 		+ CREDITS.replace(" · ", "\n") + _extra_credits()
 
-	# ---------------- mapa
+	# ---------------- mapa (M): podklad + značky kreslí _draw_map_view, kolečko přibližuje
 	_map = ColorRect.new()
-	(_map as ColorRect).color = Color(0, 0, 0, 0.8)
+	(_map as ColorRect).color = Color(0, 0, 0, 0.82)
 	_map.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_map.visible = false
 	root.add_child(_map)
-	_map_tex = TextureRect.new()
-	_map_tex.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_map_tex.offset_left = 40
-	_map_tex.offset_top = 40
-	_map_tex.offset_right = -40
-	_map_tex.offset_bottom = -40
-	_map_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_map_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_map.add_child(_map_tex)
-	_map_overlay = Control.new()
-	_map_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_map_overlay.draw.connect(_draw_map)
-	_map_tex.add_child(_map_overlay)
+	_map_view = Control.new()
+	_map_view.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_map_view.offset_left = 40
+	_map_view.offset_top = 40
+	_map_view.offset_right = -40
+	_map_view.offset_bottom = -40
+	_map_view.clip_contents = true
+	_map_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_map_view.draw.connect(_draw_map_view_wrapped)
+	_map.add_child(_map_view)
 	var mt := _label(_map, "Katastr obce Dukelčic a okolí – ortofoto © ČÚZK    ● hráč   ■ domov   ◆ místa   ★ cíl úkolu   ▲ tvoje auto   ◇ okolní obce      kolečko – přiblížení · tažení – posun · M / Esc – zavřít", 16)
 	mt.position = Vector2(46, 10)
 	_map_pos = _label(_map, "", 14)
 	_map_pos.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_map_pos.position = Vector2(46, -34)
 	_map_pos.grow_vertical = Control.GROW_DIRECTION_BEGIN
+
+	# ---------------- minimapa s kompasem (vpravo nahoře, skrytá při otevřené mapě)
+	_mini = Control.new()
+	_mini.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_mini.offset_left = -16 - MINI_SIZE
+	_mini.offset_right = -16
+	_mini.offset_top = 16
+	_mini.offset_bottom = 16 + MINI_SIZE
+	_mini.clip_contents = true
+	_mini.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mini.visible = false                 # zapne se v _process, až existuje hráč
+	_mini.draw.connect(_draw_minimap_wrapped)
+	root.add_child(_mini)
 
 	# ---------------- nabídka (obchod, hospoda, rozhovor, F2 herní menu)
 	_menu = _menu_panel(root)
@@ -539,9 +577,9 @@ func finish_loading() -> void:
 	_hook_obce_map()                     # okolní obce na hlavní mapě (druhý draw callback _map_view)
 
 
-## Podklad minimapy (M): mapa z tříd povrchu, nebo ortofoto, podle nastavení terénu (World.map_texture).
+## Podklad mapy (M) i minimapy: mapa z tříd povrchu, nebo ortofoto, podle nastavení terénu (World.map_texture).
 func refresh_map_texture() -> void:
-	_map_tex.texture = game.map_texture()
+	_map_img = game.map_texture()
 
 
 func show_message(t: String, dur := 3.0) -> void:
@@ -869,7 +907,13 @@ func _close_panels() -> void:
 func _set_menu_mode(on: bool) -> void:
 	menu_open = on
 	player.controls_locked = on
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if on else Input.MOUSE_MODE_CAPTURED
+	_update_mouse_mode()
+
+
+## Kurzor je viditelný u nabídek, rozhovoru i otevřené mapy (M); jinak zůstává zachycený.
+func _update_mouse_mode() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if (menu_open or chat_open or _map.visible) \
+		else Input.MOUSE_MODE_CAPTURED
 
 
 func toggle_inventory() -> void:
@@ -1084,11 +1128,34 @@ func toggle_journal(skills_only := false) -> void:
 	_set_menu_mode(true)
 
 
+## Vstup mapy (M) před gui i _unhandled_input: kolečko přibližuje ke kurzoru, levé tlačítko táhne.
+## Kdyby prošlo dál, klik by znovu zachytil myš a kolečko točilo kamerou (LocalClient).
+func _input(event: InputEvent) -> void:
+	if not _map.visible or (player != null and player.controls_locked):
+		return     # nad mapou může být nabídka / pauza (controls_locked) – nechat jí vstup
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
+			_map_zoom_at(1.3, event.position)
+			get_viewport().set_input_as_handled()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+			_map_zoom_at(1.0 / 1.3, event.position)
+			get_viewport().set_input_as_handled()
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			_map_drag = event.pressed
+			get_viewport().set_input_as_handled()
+	elif event is InputEventMouseMotion and _map_drag:
+		_map_center -= event.relative / _map_ppm()
+		_map_clamp()
+		_map_view.queue_redraw()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if player == null or _quests() == null or chat_open:
 		return     # svět se ještě načítá / hráč píše
 	if event.is_action_pressed("toggle_map"):
-		_map.visible = not _map.visible
+		_toggle_map()
+	elif event.is_action_pressed("quest_panel"):
+		_quest_pinned = not _quest_pinned
 	elif event.is_action_pressed("toggle_help"):
 		_help.visible = not _help.visible
 		_help_t = 0.0
@@ -1186,6 +1253,12 @@ func respect_changed(comm_name: String, delta: float, text: String) -> void:
 # ------------------------------------------------------------------ průběžná aktualizace
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("hud", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if player == null:
 		return
 	_t += delta
@@ -1309,21 +1382,28 @@ func _process(delta: float) -> void:
 		_help_t -= delta
 		if _help_t <= 0.0:
 			_help.visible = false
-	# --- úkol
+	# --- úkol (panel jen po přišpendlení klávesou P – jinak je vpravo nahoře minimapa)
 	var qt := _quest_text()
 	var jt := _job_text()               # M3.1: směna nahoře nad úkolem
 	if jt != "":
 		qt = jt + ("\n\n" + qt if qt != "" else "")
-	_quest_panel.visible = qt != ""
+	_quest_panel.visible = _quest_pinned and qt != ""
 	if qt != "" and _quest_label.text != qt:
 		_quest_label.text = qt
-	# --- kompas
+	# --- kompas a minimapa
 	_compass.text = _compass_text(p)
+	_mini.visible = not _map.visible
+	if _mini.visible:
+		_mini_t -= delta
+		if _mini_t <= 0.0:
+			_mini_t = 0.12          # minimapa stačí ~8× za sekundu – plný překres je drahý
+			_mini.queue_redraw()
+	# --- mapa (M)
 	if _map.visible:
-		_map_overlay.queue_redraw()
+		_map_view.queue_redraw()
 		var gp: Vector3 = game.player_pos(player.id)
-		_map_pos.text = "Poloha: hra x %.1f, z %.1f  ·  Blender x %.1f, y %.1f, z %.1f  (--pos=%d,%d)" % [
-			gp.x, gp.z, gp.x, -gp.z, gp.y, int(gp.x), int(gp.z)]
+		_map_pos.text = "Poloha: hra x %.1f, z %.1f  ·  Blender x %.1f, y %.1f, z %.1f  (--pos=%d,%d)   ·   přiblížení ×%.1f" % [
+			gp.x, gp.z, gp.x, -gp.z, gp.y, int(gp.x), int(gp.z), _map_zoom]
 
 
 func _compass_text(p: float) -> String:
@@ -1395,90 +1475,445 @@ func _nearest_item() -> Item:
 	return best
 
 
-# ------------------------------------------------------------------ mapa
+# ------------------------------------------------------------------ mapa (M)
 
-func _map_rect() -> Rect2:
-	var tex := _map_tex.texture
-	if tex == null:
-		return Rect2()
-	var sz := _map_tex.size
-	var ts := Vector2(tex.get_width(), tex.get_height())
-	var s := minf(sz.x / ts.x, sz.y / ts.y)
-	var d := ts * s
-	return Rect2((sz - d) * 0.5, d)
+## Otevře / zavře velkou mapu. Při otevření se vycentruje na hráče v přiblížení na obec
+## a uvolní kurzor (kolečko přibližuje, levé tlačítko táhne). Ovládání hráče běží dál.
+func _toggle_map() -> void:
+	_map.visible = not _map.visible
+	_map_drag = false
+	if _map.visible:
+		if menu_open:
+			close_menu()                                 # mapa je nad nabídkami, ty by jí překrývaly
+		var gp := player.global_position
+		_map_center = Vector2(gp.x, gp.z)
+		_map_zoom = 2.0
+		_map_clamp()
+	_update_mouse_mode()
+	_map_view.queue_redraw()
+	_mini.queue_redraw()
 
 
-func _w2m(p: Vector3, r: Rect2) -> Vector2:
+## pixely na metr při aktuálním přiblížení (podklad = celý ortho_full)
+func _map_ppm() -> float:
 	var o: Dictionary = meta["ortho_full"]
-	return r.position + Vector2((p.x - o["x0"]) / o["size_x"], (p.z - o["z0"]) / o["size_z"]) * r.size
+	return minf(_map_view.size.x / float(o["size_x"]), _map_view.size.y / float(o["size_z"])) * _map_zoom
 
 
-func _draw_map() -> void:
-	var r := _map_rect()
-	if r.size.x <= 0:
+## Střed pohledu udrží uvnitř oblasti mapy: katastr + hranice okolních obcí (_map_extent).
+func _map_clamp() -> void:
+	var e := _map_extent()
+	var half := _map_view.size * 0.5 / maxf(_map_ppm(), 0.001)
+	var cmin := e.position + half
+	var cmax := e.end - half
+	_map_center.x = clampf(_map_center.x, minf(cmin.x, cmax.x), maxf(cmin.x, cmax.x))
+	_map_center.y = clampf(_map_center.y, minf(cmin.y, cmax.y), maxf(cmin.y, cmax.y))
+
+
+## Přiblížení kolečkem k bodu `at` (souřadnice viewportu) – bod pod kurzorem zůstane na místě.
+func _map_zoom_at(factor: float, at: Vector2) -> void:
+	var local := at - _map_view.global_position
+	var c := _map_view.size * 0.5
+	var under := _map_center + (local - c) / _map_ppm()
+	_map_zoom = clampf(_map_zoom * factor, MAP_ZOOM_MIN, MAP_ZOOM_MAX)
+	_map_center = under - (local - c) / _map_ppm()
+	_map_clamp()
+	_map_view.queue_redraw()
+
+
+## svět (x, z) → bod v rámci _map_view
+func _w2v(p: Vector3) -> Vector2:
+	return _map_view.size * 0.5 + (Vector2(p.x, p.z) - _map_center) * _map_ppm()
+
+
+func _draw_map_view_wrapped() -> void:
+	var __t0 := Tests.prof_t0()
+	_draw_map_view()
+	Tests.prof_add("hud_map", __t0)
+
+
+func _draw_map_view() -> void:
+	var qs := _quests()
+	if qs == null:
 		return
+	var o: Dictionary = meta["ortho_full"]
+	var ppm := _map_ppm()
+	_map_view.draw_rect(Rect2(Vector2.ZERO, _map_view.size), Color(0, 0, 0, 0.4))
+	if _map_img:
+		_map_view.draw_texture_rect(_map_img,
+			Rect2(_w2v(Vector3(float(o["x0"]), 0, float(o["z0"]))),
+				Vector2(float(o["size_x"]), float(o["size_z"])) * ppm), false)
+	var font := ThemeDB.fallback_font
 	var p := player.body.promile()
+	# hranice katastru
 	var b := PackedVector2Array()
 	for q in meta["boundary"]:
-		b.append(_w2m(Vector3(q[0], 0, q[1]), r))
+		b.append(_w2v(Vector3(q[0], 0, q[1])))
 	b.append(b[0])
-	_map_overlay.draw_polyline(b, Color(1, 1, 1, 0.7), 2.0)
+	_map_view.draw_polyline(b, Color(1, 1, 1, 0.7), 2.0)
+	# vodní toky a plochy
 	if game.water:
 		for st in game.water.streams:
 			var line := PackedVector2Array()
 			for q in st["pts"]:
-				line.append(_w2m(q, r))
-			_map_overlay.draw_polyline(line, Color(0.35, 0.65, 1.0, 0.85), 2.5 if st["kind"] == "river" else 1.5)
+				line.append(_w2v(q))
+			_map_view.draw_polyline(line, Color(0.35, 0.65, 1.0, 0.85), 2.5 if st["kind"] == "river" else 1.5)
 		for pd in game.water.ponds:
 			var poly := PackedVector2Array()
 			for q in pd["poly"]:
-				poly.append(_w2m(Vector3(q.x, 0, q.y), r))
-			_map_overlay.draw_colored_polygon(poly, Color(0.35, 0.65, 1.0, 0.8))
+				poly.append(_w2v(Vector3(q.x, 0, q.y)))
+			_map_view.draw_colored_polygon(poly, Color(0.35, 0.65, 1.0, 0.8))
+	# silnice: nejdřív tmavý lem (čitelnost na ortofotu), pak barva podle druhu
+	var road_lines := []
+	for rd in meta.get("roads", []):
+		var line := PackedVector2Array()
+		for q in rd["pts"]:
+			line.append(_w2v(Vector3(q[0], 0, q[1])))
+		if line.size() >= 2:
+			road_lines.append([rd, line])
+			var st: Array = ROAD_STYLE.get(rd["kind"], ROAD_STYLE["other"])
+			_map_view.draw_polyline(line, Color(0, 0, 0, 0.45), st[1] + 1.8)
+	for rl in road_lines:
+		var rd: Dictionary = rl[0]
+		var line: PackedVector2Array = rl[1]
+		var st: Array = ROAD_STYLE.get(rd["kind"], ROAD_STYLE["other"])
+		_map_view.draw_polyline(line, st[0], st[1])
+		var rn := String(rd.get("name", ""))
+		if rn != "":
+			var rp := line[line.size() / 2] + Vector2(6, -6)
+			_map_view.draw_string_outline(font, rp, rn, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 3, Color(0, 0, 0, 0.85))
+			_map_view.draw_string(font, rp, rn, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, st[0])
 	for it in items_root.get_children():
 		if it is Item and not it._taken and it.active:
-			_map_overlay.draw_circle(_w2m(it.global_position, r), 3.0 if it.kind != "zalud" else 6.0, COLORS[it.kind])
-	var font := ThemeDB.fallback_font
+			_map_view.draw_circle(_w2v(it.global_position), 3.0 if it.kind != "zalud" else 6.0, COLORS[it.kind])
 	for k in game.places:
 		var pl: Place = game.places[k]
-		var mp := _w2m(pl.door, r)
+		var mp := _w2v(pl.door)
 		if k == "domov":
-			_map_overlay.draw_rect(Rect2(mp - Vector2(6, 6), Vector2(12, 12)), Color(0.2, 0.6, 1.0))
+			_map_view.draw_rect(Rect2(mp - Vector2(6, 6), Vector2(12, 12)), Color(0.2, 0.6, 1.0))
 		else:
 			var dia := PackedVector2Array([mp + Vector2(0, -7), mp + Vector2(7, 0), mp + Vector2(0, 7), mp + Vector2(-7, 0)])
-			_map_overlay.draw_colored_polygon(dia, Color(1.0, 0.75, 0.3))
+			_map_view.draw_colored_polygon(dia, Color(1.0, 0.75, 0.3))
 		var nm: String = pl.data["name"]
 		# ★ = tady se dá vzít úkol
-		if _quests().active == null and not _quests().available_at(k).is_empty():
+		if qs.active == null and not qs.available_at(k).is_empty():
 			nm = "★ " + nm
-		_map_overlay.draw_string(font, mp + Vector2(9, 5), nm, HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
+		var np := mp + Vector2(9, 5)
+		_map_view.draw_string_outline(font, np, nm, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 4, Color(0, 0, 0, 0.9))
+		_map_view.draw_string(font, np, nm, HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
 	# děda Vomáčka na lavičce u svého domu (M1.7: už ne u domova hráče) – ★ když má úkol
-	if game.npcs.has("deda") and _quests().active == null and not _quests().available_at("deda").is_empty():
-		var dm := _w2m((game.npcs["deda"] as Node3D).global_position, r)
-		_map_overlay.draw_circle(dm, 4.0, Color(1.0, 0.75, 0.3))
-		_map_overlay.draw_string(font, dm + Vector2(9, 5), "★ Děda Vomáčka", HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
+	if game.npcs.has("deda") and qs.active == null and not qs.available_at("deda").is_empty():
+		var dm := _w2v((game.npcs["deda"] as Node3D).global_position)
+		_map_view.draw_circle(dm, 4.0, Color(1.0, 0.75, 0.3))
+		_map_view.draw_string_outline(font, dm + Vector2(9, 5), "★ Děda Vomáčka", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 4, Color(0, 0, 0, 0.9))
+		_map_view.draw_string(font, dm + Vector2(9, 5), "★ Děda Vomáčka", HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
 	var my_car: Car = game.traffic.car_of(player.id)
 	if my_car:
-		var cp := _w2m(my_car.global_position, r)
-		_map_overlay.draw_colored_polygon(PackedVector2Array([cp + Vector2(0, -8), cp + Vector2(6, 5), cp + Vector2(-6, 5)]),
+		var cp := _w2v(my_car.global_position)
+		_map_view.draw_colored_polygon(PackedVector2Array([cp + Vector2(0, -8), cp + Vector2(6, 5), cp + Vector2(-6, 5)]),
 			Color(1.0, 0.3, 0.9))
-	if _quests().active:
-		var tg: Vector3 = _quests().active.target()
+	if qs.active:
+		var tg: Vector3 = qs.active.target()
 		if tg != Vector3.INF:
-			var tp := _w2m(tg, r)
-			_map_overlay.draw_circle(tp, 10.0, Color(1, 1, 0.2, 0.5 + 0.5 * sin(_t * 5.0)))
-			_map_overlay.draw_string(font, tp + Vector2(12, -8), "★ cíl", HORIZONTAL_ALIGNMENT_LEFT, -1, 16)
+			var tp := _w2v(tg)
+			_map_view.draw_circle(tp, 10.0, Color(1, 1, 0.2, 0.5 + 0.5 * sin(_t * 5.0)))
+			_map_view.draw_string_outline(font, tp + Vector2(12, -8), "★ cíl", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 4, Color(0, 0, 0, 0.9))
+			_map_view.draw_string(font, tp + Vector2(12, -8), "★ cíl", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 0.3))
 	if game.police.checkpoint_pos != Vector3.INF and game.police.checkpoint_seen.get(player.id, false):
-		var kp := _w2m(game.police.checkpoint_pos, r)
-		_map_overlay.draw_string(font, kp, "POLICIE – kontrola", HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
+		var kp := _w2v(game.police.checkpoint_pos)
+		_map_view.draw_string_outline(font, kp, "POLICIE – kontrola", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 4, Color(0, 0, 0, 0.9))
+		_map_view.draw_string(font, kp, "POLICIE – kontrola", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 0.5, 0.4))
 	# opilý neví, kde je
 	if p < 2.2:
-		var pp := _w2m(player.global_position, r)
+		var pp := _w2v(player.global_position)
 		var fwd := Vector2(-sin(player.yaw), -cos(player.yaw))
-		_map_overlay.draw_circle(pp, 7.0, Color(1, 0.2, 0.2))
-		_map_overlay.draw_line(pp, pp + fwd * 18.0, Color(1, 0.2, 0.2), 3.0)
+		_map_view.draw_circle(pp, 7.0, Color(1, 0.2, 0.2))
+		_map_view.draw_line(pp, pp + fwd * 18.0, Color(1, 0.2, 0.2), 3.0)
 	else:
-		_map_overlay.draw_string(font, r.position + r.size * 0.5, "Mapa se ti rozmazává… nevíš, kde jsi.",
-			HORIZONTAL_ALIGNMENT_CENTER, -1, 26, Color(1, 0.5, 0.4))
+		_map_view.draw_string(font, Vector2(0, _map_view.size.y * 0.5), "Mapa se ti rozmazává… nevíš, kde jsi.",
+			HORIZONTAL_ALIGNMENT_CENTER, _map_view.size.x, 26, Color(1, 0.5, 0.4))
+	# sever – šipka vpravo nahoře (mapa není natočená na sever, meta.north_angle_deg)
+	var north := deg_to_rad(float(meta.get("north_angle_deg", 78.37)))
+	var ndir := Vector2(-sin(north), -cos(north))
+	var nc := Vector2(_map_view.size.x - 38.0, 50.0)
+	_map_view.draw_line(nc - ndir * 13.0, nc + ndir * 13.0, Color(1, 1, 1, 0.8), 2.0)
+	var side := Vector2(-ndir.y, ndir.x)
+	_map_view.draw_colored_polygon(PackedVector2Array([nc + ndir * 18.0, nc + side * 5.0, nc - side * 5.0]), Color(1, 0.4, 0.3))
+	var sp := nc + ndir * 24.0 + Vector2(-4, 4)
+	_map_view.draw_string_outline(font, sp, "S", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 3, Color(0, 0, 0, 0.9))
+	_map_view.draw_string(font, sp, "S", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(1, 0.45, 0.35))
+	# měřítko a přiblížení – vpravo dole
+	var bar_m := 10.0
+	for n in [10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0]:
+		if n * ppm <= 170.0:
+			bar_m = n
+	var bl := bar_m * ppm
+	var bp := Vector2(_map_view.size.x - 20.0, _map_view.size.y - 18.0)
+	_map_view.draw_line(bp - Vector2(bl, 0), bp, Color(1, 1, 1, 0.9), 2.0)
+	_map_view.draw_line(bp - Vector2(bl, 5), bp - Vector2(bl, -5), Color(1, 1, 1, 0.9), 1.5)
+	_map_view.draw_line(bp + Vector2(0, -5), bp + Vector2(0, 5), Color(1, 1, 1, 0.9), 1.5)
+	var lab := "%d m" % int(bar_m) if bar_m < 1000.0 else "%d km" % int(bar_m / 1000.0)
+	var lw := font.get_string_size(lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	var lp := bp + Vector2(-bl - lw - 8.0, 4)
+	_map_view.draw_string_outline(font, lp, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 3, Color(0, 0, 0, 0.9))
+	_map_view.draw_string(font, lp, lab, HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
+	var zp := Vector2(14, _map_view.size.y - 10.0)
+	_map_view.draw_string(font, zp, "přiblížení ×%.1f" % _map_zoom, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1, 0.65))
+
+
+# ------------------------------------------------------------------ minimapa (vpravo nahoře)
+
+## Kruhová minimapa: podklad rotuje podle směru pohledu (nahoru = vpřed), na okraji kompas
+## se světovými stranami (S = sever – pozor, mapa není natočená na sever: north_angle_deg).
+func _draw_minimap_wrapped() -> void:
+	var __t0 := Tests.prof_t0()
+	_draw_minimap()
+	Tests.prof_add("hud_minimap", __t0)
+
+
+func _draw_minimap() -> void:
+	var qs := _quests()
+	if player == null or qs == null:
+		return
+	var c := _mini.size * 0.5
+	var rad := c.x - 4.0
+	var font := ThemeDB.fallback_font
+	var p := player.body.promile()
+	if p >= 2.2:                                  # opilý neví, kde je (jako velká mapa)
+		_mini.draw_circle(c, rad, Color(0.03, 0.04, 0.03, 0.8))
+		_mini.draw_arc(c, rad + 2.0, 0, TAU, 64, Color(ACCENT, 0.5), 3.0)
+		_mini.draw_string(font, c + Vector2(-50, 5), "rozmazané…", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 0.5, 0.4))
+		return
+	# směr pohledu (pěšky / auto / letoun) – obsah se otočí tak, aby vpřed bylo nahoru
+	var yaw := player.yaw
+	if player.car:
+		var cf := player.car.global_transform.basis.z
+		yaw = atan2(-cf.x, -cf.z)
+	elif player.aircraft:
+		var af := -player.aircraft.global_transform.basis.z
+		yaw = atan2(-af.x, -af.z)
+	var rot := yaw
+	var pp := player.global_position
+	var p2 := Vector2(pp.x, pp.z)
+	var k := 2.0 * rad / MINI_RANGE_M             # px na metr
+	# podklad – výřez mapy kolem hráče, otočený o rot, oříznutý do kruhu (rohy zůstanou průhledné)
+	if _map_img:
+		var o: Dictionary = meta["ortho_full"]
+		var sc := Vector2((pp.x - float(o["x0"])) / float(o["size_x"]) * _map_img.get_width(),
+			(pp.z - float(o["z0"])) / float(o["size_z"]) * _map_img.get_height())
+		var ss := Vector2(MINI_RANGE_M / float(o["size_x"]) * _map_img.get_width(),
+			MINI_RANGE_M / float(o["size_z"]) * _map_img.get_height())
+		var cpts := PackedVector2Array()
+		var ccols := PackedColorArray()
+		var cuvs := PackedVector2Array()
+		var ts := Vector2(_map_img.get_width(), _map_img.get_height())
+		for i in range(64):
+			var v := Vector2(cos(TAU * i / 64.0), sin(TAU * i / 64.0)) * rad
+			cpts.append(v)
+			ccols.append(Color.WHITE)
+			cuvs.append((sc - ss * 0.5 + (v + Vector2(rad, rad)) * (ss / (2.0 * rad))) / ts)
+		_mini.draw_set_transform(c, rot, Vector2.ONE)
+		_mini.draw_polygon(cpts, ccols, cuvs, _map_img)
+		_mini.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	else:
+		_mini.draw_circle(c, rad, Color(0.1, 0.14, 0.09, 0.85))
+	var xf := func(wx: float, wz: float) -> Vector2:
+		return c + (Vector2(wx, wz) - p2).rotated(rot) * k
+	# statické vrstvy z keše – každá linie má ohraničující kouli, co je celá za kruhem, přeskočí se
+	if not _mini_built:
+		_build_mini_cache()
+	var wr := MINI_RANGE_M * 0.5 + 40.0    # světový poloměr kruhu + rezerva na tloušťku čar
+	for L in _mini_lines:
+		if (L[1] - p2).length() > L[2] + wr:
+			continue
+		var line := PackedVector2Array()
+		for q in L[0]:
+			line.append(xf.call(q.x, q.y))
+		for seg in _clip_circle_line(line, c, rad):
+			_mini.draw_polyline(seg, L[3], L[4])
+	if game.water:
+		for pd in game.water.ponds:
+			var poly := PackedVector2Array()
+			for q in pd["poly"]:
+				poly.append(xf.call(q.x, q.y))
+			poly = _clip_circle_poly(poly, c, rad)
+			if poly.size() >= 3:
+				_mini.draw_colored_polygon(poly, Color(0.35, 0.65, 1.0, 0.85))
+	for key in game.places:
+		var pl: Place = game.places[key]
+		var mp: Vector2 = xf.call(pl.door.x, pl.door.z)
+		if mp.distance_to(c) > rad - 5.0:
+			continue
+		if key == "domov":
+			_mini.draw_rect(Rect2(mp - Vector2(4, 4), Vector2(8, 8)), Color(0.2, 0.6, 1.0))
+		else:
+			_mini.draw_colored_polygon(PackedVector2Array([mp + Vector2(0, -4.5), mp + Vector2(4.5, 0),
+				mp + Vector2(0, 4.5), mp + Vector2(-4.5, 0)]), Color(1.0, 0.75, 0.3, 0.9))
+	for it in items_root.get_children():
+		if it is Item and not it._taken and it.active:
+			var ipos: Vector3 = it.global_position
+			var idx: float = ipos.x - p2.x
+			var idz: float = ipos.z - p2.y
+			if idx * idx + idz * idz > wr * wr:     # mimo kruh – transformace ani tečka se nepočítá
+				continue
+			var ip: Vector2 = xf.call(ipos.x, ipos.z)
+			if ip.distance_to(c) <= rad - 3.0:
+				_mini.draw_circle(ip, 2.0, COLORS[it.kind])
+	if qs.active:
+		var tg: Vector3 = qs.active.target()
+		if tg != Vector3.INF:
+			var tp: Vector2 = xf.call(tg.x, tg.z)
+			var d := tp - c
+			if d.length() > rad - 8.0:              # cíl za okrajem – šipka směru na obvodu
+				tp = c + d.normalized() * (rad - 8.0)
+			_mini.draw_circle(tp, 5.0, Color(1, 1, 0.2, 0.55 + 0.45 * sin(_t * 5.0)))
+	var my_car: Car = game.traffic.car_of(player.id)
+	if my_car:
+		var cp: Vector2 = xf.call(my_car.global_position.x, my_car.global_position.z)
+		if cp.distance_to(c) <= rad - 6.0:
+			var cd := Vector2(my_car.global_transform.basis.z.x, my_car.global_transform.basis.z.z).rotated(rot)
+			var perp := Vector2(-cd.y, cd.x)
+			_mini.draw_colored_polygon(PackedVector2Array([cp + cd * 6.0, cp - cd * 3.0 + perp * 3.5,
+				cp - cd * 3.0 - perp * 3.5]), Color(1.0, 0.3, 0.9))
+	if game.police.checkpoint_pos != Vector3.INF and game.police.checkpoint_seen.get(player.id, false):
+		var kp: Vector2 = xf.call(game.police.checkpoint_pos.x, game.police.checkpoint_pos.z)
+		if kp.distance_to(c) <= rad - 6.0:
+			_mini.draw_circle(kp, 4.0, Color(1, 0.3, 0.3))
+			_mini.draw_string(font, kp + Vector2(-3.5, 4), "P", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
+	# hráč – šipka uprostřed, míří vždy nahoru
+	_mini.draw_colored_polygon(PackedVector2Array([c + Vector2(0, -10), c + Vector2(6.5, 8),
+		c + Vector2(0, 4.5), c + Vector2(-6.5, 8)]), Color(1, 0.25, 0.2))
+	_mini.draw_arc(c, 10.0, 0, TAU, 24, Color(1, 1, 1, 0.45), 1.5)
+	# obvodový kroužek (rohy mimo kruh zůstávají průhledné – obsah je oříznutý geometricky)
+	_mini.draw_arc(c, rad + 1.5, 0, TAU, 64, Color(ACCENT, 0.7), 2.5)
+	# kompas – světové strany na okraji; S (sever) zvýrazněné
+	var north := float(meta.get("north_angle_deg", 78.37))
+	var yaw_d := rad_to_deg(yaw)
+	if _mini_dir_w.is_empty():                   # šířky textů kompasu – shape jen jednou
+		for a in [[0.0, "S", true], [45.0, "SV", false], [90.0, "V", true], [135.0, "JV", false],
+			[180.0, "J", true], [225.0, "JZ", false], [270.0, "Z", true], [315.0, "SZ", false]]:
+			var sz0 := 15 if a[2] else 11
+			_mini_dir_w.append(font.get_string_size(a[1], HORIZONTAL_ALIGNMENT_LEFT, -1, sz0).x)
+	var di := 0
+	for a in [[0.0, "S", true], [45.0, "SV", false], [90.0, "V", true], [135.0, "JV", false],
+		[180.0, "J", true], [225.0, "JZ", false], [270.0, "Z", true], [315.0, "SZ", false]]:
+		var ang := deg_to_rad(north - a[0] - yaw_d)
+		var pos := c + Vector2(-sin(ang), -cos(ang)) * (rad - 13.0)
+		var sz := 15 if a[2] else 11
+		var w: float = _mini_dir_w[di]
+		di += 1
+		var tp := pos + Vector2(-w * 0.5, sz * 0.35)
+		var col := Color(1.0, 0.45, 0.35) if a[1] == "S" else Color(1, 1, 1, 0.9 if a[2] else 0.55)
+		_mini.draw_string_outline(font, tp, a[1], HORIZONTAL_ALIGNMENT_LEFT, -1, sz, 3, Color(0, 0, 0, 0.9))
+		_mini.draw_string(font, tp, a[1], HORIZONTAL_ALIGNMENT_LEFT, -1, sz, col)
+	# měřítko – uvnitř kruhu vlevo dole (rohy jsou průhledné, venku by viselo ve vzduchu)
+	var bl := 50.0 * k
+	var bp := c + Vector2(-rad * 0.62, rad * 0.66)
+	_mini.draw_line(bp, bp + Vector2(bl, 0), Color(1, 1, 1, 0.7), 1.5)
+	_mini.draw_string(font, bp + Vector2(bl + 5, 4), "50 m", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(1, 1, 1, 0.7))
+
+
+## Keš statických vrstev minimapy (hranice katastru, vodní toky, silnice) ve světových souřadnicích
+## x/z + ohraničující kruh každé linie – překres pak může rychle přeskočit, co je celé mimo kruh.
+func _build_mini_cache() -> void:
+	_mini_built = true
+	_mini_lines.clear()
+	if meta.is_empty():
+		return
+	var add := func(pts: PackedVector2Array, col: Color, w: float) -> void:
+		if pts.size() < 2:
+			return
+		var cc := Vector2.ZERO
+		for p in pts:
+			cc += p
+		cc /= float(pts.size())
+		var rr := 0.0
+		for p in pts:
+			rr = maxf(rr, cc.distance_to(p))
+		_mini_lines.append([pts, cc, rr, col, w])
+	var b := PackedVector2Array()
+	for q in meta.get("boundary", []):
+		b.append(Vector2(q[0], q[1]))
+	if b.size() > 0:
+		b.append(b[0])
+	add.call(b, Color(1, 1, 1, 0.45), 1.5)
+	if game.water:
+		for st in game.water.streams:
+			var line := PackedVector2Array()
+			for q in st["pts"]:
+				line.append(Vector2(q.x, q.z))
+			add.call(line, Color(0.35, 0.65, 1.0, 0.9), 2.0 if st["kind"] == "river" else 1.2)
+	for rd in meta.get("roads", []):
+		var line := PackedVector2Array()
+		for q in rd["pts"]:
+			line.append(Vector2(q[0], q[1]))
+		var st: Array = ROAD_STYLE.get(rd["kind"], ROAD_STYLE["other"])
+		add.call(line, Color(st[0], 0.85), maxf(st[1] * 0.6, 1.0))
+
+
+## Lomnou čáru `pts` ořízne na kruh (střed `cc`, poloměr `r`) – vrátí seznam souvislých úseků uvnitř.
+func _clip_circle_line(pts: PackedVector2Array, cc: Vector2, r: float) -> Array:
+	var segs := []
+	var cur := PackedVector2Array()
+	var r2 := r * r
+	for i in range(pts.size() - 1):
+		var a := pts[i] - cc
+		var d := pts[i + 1] - pts[i]
+		var lo := 0.0
+		var hi := 1.0
+		var A := d.dot(d)
+		if A > 1e-9:
+			var C := a.dot(a) - r2
+			var ad := a.dot(d)
+			var disc := 4.0 * (ad * ad - A * C)
+			if disc > 0.0:
+				var sq := sqrt(disc)
+				lo = maxf(0.0, (-2.0 * ad - sq) / (2.0 * A))
+				hi = minf(1.0, (-2.0 * ad + sq) / (2.0 * A))
+			elif C > 0.0:
+				hi = -1.0                           # úplně mimo kruh
+		if hi <= lo:
+			if cur.size() >= 2:
+				segs.append(cur)
+			cur = PackedVector2Array()
+			continue
+		var p0 := cc + a + d * lo
+		var p1 := cc + a + d * hi
+		if cur.is_empty() or cur[cur.size() - 1] != p0:
+			if cur.size() >= 2:
+				segs.append(cur)
+			cur = PackedVector2Array([p0])
+		cur.append(p1)
+	if cur.size() >= 2:
+		segs.append(cur)
+	return segs
+
+
+## Polygon ořízne na kruh (Sutherland–Hodgman proti 24úhelníku) – pro vodní plochy minimapy.
+func _clip_circle_poly(poly: PackedVector2Array, cc: Vector2, r: float) -> PackedVector2Array:
+	var out := poly
+	const N := 24
+	for i in range(N):
+		if out.is_empty():
+			break
+		var e1 := cc + Vector2(cos(TAU * i / N), sin(TAU * i / N)) * r
+		var e2 := cc + Vector2(cos(TAU * (i + 1) / N), sin(TAU * (i + 1) / N)) * r
+		var edge := e2 - e1
+		var nxt := PackedVector2Array()
+		var s := out[out.size() - 1]
+		var s_in := edge.cross(s - e1) >= 0.0
+		for q in out:
+			var q_in := edge.cross(q - e1) >= 0.0
+			var den := edge.cross(q - s)
+			if q_in != s_in and absf(den) > 1e-9:
+				var f := edge.cross(e1 - s) / den
+				nxt.append(s + (q - s) * clampf(f, 0.0, 1.0))
+			if q_in:
+				nxt.append(q)
+			s = q
+			s_in = q_in
+		out = nxt
+	return out
 
 
 # ------------------------------------------------------------------ pomocné

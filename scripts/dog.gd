@@ -19,6 +19,11 @@ var _legs: Array[Node3D] = []
 var _tail: Node3D
 var _head: Node3D
 var _label: Label3D
+var _deep := false                # hluboký spánek za simulační bublinou (schovaný, ~2 Hz pohyb)
+var _deep_dt := 0.0
+
+## Krok kinematického pohybu hluboce uspaného psa (za simulační bublinou World.sim_radius).
+const SLEEP_STEP := 0.5
 
 
 func setup(t: Terrain, w: Node, pos: Vector3, seed_: int) -> void:
@@ -77,9 +82,32 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_impl(delta)
+	Tests.prof_add("dog", __t0)
+
+
+func _physics_impl(delta) -> void:
 	var player: Node3D = world.nearest_player(global_position)
 	var to_p := player.global_position - global_position if player else Vector3(INF, 0, 0)
 	var dist := to_p.length()
+	# pásma okolo hráče: <160 m plná fyzika, 160 m…1.7×simr kinematika (viditelný, bez kolizí),
+	# >1.7×simr hluboký spánek: schovaný vizuál, chůze jen kinematicky ~2 Hz
+	var simr: float = world.sim_radius if world != null else 320.0
+	if dist > simr * 1.7:
+		if not _deep:
+			_deep = true
+			_body.visible = false
+			_label.visible = false
+		_deep_dt += delta
+		if _deep_dt < SLEEP_STEP:
+			return
+		delta = _deep_dt
+		_deep_dt = 0.0
+	elif _deep:
+		_deep = false
+		_deep_dt = 0.0
+		_body.visible = true
 	var desired := Vector3.ZERO
 	# za autem neběhá (vběhl by pod kola / tlačil by se před autem)
 	var in_car: bool = player != null and player.get("car") != null

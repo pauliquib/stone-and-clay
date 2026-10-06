@@ -331,7 +331,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				inp.add_look(settings.look(event.relative))
 	elif event is InputEventMouseButton and event.pressed:
-		if player.car == null:
+		if player.car == null and not hud._map.visible:      # s otevřenou mapou myš ovládá mapu (Hud._input)
 			if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not player.controls_locked:
 				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 			elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -346,7 +346,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
 		# otevřenou nabídku / rozhovor zavírá Esc v Hud (dostane ho dřív); jinak pauza
 		if ready_done and not hud.menu_open and not hud.chat_open:
-			pause_menu.open()
+			if hud._map.visible:
+				hud._toggle_map()                      # Esc nejdřív zavře mapu
+			else:
+				pause_menu.open()
 			get_viewport().set_input_as_handled()
 			return
 	if not ready_done or hud.chat_open:
@@ -720,6 +723,12 @@ func _offer_quest(q) -> void:
 # ------------------------------------------------------------------ smyčka
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("client", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if player == null or not ready_done:
 		return
 	_update_daylight(delta)

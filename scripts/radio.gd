@@ -604,6 +604,12 @@ func audible_r() -> float:
 
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("radio", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	_poll_task()
 	_pump_stream(delta)
 	_update_audio(delta)

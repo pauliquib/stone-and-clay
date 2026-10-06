@@ -108,6 +108,8 @@ static func add_chunks(parent: Node3D, name: String, chunks: Array, collide: boo
 		mi.mesh = ch["mesh"]
 		if vis_range > 0.0:
 			mi.visibility_range_end = vis_range
+			mi.visibility_range_end_margin = minf(vis_range * 0.08, 60.0)   # jemné dofadování
+			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 		root.add_child(mi)
 		if collide:
 			var body := StaticBody3D.new()
@@ -281,9 +283,13 @@ static func build_trees(parent: Node3D, skip := {}, terrain: Terrain = null, mgr
 			_far_mmis.append(mmi)
 			root.add_child(mmi)
 
-	# kolize kmenů – jedno statické těleso na buňku 256 m
+	# kolize kmenů – jedno statické těleso na buňku 256 m. Tvary se přidávají rovnou do fyzikálního
+	# serveru (body_add_shape), NE jako CollisionShape3D uzly: ~50 tisíc uzlů ve scéně jen za existenci
+	# stálo měřitelné ms na frame. `shapes` drží [RID těla, index tvaru] pro vypnutí při pokácení;
+	# `shape_rids` drží RIDy tvarů, aby je TreeManager uvolnil při zániku světa (nová hra).
 	var bodies := {}
 	var shapes: Array = []
+	var shape_rids: Array[RID] = []
 	for t in trunks:
 		var pos: Vector3 = t[0]
 		var key := Vector2i(floori(pos.x / TREE_FAR_CELL), floori(pos.z / TREE_FAR_CELL))
@@ -293,17 +299,18 @@ static func build_trees(parent: Node3D, skip := {}, terrain: Terrain = null, mgr
 			b.collision_mask = 0
 			b.set_meta("surface", "strom")
 			root.add_child(b)
-			bodies[key] = b
-		var s := CylinderShape3D.new()
-		s.radius = maxf(t[1], 0.15)
-		s.height = t[2]
-		var cs := CollisionShape3D.new()
-		cs.shape = s
-		cs.position = pos + Vector3(0, t[2] * 0.5, 0)
-		bodies[key].add_child(cs)
-		shapes.append(cs)
+			bodies[key] = [b, 0]
+		var rec: Array = bodies[key]
+		var b: StaticBody3D = rec[0]
+		var sr := PhysicsServer3D.cylinder_shape_create()
+		PhysicsServer3D.shape_set_data(sr, {"radius": maxf(t[1], 0.15), "height": t[2]})
+		PhysicsServer3D.body_add_shape(b.get_rid(), sr,
+			Transform3D(Basis.IDENTITY, pos + Vector3(0, t[2] * 0.5, 0)))
+		shape_rids.append(sr)
+		shapes.append([b.get_rid(), rec[1]])
+		rec[1] += 1
 	if mgr != null:
-		mgr.set_index(d, meta, near_mm, far_mm, shapes)
+		mgr.set_index(d, meta, near_mm, far_mm, shapes, shape_rids)
 	return trunks
 
 

@@ -99,7 +99,7 @@ func close() -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE     # zpět u rádia (pauza při ztrátě fokusu)
 	elif not client.hud.menu_open:
 		client.player.controls_locked = false
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		client.hud._update_mouse_mode()                 # může být otevřená mapa → viditelný kurzor
 
 
 func _input(event: InputEvent) -> void:
@@ -357,10 +357,15 @@ func _show_graphics() -> void:
 	_gfx_option("Rozlišení 3D", GameSettings.SCALE_NAMES, "scale")
 	_gfx_option("Zvětšení obrazu", GameSettings.UPSCALE_NAMES, "upscale")
 	_gfx_option("Vyhlazování hran", GameSettings.AA_NAMES, "aa")
+	_header("Barvy")
+	_option("Podání barev světa", GameSettings.COLOR_NAMES, settings.color_mode, func(i):
+		settings.color_mode = i
+		settings.apply_graphics(client))
 	_header("Scéna")
 	_gfx_option("Stíny", GameSettings.SHADOW_NAMES, "shadows")
 	_gfx_option("Dohlednost", GameSettings.VIEW_NAMES, "view")
 	_gfx_option("Vegetace (květy, ovoce, listí)", GameSettings.VEG_NAMES, "veg")
+	_gfx_option("Aktivita světa (NPC, zvířata, doprava)", GameSettings.SIM_NAMES, "sim")
 	_check("Záře (bloom)", bool(settings.gfx["glow"]), func(on):
 		settings.set_gfx("glow", on)
 		_refresh_preset_label())

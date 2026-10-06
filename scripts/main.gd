@@ -114,7 +114,7 @@ func _ready() -> void:
 	if _args.has("bottest"):
 		Tests.bot_test(self)
 	if _args.has("map"):
-		client.hud._map.visible = true
+		client.hud._toggle_map()
 	if _args.has("testmove"):
 		Tests.move_test(self)
 	if _args.has("exittest"):
@@ -149,6 +149,8 @@ func _ready() -> void:
 		Tests.terrain_test(self)
 	if _args.has("obcetest"):
 		Tests.obec_test(self)
+	if _args.has("perf"):
+		Tests.perf_test(self)
 
 
 func _frames(n: int) -> void:

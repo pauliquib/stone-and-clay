@@ -235,6 +235,12 @@ func nearest_stream(pos: Vector3, r: float) -> Array:
 # ------------------------------------------------------------------ led, vlnky, brodění hráčů
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("water", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if world == null or world.clock == null:
 		return
 	_tick += delta

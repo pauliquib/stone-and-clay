@@ -10,6 +10,8 @@ class_name Villager
 extends CharacterBody3D
 
 const PHYSICS_RANGE := 160.0
+## Krok kinematického pohybu hluboce uspaného vesničana (za simulační bublinou World.sim_radius).
+const SLEEP_STEP := 0.5
 ## Kolik prvních spawnutých vesničanů dostane behavior strom (0 = BT nikdo; Fáze 3: testovací podmnožina).
 const BT_VILLAGERS := 5
 const BT_TREE := "res://ai/villager_routine.tres"
@@ -64,6 +66,9 @@ var _bt_path: PackedVector3Array = PackedVector3Array()   # body trasy k _bt_tar
 var _bt_path_i := 0               # index aktuálního bodu trasy
 var _bt_home := Vector3.INF       # dveře domu vesničana (estate) – plní _bt_fill_vars
 var _bt_home_normal := Vector3(0, 0, 1)
+var _deep := false                # hluboký spánek za 1.7× simulační bubliny (schovaný vizuál, ~2 Hz chůze)
+var _deep_dt := 0.0               # nasčítaný čas do dalšího kroku hlubokého spánku
+var _mid := false                 # střední pásmo (sim_radius…1.7×): viditelný, kinematika bez kolizí
 
 
 func setup(g: RoadGraph, t: Terrain, w: Node, start_node: int, seed_: int, prof: Dictionary, bt := false) -> void:
@@ -98,6 +103,7 @@ func _ready() -> void:
 	add_child(cs)
 	_visual = Humanoid.new()
 	Characters.apply_look(_visual, persona.profile)
+	_visual.vis_end = 220.0            # postava za ~220 m nikdo stejně nerozezná (šetří draw call)
 	add_child(_visual)
 	_name_label = Label3D.new()
 	_name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -262,9 +268,56 @@ func _bt_step() -> Vector3:
 
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_impl(delta)
+	Tests.prof_add("villager", __t0)
+
+
+func _physics_impl(delta) -> void:
 	var player: Node3D = world.nearest_player(global_position)
 	var to_player := player.global_position - global_position if player else Vector3(INF, 0, 0)
 	var dist := to_player.length()
+	# --- simulační pásma okolo hráče (plynulá bublina): <simr plná fyzika+kolize+BT,
+	# simr…1.7×simr MID = viditelný vizuál, ale pohyb jen kinematicky bez kolizí (každý frame
+	# plynule, levné), >1.7×simr hluboký spánek = schovaný vizuál, chůze ~2 Hz
+	var simr: float = world.sim_radius if world != null else 320.0
+	if dist > simr and _knocked <= 0.0 and _flee_t <= 0.0:
+		if dist > simr * 1.7:
+			if not _deep:
+				_deep = true
+				_visual.visible = false
+				_visual.set_process(false)
+				_name_label.visible = false
+				_label.visible = false
+			_deep_dt += delta
+			if _deep_dt < SLEEP_STEP:
+				return
+			delta = _deep_dt
+			_deep_dt = 0.0
+			_deep_step(delta)
+			return
+		# MID: viditelný, ale bez move_and_slide a řečí – plynulý kinematický krok
+		if _deep:
+			_deep = false
+			_deep_dt = 0.0
+			_visual.visible = true
+			_visual.set_process(true)
+		if not _mid:
+			_mid = true
+			_label.visible = false
+			_name_label.visible = false
+		_deep_step(delta)
+		_visual.speed = velocity.length()
+		_visual.rotation.y = _yaw
+		_visual.on_floor = true
+		return
+	elif _deep or _mid:
+		_deep = false
+		_mid = false
+		_deep_dt = 0.0
+		_visual.visible = true
+		_visual.set_process(true)
+		_name_label.visible = true
 	_talk_cool = maxf(_talk_cool - delta, 0.0)
 	if promile > 0.0:
 		promile = maxf(promile - delta * 0.01, 0.0)   # ~0,6 ‰ za reálnou minutu (Fáze 3)
@@ -383,6 +436,31 @@ func _physics_process(delta: float) -> void:
 	_visual.speed = Vector3(velocity.x, 0, velocity.z).length()
 	_visual.on_floor = true
 	_visual.drunk = clampf(promile / 2.0, 0.0, 1.0)   # Fáze 3: potácení podle promile
+
+
+## Pohyb hluboce uspaného vesničana (za simulační bublinou): posun po grafu / trase BT jedním
+## velkým krokem – bez kolizí, zdravení, mávání a vizuálních animací (postava je schovaná).
+func _deep_step(delta: float) -> void:
+	if _bt_inst != null:
+		_bt_fill_vars()
+		_bt_inst.update(delta)
+	var desired := Vector3.ZERO
+	if _pause > 0.0:
+		_pause -= delta
+	elif _bt_target_pos != Vector3.INF:
+		desired = _bt_step()
+	else:
+		var goal := _goal()
+		var d := Vector2(goal.x - global_position.x, goal.y - global_position.z)
+		if d.length() < 1.3:
+			_advance()
+		else:
+			desired = Vector3(d.x, 0, d.y).normalized() * _speed
+	if desired.length() > 0.1:
+		_yaw = atan2(desired.x, desired.z)
+	global_position += desired * delta
+	global_position.y = terrain.height_at(global_position.x, global_position.z)
+	velocity = desired
 
 
 func _goal() -> Vector2:

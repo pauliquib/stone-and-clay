@@ -64,6 +64,12 @@ func on_hit(impact: float) -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(_delta)
+	Tests.prof_add("prop", __t0)
+
+
+func _physics_process_impl(_delta: float) -> void:
 	if _done or sleeping:
 		return
 	if global_transform.basis.y.dot(_up0) < 0.55 or linear_velocity.length() > 4.0:

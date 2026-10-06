@@ -58,8 +58,9 @@
   Javor 250 Kývačka. Kolo se šlape (W, max. ~30 km/h, bez motoru, zvonek), motorka má 4 stupně a ~95 km/h.
   Jednostopá vozidla se naklánějí do zatáček; při tvrdším nárazu jezdec spadne. Postava drží řídítka
   a šlape / má nohy na stupačkách (IK v `humanoid.gd`).
-- **Potoky, řeka a rybníky** (`water.gd`, `tools/water.py`): skutečné toky z OSM (převzaté z DIBAVOD) – Březnice,
-  Černý, Kaňovický, Oskorušný, Neradovský a Zlámanecký potok s přítoky (~35 km) a dvě nádrže. Osa toku je
+- **Potoky, řeka a rybníky** (`water.gd`, `tools/water.py`): skutečné toky z OSM (převzaté z DIBAVOD) – řeka
+  Břehatice a Blatný, Havraní, Jeřabinový, Sojčí a Sokolí potok s přítoky (~35 km) a dvě nádrže (názvy jsou
+  fiktivní – přepis z OSM jmen dělá `FICTIONAL_NAMES` v `tools/water.py` a `tools/export_map.py`). Osa toku je
   „sklouznutá“ do údolnice DMR 5G, koryto je vyhloubené v terénu (kolize i vzhled), hladina klesá po proudu;
   pod silnicemi a cestami tok podtéká (propustek). Voda se vlní podle proudu, v dešti a větru víc, v mrazu
   zamrzá (rybník pod −1 °C, potok pod −5 °C). Brodění zpomaluje chůzi, kroky šplouchají, u potoka je slyšet

@@ -5,6 +5,8 @@
 ## Grafika (Esc → Nastavení → Grafika): předvolba Nízká / Střední / Vysoká / Ultra nebo Vlastní –
 ## rozlišení 3D a upscaling, vyhlazování, stíny slunce, dohlednost (násobí visibility_range všech modelů,
 ## i těch přidaných později – `node_added`), vegetace kolem hráče (květy, ovoce, listí), záře, SSAO, strop FPS.
+## Podání barev světa (tonemapping, sytost, kontrast) stojí mimo předvolby – je to věc vkusu, tak přepnutí
+## předvolby nezhasne oblíbené barvy (stejně jako renderer a strop FPS).
 class_name GameSettings
 extends RefCounted
 
@@ -42,20 +44,33 @@ const VIEWS := [0.6, 0.8, 1.0, 1.25]
 const VIEW_NAMES := ["Krátká", "Střední", "Daleká", "Velmi daleká"]
 const VEGS := [0.0, 0.5, 0.75, 1.0]
 const VEG_NAMES := ["Vypnuto", "Málo", "Středně", "Plně"]
+## aktivita světa: poloměr plné simulace okolo hráče (NPC, zvířata, doprava)
+const SIMS := [250.0, 400.0, 600.0, 900.0]
+const SIM_NAMES := ["Malá", "Střední", "Velká", "Maximální"]
 const FPS_CAPS := [0, 30, 60, 75, 120, 144]
 const FPS_NAMES := ["Bez omezení", "30", "60", "75", "120", "144"]
-## předvolby: scale, upscale, aa, shadows, view, veg, glow, ssao
+## předvolby: scale, upscale, aa, shadows, view, veg, sim, glow, ssao
 const PRESETS := [
-	{"scale": 0, "upscale": 1, "aa": 0, "shadows": 0, "view": 0, "veg": 0, "glow": false, "ssao": false},
-	{"scale": 3, "upscale": 1, "aa": 1, "shadows": 2, "view": 1, "veg": 1, "glow": true, "ssao": false},
-	{"scale": 4, "upscale": 0, "aa": 2, "shadows": 3, "view": 2, "veg": 3, "glow": true, "ssao": false},
-	{"scale": 4, "upscale": 0, "aa": 3, "shadows": 4, "view": 3, "veg": 3, "glow": true, "ssao": true},
+	{"scale": 0, "upscale": 1, "aa": 0, "shadows": 0, "view": 0, "veg": 0, "sim": 0, "glow": false, "ssao": false},
+	{"scale": 3, "upscale": 1, "aa": 1, "shadows": 2, "view": 1, "veg": 1, "sim": 1, "glow": true, "ssao": false},
+	{"scale": 4, "upscale": 0, "aa": 2, "shadows": 3, "view": 2, "veg": 3, "sim": 2, "glow": true, "ssao": false},
+	{"scale": 4, "upscale": 0, "aa": 3, "shadows": 4, "view": 3, "veg": 3, "sim": 3, "glow": true, "ssao": true},
 ]
-const GFX_KEYS := ["scale", "upscale", "aa", "shadows", "view", "veg", "glow", "ssao"]
+const GFX_KEYS := ["scale", "upscale", "aa", "shadows", "view", "veg", "sim", "glow", "ssao"]
+## podání barev: [tonemapper, sytost, kontrast, bílá (tonemap_white)] – Přirozené odpovídá původnímu
+## vzhledu (LocalClient.build_environment); sytější režimy jedou přes ACES (víc kontrastu a nasycení
+## než Filmic; AgX je až od Godotu 4.4)
+const COLOR_NAMES := ["Přirozené", "Syté (truecolor)", "Živé"]
+const COLORS := [
+	[Environment.TONE_MAPPER_FILMIC, 1.08, 1.0, 6.0],
+	[Environment.TONE_MAPPER_ACES, 1.18, 1.05, 6.0],
+	[Environment.TONE_MAPPER_ACES, 1.32, 1.1, 4.5],
+]
 
 var preset := 2
 var gfx: Dictionary = PRESETS[2].duplicate()
 var fps_cap := 0
+var color_mode := 0
 var _view_applied := 1.0
 var _atlas := -1                 # naposledy nastavená velikost mapy stínů (přealokace = záškub – jen při změně)
 var _soft := -1
@@ -78,6 +93,7 @@ func load_file() -> void:
 	for k in GFX_KEYS:
 		gfx[k] = cf.get_value("grafika", k, gfx[k])
 	fps_cap = clampi(int(cf.get_value("grafika", "strop_fps", fps_cap)), 0, FPS_CAPS.size() - 1)
+	color_mode = clampi(int(cf.get_value("grafika", "barvy", color_mode)), 0, COLORS.size() - 1)
 	renderer = String(cf.get_value("grafika", "renderer", renderer))
 	if not RENDERER_VALUES.has(renderer):
 		renderer = RENDERER_VALUES[0]
@@ -97,6 +113,7 @@ func save_file() -> void:
 	for k in GFX_KEYS:
 		cf.set_value("grafika", k, gfx[k])
 	cf.set_value("grafika", "strop_fps", fps_cap)
+	cf.set_value("grafika", "barvy", color_mode)
 	cf.set_value("grafika", "renderer", renderer)
 	cf.save(PATH)
 
@@ -171,6 +188,11 @@ func apply_graphics(client: Node) -> void:
 	if env:
 		env.glow_enabled = bool(gfx["glow"])
 		env.ssao_enabled = bool(gfx["ssao"])
+		var cc: Array = COLORS[clampi(color_mode, 0, COLORS.size() - 1)]
+		env.tonemap_mode = cc[0]
+		env.adjustment_saturation = cc[1]
+		env.adjustment_contrast = cc[2]
+		env.tonemap_white = cc[3]
 	# vegetace kolem hráče
 	var veg: float = VEGS[clampi(int(gfx["veg"]), 0, VEGS.size() - 1)]
 	if client.season_fx and client.season_fx.flowers:
@@ -178,6 +200,9 @@ func apply_graphics(client: Node) -> void:
 		client.season_fx.decor.set_detail(veg)
 	if client.world and client.world.vegetation:   # Fáze 9: statická vegetace – 0 = vypnuto
 		client.world.vegetation.set_detail(veg)
+	# aktivita světa – poloměr plné simulace NPC/fauny/dopravy okolo hráče
+	if client.world:
+		client.world.sim_radius = SIMS[clampi(int(gfx.get("sim", 2)), 0, SIMS.size() - 1)]
 	# strop FPS (--maxfps má přednost)
 	if not maxfps_from_args:
 		Engine.max_fps = FPS_CAPS[clampi(fps_cap, 0, FPS_CAPS.size() - 1)]

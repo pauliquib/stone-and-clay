@@ -540,6 +540,12 @@ func home_chimney_id() -> int:
 # ------------------------------------------------------------------ čas, teplo a šíření
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("fire", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if world == null or world.clock == null:
 		return
 	var now := world.clock.minutes

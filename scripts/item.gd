@@ -122,6 +122,7 @@ func _add(m: Mesh, pos: Vector3, c: Color, rough := 0.7, metal := 0.0, emit := 0
 	var mi := MeshInstance3D.new()
 	mi.mesh = m
 	mi.position = pos
+	mi.visibility_range_end = 110.0      # drobotina – dál než ~110 m ji nikdo nepozná
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = c
 	mat.roughness = rough

@@ -29,8 +29,9 @@ zavislost na cigaretach je ve hre priliz neuprosna a silna, tres obrazu je oprav
 
 cigarety se prodavaji jen v obchode
 
-Dodrzovat zmeneny provoz v sobotu a nedeli
-v nedeli mse
+Dodrzovat zmeneny provoz obchodu v sobotu a nedeli
+
+v nedeli mse svata v kaplicce (dle realne polohy) + v kostele (Velky Ořechov) => doplnit farare a interiery
 
 po tazeni rucniho voziku uz nemuzu behat at mackam shift jak chci
 

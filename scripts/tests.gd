@@ -29,6 +29,35 @@
 class_name Tests
 extends RefCounted
 
+## Mikro-profiler pro --perf: klíč → [celkové µs, počet volání]. Obaluje se kód přes
+## `var __t0 := Tests.prof_t0()` … `Tests.prof_add("hud", __t0)`. Zapnutý jen s --perf.
+static var PROF := {}
+static var PROF_ON := false
+
+
+static func prof_t0() -> int:
+	return Time.get_ticks_usec() if PROF_ON else 0
+
+
+static func prof_add(key: String, t0: int) -> void:
+	if not PROF_ON:
+		return
+	var e: Array = PROF.get(key, [0, 0])
+	e[0] += Time.get_ticks_usec() - t0
+	e[1] += 1
+	PROF[key] = e
+
+
+static func prof_report(dur_s: float, frames: int) -> void:
+	var keys := PROF.keys()
+	keys.sort_custom(func(a, b): return PROF[a][0] > PROF[b][0])
+	print("PERF profiler (celkem za %d s, %d volajících na frame):" % [int(dur_s), frames])
+	for k in keys:
+		var e: Array = PROF[k]
+		var per_frame_us := float(e[0]) / maxf(frames, 1.0)
+		print("PERF   %-22s %7.1f ms/frame  (%d volání/frame, %.0f µs/volání)" % [
+			k, per_frame_us / 1000.0, roundi(float(e[1]) / maxf(frames, 1.0)), per_frame_us / maxf(float(e[1]) / maxf(frames, 1.0), 1.0)])
+
 
 ## Testovaný hráč (lokální, id 1).
 static func _pl(g: Node) -> Player:
@@ -1992,3 +2021,101 @@ static func obec_test(g: Node) -> void:
 		g.client.screenshot()                  # uloží args["shot"] a ukončí hru
 		return
 	g.get_tree().quit()
+
+
+## --perf[=s]: měření výkonu po načtení – každou sekundu vypíše FPS, čas CPU (process + physics)
+## a statistiky vykreslování. Rozdíl mezi dobou snímku (1000/FPS) a součtem process+physics
+## ukazuje, jestli brzdí CPU (skripty/fyzika) nebo GPU (vykreslování). --perfnpc=0 před startem
+## navíc vypne NPC/provoz/faunu pro srovnání (viz World.apply_perf_flags).
+static func perf_test(g: Node) -> void:
+	var raw := String(g._args.get("perf", "12"))
+	var dur := clampi(int(raw) if raw != "" else 12, 3, 600)
+	PROF_ON = true
+	PROF.clear()
+	await g.get_tree().create_timer(4.0).timeout        # ustálení po načtení
+	var f0 := Engine.get_process_frames()
+	var mons := [Performance.TIME_PROCESS, Performance.TIME_PHYSICS_PROCESS,
+		Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME, Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME,
+		Performance.RENDER_TOTAL_OBJECTS_IN_FRAME, Performance.OBJECT_NODE_COUNT,
+		Performance.PHYSICS_3D_ACTIVE_OBJECTS]
+	var names := ["proc_ms", "phys_ms", "draws", "prims", "obj", "nodes", "phys3d"]
+	var n := mons.size()
+	var sums := PackedFloat64Array()
+	sums.resize(n)
+	var fps_sum := 0.0
+	var fps_min := 1e9
+	var fps_max := 0.0
+	print("PERF  s |   fps | frame_ms | %s" % " | ".join(names))
+	for s in dur:
+		await g.get_tree().create_timer(1.0).timeout     # vzorek za uplynulou sekundu
+		var fps := Engine.get_frames_per_second()
+		var frame_ms := 1000.0 / maxf(fps, 0.01)
+		var row := ""
+		for i in n:
+			var v := Performance.get_monitor(mons[i])
+			sums[i] += v
+			var v2 := v * 1000.0 if i < 2 else v
+			row += ("%.1f" % v2).rpad(8) + "| "
+		fps_sum += fps
+		fps_min = minf(fps_min, fps)
+		fps_max = maxf(fps_max, fps)
+		print("PERF %3d | %5.1f | %7.1f | %s" % [s + 1, fps, frame_ms, row])
+	print("PERF průměr: fps %.1f (min %.1f, max %.1f), frame %.1f ms" % [
+		fps_sum / dur, fps_min, fps_max, 1000.0 / maxf(fps_sum / dur, 0.01)])
+	var parts := []
+	for i in n:
+		var v: float = sums[i] / dur
+		parts.append("%s=%.1f" % [names[i], v * 1000.0 if i < 2 else v])
+	print("PERF průměr: %s" % ", ".join(parts))
+	var cpu_ms := (sums[0] + sums[1]) / dur * 1000.0
+	var frame_ms := 1000.0 / maxf(fps_sum / dur, 0.01)
+	print("PERF odhad: CPU %.1f ms/frame, GPU+sync ~%.1f ms/frame → %s" % [cpu_ms, maxf(frame_ms - cpu_ms, 0.0),
+		"CPU-bound (skripty/fyzika)" if cpu_ms > frame_ms * 0.6 else "GPU-bound (vykreslování)"])
+	prof_report(dur, Engine.get_process_frames() - f0)
+	PROF_ON = false
+	# sčítání uzlů: velikosti podstromů do hloubky 3 od kořene (Main/Svet/*, Main/Klient/*)
+	var counts := {}
+	var geo := {}
+	var walk: Array = [g.get_tree().root]
+	for depth in 3:
+		var next: Array = []
+		for nd in walk:
+			for c in nd.get_children():
+				var p := str(c.get_path())
+				counts[p] = _subtree_size(c)
+				geo[p] = _subtree_geo(c)
+				next.append(c)
+		walk = next
+	var top := counts.keys()
+	top.sort_custom(func(a, b): return counts[a] > counts[b])
+	print("PERF uzly celkem %d; top větve (uzly | geometrie z toho cullable | processujících):" % int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)))
+	for k in top.slice(0, 25):
+		var gg: Array = geo[k]
+		print("PERF   %-40s %7d | %5d (%d cull) | %d" % [k, counts[k], gg[0], gg[1], gg[2]])
+	g.get_tree().quit()
+
+
+static func _subtree_size(n: Node) -> int:
+	var total := 1
+	for c in n.get_children():
+		total += _subtree_size(c)
+	return total
+
+
+## [počet GeometryInstance3D, z toho s visibility_range_end > 0, počet uzlů s _process/_physics_process].
+static func _subtree_geo(n: Node) -> Array:
+	var t := 0
+	var cull := 0
+	var proc := 0
+	if n is GeometryInstance3D:
+		t = 1
+		if (n as GeometryInstance3D).visibility_range_end > 0.0:
+			cull = 1
+	if n.is_processing() or n.is_physics_processing():
+		proc = 1
+	for c in n.get_children():
+		var r := _subtree_geo(c)
+		t += r[0]
+		cull += r[1]
+		proc += r[2]
+	return [t, cull, proc]

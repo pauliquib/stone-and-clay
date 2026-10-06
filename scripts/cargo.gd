@@ -914,6 +914,12 @@ func _grip_release_msg(id: int, chock: bool) -> void:
 # ------------------------------------------------------------------ smyčka
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("cargo", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if world == null or not world.ready_done:
 		return
 	for id in _own.keys():

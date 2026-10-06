@@ -157,6 +157,8 @@ var pedal_angle := 0.0             # natočení klik (kolo) – čte ho postava 
 var lean := 0.0                    # vizuální náklon jednostopého vozidla (rad kolem podélné osy, − = doleva)
 var _roll := 0.0                   # fyzikální náklon tělesa (rad, + = vpravo) – jen lean-steer motorky
 var _si_prev := 0.0                # minulý vstup řízení (derivace pro protizatáčení)
+var _asleep := false               # fyzika auta uspaná (set_asleep – kolize zůstává aktivní)
+var kinematic := false             # uspané AI auto posouvá Traffic po trase bez fyziky
 var _fork: MeshInstance3D
 var _crank: MeshInstance3D
 var _wipers: Array[Node3D] = []    # osy stěračů pod čelním sklem (levý řidič, pravý)
@@ -555,7 +557,63 @@ func _make_smoke() -> CPUParticles3D:
 
 # ------------------------------------------------------------------ ovládání
 
+## Uspaní auta podle vzdálenosti od hráčů (výkon na velké mapě): rigid body zamrzne (kolize zůstává
+## aktivní – do auta jde nabořit i nastoupit), raycastová kola, _process ani zvuky už neběží.
+## kin=true jen pro AI: auto zůstane viditelné a Traffic ho posouvá po trase voláním kinematic_step.
+func set_asleep(on: bool, kin := false) -> void:
+	if _asleep == on and (not on or kinematic == kin):
+		return
+	_asleep = on
+	kinematic = kin
+	if on:
+		freeze = true
+		set_physics_process(false)
+		set_process(false)
+		_engine.volume_db = -80.0
+		_skid.volume_db = -80.0
+		if _rain_roof:
+			_rain_roof.stop()
+	else:
+		freeze = false
+		set_process(true)
+		set_physics_process(true)
+		linear_velocity = Vector3.ZERO
+		angular_velocity = Vector3.ZERO
+		_prev_vel = Vector3.ZERO
+		_cur_xf = global_transform
+		_prev_xf = _cur_xf
+		vis.global_transform = _cur_xf
+
+
+## Kinematický posun AI auta po trase pro vzdálená auta (fyzika vypnutá – volá Traffic každý krok).
+func kinematic_step(dt: float) -> void:
+	if ai_path.size() < 2 or ai_i >= ai_path.size():
+		speed = 0.0
+		return
+	var pos := global_position
+	while ai_i < ai_path.size() - 1 and Vector2(ai_path[ai_i].x - pos.x, ai_path[ai_i].z - pos.z).length() < 7.0:
+		ai_i += 1
+	var tgt := ai_path[ai_i]
+	var dx := tgt.x - pos.x
+	var dz := tgt.z - pos.z
+	var dist := Vector2(dx, dz).length()
+	if dist < 0.4:
+		speed = 0.0
+		return
+	speed = minf(ai_speed_limit, dist * 0.5 + 2.0)
+	var dir := Vector3(dx / dist, 0.0, dz / dist)
+	var np := pos + dir * minf(dist, speed * dt)
+	np.y = lerpf(pos.y, tgt.y, minf(dt * 5.0, 1.0))
+	var xf := Transform3D(Basis.looking_at(-dir, Vector3.UP).orthonormalized(), np)
+	global_transform = xf
+	_prev_xf = xf
+	_cur_xf = xf
+	vis.global_transform = xf
+	_t += dt
+
+
 func set_player_driver(p: Player) -> void:
+	set_asleep(false)
 	drive = Drive.PLAYER
 	body_state = p.body
 	driver_id = p.id
@@ -598,6 +656,7 @@ func camera() -> Camera3D:
 
 
 func set_ai_route(points: PackedVector3Array, limit_ms := 13.9) -> void:
+	set_asleep(false)
 	drive = Drive.AI
 	ai_path = points
 	ai_i = 0
@@ -698,6 +757,7 @@ func detach_trailer() -> void:
 
 
 func reset_upright() -> void:
+	set_asleep(false)
 	var fwd := global_transform.basis.z
 	fwd.y = 0.0
 	fwd = fwd.normalized() if fwd.length() > 0.1 else Vector3.FORWARD
@@ -723,6 +783,12 @@ func driver_door_world() -> Vector3:
 # ------------------------------------------------------------------ fyzika
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_impl(delta)
+	Tests.prof_add("car", __t0)
+
+
+func _physics_impl(delta) -> void:
 	_t += delta
 	var fwd := global_transform.basis.z
 	speed = linear_velocity.dot(fwd)
@@ -1439,6 +1505,12 @@ func ai_done() -> bool:
 # ------------------------------------------------------------------ vizuál a kamera
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("car_vis", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	var f := Engine.get_physics_interpolation_fraction()
 	var xf := _prev_xf.interpolate_with(_cur_xf, f)
 	if two_wheeler:
