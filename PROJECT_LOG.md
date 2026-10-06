@@ -1207,3 +1207,21 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - ČRo stanice v `radia.json` beze změny (čeká na rozhodnutí uživatele).
 - Právní poznámka v README (Právní zásady → Rádio) a vyprázdnění seznamu před veřejným vydáním: zatím nesplněno, netýká se smyšlených stanic.
 - Ruční test čeká (checklist v `docs/testy_M5.md`, oddíl M5.9 – rockové stanice).
+
+## 2026-10-07 – Uzavření M5 Obec a volný čas (k závěrečné kontrole Opus 5.5)
+
+### Stav kroků (vše sloučeno do `main`, kontrola překladu `--import` rc 0 + `--check-only` bez chyb)
+- Hotovo s výhradami: M5.12 (osvětlení; otevřeno: rozbitá lampa), M5.8 (U-rampa hotová, umístění odhad z dat – ověřit na mapě).
+- Částečně (zůstávají `[ ]`): M5.1 (stavebniny + pila podle nákresu; pila odhad východně od haly, ověřit), M5.2 (koupaliště; vstupné, plot, šatna, mola chybí),
+  M5.3 (zbrojnice, výjezdy; cisterna a NPC hasiči chybí), M5.4 (hasičský sport; diváci, stánek, QTE zjednodušené), M5.5 (taneční zábava; mše v kapličce čeká na souřadnice),
+  M5.6 (fotbal; hřiště na místě hranice čarodějnic – OSM chybí; volná hra a penalty chybí), M5.7 (skate; jen ollie, triky a animace chybí),
+  M5.9 (autorádio a světlo hotovo; rockové stanice smyšlené, stream doplní uživatel; ČRo stanice ponechány k rozhodnutí),
+  M5.10 (studánka a tábor; bikepark chybí), M5.11 (řidiči v autech; vesničané s vlastním autem, spolujezdec a autobus chybí).
+- Rozhodnutí uživatele zapracovaná: stavebniny + dvůr + pila na červeném místě (JZ od návsi), koupaliště na modrém místě u potoka č. 275,
+  U-rampa hotová od začátku (dřevo na betonových patkách, louka severovýchodně od obce), příběhové využití odloženo.
+- Ruční testy: uživatel testuje až po celé M5 podle `docs/testy_M5.md`.
+
+### Otevřené body k M5 (souhrn)
+- Souřadnice kapličky pro nedělní mši (M5.5); ověření pily, hřiště a U-rampy na mapě M.
+- ČRo stanice v `data/radia.json` – rozhodnutí o ponechání; streamy pro Rock Pod Kopcem, Beat Hvozdnice, Rock Ve Žlebu.
+- Viz oddíly „Otevřené body“ u jednotlivých kroků výše a `docs/testy_M5.md`.
