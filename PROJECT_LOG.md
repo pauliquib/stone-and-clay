@@ -394,3 +394,40 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - `ruseni_nocniho_klidu` rozšířit na motorovou pilu / střelbu / hudbu z auta – nedělané (část B, hluk).
 - Nenahlášené činy nejsou ve hře vidět (jen v uložené pozici a v registru) – hajný / policie je později odhalí (M4.6).
 - Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.4 část A).
+## 2026-10-06 – M4.3 Soud a vězení
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou `godot --check-only` – ruční test čeká)
+- **Co**: nový `scripts/court.gd` (`class_name Court`, `World.court`): případ per hráč `{id, oid, name, par, drb, pokuta_max, t,
+  stav, summon_jd, trial_jd, obhajce}`. Tok: obvinění (`misto` „soud“ z `World.commit_offense` → `Court.open_case`, žádná
+  okamžitá pokuta) → předvolání poštou 3–7 dní od obvinění (`SUMMON_DAYS`), jednání 2 dny po předvolání ve 9:00, příchod
+  = hráč do 40 m od dveří úřadu (`ATTEND_RADIUS`, dočasně místo zastávky), okno 2 h → jinak rozhodnutí v nepřítomnosti
+  (pokuta ×1,5, zatykač 30 dní přes `wanted_until`, nepodmíněný trest se vykoná až po zadržení).
+- **Co**: jednání = menu „Soud“: Přiznat a litovat (+2) / Mlčet (0) / Zapírat (−1) / obhájce 5 000 Kč (+1, `SCORE_*`).
+  Skóre dále: recidiva −1 za trest (max −3), pověst ±1 (≥ 30 / ≤ −30), karma ≥ 30 +1. Rozsudek: skóre ≥ 4 podmínka + nižší
+  pokuta; 2–3 pokuta + OPP + zákaz řízení (jen dopravní činy); 0–1 pokuta + OPP, u těžkého činu / recidivy nepodmíněný;
+  < 0 pokuta ×1,3, u těžkého nepodmíněný, jinak podmínka. Těžký = nejvyšší pokuta z katalogu ≥ 30 000 Kč nebo ≥ 2 předchozí tresty.
+  Po jednání 4 h (zatemnění + `skip_time`).
+- **Co**: tresty v `data/zakon.json` → `tresty` (rozmezí peněz, OPP, podmínka, zákaz, nepodmíněný trest, měřítko vězení;
+  vše „ověřit“). Peněžitý trest → `Debts.add(…, "trest", …)`; `Debts.FINE_KINDS` rozšířeno o „trest“ (platí se na úřadě).
+  Zákaz řízení → `Permits.revoke("ridicsky", …, until_jd)`. Podmínka → `Court._probation` (porušení = nový nepodmíněný
+  trest na podmíněnou délku). Rozsudek se zapíše do záznamu `records[]` klíčem `rozsudek {druh, delka, do_jd, volba}`.
+- **Co**: `law.gd` `LawRecord.criminal_record()` = pohled na záznamy s `trestny_cin` a `rozsudek`; `Jobs._record_clean`
+  na něj přepnut (čistý rejstřík se počítá až po rozsudku).
+- **Co**: `world.gd` – `_on_busted` rozdělen: záchytka do `_sober_up_cell(id, text)`; u trestného činu (misto „soud“)
+  hlášení o obvinění místo pokuty. `World.skip_long(id, days)`: jeden skok času, pověst −20, karma +5, respekt komunit
+  −10 (štamgasti +5), dluhy dohnány po dnech, tělo dohnáno max 72 h, událost `jailed` (výpověď z práce).
+  Vězení: zatemnění, `skip_long`, teleport k úřadu, pošta se shrnutím.
+- **Ukládání**: `save_game.gd` klíč `court` (per hráč), starý save bez klíče = žádné případy.
+
+### Otevřené body
+- Autobusová zastávka ve hře není – „odvoz k soudu“ a návrat z vězení jsou dočasně u dveří úřadu (`World.places["urad"]`).
+  Doplnit zastávku jako místo (cedule + lavička) a autobus, pak přepnout `Court._at_court`.
+- OPP: jen evidence (`Court._opp`: hodiny, lhůta 1 rok). Odpracování úklidem obce (M3.2 úkoly bez mzdy) a přeměna
+  nesplněných OPP na trest chybí.
+- Podmíněné propuštění v polovině trestu chybí; nepřítomnost → nepodmíněný trest se nevykoná (chybí zatčení policií).
+- `World.skip_long`: zahrada a zvířata se dohánějí jen samy s limitem `MAX_CATCHUP_DAYS` (400 / 60) – chybí souhrnný
+  úhyn zvířat a uschnutí zahrady; auto (baterie), nájem bytu, nikotin a hmotnost zatím neřeší; tělo jen 72 h.
+- Rejstřík trestů není v deníku J / P (`hud.gd` nemá pid); jen data v `Court.status_lines(pid)` a poštou.
+- Zákaz řízení po rozsudku: konec zákazu přes `until_jd` v Permits bez přezkoušení (ověřit v ruční hře).
+- Háček pro M4.4 (svědci) a M4.6 (pytláctví, nedovolené ozbrojování jako trestné činy) – katalog už `misto: soud`, přes Court projde.
+- Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.3).

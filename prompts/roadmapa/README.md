@@ -73,8 +73,8 @@ Do nové session napiš např.:
 |---|---|---|---|
 | [x] | M4.1 Řidičská oprávnění a autoškola (rozšíření `Permits`, klávesa P) | [`M4_zakon/01_ridicska_opravneni_autoskola.md`](M4_zakon/01_ridicska_opravneni_autoskola.md) | M3.4, M1.6, M6.1 |
 | [x] | M4.2 Správní řízení na úřadě + společné dluhy a exekuce (`Debts`) | [`M4_zakon/02_spravni_rizeni_urad.md`](M4_zakon/02_spravni_rizeni_urad.md) | M4.1 |
-| [ ] | M4.3 Soud a vězení | [`M4_zakon/03_soud_a_vezeni.md`](M4_zakon/03_soud_a_vezeni.md) | M4.2 |
 | [ ] | M4.4 Další přestupky, svědci (`witness_check`), obecní vyhlášky (pálení, sucho, hluk) — **část A hotová** (svědci, nenahlášené činy, oživené řádky); **část B čeká na vlnu 4** | [`M4_zakon/04_dalsi_prestupky.md`](M4_zakon/04_dalsi_prestupky.md) | M4.2 · **velký – možná 2 session** |
+| [x] | M4.3 Soud a vězení | [`M4_zakon/03_soud_a_vezeni.md`](M4_zakon/03_soud_a_vezeni.md) | M4.2 |
 | [x] | M4.5 Dobré skutky a přátelství (`Favors`) | [`M4_zakon/05_povest_respekt_karma_skutky.md`](M4_zakon/05_povest_respekt_karma_skutky.md) | M0.6 · lépe po M4.4 |
 | [ ] | M4.6 Zbraně, lov a rybolov podle zákona | [`M4_zakon/06_zbrane_lov_rybolov_zakon.md`](M4_zakon/06_zbrane_lov_rybolov_zakon.md) | M4.1, M4.3, **M4.4**, M2.7–M2.10 |
 | [ ] | M4.7 Katastr: koupě a prodej domů, bytů, polí, pozemků, lesů (jen domácí katastr) | [`M4_zakon/07_katastr_koupe_prodej_nemovitosti.md`](M4_zakon/07_katastr_koupe_prodej_nemovitosti.md) | M1.7, **M4.2 (`Debts`)**, M3.1 |

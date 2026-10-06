@@ -84,6 +84,7 @@ var law := {}                    # id → Law.LawRecord (rejstřík přestupků 
 var jobs := {}                   # id → Jobs (zaměstnání, směny, docházka, výplata – M3.1, data/prace.json)
 var favors: Favors               # prosby vesničanů a dobré skutky (M4.5), stav per hráč
 var debts: Debts                 # dluhy a pokuty (M4.2): bloková složenka, příkaz poštou, upomínka, exekuce; stav per hráč
+var court: Court                 # soud a vězení (M4.3): obvinění, předvolání, jednání, rozsudek; stav per hráč
 var action_runner: ActionRunner  # výběr cíle a průběh kontextových akcí (M0.4)
 var sleep_spots: Array[SleepSpot] = []
 var clients := {}                # id → LocalClient (jen hráči na tomto počítači)
@@ -481,6 +482,10 @@ func add_player(id: int, pos: Vector3, yaw: float) -> Player:
 		debts = Debts.new()
 		add_child(debts)
 		debts.setup(self)
+	if court == null:             # M4.3: soud a vězení (jedna instance, stav per hráč; kontrola v _process_impl)
+		court = Court.new()
+		add_child(court)
+		court.setup(self)
 	if fences == null:            # ploty a ohrady (Fáze 7) – až PO výběhu, zahradě i statku: sondy `_find_spot`
 		fences = FenceManager.new()   # hledají jejich místa kolizním kvádrem a na hotový plot by narazily
 		add_child(fences)
@@ -1575,6 +1580,9 @@ func _on_busted(id: int, p: float, reason: String) -> void:
 	var text := "ZADRŽEN POLICIÍ\n%s\nPokuta %d Kč (%s), zákaz řízení %d h.\n%s" % [
 		reason, res.get("fine", 0), "zaplaceno %d Kč" % res.get("paid", 0) if int(res.get("paid", 0)) > 0 else "příkaz k úhradě přijde poštou",
 		int(res.get("ban_h", 0.0)), "Kůň zůstal u cesty." if pl.horse else "Auto odtaženo domů."]
+	if String(res.get("misto", "")) == "soud":     # M4.3: trestný čin → obvinění, rozsudek až u soudu
+		text = "ZADRŽEN POLICIÍ\n%s\nObvinění (trestný čin) – rozhodne soud. Předvolání přijde poštou.\nZákaz řízení %d h (do rozsudku).\n%s" % [
+			reason, int(res.get("ban_h", 0.0)), "Kůň zůstal u cesty." if pl.horse else "Auto odtaženo domů."]
 	if int(res.get("points", 0)) > 0:
 		text += "\n+%d bodů (celkem %d / %d)." % [res["points"], res["total_points"], int(Law.setting("body_limit", 12.0))]
 	if res.get("points_ban", false):
@@ -1587,15 +1595,22 @@ func _on_busted(id: int, p: float, reason: String) -> void:
 		dismount_horse(id)
 	move_player_car_to(id, "domov")
 	if p >= 1.0:
-		var zr := commit_offense(id, "zachytka", {"quiet": true})
-		text += "\nNoc strávíš na záchytce (+%s Kč)." % _thousands(int(zr.get("fine", 0)))
-		await blackout(id, 2.0)
-		var h := fmod(31.0 - clock.hour(), 24.0)
-		skip_time(id, maxf(h, 1.0), true)
-		var home: Place = places["domov"]
-		interior_clear(pl)
-		pl.teleport(home.door + Vector3(0, 0.3, 0), pl.yaw, false)
+		text = await _sober_up_cell(id, text)
 	notify(id, "show_message", [text, 9.0])
+
+
+## M4.3: záchytka (poplatek, noc do rána, `skip_time`, návrat domů). Vrací text pro hlášku.
+func _sober_up_cell(id: int, text: String) -> String:
+	var pl: Player = players.get(id)
+	var zr := commit_offense(id, "zachytka", {"quiet": true})
+	text += "\nNoc strávíš na záchytce (+%s Kč)." % _thousands(int(zr.get("fine", 0)))
+	await blackout(id, 2.0)
+	var h := fmod(31.0 - clock.hour(), 24.0)
+	skip_time(id, maxf(h, 1.0), true)
+	var home: Place = places["domov"]
+	interior_clear(pl)
+	pl.teleport(home.door + Vector3(0, 0.3, 0), pl.yaw, false)
+	return text
 
 
 ## Jediná brána pro tresty (M0.5): zapíše přestupek do rejstříku (Law.LawRecord), vybere pokutu, přičte body,
@@ -1630,10 +1645,10 @@ func commit_offense(id: int, offense_id: String, data := {}) -> Dictionary:
 			if fine > 0:
 				debts.queue_order(id, fine, jd, "%s (%s)" % [res["name"], res["par"]], offense_id)
 				rec["stav"] = "prikaz"
-		_:
-			if fine > 0:
-				debts.add(id, "pokuta", fine, jd + Debts.DUE_DAYS, "%s (soud – zjednodušeně)" % res["name"], offense_id)
-				rec["stav"] = "splatne"
+		_:    # M4.3: soud – obvinění a předvolání; rozsudek (pokuta, zákaz, vězení) řeší Court
+			if court:
+				court.open_case(id, res, float(rec.get("t", clock.minutes)))
+			rec["stav"] = "obvineni"
 	emit_game_event(id, "offense", {"id": offense_id, "fine": res["fine"], "points": res["points"],
 		"criminal": res["criminal"]})
 	if res.get("points_ban", false) and permits:   # M4.1: 12 bodů → řidičák odebrán, nutné přezkoušení
@@ -1725,6 +1740,36 @@ func skip_time(id: int, hours: float, sleeping: bool) -> void:
 	var pl: Player = players.get(id)
 	if pl:
 		pl.stamina = pl.body.stamina_max()
+
+
+## M4.3: dlouhý pobyt mimo hru (výkon trestu). Jeden skok času, bez simulace každého dne:
+## pověst / karma / respekt, dluhy po dnech (`Debts.advance_to`), tělo jen dohnáno omezeně.
+## Zahrada a zvířata se dohánějí samy s limitem MAX_CATCHUP_DAYS (otevřený bod). Vrací {days, summary}.
+func skip_long(id: int, days: int) -> Dictionary:
+	var pl: Player = players.get(id)
+	if pl == null or days <= 0:
+		return {}
+	var rep: Reputation = reputations.get(id)
+	var lines := []
+	var dluh_pred := debts.total(id) if debts else 0
+	if rep:
+		rep.change(-20.0, "výkon trestu")
+		rep.change_karma(5.0, "odpykání trestu")
+		for c in Reputation.COMMUNITIES.keys():
+			rep.change_respect(c, 5.0 if c == "stamgasti" else -10.0, "výkon trestu")
+		lines.append("Pověst −20, respekt komunit −10 (štamgasti +5 – slavný návrat), karma +5.")
+	clock.skip_hours(days * 24.0)
+	if debts:
+		debts.advance_to(clock.jd())
+	for p in players.values():
+		p.body.skip_hours(minf(days * 24.0, 72.0), p.id == id)   # tělo dohnáno omezeně (zjednodušení)
+	pl.stamina = pl.body.stamina_max()
+	var dluh_po := debts.total(id) if debts else 0
+	if dluh_po > dluh_pred:
+		lines.append("Dluhy narostly na %s (upomínky, exekuce)." % Bazaar.kc(dluh_po))
+	lines.append("Auto a zvířata ve tvé péči: zjednodušeně, otevřený bod (doháněno jen do limitu).")
+	emit_game_event(id, "jailed", {"days": days})
+	return {"days": days, "summary": "\n".join(PackedStringArray(lines))}
 
 
 # ------------------------------------------------------------------ akce hráčů
@@ -3588,6 +3633,8 @@ func _process_impl(_delta: float) -> void:
 
 	if clock and debts:           # M4.2: denní krok dluhů (upomínky, exekuce, doručení příkazů)
 		debts.advance_to(clock.jd())
+	if court:                     # M4.3: předvolání, jednání u soudu, nepřítomnost
+		court.tick()
 	_season_t -= _delta
 	if _season_t <= 0.0:
 		_season_t = SEASON_CHECK_S

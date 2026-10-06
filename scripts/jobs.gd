@@ -372,10 +372,7 @@ func _record_clean() -> bool:
 	var lr: Law.LawRecord = game.law.get(pid)
 	if lr == null:
 		return true
-	for r in lr.records:
-		if bool((r as Dictionary).get("trestny_cin", false)):
-			return false
-	return true
+	return lr.criminal_record().is_empty()     # M4.3: rejstřík trestů (jen činy s rozsudkem)
 
 
 ## Oblečení z požadavků: tag (`obleceni_tag`), volitelně na konkrétním slotu (`obleceni_slot`, M3.2 – „pracovní boty“).

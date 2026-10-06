@@ -57,3 +57,15 @@ Spouští jen uživatel. Stav: staticky ověřeno (kontrola překladu), ruční 
 8. Nehoda bez svědků (mimo obec, v noci) → žádné hlášení; zpráva o nenahlášeném činu se neobjeví ve hře, jen v uložené pozici (ověř přes F5 → F9 bez pádu).
 9. Starý save (před M4.4, s klíčem `forestry.unreported`, pokud existuje) se načte bez chyby; pokácené stromy a pařezy zůstanou.
 10. Pověst: po kácení/střelbě u vesničanů se pověst mění stejně jako dřív (`_witnesses` v pověsti počítá jen ty, kdo vidí); nic nehlásí v prázdné pustině.
+## M4.3 – Soud a vězení
+
+1. Řízení s 1,5 ‰ (F2 → Hráč → promile) → záchytka do rána a hlášení „Obvinění (trestný čin)“; rejstřík (P / deník J) zatím prázdný.
+2. F2 → Datum posuň o 3–7 dní → přijde pošta „Předvolání k soudu“ s termínem (9:00, za X dní).
+3. V den termínu ve 9:00 stůj u úřadu (do ~40 m od dveří) → menu „Soud – …“; zvol „Přiznat a litovat“ → zatemnění, hlášení ROZSUDEK, zákaz řízení (P ukazuje odebraný řidičák).
+4. Peněžitý trest se objeví v dluzích (banka → Pokuty, deník J → Úřední záznamy); zaplať na úřadě (E u úřednice).
+5. Nepřijď do 11:00 → pošta „Rozsudek“ v nepřítomnosti a zatykač (policie tě zadrží při setkání).
+6. Podmínka (vyber „Zapírat“ nebo jiný rozsudek s podmínkou); další trestný čin během podmínky → nepodmíněný trest: „Nastupuješ výkon trestu (N měsíců)“, po zatemnění propuštění u úřadu a pošta se shrnutím (pověst, dluhy).
+7. Zaměstnaný hráč (Práce) po nástupu do vězení dostane výpověď „nástup do vězení“ (deník J → Práce).
+8. Práce s požadavkem „čistý rejstřík“ (`rejstrik_cisty`) tě nevezme, dokud tě soud neodsoudí; obvinění samo o sobě nevadí.
+9. Starý save (bez klíče `court`) se načte bez chyby; případy jsou prázdné.
+10. F5 → F9 uprostřed předvolání (před jednáním): případ, termín a stav „předvolán“ zůstanou.

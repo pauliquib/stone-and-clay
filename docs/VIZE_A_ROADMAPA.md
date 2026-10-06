@@ -429,10 +429,10 @@ kroky přehazovat, mezi milníky platí závislosti.
   e-test na PC, jízdy, zkouška, jízda bez oprávnění.
 - [x] **M4.2 Správní řízení na úřadě** – blokové pokuty, příkazy poštou, splatnost, odpor, společný systém dluhů a exekucí
   (`Debts` – použije ho i M4.3 a hypotéka M4.7), schránka, vrácení řidičáku.
-- [ ] **M4.3 Soud a vězení** – trestné činy z katalogu, rejstřík jako pohled na záznamy, tresty, souhrnný časový skok a jeho následky.
 - [ ] **M4.4 Další přestupky a svědci** – **část A hotová** (jednotný `witness_check`, nenahlášené činy, oživené řádky
   katalogu; zbývá povolení ke kácení). **Zbývá část B:** obecní vyhlášky – pálení větví (suché / čerstvé, táborák), sucho
   (zákaz zalévání z vodovodu), hluk a nedělní klid (čeká na vlnu 4).
+- [x] **M4.3 Soud a vězení** – trestné činy z katalogu, rejstřík jako pohled na záznamy, tresty, souhrnný časový skok a jeho následky.
 - [x] **M4.5 Nové cesty k pověsti / respektu / karmě** – pomoc sousedům, úklid, vrácení věcí, přátelství
   s postavami, drobné dobré skutky (seznam v 3.5).
 - [ ] **M4.6 Zbraně, lov a rybolov podle zákona** – zbrojní oprávnění, lovecký a rybářský lístek,

@@ -56,6 +56,14 @@ class LawRecord:
 			points = maxi(points - n * int(Law.setting("body_odpocet", 4.0)), 0)
 			_decay_t = base + n * year
 
+	## M4.3: rejstřík trestů = pohled nad `records` – trestné činy, u kterých soud vynesl rozsudek (`rozsudek`).
+	func criminal_record() -> Array:
+		var out := []
+		for r in records:
+			if bool((r as Dictionary).get("trestny_cin", false)) and (r as Dictionary).has("rozsudek"):
+				out.append(r)
+		return out
+
 	## Zapíše přestupek. data: severity 0..1 (rozmezí pokuty / zákazu), player (Player – zákaz řízení).
 	## Pokutu nestrhává – řeší `World.commit_offense` podle `misto` (bloková / příkaz / soud).
 	## Vrací {ok, id, name, par, fine, paid, points, total_points, ban_h, points_ban, criminal, text}.

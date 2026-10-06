@@ -139,6 +139,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["law"] = lr.to_dict()
 	if world.debts:
 		d["debts"] = world.debts.to_dict(id)           # dluhy, příkazy na cestě, upomínky, exekuce (M4.2)
+	if world.court:
+		d["court"] = world.court.to_dict(id)           # obvinění, předvolání, rozsudky, podmínka, OPP (M4.3)
 	var jb: Jobs = world.jobs.get(id)
 	if jb:
 		d["jobs"] = jb.to_dict()                       # zaměstnání, docházka, napomenutí, nevyplacená mzda, rozdělaná směna (M3.1)
@@ -381,6 +383,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	var lr: Law.LawRecord = world.law.get(id)
 	if lr:
 		lr.from_dict(d.get("law", {}))         # starý save bez klíče = 0 bodů, prázdný rejstřík
+	if world.court:
+		world.court.from_dict(id, d.get("court", {}))   # starý save bez klíče = žádné případy (M4.3)
 	if world.debts:
 		if d.has("debts"):
 			world.debts.from_dict(id, d["debts"])
