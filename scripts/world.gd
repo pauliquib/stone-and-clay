@@ -133,6 +133,7 @@ var unreported := {}             # M4.4: id hráče → [{...}] činy, které ni
 var witness_sources: Array[Callable] = []   # M4.4/M4.6: další zdroje svědků (hajný, stráže) – `add_witness_source`
 var fire_mgr: FireManager        # oheň a topení (M2.2): ohniště, opékání, zákon u lesa, požár trávy, kamna doma
 var hasici: Hasici               # M5.3: sbor dobrovolných hasičů – zbrojnice u úřadu, členství, výjezdy k požáru trávy
+var studanka: Studanka           # M5.10: studánka v lese (pití, konev) a skautský tábor na mýtince (červenec)
 var npc_grow: NpcGrow            # M4.8 obsah pro dospělé: záhon zahrádkáře Ladislava (konopí), jen při zapnuté volbě
 var vyhlasky: Vyhlasky           # obecní vyhlášky (pálení, sucho, nedělní klid) a sušení čerstvých větví (M4.4 část B)
 var klesti: Klesti                # hromada klestí u domu (M4.4 část B): čerstvé větve schnou, suché se berou zpět
@@ -356,6 +357,9 @@ func build() -> void:
 	fire_mgr = FireManager.new()
 	add_child(fire_mgr)
 	fire_mgr.setup(self)
+	studanka = Studanka.new()     # M5.10: až po kalendáři (village_events) a terénu
+	add_child(studanka)
+	studanka.setup(self)
 	vyhlasky = Vyhlasky.new()
 	add_child(vyhlasky)
 	vyhlasky.setup(self)
@@ -2690,6 +2694,8 @@ func interactables(id: int) -> Array:
 		out.append_array(bazaar.interactables(id))
 	if fire_mgr:
 		out.append_array(fire_mgr.interactables(id))
+	if studanka:
+		out.append_array(studanka.interactables(id))   # M5.10: E u studánky (napít se, konev)
 	if hasici:
 		out.append_array(hasici.interactables(id))   # M5.3: vchod zbrojnice SDH (členství)
 	if garden:

@@ -129,3 +129,18 @@ Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kab
 5. Hráč nasedne do vlastního auta: v sedadle je jen jeho postava, žádný druhý řidič.
 6. F5 / F9 během jízdy: po načtení jsou AI auta s řidičem a žádná postava nezůstala viset ve vzduchu.
 7. F2 → Výkon: 5 AI aut s řidiči v obci – FPS srovnatelné s dřívějškem.
+
+## M5.10 – Studánka a skautský tábor (bikepark nehotový)
+
+Cheat: F2 → Teleport (zatím bez položky; přes souřadnice `Studanka.SPRING_POS` / `CAMP_POS` nebo blízko návsi a pěšky do lesa).
+
+1. Jdi do lesa na souřadnice (-220, 400) → u potoka stojí kamenná studánka s cedulí „Studánka U Jelena“.
+2. U studánky E → „napít se“ a hláška o studené vodě; ohlas zprávy je vidět.
+3. S prázdnou konví (`konev`) u studánky E → „naplnit konev“ → v inventáři `konev_plna`.
+4. F2 → Datum leden (nebo chladné počasí do 0 °C) → studánka je zamrzlá, voda neteče, hláška.
+5. Jdi na mýtinku (-430, 110) → stálé tábořiště: stožár s vlajkou, kruh kamenů, lavice, cedule „Tábor oddílu Lesních Sov“.
+6. F2 → Datum 10. 7. → u mýtinky (do 300 m) stojí tři stany a je vidět záře ohně.
+7. Datum 20. 7. → stany zmizí, tábořiště zůstane.
+8. Nástěnka / web obce v období 1.–14. 7. hlásí „Skautský tábor v lese“.
+9. F5 / F9 → po načtení je studánka a tábořiště na stejném místě, žádná chyba v logu.
+10. Ověř, že hra běží bez chyby po přechodu přes studánku a tábořiště (log bez SCRIPT ERROR mimo addony).

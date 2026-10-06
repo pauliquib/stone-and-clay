@@ -1143,3 +1143,30 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - **Autobus (2.4)** nebyl zadán (volitelné).
 - LOD jen podle vzdálenosti od hráče; výkon v obci s 5 AI auty nebyl měřen (nespouštěno).
 - `README.md`, `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` nebyly upraveny (zadání).
+
+## 2026-10-06 – M5.10 Místa v lese: studánka a skautský tábor (bikepark do otevřených bodů)
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Návrh míst (rozhodnutí z README → Rozhodnutí, řádek M5.10 – uživatel může upravit konstanty):**
+  - **Studánka U Jelena**: `Studanka.SPRING_POS = (-220, 400)` v lese, potok ~10 m (`water.json`), lesní cesta (`track`/`path`) ~30 m, 17 stromů do 40 m.
+  - **Tábor oddílu Lesních Sov**: `Studanka.CAMP_POS = (-430, 110)`, bezstromá mýtina (žádný strom do 10 m), 16 stromů do 40 m, cesta ~36 m, potok ~330 m, ~450 m od návsi.
+  - **Bikepark**: místo ani kolo nejsou navržené (viz otevřené body).
+- **Odvození souřadnic** (offline, skript mimo repozitář): kandidátní mřížka 10 m v rozsahu ±1 500 m. Hustota lesa = počet stromů z `data/trees.bin` (stride 11 float, x = `d[k]`, z = `d[k+2]`) v 40 m; vzdálenost k potoku z `data/water.json` (`streams[].pts`); vzdálenost k cestám z `data/map.json` (`roads` s `kind` track/path). Filtr: studánka = les ≥ 14 stromů/40 m, potok 8–60 m, cesta 10–40 m; tábor = bez stromu do 10 m, les 8–30 stromů/40 m, cesta 15–60 m, potok ≥ 60 m; mezi kandidáty nejbližší k 450 m od návsi. Výška se nepočítá v datech, bere se za běhu `Terrain.height_at(x, z)`.
+- **Nový soubor** `scripts/studanka.gd` (`class_name Studanka`, `World.studanka`):
+  - **Studánka** (procedurálně přes `MeshKit`): kamenný prstenec, nádržka s vodou, stříška na dvou sloupcích, cedule `Label3D`, hrnek na řetízku. `interactables` (dosah 3 m): „napít se“ a „naplnit konev“ (`konev` → `konev_plna`, stejně jako zahrada). V zimě (`Weather.temp` ≤ 0 °C) zamrzlá, hláška místo vody.
+  - **Tábor – stálé**: stožár s vlajkou, kruh kamenů, ohniště, čtyři lavice z kulatiny, cedule.
+  - **Tábor – letní událost**: od 1. do 14. 7. (`camp_day(jd)`, pravidlo do kalendáře `VillageEvents.register("tabor", …)` se zobrazí v nástěnce / na webu obce) tři stany a záře ohně; zobrazí se jen když je hráč do 300 m. Kontrola každé 2 s v `_process`.
+  - Stav nemá, takže `save_game.gd` se nemění.
+- **Napojení**: `scripts/world.gd` – var `studanka`, vytvoření a `setup` hned za `fire_mgr.setup` (po kalendáři a terénu), `studanka.interactables` v `interactables`.
+- **Nezměněno** (sdílené soubory): `forestry.gd`, `pois.json`, `save_game.gd`, `car.gd`, `traffic.gd`, README, `VIZE`, roadmapa README.
+- **Kontrola překladu**: `--import` a `--check-only` na `scripts/studanka.gd` a `scripts/world.gd` (výsledek viz odpověď agenta).
+
+### Otevřené body
+- **Bikepark** (horské kolo „Bobr MTB“, trasa se skoky, minihra časovka, dovednost `cyklistika`) není. Místo 30–80 m převýšení v lese se nevybralo (v datech chybí výškový profil mimo terén). Další session.
+- **Tábor – NPC**: děti a vedoucí (`Humanoid`), denní program, táborák se zpěvem (`RadioMusic`), prosby vedoucího a noční klid jsou jen v návrhu; na mýtince jsou zatím stany a oheň.
+- **Žízeň** není v `BodyState`, takže napití je jen zpráva bez efektu na výdrž. Doplnit po zavedení žízně.
+- **Karma za úklid listí** u studánky (M4.5 `EVENT_EFFECTS`) není.
+- **Hluk u tábora v noci** (stížnost přes model hluku M4.4) není.
+- **Teleport „Studánka“ / „Tábor“** není: položky do `data/pois.json` se nepřidávaly (sdílený soubor). Doplnit po dohodě s M5.1.
+- **Kolize a zem**: stany a stožár nemají kolizi; neověřeno na mapě, zda je mýtinka opravdu rovná (výška jen z `height_at`).
+- `README.md` (Systémy → Les), `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` nebyly upraveny (zadání).
