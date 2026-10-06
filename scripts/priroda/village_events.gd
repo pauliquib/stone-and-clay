@@ -5,7 +5,10 @@
 ## - datum každé události určuje `_active_at`; kontrola se opakuje každých `CHECK_S` s reálného času a hned po skoku
 ##   v datu (`refresh`, F2 → Datum)
 ## - dekorace a postavy vznikají jen když je událost aktivní a hráč je do `NEAR_R` m; jinak se zruší
-## - API: `active()`, `is_active(id)`, `event_hours(klíč_místa, jd)` (Place.is_open), `names_text()` (HUD)
+## - M5.5: pravidelná taneční zábava (1. a 3. sobota, 20–3 h, hospoda pod širým nebem): pódium, kapela (4 postavy),
+##   generovaná hudba (`RadioMusic`, střídá hraní a pauzy), tančící návštěvníci; nástěnka u úřadu (`_build_nastenka`)
+## - API: `active()`, `is_active(id)`, `event_hours(klíč_místa, jd)` (Place.is_open), `names_text()` (HUD),
+##   `upcoming(dny)` ([[jd, text]] pro plakát a web obce), `register(id, pravidlo, text)` (další akce kalendáře)
 ## Úkoly k událostem zatím nejsou (viz PROJECT_LOG – otevřené body).
 class_name VillageEvents
 extends Node3D
@@ -28,6 +31,16 @@ const FIREWORK_COLORS := [Color(1.0, 0.25, 0.2), Color(1.0, 0.8, 0.2), Color(0.3
 const XMAS_COLORS := [Color(1.0, 0.2, 0.15), Color(1.0, 0.85, 0.3), Color(0.3, 0.6, 1.0), Color(0.4, 1.0, 0.4),
 	Color(1.0, 0.95, 0.85)]
 const MASKS := ["medved", "kobyla", "slameny", "kominik", "klaun"]   # neutrální masopustní masky
+## Taneční zábava (M5.5): 1. a 3. sobota v měsíci, jen v uvedených měsících; hraje smyšlená kapela (podle dne)
+const ZABAVA_WEEKDAY := 5                   # sobota (jd % 7; 0 = pondělí)
+const ZABAVA_NTH := [1, 3]
+const ZABAVA_MONTHS := [1, 2, 3, 4, 5, 9, 10, 11]
+const ZABAVA_BANDS := ["Traktor Blues", "Zlatá Kovadlina", "Vesnický Expres", "Kulatá Šestka"]
+const ZABAVA_VISITORS := 14
+const ZABAVA_PLAY_S := 40.0                 # reálné sekundy hraní (~20 herních minut)
+const ZABAVA_PAUSE_S := 20.0                # reálné sekundy pauzy mezi sety (~10 herních minut)
+const ZABAVA_LIGHTS := [Color(1.0, 0.25, 0.3), Color(0.3, 0.6, 1.0), Color(1.0, 0.85, 0.3), Color(0.5, 1.0, 0.4)]
+const NASTENKA_POS_DIST := [5.0, 7.0, 9.0]
 
 ## Události. hours = [od, do] hodin dne události (u silvestra řeší okno `_active_at`);
 ## place_hours = úprava otevírací doby míst v „dnech události“ (viz `_place_day`), 26 = 2:00.
@@ -38,6 +51,7 @@ const EVENTS := {
 	"carodejnice": {"name": "Pálení čarodějnic", "hours": [18.0, 24.0], "place": "", "place_hours": {}},
 	"hody": {"name": "Hody", "hours": [0.0, 24.0], "place": "hospoda", "place_hours": {"hospoda": [10, 28]}},
 	"silvestr": {"name": "Silvestr", "hours": [23.667, 24.667], "place": "urad", "place_hours": {"hospoda": [10, 27]}},
+	"zabava": {"name": "Taneční zábava", "hours": [20.0, 27.0], "place": "hospoda", "place_hours": {"hospoda": [10, 27]}},
 }
 
 var world: World
@@ -62,12 +76,28 @@ var _fw_light: OmniLight3D
 var _fw_t := 1.0
 var _fw_flash := 0.0
 var _fw_center := Vector3.ZERO
+# taneční zábava (M5.5)
+var _zab_player: AudioStreamPlayer3D
+var _zab_lights: Array[OmniLight3D] = []
+var _zab_dancers: Array = []          # [Humanoid, fáze, základní natočení]
+var _zab_band: Array[Humanoid] = []
+var _zab_t := 0.0
+var _zab_on := true                   # hraje (true) / pauza (false)
+var _zab_clock := ZABAVA_PLAY_S
+var _zab_name := ""
+var _music_cache := {}                # "metal" → AudioStreamWAV
+var _music_task := -1
+var _music_res: AudioStreamWAV
+# nástěnka a registrované akce kalendáře
+var _board_label: Label3D
+var _registered := {}                 # id → {"rule": Callable(jd) -> bool, "text": String}
 
 
 func setup(w: World) -> void:
 	world = w
 	clock = w.clock
 	refresh()
+	_build_nastenka()
 
 
 # ------------------------------------------------------------------ kalendář
@@ -100,7 +130,48 @@ func _active_at(id: String, jd: int, hour: float) -> bool:
 			return jd == s or jd == s - 1
 		"silvestr":
 			return (m == 12 and day == 31 and hour >= hrs[0]) or (m == 1 and day == 1 and hour < hrs[1] - 24.0)
+		"zabava":
+			return (zabava_day(jd) and hour >= hrs[0]) or (zabava_day(jd - 1) and hour < hrs[1] - 24.0)
 	return false
+
+
+## Taneční zábava (M5.5): 1. nebo 3. sobota v povoleném měsíci; v den hodů se nekoná (má vlastní zábavu).
+static func zabava_day(jd: int) -> bool:
+	if jd % 7 != ZABAVA_WEEKDAY:
+		return false
+	var d := Clock.from_jdn(jd)
+	if not (int(d["month"]) in ZABAVA_MONTHS):
+		return false
+	var nth := (int(d["day"]) - 1) / 7 + 1
+	if not (nth in ZABAVA_NTH):
+		return false
+	return jd != hody_sunday(int(d["year"])) - 1
+
+
+## Jméno kapely na daný den (stejná kapela se opakuje podle data, ne náhodně).
+static func band_for(jd: int) -> String:
+	return ZABAVA_BANDS[posmod(jd / 7, ZABAVA_BANDS.size())]
+
+
+## Registrace další akce kalendáře (plakát, web obce): `rule` = Callable(jd) -> bool, `text` = popis.
+func register(id: String, rule: Callable, text: String) -> void:
+	_registered[id] = {"rule": rule, "text": text}
+
+
+## Nadcházející akce obce: [[jd, text]] na `days` dní od dneška (pro nástěnku a web obce).
+func upcoming(days: int) -> Array:
+	var out := []
+	if clock == null:
+		return out
+	var jd0 := clock.jd()
+	for j in range(jd0, jd0 + days + 1):
+		if zabava_day(j):
+			out.append([j, "Taneční zábava – hraje %s · 20 h · hospoda" % band_for(j)])
+		for id in _registered:
+			var r: Dictionary = _registered[id]
+			if (r["rule"] as Callable).call(j):
+				out.append([j, String(r["text"])])
+	return out
 
 
 ## Platí úprava otevírací doby míst (`place_hours`) v tento den?
@@ -116,6 +187,8 @@ func _place_day(id: String, jd: int) -> bool:
 			return jd == s or jd == s - 1
 		"silvestr":
 			return m == 12 and day == 31
+		"zabava":
+			return zabava_day(jd)
 	return false
 
 
@@ -173,6 +246,8 @@ func _process(delta: float) -> void:
 		_update_bonfire(delta)
 	if _nodes.has("silvestr"):
 		_update_fireworks(delta)
+	if _nodes.has("zabava"):
+		_update_zabava(delta)
 
 
 ## Znovu vyhodnotí, které události běží, a postaví / zruší jejich dekorace.
@@ -191,6 +266,7 @@ func refresh() -> void:
 			_build(id)
 		elif not want and _nodes.has(id):
 			_destroy(id)
+	_update_board()
 
 
 func _center(id: String) -> Vector3:
@@ -220,6 +296,8 @@ func _build(id: String) -> void:
 			_build_hody(root)
 		"silvestr":
 			_build_silvestr(root)
+		"zabava":
+			_build_zabava(root)
 
 
 func _destroy(id: String) -> void:
@@ -227,6 +305,11 @@ func _destroy(id: String) -> void:
 	_nodes.erase(id)
 	n.queue_free()
 	match id:
+		"zabava":
+			_zab_player = null
+			_zab_lights.clear()
+			_zab_dancers.clear()
+			_zab_band.clear()
 		"vanoce":
 			_xmas_lights.clear()
 		"masopust":
@@ -287,6 +370,206 @@ func _free_spot(key: String, dists: Array, lats: Array) -> Vector3:
 ## Kulaté rozsvícené světýlko (emisní koule) do stavebnice.
 func _bulb(k: MeshKit, p: Vector3, r: float, c: Color) -> void:
 	k.sphere(p, r, c, Vector3.ONE, Vector3.ZERO, 6, 3)
+
+
+# ------------------------------------------------------------------ taneční zábava (M5.5)
+
+## Pódium na hospodě pod širým nebem: kapela (kytara, basa, bicí, klávesy), světla, reproduktor a parket s tančícími.
+func _build_zabava(root: Node3D) -> void:
+	var pl: Place = world.places["hospoda"]
+	var face: float = pl.data.get("face_yaw", 0.0)
+	var b := Basis(Vector3.UP, face)
+	var base := _free_spot("hospoda", [11.0, 14.0, 9.0], [-8.0, 8.0, 0.0, -14.0, 14.0])
+	var sp := base + b * Vector3(0.0, 0.0, -7.0)
+	sp = _ground(sp.x, sp.z)
+	var f := base - sp
+	f.y = 0.0
+	f = f.normalized()
+	var yaw := atan2(-f.x, -f.z)                  # forward (−Z) kapely míří na parket
+	var side := Basis(Vector3.UP, yaw) * Vector3.RIGHT
+	var jd := clock.jd()
+	var start := jd if zabava_day(jd) else jd - 1
+	_zab_name = band_for(start)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = start
+	var wood := Color(0.42, 0.3, 0.18)
+	var k := MeshKit.new()
+	# parket a pódium (0,7 m nad terénem) se zadní stěnou
+	k.box(base + Vector3(0, 0.02, 0), Vector3(6.0, 0.04, 6.0), Color(0.55, 0.36, 0.2), Vector3(0, yaw, 0))
+	k.box(sp + Vector3(0, 0.35, 0), Vector3(7.0, 0.7, 4.0), wood, Vector3(0, yaw, 0))
+	k.box(sp + Vector3(0, 2.1, 0) - f * 1.9, Vector3(7.4, 2.8, 0.2), Color(0.15, 0.12, 0.1), Vector3(0, yaw, 0))
+	for s in [-3.6, 3.6]:
+		k.cylinder(sp + side * float(s) + Vector3(0, 1.5, 0), 0.06, 0.06, 3.0, wood)
+	# bicí: buben a činely za kapelou
+	k.cylinder(sp + Vector3(0, 1.05, 0) - f * 0.6, 0.38, 0.38, 0.35, Color(0.8, 0.12, 0.12), Vector3.ZERO, 12)
+	k.cylinder(sp + Vector3(0, 1.45, 0) - f * 0.6, 0.22, 0.22, 0.03, Color(0.85, 0.7, 0.3), Vector3.ZERO, 12)
+	# klávesy (pultík)
+	k.box(sp + side * 2.9 + Vector3(0, 1.0, 0), Vector3(0.9, 0.9, 0.5), Color(0.1, 0.1, 0.12), Vector3(0, yaw, 0))
+	var mi := MeshKit.mesh_instance(root, k.commit(MeshKit.vc_material(0.9, 0.0, 0.0, false)), 300.0)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# nápis na zadní stěně
+	var lb := Label3D.new()
+	lb.text = "%s\nTANEČNÍ ZÁBAVA" % _zab_name
+	lb.font_size = 64
+	lb.pixel_size = 0.012
+	lb.outline_size = 8
+	lb.modulate = Color(1.0, 0.9, 0.5)
+	lb.position = sp + Vector3(0, 2.6, 0) - f * 1.8
+	lb.rotation.y = atan2(f.x, f.z)
+	root.add_child(lb)
+	# světla (barevné, blikají)
+	_zab_lights.clear()
+	for i in 3:
+		var l := OmniLight3D.new()
+		l.position = sp + side * float(i - 1) * 3.0 + Vector3(0, 3.4, 0) - f * 0.5
+		l.omni_range = 18.0
+		l.light_color = ZABAVA_LIGHTS[i]
+		l.light_energy = 1.5
+		root.add_child(l)
+		_zab_lights.append(l)
+	# reproduktor na pódiu (hudba se generuje ve vlákně, viz _start_music)
+	_zab_player = AudioStreamPlayer3D.new()
+	_zab_player.position = sp + Vector3(0, 1.2, 0)
+	_zab_player.unit_size = 12.0
+	_zab_player.max_distance = 350.0
+	_zab_player.volume_db = -3.0
+	root.add_child(_zab_player)
+	_zab_on = true
+	_zab_clock = ZABAVA_PLAY_S
+	_zab_t = 0.0
+	_start_music()
+	# kapela: kytara, basa, bicí za kitem, klávesy u pultíku
+	_zab_band.clear()
+	var band_base := sp + Vector3(0, 0.7, 0)
+	var shirts := [Color(0.15, 0.15, 0.18), Color(0.7, 0.1, 0.1), Color(0.2, 0.25, 0.4), Color(0.85, 0.8, 0.6)]
+	for i in 4:
+		var h := Humanoid.new()
+		_dress(h, "", rng)
+		h.shirt = shirts[i]
+		h.pants = Color(0.12, 0.12, 0.15)
+		h.hair_style = i % 4
+		var p := band_base + side * (float(i) - 1.5) * 1.5 - f * 0.4 if i < 3 else band_base + side * 2.9
+		h.position = p
+		h.rotation.y = yaw
+		root.add_child(h)
+		_zab_band.append(h)
+		if i < 2:
+			var gn := Node3D.new()
+			var gk := MeshKit.new()
+			var body_c := Color(0.7, 0.2, 0.1) if i == 0 else Color(0.15, 0.15, 0.15)
+			gk.box(Vector3(0, 0, 0), Vector3(0.14, 0.32, 0.05), body_c)
+			gk.box(Vector3(0, 0.3, 0), Vector3(0.05, 0.4, 0.03), wood)
+			MeshKit.mesh_instance(gn, gk.commit(MeshKit.vc_material(0.8, 0.0, 0.0, false)), 300.0)
+			h.hold(gn)
+	# návštěvníci: dvě třetiny tančí na parketu (kývají se k hudbě), zbytek stojí u stolů
+	_zab_dancers.clear()
+	var shirts_v := [Color(0.9, 0.3, 0.3), Color(0.25, 0.5, 0.85), Color(0.95, 0.95, 0.9), Color(0.3, 0.6, 0.35),
+		Color(0.85, 0.7, 0.2)]
+	for i in ZABAVA_VISITORS:
+		var dancer := i % 3 != 0
+		var p: Vector3
+		if dancer:
+			p = base + Vector3(rng.randf_range(-2.4, 2.4), 0.0, rng.randf_range(-2.4, 2.4))
+		else:
+			var a := TAU * float(i) / float(ZABAVA_VISITORS)
+			p = base + Vector3(cos(a), 0.0, sin(a)) * rng.randf_range(7.5, 12.0)
+		p = _ground(p.x, p.z)
+		var h := Humanoid.new()
+		_dress(h, "", rng)
+		h.shirt = shirts_v[rng.randi() % shirts_v.size()]
+		h.vis_end = 220.0
+		h.position = p
+		var face_band := atan2(-(sp.x - p.x), -(sp.z - p.z))
+		h.rotation.y = face_band
+		root.add_child(h)
+		if dancer:
+			_zab_dancers.append([h, rng.randf() * TAU, face_band])
+
+
+## Hudba zábavy: první pokus se generuje ve vlákně (WorkerThreadPool), pak se drží v cache.
+func _start_music() -> void:
+	if _zab_player == null or not is_instance_valid(_zab_player):
+		return
+	if not _music_cache.has("metal"):
+		if _music_task < 0:
+			_music_task = WorkerThreadPool.add_task(func(): _music_res = RadioMusic.make("metal"))
+		return
+	if _zab_player.stream == null:
+		_zab_player.stream = _music_cache["metal"]
+		_zab_player.stream_paused = not _zab_on
+		_zab_player.play()
+
+
+func _update_zabava(delta: float) -> void:
+	_zab_t += delta
+	_zab_clock -= delta
+	if _zab_clock <= 0.0:
+		_zab_on = not _zab_on
+		_zab_clock = ZABAVA_PLAY_S if _zab_on else ZABAVA_PAUSE_S
+		if _zab_player and is_instance_valid(_zab_player):
+			_zab_player.stream_paused = not _zab_on
+	if _music_task >= 0 and WorkerThreadPool.is_task_completed(_music_task):
+		WorkerThreadPool.wait_for_task_completion(_music_task)
+		_music_task = -1
+		if _music_res:
+			_music_cache["metal"] = _music_res
+		_start_music()
+	var col0 := int(_zab_t * 0.5)
+	for i in _zab_lights.size():
+		var l := _zab_lights[i]
+		if not is_instance_valid(l):
+			continue
+		l.light_color = ZABAVA_LIGHTS[(col0 + i) % ZABAVA_LIGHTS.size()]
+		var pulse := maxf(0.0, sin(_zab_t * 3.0 + float(i) * 2.1))
+		l.light_energy = (1.0 + 1.2 * pulse) * (1.0 if _zab_on else 0.25)
+	for e in _zab_dancers:
+		var h: Humanoid = e[0]
+		if is_instance_valid(h):
+			h.rotation.y = float(e[2]) + sin(_zab_t * 2.2 + float(e[1])) * 0.35
+
+
+# ------------------------------------------------------------------ nástěnka obce (M5.5)
+
+## Nástěnka u obecního úřadu: nejbližší akce z `upcoming` (stálá, není vázaná na událost).
+func _build_nastenka() -> void:
+	if world == null or not world.places.has("urad"):
+		return
+	var p := _free_spot("urad", NASTENKA_POS_DIST, [-6.0, 6.0, 0.0])
+	var f: Vector3 = world.places["urad"].door - p
+	f.y = 0.0
+	var root := Node3D.new()
+	root.name = "Nastenka"
+	root.position = p
+	root.rotation.y = atan2(f.x, f.z)           # čelo (+Z) k úřadu
+	add_child(root)
+	var wood := Color(0.42, 0.3, 0.18)
+	var k := MeshKit.new()
+	k.cylinder(Vector3(-0.9, 0.9, 0.0), 0.05, 0.05, 1.8, wood)
+	k.cylinder(Vector3(0.9, 0.9, 0.0), 0.05, 0.05, 1.8, wood)
+	k.box(Vector3(0, 1.6, 0), Vector3(2.0, 1.3, 0.06), Color(0.72, 0.55, 0.35))
+	MeshKit.mesh_instance(root, k.commit(MeshKit.vc_material(0.9, 0.0, 0.0, false)), 300.0)
+	_board_label = Label3D.new()
+	_board_label.position = Vector3(0, 1.6, 0.04)
+	_board_label.pixel_size = 0.009
+	_board_label.font_size = 28
+	_board_label.modulate = Color(0.15, 0.12, 0.08)
+	root.add_child(_board_label)
+	_update_board()
+
+
+func _update_board() -> void:
+	if _board_label == null or not is_instance_valid(_board_label) or clock == null:
+		return
+	var lines := PackedStringArray(["NÁSTĚNKA OBCE"])
+	var items := upcoming(14)
+	if items.is_empty():
+		lines.append("Zatím nic nevisí.")
+	for i in mini(items.size(), 3):
+		var e: Array = items[i]
+		var d := Clock.from_jdn(int(e[0]))
+		lines.append("%s %d. %d. – %s" % [["po", "út", "st", "čt", "pá", "so", "ne"][int(e[0]) % 7],
+			int(d["day"]), int(d["month"]), String(e[1])])
+	_board_label.text = "\n".join(lines)
 
 
 # ------------------------------------------------------------------ Vánoce

@@ -76,3 +76,14 @@ Cheat: F2 → Teleport (k autu) / Datum (noc, např. 23:00) / Hráč. Auto s kab
 4. Stavebniny → „Materiál (dvůr)“: písek 10 Kč.
 5. Otevírací doba pily: po–pá 7–17, so 7–12, v neděli zavřeno (F2 → Datum na sobotu a neděli).
 6. Mapa M: značka pily na stodole severně od haly; hromady stojí mimo budovy (ne uvnitř zdí).
+## M5.5 Kalendář událostí a zábava s kapelou
+1. F2 → Datum na sobotu 1. nebo 3. v měsíci (např. 3. 10. 2026) v 19:30; teleport k hospodě: mezi 20 h a 3 h se postaví pódium, kapela a parket.
+2. Nástěnka u obecního úřadu: nápis „NÁSTĚNKA OBCE“ s nejbližšími akcemi (zábava na sobotu); ověř, že text je čitelný z blízka.
+3. Web obce (počítač doma → kalendář): den zábavy je v seznamu s názvem kapely.
+4. Kapela (4 postavy) stojí na pódiu, kytarista a basista drží nástroje; tři barevná světla blikají.
+5. Hudba hraje asi 40 s, pak 20 s pauza (ticho); pak zase hraje.
+6. Dvě třetiny návštěvníků se kývají na parketu, zbytek stojí u stolů.
+7. Mimo den zábavy (např. 4. 10. 2026) nic z toho není vidět, hospoda se chová jako dřív.
+8. V den hodů (3. sobota → neděle hodů v říjnu) zábava není, jen hody.
+9. F2 → Datum: po půlnoci (≈ 2 h) zábava ještě běží, po 3 h zmizí pódium.
+10. Starý save se načte beze změny; zábava není uložena (plyne z kalendáře).
