@@ -71,8 +71,14 @@ Vize, pilíře a herní smyčka: [`GAME_DESIGN.md`](GAME_DESIGN.md).
 | LMB | kontextová akce (sběr, rybaření, střelba…) | – |
 | RMB (držet) | míření se zbraní v ruce | – |
 | Tab / I / J / K / M / H | inventář / oblečení / deník úkolů / dovednosti / mapa / domů | |
+| M (mapa) | kolečko = zoom ke kurzoru, tažení = posun; mapa se překresluje jen při změně pohledu (marker hráče ~4× za s) | zavřít: M / Esc |
 | U | vysvobození ze zaseknutí | – |
 | F1 / Esc / F2 | nápověda / pauza a nastavení (mj. přepínač „Třes obrazu“ – abstinence a zima, ukládá se do `nastaveni.cfg`) / herní menu (čas, počasí, teleport…) | |
+
+Místa mají otevírací doby (`Place.HOURS` / `WEEK_HOURS`, výpis `hours_text()` ukazuje i víkend). Zavřené místo
+od dveří nenabízí práci, úkoly ani zboží (`World.buy` to hlídá taky) a obsluha stojí venku jen v otevírací době.
+Obecní úřad má úřední dny (Po a St 7–17, Út a Čt 8–14, Pá 8–12, víkend a svátky zavřeno). F2 → Teleport
+má sekci „Okolní obce“ (postaví tě na okraj katastru čelem k obci; obce jsou jen pohled z dálky).
 
 Funguje i herní ovladač. Ovládání koně, dronu, letadla, paramotoru a motorového rogala
 (startovní procedury, přistání, licence) je v [`docs/CONTROLS.md`](docs/CONTROLS.md).

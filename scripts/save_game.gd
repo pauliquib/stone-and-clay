@@ -221,6 +221,12 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		var it_in: Interior = world.interiors.get(inside_id)
 		if it_in and p.global_position.distance_to(it_in.global_position) > 50.0:
 			p.teleport(it_in.inside_door, it_in.inside_yaw, false)   # jiná data budov → jiný slot: ke vchodu
+	elif inside_id != "":
+		# A1-08: uložený interiér už neexistuje (jiná data budov / místo zmizelo) – pozice pod mapou by znamenala
+		# propad; hráč se postaví ke dveřím místa, nebo na bezpečný spawn
+		var ex: Array = world.interior_exit(inside_id)
+		p.teleport((ex[0] as Vector3) + Vector3(0, 0.3, 0), float(ex[1]), false)
+		push_warning("SaveGame: interiér „%s“ z pozice neexistuje – hráč postaven ven" % inside_id)
 	p.pitch = float(pd.get("pitch", -0.25))
 	p.spawn_point = _to_v3(pd.get("spawn")) if pd.has("spawn") else p.spawn_point
 	p.spawn_yaw = float(pd.get("spawn_yaw", p.spawn_yaw))

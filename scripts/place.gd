@@ -85,14 +85,17 @@ const OFFERS := {
 	"statek": [["Prodej ze dvora", 0, "header"], ["vejce", 6, "buy"], ["mleko", 22, "buy"], ["seno", 20, "buy"], ["zrni", 12, "buy"]],
 }
 const HOURS := {"hospoda": [10, 26], "obchod": [6, 21], "palenice": [8, 22], "sklep": [12, 24],
-	"chata": [0, 24], "urad": [7, 17], "domov": [0, 24], "statek": [5, 20]}
+	"chata": [0, 24], "urad": [8, 14], "domov": [0, 24], "statek": [5, 20]}
 ## Výjimky z otevírací doby podle dne v týdnu (0 = pondělí … 6 = neděle): [od, do] nebo [] = zavřeno.
 ## Svátky (Clock.holiday) mají obchod zavřený; svátky a události v obci mění hodiny přes VillageEvents.event_hours.
 const WEEK_HOURS := {
 	"obchod": {5: [7, 11], 6: []},                        # sobota jen dopoledne, v neděli zavřeno
 	"hospoda": {4: [10, 27], 5: [10, 27], 6: [10, 24]},    # pá a so do 3:00, v neděli do půlnoci
+	# A4-02: obecní úřad má úřední dny – Po a St déle, Út a Čt základní doba, v pátek krátce, víkend zavřeno
+	"urad": {0: [7, 17], 2: [7, 17], 4: [8, 12], 5: [], 6: []},
 }
-const CLOSED_ON_HOLIDAY := ["obchod"]
+const CLOSED_ON_HOLIDAY := ["obchod", "urad"]
+const DAY_NAMES := ["po", "út", "st", "čt", "pá", "so", "ne"]
 ## V pátek večer sedí v hospodě u druhého stolu víc štamgastů
 const FRIDAY_EXTRA := [["Standa", Color(0.45, 0.5, 0.3)], ["Vašek", Color(0.6, 0.35, 0.25)], ["Honza", Color(0.3, 0.4, 0.55)]]
 const FRIDAY_HOURS := [17.0, 24.0]
@@ -344,19 +347,28 @@ func hours_text() -> String:
 		return "dnes zavřeno (svátek)" if clock and clock.holiday() != "" and key in CLOSED_ON_HOLIDAY else "dnes zavřeno"
 	if h[0] == 0 and h[1] == 24:
 		return "nonstop"
-	return "%d:00–%d:00" % [h[0], int(h[1]) % 24]
+	var txt := "%d:00–%d:00" % [h[0], int(h[1]) % 24]
+	# A1-06: u míst s výjimkami podle dne (víkend, úřední dny) se vypíšou i ty
+	if WEEK_HOURS.has(key):
+		var parts := []
+		for wd in range(7):
+			if WEEK_HOURS[key].has(wd):
+				var e: Array = WEEK_HOURS[key][wd]
+				parts.append("%s %s" % [DAY_NAMES[wd], "zavřeno" if e.is_empty() else "%d:00–%d:00" % [e[0], int(e[1]) % 24]])
+		txt += " (%s)" % ", ".join(parts)
+	return txt
 
 
 # ------------------------------------------------------------------ páteční hosté
 
 func _process(delta: float) -> void:
-	if key != "hospoda":
-		return
 	_fri_t -= delta
 	if _fri_t > 0.0:
 		return
 	_fri_t = 4.0
-	_place_people()
+	_place_people()                 # obsluha mimo otevírací dobu zmizí (A1-05); hospoda i hosté
+	if key != "hospoda":
+		return
 	var clock: Clock = world.get("clock") if world else null
 	var want := 0
 	if clock and clock.weekday() == 4 and clock.hour() >= FRIDAY_HOURS[0] and clock.hour() < FRIDAY_HOURS[1] \
@@ -411,11 +423,19 @@ func set_inside(on: bool, it: Interior) -> void:
 	_place_people()
 
 
+## Je místo teď otevřené? (bez hodin světa vždy ano)
+func _open_now() -> bool:
+	var clock: Clock = world.get("clock") if world else null
+	return clock == null or is_open(clock.hour())
+
+
 ## Zahrádka je venku jen v létě, za tepla, ve dne a bez deště; jinak štamgasti sedí uvnitř (zahrádka zůstane prázdná).
 func _garden_open() -> bool:
 	var clock: Clock = world.get("clock") if world else null
 	if clock == null:
 		return true
+	if not is_open(clock.hour()):
+		return false
 	var w = world.get("weather")
 	var dry: bool = w == null or (not w.is_raining() and w.temp >= 15.0)
 	return clock.season() == "léto" and clock.hour() >= 10.0 and clock.hour() < 22.0 and dry
@@ -428,8 +448,11 @@ func _place_people() -> void:
 		if player_inside and keeper_inside_pos != Vector3.INF:
 			keeper.global_position = keeper_inside_pos
 			keeper.base_yaw = keeper_inside_yaw
-		else:
+		elif _open_now():
 			keeper.position = _keeper_home
+			keeper.base_yaw = _keeper_home_yaw
+		else:
+			keeper.position = _keeper_home + HIDDEN_OFFSET     # zavřeno: obsluha není venku 24/7
 			keeper.base_yaw = _keeper_home_yaw
 	if key != "hospoda":
 		return

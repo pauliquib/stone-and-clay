@@ -217,6 +217,10 @@ func open_teleport() -> void:
 		opts.append(["K bazaru vozidel (cedule)", world.teleport_player.bind(pid, world.bazaar.pos + Vector3(0, 0, 4.0), 0.0)])
 	if world.airfield and world.airfield.ok:
 		opts.append(["Na letiště (polní dráha, M6.5)", _tp.bind("letiste")])
+	if not world.obce.is_empty():
+		opts.append(hdr("Okolní obce (na okraj katastru, pohled z dálky)"))
+		for o in world.obce:
+			opts.append([String(o.get("name", "obec")), _tp.bind("obec:" + String(o.get("id", o.get("name", "")))))
 	opts.append(hdr("Zvěř a příroda"))
 	opts.append(["Ke srncům", _tp.bind("zver:srnec")])
 	opts.append(["K divočákům", _tp.bind("zver:divocak")])
