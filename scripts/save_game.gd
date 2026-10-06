@@ -21,7 +21,7 @@ const SLOT_NAMES := {"rychly": "Rychlé uložení (F5)", "auto": "Automaticky (p
 	"2": "Pozice 2", "3": "Pozice 3"}
 const BODY_KEYS := ["weight", "stomach_alc", "body_alc", "stomach_kcal", "nicotine", "tar", "craving", "ever_smoked",
 	"caffeine", "nausea", "health", "alive", "total_alc_g", "total_kcal", "cigarettes_smoked", "drinks",
-	"wetness", "cold"]
+	"wetness", "cold", "addiction", "_smoke_rate"]
 
 
 static func path(slot: String) -> String:
@@ -253,6 +253,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		p.first_person = bool(pd.get("first_person", false))
 		p.visual.set_first_person(p.first_person)
 	var bd: Dictionary = d.get("body", {})
+	p.body.addiction = 0.0        # starý save bez závislosti = 0
+	p.body._smoke_rate = 0.0
 	for k in bd:
 		if not k in BODY_KEYS:
 			continue

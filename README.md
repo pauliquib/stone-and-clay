@@ -72,7 +72,7 @@ Vize, pilíře a herní smyčka: [`GAME_DESIGN.md`](GAME_DESIGN.md).
 | RMB (držet) | míření se zbraní v ruce | – |
 | Tab / I / J / K / M / H | inventář / oblečení / deník úkolů / dovednosti / mapa / domů | |
 | U | vysvobození ze zaseknutí | – |
-| F1 / Esc / F2 | nápověda / pauza a nastavení / herní menu (čas, počasí, teleport…) | |
+| F1 / Esc / F2 | nápověda / pauza a nastavení (mj. přepínač „Třes obrazu“ – abstinence a zima, ukládá se do `nastaveni.cfg`) / herní menu (čas, počasí, teleport…) | |
 
 Funguje i herní ovladač. Ovládání koně, dronu, letadla, paramotoru a motorového rogala
 (startovní procedury, přistání, licence) je v [`docs/CONTROLS.md`](docs/CONTROLS.md).

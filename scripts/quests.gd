@@ -309,6 +309,9 @@ class Quest:
 class CigaretyQuest:
 	extends Quest
 
+	## Kolik cigaret děda chce: krabička má 20 ks, ale hráč mohl jednu zapálit, tak stačí i načatá (A3-10).
+	const CIGS_NEEDED := 15
+
 	func _init() -> void:
 		id = "cigarety"
 		title = "Cigarety pro dědu"
@@ -327,14 +330,14 @@ class CigaretyQuest:
 
 	func objective() -> String:
 		if step == 0:
-			return "Kup krabičku cigaret v Potravinách (nebo v hospodě)" + closed_hint("obchod")
+			return "Kup krabičku cigaret v Potravinách" + closed_hint("obchod")
 		return "Přines cigarety dědovi Vomáčkovi – sedí na lavičce u svého domu (%s) [E]" % game.deda_label()
 
 	func target() -> Vector3:
 		return game.place_pos("obchod") if step == 0 else game.place_pos("deda")
 
 	func options(place: String) -> Array:
-		if place == "deda" and step == 1 and player.item_count("cigarety") >= 20:
+		if place == "deda" and step == 1 and player.item_count("cigarety") >= CIGS_NEEDED:
 			return [["Dát dědovi cigarety", _give]]
 		return []
 
@@ -345,13 +348,13 @@ class CigaretyQuest:
 		super.update(delta)
 		if state != "active":
 			return
-		if step == 0 and player.item_count("cigarety") >= 20:
+		if step == 0 and player.item_count("cigarety") >= CIGS_NEEDED:
 			advance()
-		elif step == 1 and player.item_count("cigarety") < 20:
-			back_to(0, "Nemáš celou krabičku (20 ks) – kup novou v Potravinách.")
+		elif step == 1 and player.item_count("cigarety") < CIGS_NEEDED:
+			back_to(0, "Nemáš dost cigaret (aspoň %d ks) – kup krabičku v Potravinách." % CIGS_NEEDED)
 
 	func _give() -> void:
-		player.remove_item("cigarety", 20)
+		player.remove_item("cigarety", CIGS_NEEDED)
 		game.npc_say(pid, "deda", "Díky, synku! Na, tady máš za ně – a jednu si dej se mnou.")
 		player.inventory["cigarety"] = player.item_count("cigarety") + 1
 		succeed("Děda má cigarety a dal ti jednu. (Použij ji v inventáři – Tab.)", 250)
@@ -827,8 +830,7 @@ class ScitaniZvereQuest:
 class KrmivoQuest:
 	extends Quest
 	var carrying := false
-	var _walk0 := 0.0
-	var _sprint0 := 0.0
+	const MOD_KRMIVO := "krmivo"     # zdroj modifikátoru rychlosti (`Player.set_speed_mod`)
 	const SLOW := 0.8                # s pytlem se jde o pětinu pomaleji
 
 	func _init() -> void:
@@ -860,10 +862,7 @@ class KrmivoQuest:
 
 	func _take() -> void:
 		carrying = true
-		_walk0 = player.walk_speed
-		_sprint0 = player.sprint_speed
-		player.walk_speed = _walk0 * SLOW
-		player.sprint_speed = _sprint0 * SLOW
+		player.set_speed_mod(MOD_KRMIVO, {"walk_k": SLOW})
 		game.npc_say(pid, "chata", "Krmelec najdeš v lese za chatou. Ať to zvěř nevyplašíš!")
 		advance()
 
@@ -874,8 +873,7 @@ class KrmivoQuest:
 
 	func cleanup() -> void:
 		if carrying:
-			player.walk_speed = _walk0
-			player.sprint_speed = _sprint0
+			player.clear_speed_mod(MOD_KRMIVO)
 			carrying = false
 
 

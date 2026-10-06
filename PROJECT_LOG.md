@@ -52,3 +52,28 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Prolínání FADE_SELF u dlaždic kreslí okraj dohledu průhledně (transparentní průchod) – kdyby dělalo
   artefakty se stíny / řazením, stačí v `add_chunks` vrátit FADE_DISABLED (ořez zůstane správný).
 - Výkon velké mapy se nově měří přes `--perf` (spouští jen uživatel).
+
+## 2026-10-06 – Vlna 0d – F3 Hráč a řemesla
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **A3-01 / A1-11**: cigarety odebrány z `Place.OFFERS["hospoda"]` (jen Potraviny); text úkolu „Cigarety pro dědu“ upraven.
+- **A3-10**: úkol přijme i načatou krabičku (`CigaretyQuest.CIGS_NEEDED` = 15 ks, tolik se dědovi odevzdá).
+- **A3-02 / A3-03**: `BodyState` – `ADDICTION_NORM` 80, `ADDICTION_DECAY_K` 0,0578 (poločas 12 h), `CRAVING_NICOTINE_MIN`
+  0,25, `CRAVING_RATE` 0,07, strop chuti `CRAVING_BASE_CAP` + závislost, `CRAVING_SLEEP_K` 0,2 (spánek).
+- **A3-08**: `addiction` a `_smoke_rate` v `SaveGame.BODY_KEYS`; starý save bez klíče = 0.
+- **A3-04 / A3-05**: třes obrazu = hladký šum (`_shake_noise`), práh abstinence 0,6, amplituda 0,0009, záchvaty 5 s / 60 s,
+  zima plynule se stropem 0,003, ne při míření / dalekohledu; nastavení „Třes obrazu“ (`GameSettings.withdrawal_shake`,
+  cfg `obraz/tres`, přepínač v `pause_menu.gd`, použito přes `Player.shake_enabled`).
+- **A3-06 / A2-24**: `Player.speed_mods` + `set_speed_mod / clear_speed_mod / effective_walk / effective_sprint / effective_jump`;
+  `walk_speed` / `sprint_speed` / `jump_velocity` se už nikde nepřepisují. Převedeno: `Cargo` (rameno, vozík), `Hunting`
+  (zvěř na rameni), `Quests` Krmivo. `no_sprint` blokuje sprint a tím i jeho výdrž.
+- **A3-07**: výdrž nákladu přes `Player.drain_stamina` (cargo ×2, hunting).
+- **A1-09**: `_recover_from_void` v interiéru vrací ke dveřím interiéru (nebo `exit_interior`) + `push_warning` s diagnostikou.
+- **A3-09**: `Farm._slaughter_go` kontroluje `is_instance_valid(p / a)` po `await`.
+- **A3-11**: `Player.add_item` rozbaluje balení podle pole `count` v katalogu, ne podle id „cigarety“.
+- **A3-13**: guard `p.input != null` v `ActionRunner` a `Fishing`.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v odpovědi).
+- A3-12 (keš úrovní) odloženo podle auditu. Cigarety dál nabízí i obchod v `OFFERS["obchod"]` za 165 Kč.
+- Stará uložená pozice s neseným nákladem: modifikátor se po načtení neobnovuje (náklad se při načtení zahazuje / pouští jako dřív).

@@ -449,7 +449,7 @@ func _pick_weighted(w: Dictionary) -> String:
 func _tick_fight(id: int, s: Dictionary, p: Player, delta: float) -> bool:
 	var sk: Skills = world.skills.get(id)
 	var b := sk.bonus("rybareni") if sk else 0.0
-	var reel := p.input.reel
+	var reel: bool = p.input != null and p.input.reel
 	var rate := REEL_RATE if reel else -SLACK_RATE
 	if reel and String(s["rod"]) == "udice_lepsi":
 		rate *= ROD_BETTER_REEL

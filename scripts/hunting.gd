@@ -73,7 +73,8 @@ var blood: Array = []                # {node, t} krvavé kapky
 var dealer: Npc                      # překupník (večer za hospodou)
 var dealer_pos := Vector3.INF
 var black := {}                      # id hráče → {item: počet kusů bez dokladu (nelegální)}
-var _carry := {}                     # id hráče → {c: Carcass, walk0, sprint0}
+var _carry := {}                     # id hráče → {c: Carcass}
+const MOD_CARRY := "zverina"            # zdroj modifikátoru rychlosti hráče (`Player.set_speed_mod`)
 var _roadkill: Array = []            # mrtvá zvířata po srážce v okolí hráče (z posledního ticku)
 var _blood_mesh: CylinderMesh
 var _blood_mat: StandardMaterial3D
@@ -671,11 +672,9 @@ func lift(id: int, c: Carcass) -> void:
 		_too_heavy(id)
 		return
 	c.carried_by = id
-	_carry[id] = {"c": c, "walk0": p.walk_speed, "sprint0": p.sprint_speed, "jump0": p.jump_velocity}
+	_carry[id] = {"c": c}
 	var k := clampf(1.0 - kg / 60.0, 0.35, 0.9)
-	p.walk_speed *= k
-	p.sprint_speed = p.walk_speed          # se zvěří na rameni se neběhá
-	p.jump_velocity = Cargo.JUMP_CARRIED   # jen malý hop (M2.10)
+	p.set_speed_mod(MOD_CARRY, {"walk_k": k, "no_sprint": true, "jump": Cargo.JUMP_CARRIED})   # se zvěří na rameni se neběhá, jen malý hop (M2.10)
 	c.node.set_physics_process(false)
 	_msg(id, "Neseš %s (%d kg). G = položit." % [String(sp.get("nazev", c.species)), roundi(kg)], 3.0)
 	world.emit_game_event(id, "cargo_lift", {"kind": c.cargo_kind, "kg": kg, "tag": "zverina"})
@@ -691,12 +690,9 @@ func release_carried(id: int) -> Carcass:
 	if not _carry.has(id):
 		return null
 	var c: Carcass = _carry[id]["c"]
-	var e: Dictionary = _carry[id]
 	var p := _player(id)
 	if p != null:
-		p.walk_speed = float(e["walk0"])
-		p.sprint_speed = float(e["sprint0"])
-		p.jump_velocity = float(e.get("jump0", p.jump_velocity))
+		p.clear_speed_mod(MOD_CARRY)
 	c.carried_by = 0
 	_carry.erase(id)
 	return c
@@ -733,9 +729,7 @@ func _release_player(id: int) -> void:
 	var c: Carcass = e["c"]
 	var p := _player(id)
 	if p != null:
-		p.walk_speed = float(e["walk0"])
-		p.sprint_speed = float(e["sprint0"])
-		p.jump_velocity = float(e.get("jump0", p.jump_velocity))
+		p.clear_speed_mod(MOD_CARRY)
 	c.carried_by = 0
 	if c.node != null and is_instance_valid(c.node):
 		c.node.set_physics_process(true)
@@ -762,7 +756,7 @@ func _carry_follow(delta: float) -> void:
 		# výdrž: chůze s břemenem unavuje; při nule ho hráč upustí
 		var hv := Vector2(p.velocity.x, p.velocity.z).length()
 		if hv > 0.5:
-			p.stamina = maxf(p.stamina - delta * CARRY_STAMINA_K * carried_kg(id) / 20.0, 0.0)
+			p.drain_stamina(delta * CARRY_STAMINA_K * carried_kg(id) / 20.0)
 		if p.stamina <= 0.01:
 			_msg(id, "Došly ti síly – zvěř ti sklouzla z ramene.", 3.0)
 			drop(id)

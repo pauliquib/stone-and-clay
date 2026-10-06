@@ -7,7 +7,7 @@
 ## Jídlo: kcal do žaludku → trávení ~500 kcal/h → energetická bilance → hmotnost / BMI
 ##   (herní zrychlení: 1 kg tuku ≈ 7700 kcal / OBESITY_GAIN).
 ## Cigarety: nikotin (poločas ~2 h), chuť na cigaretu, dehet v plicích snižuje výdrž.
-##   Závislost (`addiction`) je klouzavý průměr kouření (poločas 24 h): příležitostný
+##   Závislost (`addiction`) je klouzavý průměr kouření (poločas 12 h): příležitostný
 ##   kuřák (1–2 denně) zůstává hluboko pod 0,1, těžký kuřák (2 krabičky/den, tj. 40 ks)
 ##   se ustálí kolem 1,0. Třes z abstinence se odvíjí od `craving * addiction`, takže
 ##   viditelně třese jen u fakticky závislé postavy a vždy zůstává hratelný (malá amplituda).
@@ -43,8 +43,12 @@ const OVERHEAT_INSUL := 0.8        # izolace, od které se přehřívá
 const OVERHEAT_RATE := 0.6         # /h za (°C nad limit × izolace nad limit)
 const OVERHEAT_STAMINA := 0.2      # o tolik přehřátí (1,0) snižuje maximální výdrž
 # --- závislost na nikotinu (M.smoke)
-const ADDICTION_DECAY_K := 0.02888 # /h – poločas klouzavého průměru kouření ~24 h
-const ADDICTION_NORM := 57.7       # _smoke_rate odpovídající ustálené závislosti 1,0 (~2 krabičky/den)
+const ADDICTION_DECAY_K := 0.0578  # /h – poločas klouzavého průměru kouření ~12 h
+const ADDICTION_NORM := 80.0       # _smoke_rate odpovídající ustálené závislosti 1,0 (~2 krabičky/den)
+const CRAVING_NICOTINE_MIN := 0.25 # mg – pod touto hladinou nikotinu chuť roste (po cigaretě ~4 h herních)
+const CRAVING_RATE := 0.07         # /h – růst chuti (do plné chuti zhruba 14 h herních, tj. ~30 min reálně)
+const CRAVING_BASE_CAP := 0.35     # strop chuti u nezávislé postavy; závislost ho zvedá až k 1,0
+const CRAVING_SLEEP_K := 0.2       # násobek růstu chuti ve spánku (spící po ránu nevstává s 100% chutí)
 
 var weight := 82.0                 # kg
 var stomach_alc := 0.0             # g ethanolu v žaludku
@@ -327,8 +331,11 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 	# --- nikotin, dehet, chuť
 	nicotine *= exp(-dt_h * 0.35)
 	tar = maxf(tar - dt_h * 0.04, 0.0)
-	if ever_smoked and nicotine < 0.4:
-		craving = minf(craving + dt_h * 0.22, 1.0)
+	if ever_smoked and nicotine < CRAVING_NICOTINE_MIN:
+		var cap := CRAVING_BASE_CAP + (1.0 - CRAVING_BASE_CAP) * addiction
+		var grow := CRAVING_RATE * (CRAVING_SLEEP_K if sleeping else 1.0)
+		if craving < cap:
+			craving = minf(craving + dt_h * grow, cap)
 	_smoke_rate *= exp(-dt_h * ADDICTION_DECAY_K)
 	addiction = clampf(_smoke_rate / ADDICTION_NORM, 0.0, 1.0)
 	caffeine = maxf(caffeine - dt_h * 0.25, 0.0)

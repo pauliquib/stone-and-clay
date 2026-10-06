@@ -26,6 +26,7 @@ var fullscreen := false
 var vsync := 0               # index do VSYNC_MODES
 var trike_intuitive := false # M6.5: arkádové řízení rogala hrazdou (W = nahoru); výchozí realistické obrácené
 var show_fps := true
+var withdrawal_shake := true # třes obrazu při abstinenci a zimě (Esc → Nastavení → Třes obrazu)
 var vsync_from_args := false # --vsync / --novsync na příkazové řádce má přednost před uloženým nastavením
 var maxfps_from_args := false
 var renderer := "forward_plus"  # uloženo do nastaveni.cfg, čte ho run.sh (projeví se až po restartu hry)
@@ -88,6 +89,7 @@ func load_file() -> void:
 	fullscreen = bool(cf.get_value("obraz", "cela_obrazovka", fullscreen))
 	vsync = clampi(int(cf.get_value("obraz", "vsync", vsync)), 0, VSYNC_MODES.size() - 1)
 	show_fps = bool(cf.get_value("obraz", "fps", show_fps))
+	withdrawal_shake = bool(cf.get_value("obraz", "tres", withdrawal_shake))
 	volume = clampf(float(cf.get_value("zvuk", "hlasitost", volume)), 0.0, 1.0)
 	preset = clampi(int(cf.get_value("grafika", "predvolba", preset)), 0, PRESET_NAMES.size() - 1)
 	for k in GFX_KEYS:
@@ -108,6 +110,7 @@ func save_file() -> void:
 	cf.set_value("obraz", "cela_obrazovka", fullscreen)
 	cf.set_value("obraz", "vsync", vsync)
 	cf.set_value("obraz", "fps", show_fps)
+	cf.set_value("obraz", "tres", withdrawal_shake)
 	cf.set_value("zvuk", "hlasitost", volume)
 	cf.set_value("grafika", "predvolba", preset)
 	for k in GFX_KEYS:
@@ -130,6 +133,7 @@ func apply(client: Node) -> void:
 	AudioServer.set_bus_mute(0, volume <= 0.0)
 	if client.player:
 		client.player.base_fov = fov
+		client.player.shake_enabled = withdrawal_shake
 	if client.hud:
 		client.hud.show_fps = show_fps
 	apply_graphics(client)

@@ -18,6 +18,16 @@ signal jumped
 signal landed(impact: float)
 signal game_event(kind: String, data: Dictionary)
 
+## Třes obrazu (abstinence od cigaret, zima) – laditelné hodnoty. Amplitudy v radiánech (náklon pohledu).
+const SHAKE_WITHDRAWAL_MIN := 0.6    # od jaké hodnoty `craving × addiction` třes začne
+const SHAKE_WITHDRAWAL_AMP := 0.0009 # nejvyšší amplituda třesu z abstinence
+const SHAKE_FIT_PERIOD := 60.0       # s – záchvat třesu se opakuje jednou za tuto dobu
+const SHAKE_FIT_LEN := 5.0           # s – délka záchvatu
+const SHAKE_COLD_MIN := 0.3          # od jaké úrovně prochladnutí (body.cold) se třese
+const SHAKE_COLD_AMP := 0.003        # amplituda při plném prochladnutí
+const SHAKE_COLD_MAX := 0.003        # pevný strop třesu zimou
+const SHAKE_FREQ := 9.0              # rychlost chvění (vstup do šumu: _t × tato hodnota)
+
 @export var walk_speed := 4.6
 @export var sprint_speed := 8.4
 @export var crouch_speed := 2.2
@@ -34,6 +44,7 @@ signal game_event(kind: String, data: Dictionary)
 @export var slide_boost := 1.8
 @export var slide_friction := 3.2
 @export var mouse_sensitivity := 0.0024
+var shake_enabled := true       # třes obrazu zapnut (Esc → Nastavení → Třes obrazu)
 var base_fov := 72.0             # základní zorné pole (Esc → Nastavení)
 
 const STAND_HEIGHT := 1.8
@@ -118,6 +129,7 @@ var _zoom := 4.2
 var _arm_len := 4.2
 var _t := 0.0
 var _noise := FastNoiseLite.new()
+var _shake_noise := FastNoiseLite.new()   # hladký šum pro třes obrazu (abstinence, zima)
 var _input_hist: Array = []
 var _stumble_cool := 2.0
 var _action := ""
@@ -162,6 +174,8 @@ func _ready() -> void:
 	add_child(_col)
 	_noise.frequency = 0.35
 	_noise.seed = 122
+	_shake_noise.seed = 77
+	_shake_noise.frequency = 1.0
 
 	body = BodyState.new()
 	body.name = "Telo"
@@ -234,6 +248,17 @@ func _recover_from_void() -> void:
 	var w := get_parent() as World
 	if w == null or w.terrain == null:
 		return
+	if inside != "":
+		# v interiéru je terén pod mapou – na povrch bychom hráče vyhodili pod / nad dům; vrátíme ho ke dveřím
+		var it: Interior = w.interiors.get(inside)
+		push_warning("Hráč %d propadl v interiéru '%s' (pozice %s, rychlost %s, interiér postaven: %s) – vracím ke dveřím." % [
+			id, inside, str(global_position), str(velocity), str(it != null and is_instance_valid(it))])
+		if it != null and is_instance_valid(it):
+			teleport(it.inside_door, it.inside_yaw, false)
+		else:
+			w.exit_interior(id, false)        # interiér už neexistuje → ven před dveře
+		w.notify(id, "show_message", ["Propadl ses podlahou – vrátil jsem tě ke dveřím.", 3.5])
+		return
 	var gy := w.terrain.height_at(global_position.x, global_position.z) + 0.3
 	teleport(Vector3(global_position.x, gy, global_position.z), yaw, false)
 	w.notify(id, "show_message", ["Propadl ses terénem – vrátil jsem tě zpátky na povrch.", 3.5])
@@ -300,9 +325,11 @@ func _update_overload(warn: bool) -> void:
 	overloaded = now
 
 
+## Přidá `n` kusů předmětu. Balení (předmět s polem `count` v katalogu, dnes krabička cigaret = 20 ks) se
+## do inventáře rozbalí na jednotlivé kusy – nákup tedy dává `n × count` ks (A3-11: žádné skryté pravidlo
+## jen pro jedno id, řídí to katalog).
 func add_item(id: String, n := 1) -> void:
-	if id == "cigarety":
-		n *= int(Consumables.info(id)["count"])
+	n *= maxi(int(ItemsDB.info(id).get("count", 1)), 1) if ItemsDB.exists(id) else 1
 	inventory[id] = int(inventory.get(id, 0)) + n
 	_update_overload(true)
 
@@ -405,6 +432,60 @@ func equipped_text() -> String:
 
 
 ## Ubere výdrž (akce); po dobu akce se výdrž nedobíjí.
+## Modifikátory rychlosti pohybu: zdroj (např. "vozik", "rameno") → {walk_k: násobek chůze a sprintu (výchozí 1),
+## no_sprint: bool (sprint zakázán), jump: strop rychlosti výskoku}. Žádný zdroj nesahá na `walk_speed` /
+## `sprint_speed` (zůstávají výchozími `@export` hodnotami), takže se modifikátory nemohou „zaseknout“
+## ani se obnovit v opačném pořadí (A3-06). Zdroj modifikátor sám nastaví a po skončení smaže.
+var speed_mods: Dictionary = {}
+
+
+func set_speed_mod(source: String, mod: Dictionary) -> void:
+	speed_mods[source] = mod
+
+
+func clear_speed_mod(source: String) -> void:
+	speed_mods.erase(source)
+
+
+func has_speed_mod(source: String) -> bool:
+	return speed_mods.has(source)
+
+
+## Součin `walk_k` všech modifikátorů.
+func speed_mod_k() -> float:
+	var k := 1.0
+	for src in speed_mods:
+		k *= float((speed_mods[src] as Dictionary).get("walk_k", 1.0))
+	return k
+
+
+func sprint_blocked() -> bool:
+	for src in speed_mods:
+		if bool((speed_mods[src] as Dictionary).get("no_sprint", false)):
+			return true
+	return false
+
+
+## Efektivní rychlost chůze (výchozí `walk_speed` × modifikátory).
+func effective_walk() -> float:
+	return walk_speed * speed_mod_k()
+
+
+## Efektivní rychlost sprintu (s `no_sprint` je rovna chůzi).
+func effective_sprint() -> float:
+	return effective_walk() if sprint_blocked() else sprint_speed * speed_mod_k()
+
+
+## Efektivní rychlost výskoku (nejnižší strop `jump` z modifikátorů).
+func effective_jump() -> float:
+	var j := jump_velocity
+	for src in speed_mods:
+		var m: Dictionary = speed_mods[src]
+		if m.has("jump"):
+			j = minf(j, float(m["jump"]))
+	return j
+
+
 func drain_stamina(v: float) -> void:
 	stamina = maxf(stamina - v, 0.0)
 	_stamina_delay = 0.9
@@ -836,8 +917,8 @@ func _physics_process_impl(delta: float) -> void:
 	# --- sprint a výdrž (obezita a kouření snižují)
 	var smax := body.stamina_max()
 	var sprinting := sprint_in and move_in.length() > 0.1 and not _crouching \
-		and not _stamina_lock and move_in.y < 0.3 and not busy and not overloaded and not aim_on
-	if sprinting and on_floor and hvel.length() > walk_speed:
+		and not _stamina_lock and move_in.y < 0.3 and not busy and not overloaded and not aim_on and not sprint_blocked()
+	if sprinting and on_floor and hvel.length() > effective_walk():
 		stamina = maxf(stamina - delta * 0.11 * body.stamina_drain_mult(), 0.0)
 		_stamina_delay = 0.9
 		if stamina <= 0.0:
@@ -855,9 +936,9 @@ func _physics_process_impl(delta: float) -> void:
 		sm *= OVERLOAD_SPEED_MULT
 	if aim_on:
 		sm *= AIM_SPEED_MULT
-	var target_speed := walk_speed * sm
+	var target_speed := effective_walk() * sm
 	if sprinting:
-		target_speed = sprint_speed * sm
+		target_speed = effective_sprint() * sm
 	elif _crouching:
 		target_speed = crouch_speed
 	if busy and _action != "smoke":
@@ -923,7 +1004,7 @@ func _physics_process_impl(delta: float) -> void:
 
 	# --- skok
 	if _jump_buffer > 0.0 and _coyote > 0.0 and _can_stand() and fallen <= 0.0 and not busy:
-		velocity.y = (jump_velocity + (0.6 if _sliding else 0.0)) * body.jump_mult()
+		velocity.y = (effective_jump() + (0.6 if _sliding else 0.0)) * body.jump_mult()
 		_jump_buffer = 0.0
 		_coyote = 0.0
 		_sliding = false
@@ -1199,10 +1280,18 @@ func _process_impl(delta: float) -> void:
 	var craving := body.craving if body.ever_smoked else 0.0
 	var withdrawal := craving * body.addiction   # jen fakticky závislá postava, ne po jedné cigaretě
 	var shake := Vector3.ZERO
-	if withdrawal > 0.35:   # třes rukou / nervozita – mírný, jen u silné závislosti
-		shake = Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * 0.0022 * (withdrawal - 0.35) / 0.65
-	if body.cold > 0.3:   # třes zimou
-		shake += Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * 0.005 * (body.cold - 0.3) * 8.0
+	if shake_enabled and not aim_on and not scope_on:
+		var tremor := 0.0
+		if withdrawal > SHAKE_WITHDRAWAL_MIN:   # abstinence: jen krátké „záchvaty“, mezi nimi klid
+			var ph := fposmod(_t, SHAKE_FIT_PERIOD)
+			if ph < SHAKE_FIT_LEN:
+				var env := sin(PI * ph / SHAKE_FIT_LEN)
+				tremor += SHAKE_WITHDRAWAL_AMP * env * env * (withdrawal - SHAKE_WITHDRAWAL_MIN) / (1.0 - SHAKE_WITHDRAWAL_MIN)
+		if body.cold > SHAKE_COLD_MIN:          # zima: plynulý třes
+			tremor += minf(SHAKE_COLD_AMP * (body.cold - SHAKE_COLD_MIN) / (1.0 - SHAKE_COLD_MIN), SHAKE_COLD_MAX)
+		if tremor > 0.0:
+			# hladký šum (ne bílý): jemné chvění o frekvenci SHAKE_FREQ, ne skákání každý snímek
+			shake = Vector3(_shake_noise.get_noise_1d(_t * SHAKE_FREQ), _shake_noise.get_noise_1d(_t * SHAKE_FREQ + 313.0), 0.0) * tremor
 	rig.rotation = Vector3(pitch + sway_pitch + shake.x + aim_sway.y, yaw + sway_yaw + shake.y + aim_sway.x, sway_roll)
 	var want_len := 0.0 if first_person else _zoom
 	_arm_len = lerpf(_arm_len, want_len, 1.0 - exp(-10.0 * delta))

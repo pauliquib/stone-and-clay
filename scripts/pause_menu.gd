@@ -319,6 +319,7 @@ func _show_settings() -> void:
 	_check("Intuitivní řízení rogala (W = nos nahoru; výchozí realistické obrácené)", settings.trike_intuitive,
 		func(on): settings.trike_intuitive = on)
 	_slider("Zorné pole (FOV)", 55.0, 95.0, 1.0, settings.fov, func(x): settings.fov = x, "%d°")
+	_check("Třes obrazu (abstinence, zima)", settings.withdrawal_shake, func(on): settings.withdrawal_shake = on)
 	_header("Zvuk")
 	_slider("Hlasitost", 0.0, 1.0, 0.05, settings.volume, func(x): settings.volume = x, "", true)
 	_header("Výkon")

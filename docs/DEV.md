@@ -195,6 +195,10 @@ Poznámka: po přidání skriptu s novým `class_name` je třeba obnovit seznam 
 Testy spuštěné přímo přes `godot` bez okna (`--headless`) vypisují při pití/jídle `Parameter "m" is null`
 (bez rendereru) – na výsledek to nemá vliv.
 
+Laditelné konstanty hráče a řemesel (bez spouštění): třes obrazu `Player.SHAKE_*`, závislost a chuť na cigaretu
+`BodyState.ADDICTION_*` / `CRAVING_*`, modifikátory rychlosti `Player.speed_mods` (`set_speed_mod` / `clear_speed_mod`;
+zdroje `Cargo.MOD_OWN`, `Cargo.MOD_CART`, `Hunting.MOD_CARRY`, `Quests` Krmivo). Cigarety se prodávají jen v Potravinách.
+
 ## Architektura (příprava na multiplayer)
 
 | Skript | Za co odpovídá |

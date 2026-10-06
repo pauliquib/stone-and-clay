@@ -211,7 +211,7 @@ func _tick(id: int, delta: float) -> void:
 	if p.car != null or p.horse != null or p.fallen > 0.0 or p.busy or p.controls_locked:
 		cancel(id)
 		return
-	if p.input.move.length() > 0.1 or p.input.jump:
+	if p.input != null and (p.input.move.length() > 0.1 or p.input.jump):
 		cancel(id, "Přerušeno.")
 		return
 	if p.equipped != r["tool"] or not Actions.tool_ok(def, p.equipped):

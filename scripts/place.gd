@@ -11,7 +11,7 @@ const OFFERS := {
 		["panak_slivovice", 55, "serve"], ["panak_vodky", 45, "serve"], ["fernet", 50, "serve"],
 		["vino_sklenka", 45, "serve"], ["kava", 35, "serve"], ["voda", 25, "serve"],
 		["utopenec", 59, "serve"], ["tlacenka", 65, "serve"], ["chleba_sadlo", 45, "serve"],
-		["gulas", 169, "serve"], ["smazak", 189, "serve"], ["cigarety", 170, "buy"], ["pivo", 45, "buy"],
+		["gulas", 169, "serve"], ["smazak", 189, "serve"], ["pivo", 45, "buy"],
 		# M2.7 výkup ryb hostinským (režim "sell", cena za kus; kapr v prosinci ×2 – `World.sell_items`; DOPLNIT: ceny odhad)
 		["Výkup ryb", 0, "header"], ["ryba_kapr", 100, "sell"], ["ryba_lin", 90, "sell"], ["ryba_stika", 160, "sell"],
 		["ryba_candat", 180, "sell"], ["ryba_pstruh", 70, "sell"], ["ryba_okoun", 40, "sell"], ["ryba_cejn", 30, "sell"],
