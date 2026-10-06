@@ -50,9 +50,9 @@ const START_BANK := 0                 # nová hra: prázdný účet (peníze jso
 const TESTS := {
 	"pravidla_cvicny": ["Pravidla silničního provozu – cvičný", "res://data/testy/pravidla_cvicny.json", ""],
 	"autoskola": ["Autoškola – teorie řidičáku (cvičný)", "res://data/testy/autoskola.json", ""],
-	"zbrojni": ["Zbrojní průkaz", "", "M4.6"],
-	"lovecky": ["Lovecký lístek", "", "M4.6"],
-	"rybarsky": ["Rybářský lístek", "", "M4.6"],
+	"zbrojni": ["Zbrojní průkaz", "res://data/testy/zbrojni.json", ""],
+	"lovecky": ["Lovecký lístek", "res://data/testy/lovecky.json", ""],
+	"rybarsky": ["Rybářský lístek", "res://data/testy/rybarsky.json", ""],
 	"drony": ["Dron A1/A3 – pilot v otevřené kategorii", "res://data/testy/drony.json", ""],
 	"paramotor": ["Létací škola – teorie paramotoru", "res://data/testy/paramotor.json", ""],
 	"ul": ["Létací škola – teorie ultralehkého (rogalo)", "res://data/testy/ul.json", ""],
@@ -748,6 +748,8 @@ func record_test(pid: int, id: String, score: int, total: int, passed: bool) -> 
 		world.ul_theory_passed(pid)
 	if id == "autoskola" and passed:  # M4.1: složená teorie autoškoly (řidičák = teorie + výcvikové jízdy)
 		world.auto_theory_passed(pid)
+	if (id == "zbrojni" or id == "lovecky" or id == "rybarsky") and passed and world.gamekeeper:
+		world.gamekeeper.test_passed(pid, id)   # M4.6: doklad u myslivce (po zaplaceném kurzu v chatě)
 
 
 func test_stats(pid: int, id: String) -> Dictionary:

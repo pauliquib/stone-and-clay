@@ -490,3 +490,36 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Parcely jsou mřížka 1 ha bez ohledu na hranice pozemků a budovy; neřeší se překryv s budovami.
 - Výkup obcí a nabídka kupci nemají vliv na pověst / vztahy s vesničany (M7).
 - Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.7).
+## 2026-10-06 – M4.6 Zbraně, lov a rybolov podle zákona (část: doklady, hajný, rybářská stráž)
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou `godot --import` + `--check-only` na všech změněných `.gd` – výstup prázdný; ruční test čeká)
+- **Co**: nový `scripts/gamekeeper.gd` (`class_name Gamekeeper`, Node3D, procedurální kapsle): dvě instance – `World.gamekeeper`
+  (myslivecký hajný, obchůzka po lesích kolem chaty, `Fauna.random_point(..., "forest")`, výstřel `gunshot` / `poaching` slyší do
+  1 500 m s šancí 70 % a jde na místo činu na 240 s) a `World.rybar_straz` (rybářská stráž, obchůzka jen so/ne 5–12 h).
+  Kontrola: hráč do 15 m s podezřelým stavem (hajný: zbraň nebo nelegální úlovek na rameni / u těla; stráž: rybaření), cooldown 90 min.
+  Menu: „Ukázat doklady“ (přestupek `pytlactvi` / `rybarske_pytlactvi`, u pušky bez zbrojního `police_check` = zabavení),
+  „Zapírat“ (stejné přestupky), „Utéct“ (`wanted_until` +120 min, policejní hláška).
+- **Co**: svědci přes `World.add_witness_source` (`witness_candidates`, jen na službě); role `hajny` v `witness_check` hlásí vždy
+  (vedle `policie`).
+- **Co**: doklady u myslivecké chaty (`interactables` u dveří chaty, `World.interactables`): kurzy zbrojní 4 000 Kč, lovecký 5 000 Kč,
+  rybářský 1 000 Kč (zaplacení → `_kurz[pid][druh]`), povolenka k lovu 1 500 Kč / 30 dní (vyžaduje lovecký lístek), povolenka k rybolovu
+  1 800 Kč / 365 dní (vyžaduje rybářský lístek). Ladicí hodnoty v `Gamekeeper.PRICES`, `POV_DAYS`.
+- **Co**: eTesty `zbrojni`, `lovecky`, `rybarsky` → `data/testy/zbrojni.json`, `lovecky.json`, `rybarsky.json` (8 vlastních otázek,
+  `prah_pct` 75, „ověřit“). `Computer.record_test` volá `World.gamekeeper.test_passed(pid, id)` → doklad se vydá **jen po zaplaceném kurzu**.
+- **Co**: `permits.gd` – `has()` respektuje `valid_until` (prošlá povolenka neplatí), nová `renew(pid, kind, until_jd, no)`.
+- **Ukládání**: klíč `gamekeeper` (`{"kurz": {...}}`) v `save_game.gd`, výchozí prázdno při načtení starého save; doklady a platnost
+  už ukládá `permits`.
+- **Úpravy sdílených souborů** (malé, jen vlastní řádky): `world.gd` (deklarace, vytvoření + `add_witness_source`, role `hajny`,
+  `emit_game_event` → `gamekeeper.on_event`, `interactables`), `save_game.gd`, `computer.gd` (TESTS cesty + háček), `permits.gd`.
+- **Dokumentace**: `docs/testy_M4.md` (oddíl M4.6, 10 bodů), odškrtnuto v `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md`
+  (s poznámkou „částečně“).
+
+### Otevřené body
+- **Kontrola kufru policií** (`police.gd`: prohlídka kufru, náklad bez `doklad_puvod`, zbraň viditelná) – nedělané.
+- **Rybářská stráž**: obchůzka je po okolí chaty, ne po úsecích vody (`Water`); zabavení udice a úlovku nedělané.
+- **Hajný**: bez zabavení luku/kuše a bez zápisu pověsti −20 / respektu `zemedelci` −20 (jen přes `commit_offense` z `data/zakon.json`).
+  Pachatel bez úlovku a bez výstřelu (jen zbraň) se kontroluje jen přes zbraň.
+- **Zbrojní průkaz**: střelnice (praktická zkouška) a lékařský posudek nejsou; doklad = kurz + eTest.
+- **Povolenky** nejsou v panelu P (`hud.gd` `DOC_KINDS` jen základní doklady – hud.gd patří M4.7, nechal jsem ho být).
+- **Vizuál**: NPC je zatím jednoduchá procedurální kapsle (ne `Humanoid`); bez animací a bez raycastu na zdi při vidění.
+- **Čeká na ruční test uživatele** (checklist v `docs/testy_M4.md`, oddíl M4.6).

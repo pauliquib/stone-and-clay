@@ -81,6 +81,9 @@ func has(pid: int, kind: String, sub := "") -> bool:
 	var e: Dictionary = _g(pid).get(kind, {})
 	if e.is_empty() or not (e.get("revoked", {}) as Dictionary).is_empty():
 		return false
+	var vu := int(e.get("valid_until", -1))
+	if vu >= 0 and _now() > vu:
+		return false                  # povolenka s platností (M4.6) prošla
 	if sub == "":
 		return kind != "ridicsky" or not (e.get("sub", {}) as Dictionary).is_empty()
 	for g in (e.get("sub", {}) as Dictionary):
@@ -98,6 +101,14 @@ func grant(pid: int, kind: String, no := "", sub := "", valid_until := -1) -> vo
 	var e: Dictionary = g[kind]
 	if sub != "" and not (e["sub"] as Dictionary).has(sub):
 		(e["sub"] as Dictionary)[sub] = _now()
+
+
+## Vydá nebo prodlouží doklad s platností do `until_jd` (povolenky k lovu a rybolovu, M4.6). Existující doklad jen dostane nový termín.
+func renew(pid: int, kind: String, until_jd: int, no := "") -> void:
+	if not _g(pid).has(kind):
+		grant(pid, kind, no, "", until_jd)
+		return
+	(_g(pid)[kind] as Dictionary)["valid_until"] = until_jd
 
 
 ## Odebere doklad (12 bodů, zákaz řízení). `until_jd` = do kdy platí zákaz (-1 = natrvalo), `retest` = nutné přezkoušení.
