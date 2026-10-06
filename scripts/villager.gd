@@ -18,17 +18,24 @@ const BT_TREE := "res://ai/villager_routine.tres"
 ## Druhy hran pro pěší A* trasu k cíli z BT (vše, kudy vesničan chodí).
 const WALK_KINDS := ["secondary", "tertiary", "unclassified", "residential", "service", "living_street",
 	"track", "footway", "path"]
-## Povolání postavy (Characters.PROFILES[].job) → klíč místa pracoviště (`World.places`). Co nesedí,
-## zaměstnání nemá (důchodce, student, maminka na mateřské…) → větev „Práce“ ve stromu selže.
+## Povolání postavy (Characters.PROFILES[].job) → klíč místa pracoviště (`World.places`). Páruje se po
+## SLOVECH povolání (začátek slova = kmen), ne podřetězcem: „hospodský“ → hospoda, ale „hospodář“ → statek.
+## Co nesedí, zaměstnání nemá (důchodce, student, maminka na mateřské…) → větev „Práce“ ve stromu selže.
 const JOB_PLACE := {
 	"úřad": "urad", "účetní": "urad", "starosta": "urad",
-	"hospod": "hospoda", "hostinsk": "hospoda", "výčep": "hospoda",
+	"hospodsk": "hospoda", "hostinsk": "hospoda", "výčep": "hospoda",
 	"prodavač": "obchod", "obchod": "obchod", "pošt": "obchod", "cukrář": "obchod",
 	"vinař": "sklep", "sklep": "sklep",
 	"pálen": "palenice", "palič": "palenice",
 	"myslivec": "chata", "lesní": "chata", "hajn": "chata",
 	"zemědělec": "statek", "hospodář": "statek", "chovatel": "statek", "farm": "statek",
 }
+## Kmeny slov, které povolání zneplatní („bývalý hasič“, „starosta sousední vsi“, „pošta v okresním městě“
+## = nepracuje tady, jen to slovo zní podobně).
+const JOB_EXCLUDE := ["býval", "soused", "okresn"]
+## Po kolika zaseknutích cestou za jedním cílem z BT vesničan cíl vzdá (a na ~`BT_GIVEUP_S` s ho nezkouší).
+const BT_STUCK_MAX := 3
+const BT_GIVEUP_S := 90.0
 
 var graph: RoadGraph
 var terrain: Terrain
@@ -64,6 +71,10 @@ var _bt_vars_ok := false          # jsou v blackboardu naplněné cíle (places/
 var _bt_target_pos := Vector3.INF # cíl pohybu z BT (INF = choď po grafu jako dřív)
 var _bt_path: PackedVector3Array = PackedVector3Array()   # body trasy k _bt_target_pos (uzly grafu → 3D)
 var _bt_path_i := 0               # index aktuálního bodu trasy
+var _bt_stuck_n := 0              # kolikrát se zasekl cestou za aktuálním cílem z BT (BT_STUCK_MAX → vzdá)
+var _bt_giveup_pos := Vector3.INF # cíl, který vzdal (A4-03) – dočasně ho `move_to` odmítá
+var _bt_giveup_until := 0         # do kdy (Time.get_ticks_msec) se vzdaný cíl nezkouší
+var _bt_work_ok := false          # pracoviště v blackboardu je hotové (statek vzniká později než boti)
 var _bt_home := Vector3.INF       # dveře domu vesničana (estate) – plní _bt_fill_vars
 var _bt_home_normal := Vector3(0, 0, 1)
 var _deep := false                # hluboký spánek za 1.7× simulační bubliny (schovaný vizuál, ~2 Hz chůze)
@@ -144,8 +155,9 @@ func _bt_start() -> void:
 	if persona:
 		persona.daily_routine = _bt
 	_bt_bb = ClassDB.instantiate("Blackboard")
-	for k in ["self", "world", "graph", "terrain", "home", "garden", "workplace", "pub_table"]:
+	for k in ["self", "world", "graph", "terrain", "home", "garden", "workplace", "pub_table", "shop"]:
 		_bt_bb.set_var(k, Vector3.INF)
+	_bt_bb.set_var("workplace_key", "")
 	_bt_bb.set_var("self", self)
 	_bt_bb.set_var("world", world)
 	_bt_bb.set_var("graph", graph)
@@ -158,14 +170,25 @@ func _bt_start() -> void:
 ## (vesničané se rodí před `_spawn_places`/`estate`, proto se to dělá líně za běhu).
 func _bt_fill_vars() -> void:
 	var places = world.get("places") if world else null
-	if _bt_vars_ok or not (places is Dictionary) or places.is_empty() or world.get("estate") == null:
+	if not (places is Dictionary) or places.is_empty() or world.get("estate") == null:
 		return
-	_bt_vars_ok = true
-	_bt_home = _home_pos()
-	_bt_bb.set_var("home", _bt_home)
-	_bt_bb.set_var("garden", _garden_pos())
-	_bt_bb.set_var("workplace", _workplace_pos())
-	_bt_bb.set_var("pub_table", _pub_table_pos())
+	if not _bt_vars_ok:
+		_bt_vars_ok = true
+		_bt_home = _home_pos()
+		_bt_bb.set_var("home", _bt_home)
+		_bt_bb.set_var("garden", _garden_pos())
+		_bt_bb.set_var("pub_table", _pub_table_pos())
+		var shop: Place = places.get("obchod")
+		_bt_bb.set_var("shop", shop.door if shop else Vector3.INF)
+	# pracoviště zvlášť: místo „statek“ vzniká později než ostatní → zkoušej dál, dokud nevznikne
+	if not _bt_work_ok:
+		var key := _workplace_key()
+		_bt_bb.set_var("workplace_key", key)
+		if key == "":
+			_bt_work_ok = true            # povolání bez pracoviště (důchodce…) – hotovo
+		elif places.has(key):
+			_bt_bb.set_var("workplace", _workplace_pos())
+			_bt_work_ok = true
 
 
 ## Dveře domu vesničana – nemovitost z registru (`Estate.pick_customer_house`, seed = jeho spawn seed).
@@ -192,15 +215,28 @@ func _garden_pos() -> Vector3:
 	return g
 
 
-## Dveře pracoviště podle povolání (`JOB_PLACE` → `World.places`); INF = zaměstnání nemá.
-func _workplace_pos() -> Vector3:
+## Klíč místa pracoviště podle povolání (`JOB_PLACE`, po slovech); "" = zaměstnání tady nemá.
+func _workplace_key() -> String:
 	var job := String(persona.profile.get("job", "")).to_lower() if persona else ""
-	for k in JOB_PLACE:
-		if k in job:
-			var pl: Place = world.get("places").get(JOB_PLACE[k])
-			if pl:
-				return pl.door
-	return Vector3.INF
+	var words: PackedStringArray = job.replace(",", " ").replace("–", " ").replace("-", " ").split(" ", false)
+	for w in words:
+		for x in JOB_EXCLUDE:
+			if w.begins_with(x):
+				return ""
+	for w in words:
+		for k in JOB_PLACE:
+			if w.begins_with(k):
+				return JOB_PLACE[k]
+	return ""
+
+
+## Dveře pracoviště podle povolání (`_workplace_key` → `World.places`); INF = zaměstnání nemá / místo ještě není.
+func _workplace_pos() -> Vector3:
+	var key := _workplace_key()
+	if key == "":
+		return Vector3.INF
+	var pl: Place = world.get("places").get(key)
+	return pl.door if pl else Vector3.INF
 
 
 ## Stůl na zahrádce u hospody (`Place.garden_tables`), jinak dveře hospody.
@@ -214,14 +250,20 @@ func _pub_table_pos() -> Vector3:
 
 
 ## Povel z BT: jdi na pozici `target` (trasa po silnicích, `_bt_step`). Opakované volání
-## se stejným cílem nic nemění; nový cíl přepočítá trasu.
-func move_to(target: Vector3) -> void:
+## se stejným cílem nic nemění; nový cíl přepočítá trasu. Vrací false, když cíl nelze (INF / vzdaný).
+func move_to(target: Vector3) -> bool:
 	if target == Vector3.INF:
-		return
+		return false
+	# cíl, který vesničan po opakovaném zaseknutí vzdal, chvíli nezkouší (A4-03) → BT akce selže
+	if _bt_giveup_pos != Vector3.INF and Time.get_ticks_msec() < _bt_giveup_until \
+			and _bt_giveup_pos.distance_to(target) <= 3.0:
+		return false
 	if _bt_target_pos == Vector3.INF or _bt_target_pos.distance_to(target) > 3.0:
 		_bt_target_pos = target
 		_bt_path = PackedVector3Array()
 		_bt_path_i = 0
+		_bt_stuck_n = 0
+	return true
 
 
 ## BT větev skončila (procházka): zruš cíl – vesničan zase chodí po grafu náhodně.
@@ -274,8 +316,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _physics_impl(delta) -> void:
-	var player: Node3D = world.nearest_player(global_position)
-	var to_player := player.global_position - global_position if player else Vector3(INF, 0, 0)
+	var player: Player = world.nearest_player(global_position)
+	var to_player := world.player_world_pos(player) - global_position if player else Vector3(INF, 0, 0)
 	var dist := to_player.length()
 	# --- simulační pásma okolo hráče (plynulá bublina): <simr plná fyzika+kolize+BT,
 	# simr…1.7×simr MID = viditelný vizuál, ale pohyb jen kinematicky bez kolizí (každý frame
@@ -419,9 +461,17 @@ func _physics_impl(delta) -> void:
 			if _stuck > 2.0:
 				_stuck = 0.0
 				if _bt_target_pos != Vector3.INF:
-					# zaseknutý cestou za cílem z BT → přeskoč bod a naplánuj trasu znovu odsud
-					_bt_path_i += 1
-					_bt_replan()
+					# zaseknutý cestou za cílem z BT → přeskoč bod a naplánuj trasu znovu odsud;
+					# po BT_STUCK_MAX zaseknutích cíl vzdej (replan jinak vrací přeskočení na začátek)
+					_bt_stuck_n += 1
+					if _bt_stuck_n >= BT_STUCK_MAX:
+						_bt_giveup_pos = _bt_target_pos
+						_bt_giveup_until = Time.get_ticks_msec() + int(BT_GIVEUP_S * 1000.0)
+						clear_target()
+						_bt_stuck_n = 0
+					else:
+						_bt_path_i += 1
+						_bt_replan()
 				else:
 					var t := _next
 					_next = _cur
@@ -483,7 +533,7 @@ func _advance() -> void:
 
 ## Rozhovor (E): drb z vesnice.
 func talk() -> String:
-	var p: Node3D = world.nearest_player(global_position)
+	var p: Player = world.nearest_player(global_position)
 	var t: String = Dialog.rumor(world.dialog_context(int(p.get("id")), self)) if p else "Dobrý den."
 	say(t, 4.5)
 	return t

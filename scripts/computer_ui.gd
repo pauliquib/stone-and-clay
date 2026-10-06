@@ -27,7 +27,7 @@ const MINE_COLORS := [Color(0.1, 0.2, 0.8), Color(0.1, 0.5, 0.1), Color(0.8, 0.1
 const SITES := [["eshop", "eŠuplík", "vesnet://esuplik/"], ["bazar", "Bazárek", "vesnet://bazarek/"],
 	["prace", "Práce v kraji", "vesnet://prace-v-kraji/"], ["banka", "Moje banka", "vesnet://moje-banka/"],
 	["obec", "Obecní web", "vesnet://obec/"], ["etesty", "eTesty", "vesnet://etesty/"],
-	["letectvi", "Letectví – ÚCL", "vesnet://letectvi/"]]
+	["letectvi", "Letectví – ÚVL", "vesnet://letectvi/"]]
 
 var client: Node
 var world: World
@@ -593,15 +593,15 @@ func _run_test(tid: String) -> void:
 	_btn(row, "← Zpět na eTesty", func(): _show("etesty"))
 
 
-# ------------------------------------------------------------------ Letectví – ÚCL (M6.1)
+# ------------------------------------------------------------------ Letectví – ÚVL (M6.1)
 
-## Portál bezpilotních letů (smyšlený ÚCL): registrace provozovatele, osvědčení A1/A3 (eTest „drony“),
+## Portál bezpilotních letů (smyšlený ÚVL): registrace provozovatele, osvědčení A1/A3 (eTest „drony“),
 ## flotila dronů (baterie, poškození), nabíjení a opravy. Pravidla ve hře: max 120 m, ne nad lidmi,
 ## VLOS 500 m, soukromí nad cizími pozemky – zjednodušená simulace, ne právní rada.
 func _p_letectvi() -> void:
 	_h1("Letectví – portál bezpilotních letů")
-	_text("Smyšlený portál pro registraci a kvalifikaci pilotů UAS. Zjednodušená herní simulace pravidel " +
-		"(EU 2019/947, ÚCL) – nejde o právní radu ani oficiální stránky.", DIM)
+	_text("Smyšlený portál Úřadu pro vzdušné lety (ÚVL) pro registraci a kvalifikaci pilotů UAS. Zjednodušená herní simulace pravidel " +
+		"(EU 2019/947, ÚVL) – nejde o právní radu ani oficiální stránky.", DIM)
 	# --- registrace provozovatele
 	_h2("Registrace provozovatele (zdarma, okamžitá)")
 	if world.permits == null:

@@ -326,7 +326,7 @@ func _recent(pid: int) -> Dictionary:
 func _speed_offense(in_village: bool, over: float) -> String:
 	if over >= 40.0:
 		return "rychlost_vyrazna"
-	return "rychlost_obec_20" if in_village else "rychlost_mimo_obec"
+	return "rychlost_obec" if in_village else "rychlost_mimo_obec"
 
 
 ## Co policista u okénka udělá: "test" dechová zkouška (podezření na alkohol, bez zákazu, nebo náhodně),

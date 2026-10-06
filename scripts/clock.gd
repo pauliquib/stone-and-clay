@@ -3,15 +3,15 @@
 ## (vegetace – Seasons, počasí – Weather) a aktivitu zvířat.
 ##
 ## Kalendář je skutečný: den 1 = `start_date` (výchozí dnešní datum systému, ladicí parametr --date=RRRR-MM-DD).
-## Poloha slunce a měsíce se počítá astronomicky pro Dukelčice (49,14° s. š., 17,70° v. d.) a místní čas
+## Poloha slunce a měsíce se počítá astronomicky pro zeměpisnou polohu obce (`LAT` / `LON` níže, přibližná – fiktivní obec) a místní čas
 ## (SEČ / letní čas SELČ od poslední neděle v březnu do poslední neděle v říjnu) → délka dne, výška slunce
 ## a západ se mění s ročním obdobím.
 class_name Clock
 extends Node
 
 const TIME_SCALE := 30.0
-const LAT := 49.14                   # zeměpisná šířka obce (°)
-const LON := 17.70                   # zeměpisná délka (°)
+const LAT := 49.1                    # zeměpisná šířka obce (°) – přibližná
+const LON := 17.7                    # zeměpisná délka (°) – přibližná
 
 const MONTHS := ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září",
 	"října", "listopadu", "prosince"]

@@ -330,7 +330,7 @@ func open_player() -> void:
 		["Nástroje do inventáře", world.cheat.bind(pid, "nastroje")],
 		["Zbraně: luk, kuše, šípy (M2.8)", world.cheat.bind(pid, "zbrane")],
 		["Zbrojní oprávnění zap / vyp + puška (M2.8)", world.cheat.bind(pid, "zbrojni")],
-		["Drony + registrace ÚCL + A1/A3 (M6.1)", world.cheat.bind(pid, "drony")],
+		["Drony + registrace ÚVL + A1/A3 (M6.1)", world.cheat.bind(pid, "drony")],
 		hdr("Práce"),
 		["Přijmout hned – vybrat práci (M3.1/M3.2)", _job_pick],
 		["Splnit požadavky (výřečnost 3, dřevorubectví 8, zahradničení 5, pracovní boty, střízlivost) (M3.2/M3.3)", _job_debug.bind("req")],

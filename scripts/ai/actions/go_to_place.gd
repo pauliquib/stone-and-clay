@@ -16,7 +16,8 @@ func _tick(_delta: float) -> Status:
 		return FAILURE
 	if Vector2(t.x - v.global_position.x, t.z - v.global_position.z).length() < arrive:
 		return SUCCESS
-	v.move_to(t)
+	if not v.move_to(t):   # cíl vzdaný po zaseknutí → větev selže a strom zkusí jinou
+		return FAILURE
 	return RUNNING
 
 

@@ -78,7 +78,7 @@ const GOSSIP_EVENTS := {
 	"snow_volunteer": ["Někdo nám ráno odházel sníh u zastávky. Díky, dobrá duše!"],
 	"fines_paid": ["Prý někdo zaplatil všechny pokuty najednou. To se hned tak nevidí."],
 	"drone_crash": ["Někomu prý spadl dron – slyšeli jste to řinčení? Majitel prý poletí další.", "Prý zase něco bzučelo a spadlo do zahrady. Drony, povídám, drony!"],
-	"drone_registered": ["Někdo tu prý registroval drona u ÚCL. Už se asi chystá špehovat sousedy."],
+	"drone_registered": ["Někdo tu prý registroval drona u ÚVL. Už se asi chystá špehovat sousedy."],
 }
 ## Výplň diskuse, když se nic neděje (výběr podle dne).
 const GOSSIP_FILLER := [
@@ -742,7 +742,7 @@ func record_test(pid: int, id: String, score: int, total: int, passed: bool) -> 
 	e["n"] = int(e.get("n", 0)) + 1
 	tests[id] = e
 	world.emit_game_event(pid, "etest_done", {"test": id, "score": score, "total": total, "passed": passed})
-	if id == "drony" and passed:      # M6.1: složený test = osvědčení A1/A3 (ÚCL)
+	if id == "drony" and passed:      # M6.1: složený test = osvědčení A1/A3 (ÚVL)
 		world.drone_pass_test(pid)
 	if id == "paramotor" and passed:  # M6.4: složená teorie létací školy paramotoru
 		world.pg_theory_passed(pid)
@@ -791,7 +791,7 @@ func on_event(pid: int, kind: String, data: Dictionary) -> void:
 	match kind:
 		"offense":
 			var o := Law.offense(String(data.get("id", "")))
-			var what := String(o.get("nazev", "něco provedl")).to_lower()
+			var what := String(o.get("drb", String(o.get("nazev", "něco provedl")).to_lower()))   # A4-13: věta do drbů z dat
 			if not texts.is_empty():
 				_add_gossip(pid, String(texts[r.randi_range(0, texts.size() - 1)]) % what)
 			var lr: Law.LawRecord = world.law.get(pid)
