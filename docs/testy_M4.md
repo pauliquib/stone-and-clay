@@ -82,3 +82,15 @@ Spouští jen uživatel. Stav: staticky ověřeno (kontrola překladu), ruční 
 8. Dlouhé sucho (F2 → Datum, několik dní bez deště, horko) → na desce přibude „Zákaz zalévání a napouštění z vodovodu“; po dešti zmizí.
 9. Starý save (bez klíčů `vyhlasky` a `weather.drought`) se načte bez chyby; čerstvé větve nejsou, sucho = 0.
 10. F5 → F9 po odvětvení: čerstvé větve v kapse i jejich stáří sušení zůstanou.
+
+## M4.6 – Zbraně, lov a rybolov podle zákona (doklady, hajný, rybářská stráž)
+1. F2 → Teleport do myslivecké chaty, u dveří E → „Myslivecký a rybářský spolek“: zaplať kurz zbrojního průkazu (4 000 Kč) a lovecký kurz (5 000 Kč); bez zaplaceného kurzu test doklad nevydá.
+2. Počítač doma (E) → eTesty → Zbrojní průkaz, Lovecký lístek: složit (prah 75 %) → hlášení „Doklad vydán“; panel P ukazuje doklady.
+3. V chatě koupit povolenku k lovu (1 500 Kč, 30 dní) a rybářský kurz (1 000 Kč) + test „Rybářský lístek“; pak povolenku k rybolovu na rok (1 800 Kč).
+4. Legální lov srnce s puškou a dokladem, v době lovu, ve dne, mimo obec → výstřel bez přestupku.
+5. Pytlák: v lese za šera vystřel na zvěř bez dokladů; hajný (F2 → Teleport do lesa u chaty) přijde za výstřelu (slyšet do 1,5 km) a přijde ke hráči (do 15 m) a při kontrole zapíše přestupek „Pytláctví“, pokud má nelegální úlovek.
+6. Hajný u hráče: „Ukázat doklady“ s nelegálním úlovkem → zápis přestupku; bez úlovku a s dokladem → „V pořádku, lovu zdar.“
+7. Utéct hajnému (volba „Utéct“) → po dobu ~2 h herního času hledá policie (wanted).
+8. Rybaření bez lístku o víkendu ráno (sobota/neděle, 5–12 h) → rybářská stráž u hráče při kontrole zapíše přestupek „rybářské pytláctví“ a hlášku „Zapisuji: rybaření bez lístku a povolenky“.
+9. Starý save (bez klíče `gamekeeper`) se načte bez chyby, kurzy jsou prázdné; F5 → F9 zachová zaplacené kurzy a doklady s platností.
+10. Povolenka k lovu po uplynutí 30 dnů (F2 → Datum +31 dní) přestane platit (`has` vrací false) a jde koupit znovu.

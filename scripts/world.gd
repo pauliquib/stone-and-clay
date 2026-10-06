@@ -142,6 +142,8 @@ var palenice: PalenicePrace      # M3.3: pomocník v pálenici – kvas, topení
 var computer: Computer           # M3.4: počítač doma – banka, e-shop s balíky, bazar, práce, pošta, web obce, eTesty; bankomaty
 var mail := {}                   # M3.4: id → [{t, from, subject, body, read}] – e-maily (World.send_mail)
 var orders := {}                 # M3.4: id → [{no, items, total, cod, jd, state}] – objednávky z e-shopu (den doručení)
+var gamekeeper: Gamekeeper        # M4.6: myslivecký hajný (lesy, výstřely, kontrola dokladů, kurzy v chatě)
+var rybar_straz: Gamekeeper       # M4.6: rybářská stráž (víkendová obchůzka, kontrola lístků a povolenek)
 var hunting: Hunting             # lov zvěře (M2.9): zásah, postřelení, krvavá stopa, úlovek (Carcass), vyvrhnutí, pytláctví, překupník
 var fires: Array = []            # ohniště (Fire) – hořící, žhavé i vyhaslé kamenné kruhy
 var grass_fires: Array = []      # probíhající požáry trávy (GrassFire)
@@ -490,6 +492,15 @@ func add_player(id: int, pos: Vector3, yaw: float) -> Player:
 		court = Court.new()
 		add_child(court)
 		court.setup(self)
+	if gamekeeper == null:        # M4.6: hajný a rybářská stráž (jedna instance každá; svědci přes add_witness_source)
+		gamekeeper = Gamekeeper.new()
+		add_child(gamekeeper)
+		gamekeeper.setup(self, Gamekeeper.HAJNY)
+		add_witness_source(gamekeeper.witness_candidates)
+		rybar_straz = Gamekeeper.new()
+		add_child(rybar_straz)
+		rybar_straz.setup(self, Gamekeeper.STRAZ)
+		add_witness_source(rybar_straz.witness_candidates)
 	if fences == null:            # ploty a ohrady (Fáze 7) – až PO výběhu, zahradě i statku: sondy `_find_spot`
 		fences = FenceManager.new()   # hledají jejich místa kolizním kvádrem a na hotový plot by narazily
 		add_child(fences)
@@ -1470,6 +1481,8 @@ func emit_game_event(id: int, kind: String, data: Dictionary) -> void:
 	var cl = clients.get(id)
 	if cl:
 		cl.on_game_event(kind, data)
+	if gamekeeper:
+		gamekeeper.on_event(id, kind, data)   # M4.6: hajný slyší výstřely a pytlácké činy
 	var q: Quests = quests.get(id)
 	if q:
 		q.on_event(kind, data)
@@ -2559,6 +2572,8 @@ func interactables(id: int) -> Array:
 		out.append({"pos": police.checkpoint_cop.global_position, "r": 2.5, "kind": "cop", "text": "Policista"})
 	if hunter:
 		out.append_array(hunter.interactables(id))
+	if gamekeeper:
+		out.append_array(gamekeeper.interactables(id))   # M4.6: kurzy a povolenky v myslivecké chatě
 	if paddock:
 		out.append_array(paddock.interactables(id))
 	if bazaar:
@@ -4091,8 +4106,8 @@ func witness_check(id: int, pos: Vector3, kind: String, see_r: float, hear_r := 
 			continue
 		var persona: Persona = c.get("persona")
 		var reports := false
-		if String(c.get("role", "")) == "policie":
-			reports = true
+		if String(c.get("role", "")) == "policie" or String(c.get("role", "")) == "hajny":
+			reports = true                # policie a hajný (M4.6) hlásí vždy
 		else:
 			var p := WITNESS_DEFAULT_P
 			if persona:

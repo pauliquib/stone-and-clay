@@ -437,7 +437,7 @@ kroky přehazovat, mezi milníky platí závislosti.
 - [x] **M4.3 Soud a vězení** – trestné činy z katalogu, rejstřík jako pohled na záznamy, tresty, souhrnný časový skok a jeho následky.
 - [x] **M4.5 Nové cesty k pověsti / respektu / karmě** – pomoc sousedům, úklid, vrácení věcí, přátelství
   s postavami, drobné dobré skutky (seznam v 3.5).
-- [ ] **M4.6 Zbraně, lov a rybolov podle zákona** – zbrojní oprávnění, lovecký a rybářský lístek,
+- [x] **M4.6 Zbraně, lov a rybolov podle zákona** (částečně – viz PROJECT_LOG: bez kontroly kufru policií, zabavení udice, střelnice a posudku) – zbrojní oprávnění, lovecký a rybářský lístek,
   povolenky (kurzy a zkoušky přes PC / střelnici), hajný a rybářská stráž v terénu, svědci hlásí
   pytláctví, kontroly dokladů a kufru policií, zabavení, trestné činy. *Hotovo, když:* pytlák s úlovkem
   na rameni je dopaden hajným a legální lovec s doklady a úlovkem v kufru projde kontrolou policie.
