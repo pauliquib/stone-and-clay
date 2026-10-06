@@ -8,21 +8,21 @@ extends Node
 
 ## Známé druhy oprávnění: id → [název, vydavatel, poznámka pro UI].
 const KINDS := {
-	"dron_provozovatel": ["Registrace provozovatele UAS", "ÚCL – portál bezpilotních letů",
+	"dron_provozovatel": ["Registrace provozovatele UAS", "ÚVL – portál bezpilotních letů",
 		"Bezplatná registrace; registrační číslo se vyznačuje na dronu."],
-	"dron_a1a3": ["Osvědčení pilota UAS – A1/A3", "ÚCL – online zkouška",
+	"dron_a1a3": ["Osvědčení pilota UAS – A1/A3", "ÚVL – online zkouška",
 		"Potřebné pro drony nad 250 g a pro let v blízkosti lidí."],
 	# M6.4 paramotor (sportovní létající zařízení – zjednodušeně)
-	"pilot_pg_motor": ["Pilotní průkaz paramotoru (SLZ)", "ÚCL – létací škola",
+	"pilot_pg_motor": ["Pilotní průkaz paramotoru (SLZ)", "ÚVL – létací škola",
 		"Teorie (eTest „paramotor“) + 5 výcvikových vzletů s instruktorem; výcvik 35 000 Kč."],
-	"pg_registrace": ["Registrace paramotoru (poznávací značka)", "ÚCL – evidence SLZ",
+	"pg_registrace": ["Registrace paramotoru (poznávací značka)", "ÚVL – evidence SLZ",
 		"Registrační značka se vyznačuje na křídle."],
 	"pg_pojisteni": ["Pojištění odpovědnosti paramotoru", "Pojišťovna (roční)",
 		"Povinná výbava provozovatele; ve hře roční platba 1 200 Kč."],
 	# M6.5 motorové rogalo / ultralehké letadlo (ULL – zjednodušeně, LAA ČR)
-	"pilot_ul": ["Pilotní průkaz ULL (rogalo)", "ÚCL – létací škola",
+	"pilot_ul": ["Pilotní průkaz ULL (rogalo)", "ÚVL – létací škola",
 		"Teorie (eTest „ultralehké“) + 10 výcvikových letů s instruktorem; výcvik 75 000 Kč."],
-	"ul_registrace": ["Registrace UL stroje (poznávací značka)", "ÚCL – evidence UL",
+	"ul_registrace": ["Registrace UL stroje (poznávací značka)", "ÚVL – evidence UL",
 		"Registrační značka se vyznačuje na vozíku."],
 	"ul_pojisteni": ["Pojištění odpovědnosti UL stroje", "Pojišťovna (roční)",
 		"Povinná výbava provozovatele; ve hře roční platba 3 000 Kč."],
@@ -53,7 +53,7 @@ func has(pid: int, kind: String) -> bool:
 	return _g(pid).has(kind)
 
 
-## Udělí oprávnění (registrace na ÚCL, složený test). `no` = registrační / evidenční číslo.
+## Udělí oprávnění (registrace na ÚVL, složený test). `no` = registrační / evidenční číslo.
 func grant(pid: int, kind: String, no := "") -> void:
 	var g := _g(pid)
 	if g.has(kind):

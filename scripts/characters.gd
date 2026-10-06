@@ -27,7 +27,7 @@ const TRAITS := {
 ## speed = chůze m/s, topics = oblíbená témata (Dialog), hobby = krátká věta o sobě.
 const PROFILES := [
 	{"name": "Bohuslav Křemínek", "age": 71, "job": "důchodce, bývalý traktorista", "trait": "moudry",
-		"hobby": "Za mých mladých let jsem oral celé JZD na Zetoru.", "topics": ["pole", "traktor", "pocasi"],
+		"hobby": "Za mých mladých let jsem oral celé JZD na starém strojáku.", "topics": ["pole", "traktor", "pocasi"],
 		"look": {"shirt": Color(0.42, 0.4, 0.33), "pants": Color(0.22, 0.2, 0.17), "hair": Color(0.82, 0.82, 0.8), "style": 1,
 			"moustache": true, "hat": true, "fat": 0.35, "size": 0.95, "sleeves": true, "skin": 0.6}, "speed": 1.0},
 	{"name": "Anežka Pupíková", "age": 64, "job": "důchodkyně, zahrádkářka", "trait": "drbna",

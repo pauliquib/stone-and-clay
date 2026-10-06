@@ -168,7 +168,7 @@ nástroje v ruce, akce má **trvání** (průběh na HUD), stojí výdrž, dá X
 Katalog `přestupků / trestných činů`: druh → zákon a § (např. 361/2000 Sb. silniční provoz,
 251/2016 Sb. přestupky, 40/2009 Sb. trestní zákoník, 114/1992 Sb. ochrana přírody, 289/1995 Sb. lesy,
 133/1985 Sb. požární ochrana, 449/2001 Sb. myslivost, 99/2004 Sb. rybářství, zákon o zbraních
-a střelivu – od 2026 nový zákon č. 90/2024 Sb., letecké předpisy ÚCL), rozpětí pokuty, body v bodovém systému, zákaz
+a střelivu – od 2026 nový zákon č. 90/2024 Sb., letecké předpisy ÚVL), rozpětí pokuty, body v bodovém systému, zákaz
 činnosti, zda jde o trestný čin (→ soud). Konkrétní částky a body se doplní z **aktuálního znění** při
 implementaci (bodový systém byl novelizován v roce 2024).
 
@@ -322,7 +322,7 @@ hasičská soutěž).
   a podmínky. Radio Skyrock se nepřidává. Smyšlené *Rádio Kovadlina* (metal) zůstává.
 
 ### 4.6 Létání (1)
-- **Dron:** pohled z kamery, baterie, dosah, vítr; pravidla ÚCL (registrace provozovatele, online test
+- **Dron:** pohled z kamery, baterie, dosah, vítr; pravidla ÚVL (registrace provozovatele, online test
   A1/A3, max. 120 m, ne nad lidmi a cizími pozemky) → přestupky, dron může spadnout a něco poškodit.
 - **Motorový paraglide (paramotor):** rozběh, trim, plyn, vítr a termika, přistání; pilotní průkaz
   (sportovní létání – LAA ČR).
@@ -440,7 +440,7 @@ kroky přehazovat, mezi milníky platí závislosti.
   v `data/radia.json`, právní poznámka v README.
 
 ### M6 – Létání
-- [x] **M6.1 Dron** – ovládání, kamera, baterie, pravidla ÚCL a přestupky. *Hotovo: `Drone` (RigidBody3D se servo letovým modelem, vítr, režimy vzlet/let/RTH/přistání/pád/strom), `DroneModel` (2 modely, procedurální vizuál), `Permits` (registrace ÚCL + osvědčení A1/A3 přes eTest), 7 přestupků v `zakon.json`, prodej v Potravinách / eŠuplíku, stránka Letectví – ÚCL na PC (registrace, flotila, nabíjení, oprava), fotka do `user://fotky_dron/`, OSD telemetrie, save/load; otevřené body v PROJECT_LOG.*
+- [x] **M6.1 Dron** – ovládání, kamera, baterie, pravidla ÚVL a přestupky. *Hotovo: `Drone` (RigidBody3D se servo letovým modelem, vítr, režimy vzlet/let/RTH/přistání/pád/strom), `DroneModel` (2 modely, procedurální vizuál), `Permits` (registrace ÚVL + osvědčení A1/A3 přes eTest), 7 přestupků v `zakon.json`, prodej v Potravinách / eŠuplíku, stránka Letectví – ÚVL na PC (registrace, flotila, nabíjení, oprava), fotka do `user://fotky_dron/`, OSD telemetrie, save/load; otevřené body v PROJECT_LOG.*
 - [x] **M6.2 Pozadí za okrajem mapy** – nízkorozlišený terén okolí, horizont, hranice letu. *Hotovo: `Surroundings` (LOD dlaždice okolí + díra pod katastrem, MultiMesh kužely lesa, fallback prstenec bez dat), `tools/surroundings.py` (DMR 5G ČÚZK + maska OSM → `surround_height/surface.bin`), `World.flight_bounds` (strop 1 500 m AGL, hranice 2 km za katastrem – rozhodnutí uživatele), mlha z řídne z výšky, F2 → Teleport → volná kamera; otevřené body v PROJECT_LOG.*
 - [x] **M6.3 Letový model** – společný základ (vztlak, odpor, vítr, termika) pro paraglide a rogalo.
 - [x] **M6.4 Motorový paraglide** – rozběh, řízení, přistání, pilotní průkaz.

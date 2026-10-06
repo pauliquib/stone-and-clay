@@ -35,7 +35,7 @@ držený Mezerník = povolené trimry (větší rychlost), Ctrl = „uši“ (ry
 křídlo může částečně zavřít (propad na stranu) – srovná opačná brzda. **Přistání:** proti větru, se
 staženým plynem, ve výšce ~1 m obě brzdy naplno (flare) → dosednutí na nohy a doběh. E u ležícího
 stroje = složit křídlo zpátky do batohu (25 kg). Průkaz (`pilot_pg_motor`), registrace a pojištění:
-počítač doma → *Letectví – ÚCL* (škola 35 000 Kč: eTest „paramotor“ + 5 výcvikových vzletů).
+počítač doma → *Letectví – ÚVL* (škola 35 000 Kč: eTest „paramotor“ + 5 výcvikových vzletů).
 
 **S motorovým rogalem / trikem (M6.5):** ojetý stroj koupíš na inzertní ceduli u hangáru polního
 letiště (dráha ~260 m jihozápadně od návsi; F2 → Teleport → *Letiště*), případně F2 → Vozidla.
@@ -51,5 +51,5 @@ nebo nad lidmi = přestupky `ul_*` (svědek = hluk motoru ~800 m). **Spolujezdec
 triku nabídneš E „vyhlídkový let“ vesničanovi s přátelstvím ≥ 60 – sedí vzadu, komentuje let
 bublinami, po přistání se vysadí (+ přátelství, + pověst). Průkaz ULL (`pilot_ul`, škola
 75 000 Kč = eTest „ultralehké“ + 10 výcvikových letů s instruktorem rádiem), registrace
-`ul_registrace` (1 500 Kč) a pojištění `ul_pojisteni` (3 000 Kč/rok): PC → *Letectví – ÚCL*.
+`ul_registrace` (1 500 Kč) a pojištění `ul_pojisteni` (3 000 Kč/rok): PC → *Letectví – ÚVL*.
 Ukládá se se stroji (`aircrafts`); spolujezdec se před uložením vysadí.

@@ -490,16 +490,16 @@
   návrat domů (RTH) při vybití (5 %), ztrátě signálu nebo na přání (F); baterie zkracuje mráz i sport;
   poškozený dron klesá, nad 55 % poškození nevzlétne (oprava na PC). Nárazy: ťuknutí = poškrábání,
   > 4 m/s = havárie a volný pád, strom = zaseknutí na 6 s, osoba / zvíře = zranění + přestupek; bzučení
-  plaší zvěř do 45 m. **Pravidla ÚCL (zjednodušená herní simulace, ne právní rada):** registrace
-  provozovatele povinná u dronu s kamerou (zdarma na PC → *Letectví – ÚCL*, evidenční číslo + e-mail),
+  plaší zvěř do 45 m. **Pravidla ÚVL (zjednodušená herní simulace, ne právní rada):** registrace
+  provozovatele povinná u dronu s kamerou (zdarma na PC → *Letectví – ÚVL*, evidenční číslo + e-mail),
   eTest „drony“ (10 otázek, práh 8) = osvědčení A1/A3 pro > 250 g; max **120 m** nad zemí (dron odepře
   stoupání), vizuální **dohled 500 m** (60 s mimo = přestupek), **ne nad lidmi** (~25 m), **soukromí**
   (> 30 s vrtění pod 30 m nad cizím pozemkem). Sedm nových přestupků v `data/zakon.json` – zapisují se
   jen když drona někdo uvidí nebo uslyší (svědci ~150 m v obci, policejní hlídka 400 m). Telemetrie a
   varování v OSD, fotky do `user://fotky_dron/`, smyčka bzučení `Sfx.drone_loop`. Stav flotily
   (baterie, poškození) i zaparkovaný dron se ukládají (`SaveGame` klíče `drones`, `permits`); nabíjení
-  a oprava na počítači doma → *Letectví – ÚCL*. XP Letectví za uletěnou vzdálenost. Cheat F2 → Hráč
-  „Drony + registrace ÚCL + A1/A3“. Ladění: `DroneModel.MODELS` (specifikace modelů), konstanty nahoře
+  a oprava na počítači doma → *Letectví – ÚVL*. XP Letectví za uletěnou vzdálenost. Cheat F2 → Hráč
+  „Drony + registrace ÚVL + A1/A3“. Ladění: `DroneModel.MODELS` (specifikace modelů), konstanty nahoře
   v `dron.gd` (limity, prahy, časovače), `Permits.KINDS`.
 - **Létání – model (M6.3):** `scripts/flight/` = `aircraft.gd` (`Aircraft` extends `RigidBody3D`,
   vlastní integrátor), `thermals.gd` (`Thermals` – uzem světa „Termika“), `flight_hud.gd`
@@ -530,7 +530,7 @@
   ~10 m rozpětí jako kyvadlo ~6,6 m nad pilotem. Koupě: obchod/eŠuplík (`paramotor` 180 000 Kč,
   `paramotor_ojety` 90 000 Kč – položky 25 kg, `Cargo.CARGO["paramotor"]`). Průkaz
   `pilot_pg_motor` + registrace `pg_registrace` + pojištění `pg_pojisteni` (`Permits.KINDS`, PC →
-  Letectví – ÚCL; škola 35 000 Kč = eTest `data/testy/paramotor.json` + 5 výcvikových vzletů s
+  Letectví – ÚVL; škola 35 000 Kč = eTest `data/testy/paramotor.json` + 5 výcvikových vzletů s
   instruktorem „rádiem“, stav `Computer.pg_school` / save klíč `pg_skola`). Nové přestupky
   `pg_*` v `zakon.json` – svědek hluku ~800 m (`World.pg_noise_witnessed`), „obec“ ~350 m od místa
   (`pg_over_village`). Spawn i bez batohu: F2 → Vozidla → Paramotor.
@@ -551,10 +551,15 @@
   **Průkazy:** `pilot_ul` (škola 75 000 Kč = eTest `data/testy/ul.json` práh 8/10 + 10 výcvikových
   vzletů, stav `Computer.ul_school` / save klíč `ul_skola`, řízení `World.ul_enroll /
   ul_theory_passed / ul_training_takeoff / _ul_try_grant`), `ul_registrace` (1 500 Kč),
-  `ul_pojisteni` (3 000 Kč) – PC → Letectví – ÚCL. **Přestupky `ul_*`** v `zakon.json`
+  `ul_pojisteni` (3 000 Kč) – PC → Letectví – ÚVL. **Přestupky `ul_*`** v `zakon.json`
   (`ul_bez_prukazu/registrace/pojisteni`, `ul_pristani_mimo`, `ul_nizko_nad_obci`, `ul_nad_lidmi`,
   `ul_noc`, `ul_mraky`) – svědek hluku ~800–900 m (`World.pg_noise_witnessed`), `Airfield.on_runway`
   pro přistání na dráze (nouze vyjmuta – zjednodušeně jen svědek). **Spolujezdec:** vesničan s
   přátelstvím ≥ 60 v dosahu 14 m (`World.trike_interactables`, `Trike.board_passenger/_pax_off`) –
   bubliny `PAX_LINES`, +8 přátelství a +3 pověst za svezení. Teleport F2 → *Letiště*
   (`Airfield.teleport_spot`). Další stroje (samostatný UL letoun, vrtulník) = otevřené body.
+
+### Vlna 0d – F5 (NPC, zákon, obsah)
+- **Katalog přestupků** (`data/zakon.json`): každý přestupek má pole `drb` (věta do drbů na obecním webu, `Computer.on_event`)
+  a `karma` (změna skryté karmy; `Reputation.OFFENSE_KARMA` je jen přepis výjimek). `rychlost_obec_20` → `rychlost_obec`
+  (starý klíč řeší `Law.ALIASES`). eTesty (`TestUI`): míchané odpovědi, volitelné `pocet` (losování z banku) a `prah_pct`.

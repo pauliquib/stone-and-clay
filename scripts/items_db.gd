@@ -105,7 +105,7 @@ const ITEMS := {
 	"spacak": {"name": "Spacák a karimatka (vyspíš se kdekoli venku)", "short": "Spacák", "type": "gear", "kg": 1.5, "price": 890,
 		"color": Color(0.8, 0.3, 0.1)},
 	# ---- M6.1 drony (stavy baterie a poškození drží `World.drone_states`, modely `DroneModel.MODELS`;
-	# start z inventáře → `World.drone_launch`; opravy a nabíjení na počítači doma, stránka Letectví – ÚCL)
+	# start z inventáře → `World.drone_launch`; opravy a nabíjení na počítači doma, stránka Letectví – ÚVL)
 	"dron": {"name": "Dron Ptáček Mini (249 g, kamera, ~12 min letu)", "short": "Dron Mini", "type": "gear", "kg": 0.45,
 		"price": 7990, "color": Color(0.82, 0.83, 0.88)},
 	"dron_velky": {"name": "Dron Ptáček Pro XL (2,5 kg, 4K kamera, ~15 min letu, vyžaduje A1/A3)", "short": "Dron XL",
@@ -113,7 +113,7 @@ const ITEMS := {
 	"dron_baterie": {"name": "Náhradní baterie dronu (při startu se sama vymění za vybitou)", "short": "Baterie dronu",
 		"type": "gear", "kg": 0.3, "price": 1490, "color": Color(0.35, 0.55, 0.75)},
 	# ---- M6.4 paramotor (sbalený stroj v batohu, 25 kg = hranice nosnosti; start přes detail →
-	# „Připravit k letu" → `World.pg_prepare`; registrace / škola / pojištění na PC → Letectví – ÚCL)
+	# „Připravit k letu" → `World.pg_prepare`; registrace / škola / pojištění na PC → Letectví – ÚVL)
 	"paramotor": {"name": "Paramotor Vlaštovka 24 (nový: křídlo 24 m² + motor s vrtulí)", "short": "Paramotor",
 		"type": "gear", "kg": 25.0, "price": 180000, "color": Color(0.85, 0.3, 0.2)},
 	"paramotor_ojety": {"name": "Paramotor Sokolík (ojetý, po prohlídce)", "short": "Paramotor (ojetý)",

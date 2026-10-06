@@ -10,7 +10,7 @@
 ## Ovládání (jako chůze): WASD let vpřed/strany, myš = otáčení dronu + naklápění kamery, Mezerník stoupat,
 ## Ctrl klesat, Shift sportovní režim, V kamera z dronu / za dronem, F přistát / návrat, O nebo LMB fotka.
 ##
-## Práva (ÚCL / EU 2019/947 – zjednodušená herní simulace): registrace provozovatele `dron_provozovatel`,
+## Práva (ÚVL / EU 2019/947 – zjednodušená herní simulace): registrace provozovatele `dron_provozovatel`,
 ## A1/A3 `dron_a1a3` pro >250 g, max 120 m AGL, ne nad lidmi, VLOS 500 m, soukromí (30 m / 30 s nad cizím
 ## pozemkem). Přestupky jdou přes `World.commit_offense`, jen když drona někdo uvidí (`World.drone_witnessed`).
 class_name Drone

@@ -158,7 +158,7 @@ static func save(world: World, id: int, slot: String) -> bool:
 	d["drones"] = world.drones_to_dict(id)              # M6.1: flotila (baterie, poškození) + dron zaparkovaný ve světě
 	d["aircrafts"] = world.aircrafts_to_dict(id)        # M6.3: letouny (pozice, yaw, palivo, dmg) + „sedí ve stroji“
 	if world.permits:
-		d["permits"] = world.permits.to_dict(id)        # M6.1: registrace ÚCL, osvědčení A1/A3 (později doklady M4.6)
+		d["permits"] = world.permits.to_dict(id)        # M6.1: registrace ÚVL, osvědčení A1/A3 (později doklady M4.6)
 	var f := FileAccess.open(path(slot), FileAccess.WRITE)
 	if f == null:
 		push_warning("Uložení se nepovedlo: %s (%s)" % [path(slot), error_string(FileAccess.get_open_error())])

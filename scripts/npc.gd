@@ -105,10 +105,10 @@ func _process_impl(delta: float) -> void:
 		_say_t -= delta
 		if _say_t <= 0.0:
 			_label.visible = false
-	var player: Node3D = world.nearest_player(global_position) if world else null
+	var player: Player = world.nearest_player(global_position) if world else null
 	if player == null:
 		return
-	var to := player.global_position - global_position
+	var to := world.player_world_pos(player) - global_position
 	# za simulační bublinou se NPC schová (jen u hráče) – otáčení za ním nemá smysl počítat
 	var simr: float = world.sim_radius if world != null else 320.0
 	var d := to.length()

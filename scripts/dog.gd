@@ -88,8 +88,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _physics_impl(delta) -> void:
-	var player: Node3D = world.nearest_player(global_position)
-	var to_p := player.global_position - global_position if player else Vector3(INF, 0, 0)
+	var player: Player = world.nearest_player(global_position)
+	var to_p := world.player_world_pos(player) - global_position if player else Vector3(INF, 0, 0)
 	var dist := to_p.length()
 	# pásma okolo hráče: <160 m plná fyzika, 160 m…1.7×simr kinematika (viditelný, bez kolizí),
 	# >1.7×simr hluboký spánek: schovaný vizuál, chůze jen kinematicky ~2 Hz

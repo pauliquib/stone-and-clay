@@ -31,7 +31,7 @@ cigarety se prodavaji jen v obchode
 
 Dodrzovat zmeneny provoz obchodu v sobotu a nedeli
 
-v nedeli mse svata v kaplicce (dle realne polohy) + v kostele (Velky Ořechov) => doplnit farare a interiery
+v nedeli mse svata v kaplicce (dle realne polohy) + v kostele (Velký Oříškov (fiktivní obec z data/obce.json)) => doplnit farare a interiery
 
 po tazeni rucniho voziku uz nemuzu behat at mackam shift jak chci
 

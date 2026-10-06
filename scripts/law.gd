@@ -7,6 +7,9 @@ extends RefCounted
 const PATH := "res://data/zakon.json"
 const MAX_RECORDS := 200
 
+## Přejmenovaná id přestupků (staré uložené pozice / rejstříky) → dnešní id.
+const ALIASES := {"rychlost_obec_20": "rychlost_obec"}
+
 static var _cache := {}
 
 ## Načte (a uloží do cache) celý katalog; při chybě prázdný slovník.
@@ -19,7 +22,7 @@ static func load_catalog() -> Dictionary:
 
 
 static func offense(id: String) -> Dictionary:
-	return (load_catalog().get("prestupky", {}) as Dictionary).get(id, {})
+	return (load_catalog().get("prestupky", {}) as Dictionary).get(ALIASES.get(id, id), {})
 
 
 static func setting(key: String, def: float) -> float:
