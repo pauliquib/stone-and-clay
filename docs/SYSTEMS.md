@@ -12,7 +12,12 @@
   úřad 7–17, Myslivecká chata a domov nonstop. Doma: spánek do 7:00, lednička, kafe, oprava auta.
 - **Doprava** (`traffic.gd`, `car.gd`): 5 AI aut jezdí pravým pruhem, brzdí před zatáčkami a před
   překážkou v pruhu (auto, chodec, pes, popelnice), stojící překážku objedou, vzájemné zablokování
-  na křižovatce řeší přednost; zaseknutá auta mimo dohled hráče se přesunou. **M1.6:** modely se losují
+  na křižovatce řeší přednost; zaseknutá auta mimo dohled hráče se přesunou, u hráče dostanou novou trasu
+  z místa, kde stojí. **Vlna 0d:** pure pursuit na bod interpolovaný L = clamp(0,6·v + 3, 4, 14) m před autem,
+  body trasy se odbavují až za rovinou rohu, brzdí podle poloměru zatáčky už k tečnému bodu (`Car.AI_*`),
+  vidí i statickou překážku (dům, strom, plot – vrstva 1 bez terénu a vozovky); pruh má mitre korekci
+  a zaoblené ostré rohy (`RoadGraph.LANE_*`, `ROUND_*`), trasy nezačínají ani nekončí na service větvích
+  (`RoadGraph.END_KINDS`). **M1.6:** modely se losují
   podle vah (`Traffic.AI_WEIGHTS` – hodně osobních, občas dodávka / pickup); **malotraktor Traktůrek** jezdí
   jen v sezóně polních prací (duben–říjen, 6–19 h) a jen po okreskách a polních cestách, max. ~27 km/h.
 - **Nová vozidla a bazar (M1.6):** katalog `CarModel.MODELS` má pole `kategorie`, `skupina_rp` (AM/A1/A2/B/T pro M4.1),

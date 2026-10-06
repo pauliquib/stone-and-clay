@@ -13,10 +13,14 @@ const AI_WEIGHTS := {"octavia": 3.0, "fabia": 3.0, "sedan120": 1.5, "rodinka": 2
 const PARKED_WEIGHTS := {"octavia": 3.0, "fabia": 3.0, "sedan120": 1.5, "rodinka": 2.5, "van": 0.6, "bednar": 0.8, "lesak": 1.0,
 	"pionyrek": 0.5, "vcelka": 0.5, "armadka": 0.3, "krosak": 0.2}
 const TRACTOR_KINDS := ["tertiary", "unclassified", "service", "track"]   # jen okresky a polní cesty (DOPLNIT: podle grafu silnic)
+const TRACTOR_END_KINDS := ["tertiary", "unclassified", "track"]   # start / cíl traktoru (ne vjezdy – service)
 const TRACTOR_ID := "traktorek"
 const TRACTOR_CHECK_S := 15.0
 const VILLAGE_CENTER := Vector2(120.0, 180.0)
 const VILLAGE_R := 520.0
+const STUCK_S := 25.0             # stojí bez překážky tak dlouho → zaseknuté (respawn / přeplánování)
+const BLOCKED_S := 40.0           # dlouho zablokované překážkou (dům v silnici, stojící auto)
+const REPLAN_COOL_S := 15.0       # přeplánování jednoho auta u hráče nejvýš jednou za tolik s
 
 var graph: RoadGraph
 var terrain: Terrain
@@ -27,6 +31,7 @@ var ai_cars: Array[Car] = []
 var parked: Array[Car] = []
 var rng := RandomNumberGenerator.new()
 var _stuck := {}
+var _replan_at := {}              # auto → čas posledního přeplánování u hráče (ms)
 var _plate_n := 1000
 var _tractor_t := 0.0
 var _sleep_t := 0.0             # periodika uspávání / probouzení vozidel podle vzdálenosti hráčů
@@ -134,6 +139,7 @@ func _update_tractor(delta: float) -> void:
 	elif t != null and world.nearest_player_dist(t.global_position) > 60.0:
 		ai_cars.erase(t)
 		_stuck.erase(t)
+		_replan_at.erase(t)
 		t.queue_free()
 
 
@@ -269,15 +275,22 @@ func _respawn(c: Car, first := false) -> void:
 	var pp := Vector2(anchor.x, anchor.z)
 	var is_tractor := c.model_id == TRACTOR_ID
 	var a := graph.astar(TRACTOR_KINDS if is_tractor else RoadGraph.CAR_KINDS)
+	# start i cíl jen na „opravdových“ silnicích – service větve jsou vjezdy do dvorů (auto by tam
+	# začínalo / končilo v zahradě); trasa jimi může jen projet
+	var ends := graph.astar(TRACTOR_END_KINDS if is_tractor else RoadGraph.END_KINDS)
 	for attempt in 30:
 		var ang := rng.randf() * TAU
 		var r := rng.randf_range(120.0, 450.0) if not first else rng.randf_range(60.0, 500.0)
-		var s := a.get_closest_point(pp + Vector2(cos(ang), sin(ang)) * r)
+		var s := ends.get_closest_point(pp + Vector2(cos(ang), sin(ang)) * r)
+		if s < 0 or not a.has_point(s):
+			continue
 		var sp := graph.nodes[s]
 		if sp.distance_to(pp) < 90.0:
 			continue
 		var ang2 := rng.randf() * TAU
-		var e := a.get_closest_point(sp + Vector2(cos(ang2), sin(ang2)) * rng.randf_range(500.0, 1600.0))
+		var e := ends.get_closest_point(sp + Vector2(cos(ang2), sin(ang2)) * rng.randf_range(500.0, 1600.0))
+		if e < 0 or not a.has_point(e):
+			continue
 		var ids := a.get_id_path(s, e)
 		if ids.size() < 6:
 			continue
@@ -288,6 +301,31 @@ func _respawn(c: Car, first := false) -> void:
 		c.set_ai_route(pts, minf(13.9 if v_obci else 19.0, float(c.model.spec.get("ai_vmax", 99.0))))
 		_stuck[c] = 0.0
 		return
+
+
+## Nová trasa z místa, kde auto stojí (bez teleportu) – do náhodného cíle 300–1200 m daleko.
+## Body trasy za autem `Car.reroute` rovnou odbaví. Vrací false, když trasu nenašlo.
+func _replan(c: Car) -> bool:
+	var is_tractor := c.model_id == TRACTOR_ID
+	var a := graph.astar(TRACTOR_KINDS if is_tractor else RoadGraph.CAR_KINDS)
+	var ends := graph.astar(TRACTOR_END_KINDS if is_tractor else RoadGraph.END_KINDS)
+	var here := Vector2(c.global_position.x, c.global_position.z)
+	var s := a.get_closest_point(here)
+	if s < 0:
+		return false
+	for attempt in 10:
+		var ang := rng.randf() * TAU
+		var e := ends.get_closest_point(here + Vector2(cos(ang), sin(ang)) * rng.randf_range(300.0, 1200.0))
+		if e < 0 or e == s or not a.has_point(e):
+			continue
+		var ids := a.get_id_path(s, e)
+		if ids.size() < 4:
+			continue
+		c.reroute(graph.lane_points(ids, terrain))
+		_stuck[c] = 0.0
+		return true
+	_stuck[c] = 0.0
+	return false
 
 
 func _physics_process(delta: float) -> void:
@@ -319,15 +357,25 @@ func _physics_process_impl(delta: float) -> void:
 		else:
 			_stuck[c] = 0.0
 		# zaseknuté / dlouho zablokované auto daleko od hráče se přesune jinam (hráč to nevidí)
-		var blocked_long := c.ai_blocked > 40.0 and d > 80.0
-		if d > 650.0 or c.ai_done() or float(_stuck.get(c, 0.0)) > 25.0 or c.damage >= 100.0 or blocked_long:
+		var stuck := float(_stuck.get(c, 0.0)) > STUCK_S
+		var blocked_long := c.ai_blocked > BLOCKED_S and d > 80.0
+		if d > 650.0 or c.ai_done() or stuck or c.damage >= 100.0 or blocked_long:
 			if d > 60.0 and respawns == 0:
 				respawns += 1
-				var why := "daleko" if d > 650.0 else ("dojel" if c.ai_done() else ("zaseknutý" if float(_stuck.get(c, 0.0)) > 25.0 \
+				var why := "daleko" if d > 650.0 else ("dojel" if c.ai_done() else ("zaseknutý" if stuck \
 					else ("zničený" if c.damage >= 100.0 else "zablokovaný")))
 				respawn_log.append([Time.get_ticks_msec(), c.name, why])
 				c.repair()
 				_respawn(c)
+				continue
+		# u hráče (≤ 60 m) se auto nepřesouvá – hráč by to viděl; zaseknuté, dojeté nebo dlouho
+		# zablokované (dům v silnici, stojící auto) dostane novou trasu z místa, kde stojí (dřív stálo navždy)
+		if d <= 60.0 and respawns == 0 and c.damage < 100.0 and (c.ai_done() or stuck or c.ai_blocked > BLOCKED_S) \
+				and Time.get_ticks_msec() - int(_replan_at.get(c, -100000)) > REPLAN_COOL_S * 1000.0:
+			respawns += 1
+			_replan_at[c] = Time.get_ticks_msec()
+			respawn_log.append([Time.get_ticks_msec(), c.name, "přeplánován u hráče"])
+			_replan(c)
 
 
 ## Uspávání vozidel podle vzdálenosti k nejbližšímu hráči (výkon na velké mapě): stojící vozidla

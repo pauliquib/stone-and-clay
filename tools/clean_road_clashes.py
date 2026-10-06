@@ -18,13 +18,23 @@ Postup:
      v tools/buildings.py,
   5. duplicitní budovy: dvě budovy, jejichž půdorysy se kryjí z ≥ DUP_FRAC menší z nich
      (typicky na hranici jádra a rozšíření mapy) → menší se vyřadí,
-  6. strom se vyřadí, když je jeho kmen na vozovce.
+  6. budova se vyřadí, když její půdorys zasahuje do pásu kolem OSY silnice z data/map.json
+     (`AXIS_BUF` podle druhu silnice) na ploše ≥ AXIS_MIN_M2 – síť asfaltu je místy užší než
+     skutečná silnice, takže dům 0,8–2 m od osy pravidlo vozovky (3.) neodchytí, ale AI auta
+     v pruhu (1–1,6 m od osy) do něj narážejí. Účelové cesty (service) jsou často skutečné
+     vjezdy do dvorů a garáží: pás je úzký a konce cest (`SERVICE_END_M`) se nepočítají.
+     Budovy s místem (`poi`) a dům hráče (`home`) z data/buildings.json se nevyřazují – jen
+     se vypíšou k ruční kontrole,
+  7. strom se vyřadí, když je jeho kmen na vozovce nebo blíž ose silnice než `TREE_AXIS_BUF`,
+  8. z data/buildings.json (fasády, nemovitosti) se vyřadí záznamy vyřazených budov
+     (jejich id se vypíšou – patří do `EXCLUDE` v tools/buildings.py, aby přežily přegenerování).
 
 Čte vždy z data/orig/ (při prvním spuštění se tam originály zkopírují), zapisuje do data/ →
 lze spouštět opakovaně. Spouští se po tools/export_map.py:
 
     python3 tools/clean_road_clashes.py
 """
+import json
 import os
 import shutil
 import struct
@@ -43,6 +53,17 @@ MIN_OV_M2 = 2.0      # …na ploše aspoň 2 m² (síť silnic sedí na ortofotu
 FRAC = 0.3           # nebo pokrývá aspoň 30 % půdorysu
 DUP_FRAC = 0.5       # dvě budovy se kryjí z ≥ 50 % menší z nich
 CHUNK = 256.0
+# pás kolem osy silnice (m od osy), do kterého dům nesmí zasahovat (bod 6) – pruh AI je 1,0 m
+# (residential) / 1,6 m (secondary, tertiary) od osy, auto je ~1,8 m široké
+AXIS_BUF = {"secondary": 2.6, "tertiary": 2.6, "unclassified": 2.0, "residential": 2.0,
+            "living_street": 2.0, "service": 0.75}
+AXIS_MIN_M2 = 1.0        # zásah půdorysu do pásu aspoň 1 m² (dotyk rohem se nepočítá)
+SERVICE_MIN_M2 = 2.0     # u service: osa vede půdorysem aspoň ~2 m (průjezd, ne konec vjezdu)
+SERVICE_END_M = 4.0      # posledních 4 m na koncích service cesty se nepočítá (vjezd do garáže / dvora)
+TREE_AXIS_BUF = {"secondary": 2.3, "tertiary": 2.3, "unclassified": 1.7, "residential": 1.7,
+                 "living_street": 1.7}
+NEAR_REPORT_M = 2.0      # budovy blíž ose, které pravidlo nevyřadí, se vypíšou k ruční kontrole
+SEG_CELL = 32.0          # m – mřížka pro hledání úseků osy u budovy
 FILES = ["walls.bin", "roofs.bin", "trees.bin", "asphalt.bin", "gravel.bin"]
 
 # Ručně vyřazené budovy: popis + půdorys v herních souřadnicích (x, z) – artefakty podkladů,
@@ -190,6 +211,105 @@ def attach_walls(both, comp, n_w, g, x0, z0):
     return np.unique(out, return_inverse=True)[1]
 
 
+def load_axis():
+    """Úseky os silnic z data/map.json → (segs (n, 4) [ax, az, bx, bz], kind (n,), hash {(cx, cz): [indexy]}).
+    Service cesty se zkrátí o SERVICE_END_M na obou koncích (vjezd do dvora / garáže); kratší vynechá."""
+    roads = json.load(open(os.path.join(DATA, "map.json")))["roads"]
+    segs, kinds, ends = [], [], []
+    for rd in roads:
+        k = rd.get("kind", "")
+        if k not in AXIS_BUF:
+            continue
+        pts = np.asarray(rd["pts"], float)
+        if len(pts) < 2:
+            continue
+        ln = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+        cum = np.concatenate([[0.0], np.cumsum(ln)])
+        total = cum[-1]
+        for i in range(len(pts) - 1):
+            a, b = pts[i], pts[i + 1]
+            if ln[i] < 1e-3:
+                continue
+            if k == "service" and total > 2.0 * SERVICE_END_M:
+                # konce service cesty vynechat: úsek se zkrátí na střední část (vjezd do dvora / garáže)
+                t0 = max(SERVICE_END_M - cum[i], 0.0) / ln[i]
+                t1 = 1.0 - max(cum[i + 1] - (total - SERVICE_END_M), 0.0) / ln[i]
+                if t1 <= t0:
+                    continue
+                a, b = pts[i] + (pts[i + 1] - pts[i]) * t0, pts[i] + (pts[i + 1] - pts[i]) * t1
+            elif k == "service":
+                continue          # krátká service cesta = celá je vjezd
+            segs.append([a[0], a[1], b[0], b[1]])
+            kinds.append(k)
+    segs = np.asarray(segs, float).reshape(-1, 4)
+    hsh = {}
+    for i, (ax, az, bx, bz) in enumerate(segs):
+        for cx in range(int(np.floor(min(ax, bx) / SEG_CELL)), int(np.floor(max(ax, bx) / SEG_CELL)) + 1):
+            for cz in range(int(np.floor(min(az, bz) / SEG_CELL)), int(np.floor(max(az, bz) / SEG_CELL)) + 1):
+                hsh.setdefault((cx, cz), []).append(i)
+    return segs, np.asarray(kinds), hsh
+
+
+def segs_near(hsh, x0, z0, x1, z1):
+    out = set()
+    for cx in range(int(np.floor(x0 / SEG_CELL)), int(np.floor(x1 / SEG_CELL)) + 1):
+        for cz in range(int(np.floor(z0 / SEG_CELL)), int(np.floor(z1 / SEG_CELL)) + 1):
+            out.update(hsh.get((cx, cz), ()))
+    return np.fromiter(out, int, len(out))
+
+
+def seg_dist(px, pz, segs):
+    """Vzdálenost bodů (m,) k úsekům (n, 4) → (m, n)."""
+    ax, az, bx, bz = (segs[:, i][None, :] for i in range(4))
+    dx, dz = bx - ax, bz - az
+    t = np.clip(((px[:, None] - ax) * dx + (pz[:, None] - az) * dz) / (dx * dx + dz * dz), 0.0, 1.0)
+    return np.hypot(px[:, None] - (ax + t * dx), pz[:, None] - (az + t * dz))
+
+
+def axis_clash(fp, x0c, z0c, segs, kinds, hsh):
+    """Půdorys (bool rastr s rohem buňky [0, 0] v (x0c, z0c)) proti pásům os silnic.
+    Vrací (zasáhne, popis, min. vzdálenost od osy)."""
+    ii, jj = np.nonzero(fp)
+    px = x0c + (jj + 0.5) * RES
+    pz = z0c + (ii + 0.5) * RES
+    m = max(AXIS_BUF.values()) + 0.5
+    idx = segs_near(hsh, px.min() - m, pz.min() - m, px.max() + m, pz.max() + m)
+    if len(idx) == 0:
+        return False, "", 99.0
+    d = seg_dist(px, pz, segs[idx])
+    kk = kinds[idx]
+    buf = np.array([AXIS_BUF[k] for k in kk])
+    for k in sorted(set(kk.tolist())):
+        cols = kk == k
+        inside = (d[:, cols] < buf[cols][None, :]).any(1)
+        m2 = inside.sum() * RES * RES
+        need = SERVICE_MIN_M2 if k == "service" else AXIS_MIN_M2
+        if m2 >= need:
+            dk = float(d[:, cols].min())
+            return True, "%.1f m od osy (%s, pás %.1f m), v pásu %.1f m²" % (dk, k, AXIS_BUF[k], m2), dk
+    return False, "", float(d.min())
+
+
+def load_details():
+    """data/buildings.json (fasády, nemovitosti) – None, když chybí."""
+    path = os.path.join(DATA, "buildings.json")
+    if not os.path.exists(path):
+        return None
+    return json.load(open(path))
+
+
+def detail_at(details, x, z):
+    """Záznam z buildings.json, jehož půdorys obsahuje bod (x, z) (střed budovy z geometrie)."""
+    if not details:
+        return None
+    pt = np.array([[x, z]])
+    for b in details:
+        poly = b.get("poly", [])
+        if len(poly) >= 3 and points_in_poly(pt, poly)[0]:
+            return b
+    return None
+
+
 def main():
     os.makedirs(ORIG, exist_ok=True)
     for f in FILES:
@@ -213,6 +333,12 @@ def main():
     n_w = len(wp)
     comp = attach_walls(both, comp, n_w, g, x0, z0)
     removed = []
+    axis_removed = []        # bod 6 – zásah do pásu kolem osy silnice
+    protected = []           # zasahují do pásu, ale jsou to místa / dům hráče → jen výpis
+    near = []                # blízko osy, ale pod prahem (dotyk rohem) → jen výpis k ruční kontrole
+    segs, kinds, hsh = load_axis()
+    details = load_details()
+    print(f"osy silnic: {len(segs)} úseků, buildings.json: {len(details) if details else 0} budov")
     keep_tri = np.ones(len(both), bool)
     fps = []    # (ci, i0, j0, footprint) pro hledání duplicit
     for ci in range(comp.max() + 1):
@@ -231,15 +357,28 @@ def main():
         c = xz.reshape(-1, 2).mean(0)
         fps.append((ci, i0, j0, fp, c))
         ov = fp & road_mask[i0:i1 + 1, j0:j1 + 1]
-        if not ov.any():
-            continue
-        depth = ndimage.distance_transform_edt(fp)[ov].max() * RES
-        frac = ov.sum() / area
-        ov_m2 = ov.sum() * RES * RES
-        if frac >= FRAC or (depth >= DEPTH_M and ov_m2 >= MIN_OV_M2):
+        if ov.any():
+            depth = ndimage.distance_transform_edt(fp)[ov].max() * RES
+            frac = ov.sum() / area
+            ov_m2 = ov.sum() * RES * RES
+            if frac >= FRAC or (depth >= DEPTH_M and ov_m2 >= MIN_OV_M2):
+                keep_tri[sel] = False
+                removed.append((c[0], c[1], area * RES * RES, "vozovka %.1f m dovnitř, %.0f m² (%d %% půdorysu)" % (
+                    depth, ov_m2, frac * 100)))
+                continue
+        # bod 6: zásah do pásu kolem osy silnice
+        hit, why, dmin = axis_clash(fp, x0 + j0 * RES, z0 + i0 * RES, segs, kinds, hsh)
+        if not hit and dmin < NEAR_REPORT_M:
+            near.append((c[0], c[1], area * RES * RES, dmin))
+        if hit:
+            det = detail_at(details, c[0], c[1])
+            if det is not None and (det.get("poi") or det.get("home")):
+                protected.append((c[0], c[1], area * RES * RES, why, det.get("id"), det.get("poi") or "domov"))
+                continue
             keep_tri[sel] = False
-            removed.append((c[0], c[1], area * RES * RES, "vozovka %.1f m dovnitř, %.0f m² (%d %% půdorysu)" % (
-                depth, ov_m2, frac * 100)))
+            axis_removed.append((c[0], c[1], area * RES * RES, "osa silnice: " + why))
+    n_axis = len(axis_removed)
+    removed += axis_removed
     n_road = len(removed)
     # ručně vyřazené budovy podle půdorysu – odstraní se VŠECHNY komponenty s výrazným
     # překryvem půdorysu (budova může být torzo: zdi a střecha jako dvě komponenty)
@@ -309,12 +448,32 @@ def main():
                 keep_tri[comp == ci] = False
                 removed.append((pc[0], pc[1], small.sum() * RES * RES, "duplicita – kryje se z %d %% s jinou budovou" % (
                     100 * inter / small.sum())))
-    print(f"budov: {comp.max() + 1}, vyřazeno: {len(removed)} (ve vozovce {n_road}, duplicit {len(removed) - n_road})")
+    print(f"budov: {comp.max() + 1}, vyřazeno: {len(removed)} (ve vozovce {n_road - n_axis}, u osy silnice {n_axis}, "
+          f"duplicit {len(removed) - n_road})")
     for x, z, a, why in removed:
         print(f"  budova u ({x:7.1f}, {z:7.1f})  {a:5.0f} m²  {why}")
+    for x, z, a, dmin in sorted(near, key=lambda r: r[3]):
+        print(f"  blízko osy (ponechána, roh pod prahem) u ({x:7.1f}, {z:7.1f})  {a:5.0f} m²  {dmin:.1f} m od osy")
+    for x, z, a, why, bid, poi in protected:
+        print(f"  CHRÁNĚNÁ (nevyřazena, zkontrolovat ručně) u ({x:7.1f}, {z:7.1f})  {a:5.0f} m²  id {bid} ({poi}): {why}")
     kw, kr = keep_tri[:n_w], keep_tri[n_w:]
     write_dbm(os.path.join(DATA, "walls.bin"), wp[kw], wn[kw], wc[kw])
     write_dbm(os.path.join(DATA, "roofs.bin"), rp[kr], rn[kr], rc[kr])
+
+    # bod 8: záznamy vyřazených budov (bod 6) z buildings.json – jinak by na místě zůstaly
+    # fasády / dveře / nemovitost bez domu. Shoda = střed geometrie leží v půdorysu záznamu
+    # a plochy jsou srovnatelné (ne sousední velký dům).
+    if details:
+        drop = []
+        for x, z, a, _why in axis_removed:
+            det = detail_at(details, x, z)
+            if det is not None and 0.5 * a <= float(det.get("area", a)) <= 2.0 * a and det not in drop:
+                drop.append(det)
+        if drop:
+            print(f"buildings.json: vyřazeno {len(drop)} záznamů (doplnit do EXCLUDE v tools/buildings.py): "
+                  + ", ".join(repr(b.get("id")) for b in drop))
+            kept = [b for b in details if b not in drop]
+            json.dump(kept, open(os.path.join(DATA, "buildings.json"), "w"), ensure_ascii=False, separators=(",", ":"))
 
     # stromy
     tb = open(os.path.join(ORIG, "trees.bin"), "rb").read()
@@ -325,7 +484,24 @@ def main():
     inside = (i >= 0) & (i < g.h) & (j >= 0) & (j < g.w)
     on_road = np.zeros(n, bool)
     on_road[inside] = road_mask[i[inside], j[inside]]
-    print(f"stromů: {n}, vyřazeno (kmen ve vozovce): {on_road.sum()}")
+    n_asph = int(on_road.sum())
+    # kmen blíž ose silnice než TREE_AXIS_BUF (pruh AI aut)
+    tsel = np.where(~on_road)[0]
+    t_ax = 0
+    if len(segs):
+        tk = np.array([TREE_AXIS_BUF.get(k, 0.0) for k in kinds])
+        mt = max(TREE_AXIS_BUF.values()) + 0.5
+        for ti in tsel:
+            tx, tz = float(T[ti, 0]), float(T[ti, 2])
+            idx = segs_near(hsh, tx - mt, tz - mt, tx + mt, tz + mt)
+            if len(idx) == 0:
+                continue
+            d = seg_dist(np.array([tx]), np.array([tz]), segs[idx])[0]
+            if (d < tk[idx]).any():
+                on_road[ti] = True
+                t_ax += 1
+                print(f"  strom u ({tx:7.1f}, {tz:7.1f})  {float(d.min()):.1f} m od osy silnice")
+    print(f"stromů: {n}, vyřazeno: {on_road.sum()} (kmen ve vozovce {n_asph}, u osy silnice {t_ax})")
     with open(os.path.join(DATA, "trees.bin"), "wb") as f:
         f.write(b"DBI1")
         f.write(struct.pack("<i", int((~on_road).sum())))
