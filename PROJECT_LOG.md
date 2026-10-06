@@ -757,3 +757,30 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 
 ### Změněné soubory
 `scripts/gamekeeper.gd`, `docs/testy_M4.md`, `PROJECT_LOG.md`.
+## 2026-10-06 – M4.8 zbytek (ubalení, jedlé konopí, lysohlávky, efekty obrazu, zabavení na záhonu; zůstává `[ ]`)
+- **Ubalení a pečení** (`items_db.gd` `ItemsDB.RECIPES`, `player.gd` `craft` / `craft_ok`, tlačítka v detailu předmětu v `hud.gd`):
+  papírky (`papirky`, Potraviny, `adult`) + sušený tabák `tabak_list` → cigareta `tabak_susene` (1 ks, nikotin přes `smoke()`);
+  papírky + sušené konopí `konopi_susene` → joint `konopi_kvety` (THC). Jedlá varianta: konopí + rohlík → `konopne_pecivo`
+  (`thc_eat` 0,8; nástup se zpožděním 1 h – `BodyState._thc_later`, neukládá se → otevřený bod).
+- **Sušák přepsán na materiály**: `garden.gd` CROPS `tabak.item = tabak_list`, `konopi.item = konopi_susene` (sušák dává suroviny na ubalení, ne hotový předmět).
+- **Lysohlávky (sběr)**: `world.gd` `SEASON_ITEMS["lysohlavky"]` (doy 244–320, regrow 10), `_add_lysohlavky` (každý 4. hřib, seed 1704, na konec `meta["items"]`
+  jako šípky), `_item_present` vrací false při vypnuté volbě (předmět existuje, ale je neaktivní; přepnutí se projeví při nejbližším `refresh_season_items`).
+  `_houba_druh`: záměna s muchomůrkou `LYSOHLAVKY_ZAMENA_P` 0,3, klesá s dovedností `myslivost` (×0,2 při úrovni 20); správný nález = +4 XP.
+  Muchomůrka (`muchomurka`, `toxic` 1,0) při snědení: nevolnost + zdraví (`BodyState.MUSHROOM_TOXIC_HP` 12). Vizuál v `item.gd`, počítadlo v `hud.gd`.
+  Dovednost: zvolena existující `myslivost` (ne nová „houbaření“, aby se při vypnuté volbě neobjevil řádek v deníku).
+- **Efekty obrazu**: `game_settings.gd` `image_fx` (klíč `obraz/efekty`, výchozí zapnuto), `DrunkFx.enabled` (static), `pause_menu.gd` `_set_image_fx`;
+  `DrunkFx._process` při vypnutí jen skryje ColorRect. Nezávisle na `adult_content`; psilocybinový příspěvek zůstává za volbou pro dospělé.
+- **Zahrádkář – následek**: `npc_grow.gd` `_sow`: nahlášení svědkem → `zabaveno = true`, `rostliny = 0` (záhon prázdný, bez vizuálu rostlin).
+  Pokuta NPC zvolena nebyla (NPC nemá rejstřík zákona). Klíč `zabaveno` v `state` (starý save = false).
+- **Police**: `_drugs_carried` počítá i `konopi_susene`, `tabak_list`, `konopne_pecivo`.
+- **Dokumentace**: `docs/testy_M4.md` – oddíl „M4.8 zbytek“ (10 bodů).
+- **Kontrola překladu**: `godot --headless --path . --import` a `--check-only` na každý změněný .gd (viz výsledek v hlášení).
+
+### Otevřené body (M4.8 zůstává `[ ]`)
+- Zpožděné THC z pečiva se neukládá do savu (při F5/F9 ztraceno). Doplnit klíč v `save_game.gd` a převod.
+- Zákonná čísla (`nedovolene_pestovani`, `prechovavani_navykove_latky`, `rizeni_pod_vlivem_navykove_latky`) pořád NEOVĚŘENO v úředním znění.
+- Sušák bez objektu sušáku a bez vlhkosti / plísně (zjednodušeno).
+- Pokuta NPC zahrádkáři nezavedena (zabavení místo ní).
+- README (Systémy / Nastavení / Ovládání: „Efekty obrazu“) a `docs/VIZE_A_ROADMAPA.md` neaktualizovány – zadání mělo „nic dalšího neměnit“.
+- Ubalení a pečení jsou okamžité (bez animace a bez oven / kamen).
+- Čeká na ruční test uživatele: `docs/testy_M4.md`, oddíl „M4.8 zbytek“.

@@ -525,6 +525,28 @@ func use_item(id: String) -> bool:
 	return true
 
 
+## M4.8: ruční úprava z ItemsDB.RECIPES (ubalení, pečení). Vrací false, když chybí některý vstup.
+func craft(id: String, recipe: Dictionary) -> bool:
+	if not craft_ok(id, recipe):
+		return false
+	var need: Dictionary = recipe["need"]
+	remove_item(id, 1)
+	for k in need:
+		remove_item(String(k), int(need[k]))
+	add_item(String(recipe["out"]), 1)
+	return true
+
+
+func craft_ok(id: String, recipe: Dictionary) -> bool:
+	if item_count(id) < 1:
+		return false
+	var need: Dictionary = recipe["need"]
+	for k in need:
+		if item_count(String(k)) < int(need[k]):
+			return false
+	return true
+
+
 ## Vypije / sní něco, co mu někdo podal (hospoda, degustace) – bez inventáře.
 func consume_served(id: String) -> void:
 	var info := Consumables.info(id)

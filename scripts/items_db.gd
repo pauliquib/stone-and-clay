@@ -105,19 +105,31 @@ const ITEMS := {
 	# Oficiální text: zjednodušená herní simulace, nejde o návod. Úroveň THC / psilocybinu v `BodyState`.
 	"tabak_semena": {"name": "Semena tabáku (sáček)", "short": "Semena tabáku", "type": "seed", "kg": 0.01, "stack": 99,
 		"price": 45, "adult": true, "color": Color(0.7, 0.75, 0.5)},
-	"tabak_susene": {"name": "Sušený tabák (ruční cigarety z papírků)", "short": "Sušený tabák", "type": "smoke", "kg": 0.05,
+	"tabak_susene": {"name": "Ruční cigareta z papírku (tabák)", "short": "Cigareta", "type": "smoke", "kg": 0.05,
 		"count": 1, "stack": 99, "price": 0, "adult": true, "color": Color(0.5, 0.36, 0.18)},
+	"papirky": {"name": "Papírky na cigarety (balení 60 ks)", "short": "Papírky", "type": "material", "kg": 0.02,
+		"stack": 99, "price": 25, "adult": true, "color": Color(0.95, 0.93, 0.85)},
 	"konopi_semena": {"name": "Semena konopí (průmyslová odrůda, nízké THC)", "short": "Semena konopí", "type": "seed",
 		"kg": 0.01, "stack": 99, "price": 60, "adult": true, "color": Color(0.55, 0.6, 0.35)},
-	"konopi_kvety": {"name": "Sušené květy konopí (1 dávka)", "short": "Konopí", "type": "smoke", "kg": 0.05, "count": 1,
+	"konopi_kvety": {"name": "Joint z konopí (1 dávka)", "short": "Joint", "type": "smoke", "kg": 0.05, "count": 1,
 		"stack": 99, "price": 0, "adult": true, "thc": 1.0, "color": Color(0.42, 0.52, 0.22)},
-	# M4.8 sušák: čerstvá sklizeň schne ~2 týdny (Garden → Vyhlasky.add_batch), pak je z ní suchý předmět výše
+	# M4.8 sušák: čerstvá sklizeň schne ~2 týdny (Garden → Vyhlasky.add_batch), pak je z ní suchý materiál (na ubalení / pečení)
+	"tabak_list": {"name": "Sušený tabák (na ubalení)", "short": "Sušený tabák", "type": "material", "kg": 0.05,
+		"stack": 99, "price": 0, "adult": true, "color": Color(0.5, 0.36, 0.18)},
+	"konopi_susene": {"name": "Sušené květy konopí (na ubalení a pečení)", "short": "Suché konopí", "type": "material", "kg": 0.05,
+		"stack": 99, "price": 0, "adult": true, "color": Color(0.42, 0.52, 0.22)},
 	"tabak_cerstvy": {"name": "Čerstvé listy tabáku (sušák)", "short": "Čerstvý tabák", "type": "material", "kg": 0.1,
 		"stack": 99, "price": 0, "adult": true, "color": Color(0.4, 0.55, 0.25)},
 	"konopi_cerstve": {"name": "Čerstvé květy konopí (sušák)", "short": "Čerstvé konopí", "type": "material", "kg": 0.1,
 		"stack": 99, "price": 0, "adult": true, "color": Color(0.35, 0.5, 0.2)},
-	"lysohlavky": {"name": "Lysohlávky (čerstvé, záměna s jedovatou houbou možná)", "short": "Lysohlávky", "type": "food",
+	"lysohlavky": {"points": 8, "name": "Lysohlávky (čerstvé)", "short": "Lysohlávky", "type": "food",
 		"kg": 0.05, "kcal": 20, "price": 0, "adult": true, "psilo": 1.0, "color": Color(0.8, 0.75, 0.6)},
+	# záměna při sběru (`World._houba_druh`): muchomůrka = otrava (`toxic`, `BodyState.eat`)
+	"muchomurka": {"name": "Muchomůrka (záměna za lysohlávku)", "short": "Muchomůrka", "type": "food",
+		"kg": 0.05, "kcal": 20, "price": 0, "adult": true, "toxic": 1.0, "color": Color(0.8, 0.15, 0.1)},
+	# jedlá varianta: rohlík + sušené konopí; THC nastoupí se zpožděním (`thc_eat`, `BodyState.eat`)
+	"konopne_pecivo": {"name": "Konopné pečivo (rohlík s THC)", "short": "Konopné pečivo", "type": "food",
+		"kg": 0.1, "kcal": 300, "price": 0, "adult": true, "thc_eat": 0.8, "color": Color(0.7, 0.55, 0.3)},
 	# ------------------------------------------------------------ vybavení
 	"spacak": {"name": "Spacák a karimatka (vyspíš se kdekoli venku)", "short": "Spacák", "type": "gear", "kg": 1.5, "price": 890,
 		"color": Color(0.8, 0.3, 0.1)},
@@ -341,6 +353,16 @@ const ITEMS := {
 
 ## M4.8: „Obsah pro dospělé“ (Esc → Nastavení). Nastavuje `GameSettings` / `PauseMenu`; výchozí vypnuto.
 static var adult_on := false
+
+
+## M4.8: ruční úpravy v inventáři (ubalení, pečení). `need` = kromě předmětu, na který se akce volá (ten se spotřebuje
+## vždy), se spotřebuje ještě tohle; `out` vznikne. Jen při zapnuté volbě (položky jsou `adult`).
+const RECIPES := {
+	"tabak_list": [{"name": "Ubalit cigaretu", "need": {"papirky": 1}, "out": "tabak_susene"}],
+	"konopi_susene": [
+		{"name": "Ubalit joint", "need": {"papirky": 1}, "out": "konopi_kvety"},
+		{"name": "Upéct konopné pečivo (s rohlíkem)", "need": {"rohlik": 1}, "out": "konopne_pecivo"}],
+}
 
 
 ## Předmět s klíčem `adult` je ve hře jen při zapnuté volbě (vypnuto = neexistuje, ani v nabídkách).

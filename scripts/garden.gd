@@ -102,11 +102,11 @@ const CROPS := {
 		"water_need": 5, "frost_kill": -22.0, "yield": [4, 8], "xp": 10.0, "feed": 0.0, "min_temp": -8.0, "cold_ok": true,
 		"leaf": Color(0.4, 0.62, 0.28), "ripe": Color(0.75, 0.68, 0.3), "h": 0.45, "wid": 0.03, "lean": 0.05},
 	# M4.8: obsah pro dospělé (jen při zapnuté volbě, viz crop_visible)
-	"tabak": {"name": "Tabák", "item": "tabak_susene", "seed": "tabak_semena", "sow_months": [4, 5], "days": 90,
+	"tabak": {"name": "Tabák", "item": "tabak_list", "seed": "tabak_semena", "sow_months": [4, 5], "days": 90,
 		"water_need": 3, "frost_kill": -2.0, "yield": [6, 12], "xp": 8.0, "feed": 0.0, "min_temp": 8.0, "adult": true,
 		"fresh": "tabak_cerstvy",
 		"leaf": Color(0.3, 0.55, 0.22), "ripe": Color(0.45, 0.5, 0.2), "h": 0.9, "wid": 0.1, "lean": 0.15},
-	"konopi": {"name": "Konopí", "item": "konopi_kvety", "seed": "konopi_semena", "sow_months": [4, 5], "days": 110,
+	"konopi": {"name": "Konopí", "item": "konopi_susene", "seed": "konopi_semena", "sow_months": [4, 5], "days": 110,
 		"water_need": 3, "frost_kill": -2.0, "yield": [4, 8], "xp": 10.0, "feed": 0.0, "min_temp": 8.0, "adult": true,
 		"fresh": "konopi_cerstve",
 		"leaf": Color(0.22, 0.5, 0.2), "ripe": Color(0.4, 0.5, 0.22), "h": 1.6, "wid": 0.06, "lean": 0.1},
