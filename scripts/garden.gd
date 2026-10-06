@@ -33,6 +33,7 @@ const RAMP_SIZE := Vector2(8.0, 6.0)     # m – DOPLNIT: rezerva mezi domem a z
 const FIELD_SIZE := Vector2i(10, 10)     # m – záhony na pronajatém poli (velkoplošná orba traktorem = otevřený bod)
 const RENT_KC := 1500                    # Kč za rok – DOPLNIT: cena pronájmu pole
 const RENT_DAYS := 365
+const KONOPI_LEGAL := 3                  # M4.8: rostlin konopí bez přestupku (40/2009 Sb. po novele – NEOVĚŘENO, viz zakon.json)
 const SPOT_R0 := 8.0                     # hledání místa zahrady: od … do (m od dveří)
 const SPOT_R1 := 70.0
 const SPOT_TRIES := 320
@@ -730,6 +731,16 @@ func _on_dig(id: int, _def: Dictionary, aim: Dictionary, ok_: bool) -> void:
 	world.play_sfx(id, "step", 0.6, -2.0)
 
 
+## Počet zasetých / rostoucích rostlin plodiny `crop` ve všech záhonech (M4.8: limit konopí).
+func _count_crop(crop: String) -> int:
+	var n := 0
+	for pl in plots:
+		for cell in (pl as Plot).cells.values():
+			if String((cell as Dictionary).get("c", "")) == crop:
+				n += 1
+	return n
+
+
 func _on_sow(id: int, _def: Dictionary, aim: Dictionary, ok_: bool) -> void:
 	var p := _player(id)
 	var c := _cell_of(aim)
@@ -738,8 +749,9 @@ func _on_sow(id: int, _def: Dictionary, aim: Dictionary, ok_: bool) -> void:
 	var crop := pick_crop(id)
 	if crop == "" or not p.remove_item(String(CROPS[crop]["seed"]), 1):
 		return
-	# M4.8: konopí je vidět na zahradě → svědci (soused, drbna, policie) mohou nahlásit nedovolené pěstování
-	if crop == "konopi" and world.witness_reported(id, p.global_position, "pestovani", 25.0):
+	# M4.8: konopí nad zákonný počet rostlin je vidět na zahradě → svědci (soused, drbna, policie) mohou nahlásit
+	if crop == "konopi" and _count_crop("konopi") + 1 > KONOPI_LEGAL \
+			and world.witness_reported(id, p.global_position, "pestovani", 25.0):
 		world.commit_offense(id, "nedovolene_pestovani", {})
 	var pl: Plot = aim["plot"]
 	pl.cells[aim["cell"]] = {"s": S_ZASETO, "c": crop, "g": 0.0, "dry": 0, "m": 0.0, "w": float(c.get("w", 0.0)), "h": 1.0, "o": 0,

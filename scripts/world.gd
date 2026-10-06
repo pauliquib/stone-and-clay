@@ -1642,7 +1642,7 @@ func _sober_up_cell(id: int, text: String) -> String:
 ## Jediná brána pro tresty (M0.5): zapíše přestupek do rejstříku (Law.LawRecord), vybere pokutu, přičte body,
 ## případně dá zákaz řízení a pošle událost „offense“. data: severity 0..1, quiet (bez zprávy o bodech).
 ## M4.2 – platba podle `misto` z katalogu: na_miste = bloková pokuta hned z hotovosti (jinak složenka v `debts`),
-## spravni_rizeni = příkaz poštou za 1–3 dny (pak dluh se splatností), soud = dluh rovnou (do M4.3).
+## spravni_rizeni = příkaz poštou za 1–3 dny (pak dluh se splatností), soud = obvinění a případ v `Court` (M4.3).
 func commit_offense(id: int, offense_id: String, data := {}) -> Dictionary:
 	var lr: Law.LawRecord = law.get(id)
 	var pl: Player = players.get(id)
@@ -1667,14 +1667,14 @@ func commit_offense(id: int, offense_id: String, data := {}) -> Dictionary:
 			elif fine > 0:
 				debts.add(id, "pokuta", fine, jd + Debts.DUE_DAYS, "%s (bloková pokuta)" % res["name"], offense_id)
 				rec["stav"] = "splatne"
-		"spravni_rizeni":
-			if fine > 0:
-				debts.queue_order(id, fine, jd, "%s (%s)" % [res["name"], res["par"]], offense_id)
-				rec["stav"] = "prikaz"
-		_:    # M4.3: soud – obvinění a předvolání; rozsudek (pokuta, zákaz, vězení) řeší Court
+		"soud":    # M4.3: soud – obvinění a předvolání; rozsudek (pokuta, zákaz, vězení) řeší Court
 			if court:
 				court.open_case(id, res, float(rec.get("t", clock.minutes)))
 			rec["stav"] = "obvineni"
+		_:    # spravni_rizeni (i neznámé `misto` – nikdy ne soud omylem)
+			if fine > 0:
+				debts.queue_order(id, fine, jd, "%s (%s)" % [res["name"], res["par"]], offense_id)
+				rec["stav"] = "prikaz"
 	emit_game_event(id, "offense", {"id": offense_id, "fine": res["fine"], "points": res["points"],
 		"criminal": res["criminal"]})
 	if res.get("points_ban", false) and permits:   # M4.1: 12 bodů → řidičák odebrán, nutné přezkoušení
@@ -3050,8 +3050,10 @@ func license_check(id: int, c: Car) -> Dictionary:
 	var grp := String(c.model.spec.get("skupina_rp", "")) if c and c.model else ""
 	if grp == "" or permits == null or permits.has(id, "ridicsky", grp):
 		return {"ok": true, "group": grp, "reason": ""}
-	var why := "odebraný řidičák, nutné přezkoušení" if not permits.is_revoked(id, "ridicsky").is_empty() \
-		else "chybí skupina"
+	var rv := permits.is_revoked(id, "ridicsky")
+	var why := "chybí skupina"
+	if not rv.is_empty():
+		why = "odebraný řidičák, nutné přezkoušení" if bool(rv.get("retest", false)) else "zákaz řízení"
 	return {"ok": false, "group": grp, "reason": why}
 
 
@@ -3062,8 +3064,10 @@ func auto_enroll(id: int, skupina: String) -> String:
 	var s := auto_school(id)
 	if bool(s.get("zaplaceno", false)):
 		return "Kurz už máš zaplacený (skupina %s) – slož teorii a %d výcvikové jízdy." % [s["skupina"], AUTO_JIZD_NUTNE]
-	var odebrano := not permits.is_revoked(id, "ridicsky").is_empty()
-	var retest := odebrano
+	var rv := permits.is_revoked(id, "ridicsky")
+	if not rv.is_empty() and not bool(rv.get("retest", false)):
+		return "Zákaz řízení (%s) ještě běží – do herního dne %d." % [String(rv.get("reason", "")), int(rv.get("until_jd", -1))]
+	var retest := not rv.is_empty()
 	var grp := "B" if retest else skupina
 	if retest and clock.minutes < float(_license_suspended_until(id)):
 		return "Zákaz řízení ještě běží – přezkoušení až po něm."

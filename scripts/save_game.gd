@@ -276,6 +276,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	var bd: Dictionary = d.get("body", {})
 	p.body.addiction = 0.0        # starý save bez závislosti = 0
 	p.body._smoke_rate = 0.0
+	p.body.thc = 0.0              # M4.8: starý save bez klíče = bez látek
+	p.body.psilo = 0.0
 	for k in bd:
 		if not k in BODY_KEYS:
 			continue
@@ -396,8 +398,7 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	if world.court:
 		world.court.from_dict(id, d.get("court", {}))   # starý save bez klíče = žádné případy (M4.3)
 	if world.debts:
-		if d.has("debts"):
-			world.debts.from_dict(id, d["debts"])
+		world.debts.from_dict(id, d.get("debts", {}))   # starý save bez klíče = žádné dluhy (ne zbytky z hrané pozice)
 		if lr and lr.unpaid_fines > 0:         # M4.2 migrace: starý save – nezaplacené pokuty → jeden dluh
 			world.debts.add(id, "pokuta", lr.unpaid_fines, world.clock.jd() + Debts.DUE_DAYS,
 				"Nezaplacené pokuty (starší)")

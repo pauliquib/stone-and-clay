@@ -149,8 +149,16 @@ func on_fuel(id: int, f: Node3D, item: String) -> void:
 	var pos := f.global_position
 	if item == FRESH_ITEM:
 		_smoke(id, pos, "paleni_mokreho_odpadu")
-	if (zakaz_paleni() or sucho_aktivni()) and world.lot_door().distance_to(pos) > HOME_R:
+	if (zakaz_paleni() or sucho_aktivni()) and not _own_land(pos):
 		_smoke(id, pos, "poruseni_vyhlasky_obce")
+
+
+## Vlastní pozemek: u usedlosti (zahrada) nebo u dveří domova (byt / koupený dům, M4.7).
+func _own_land(pos: Vector3) -> bool:
+	if world.lot_door().distance_to(pos) <= HOME_R:
+		return true
+	var home: Place = world.places.get("domov")
+	return home != null and home.door.distance_to(pos) <= HOME_R
 
 
 ## Kouř z ohně: svědek ho nahlásí → přestupek hned; nikdo → nenahlášený čin (odhalí hajný / policie).
@@ -159,7 +167,7 @@ func _smoke(id: int, pos: Vector3, offense: String) -> void:
 		world.commit_offense(id, offense, {"severity": SMOKE_SEV})
 		world.notify(id, "popup", ["Někdo tě viděl a nahlásil kouř z ohně.", 3.5])
 		return
-	world.add_unreported(id, {"kind": offense, "offenses": [offense], "pos": pos, "t": world.clock.minutes,
+	world.add_unreported(id, {"kind": offense, "offenses": [offense], "pos": [pos.x, pos.y, pos.z], "t": world.clock.minutes,
 		"value": 0.0, "severity": SMOKE_SEV, "tool": "oheň", "discover_p": 0.3})
 	world.notify(id, "show_message", ["Kouř z ohně je vidět z dálky. Zatím si toho nikdo nevšiml.", 3.0])
 

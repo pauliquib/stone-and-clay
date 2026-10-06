@@ -117,3 +117,26 @@ Spouští jen uživatel. Stav: staticky ověřeno (kontrola překladu), ruční 
 8. F5 → F9 zachová THC a stav zahrady; starý save bez klíčů `thc` / `psilo` se načte bez chyby.
 9. Lysohlávky: ve hře zatím nejdou sehnat (sběr chybí, viz otevřené body); ověřit jen, že se předmět neobjeví s vypnutou volbou.
 10. Zákonné řádky v `data/zakon.json` (`nedovolene_pestovani`, `prechovavani_navykove_latky`, `rizeni_pod_vlivem_navykove_latky`) mají poznámku „NEOVĚŘENO“ – přečíst a ověřit čísla proti zdroji.
+
+## Závěrečná kontrola M4 – opravené chyby (ověřit při testu)
+
+Doporučené pořadí testování celé M4: M4.1 → M4.2 → M4.3 → M4.4 A/B → M4.5 → M4.6 → M4.7 → M4.8, pak tento oddíl.
+
+1. **Konopí není soud:** Obsah pro dospělé zapnout, zasadit 4. rostlinu konopí před sousedem → přestupek přijde jako
+   *příkaz poštou* (deník J → Úřední záznamy), **ne** „Obvinění / předvolání k soudu“. 1.–3. rostlina bez přestupku.
+2. **Soudní zákaz řízení skončí:** odsouzení s „Zákazem řízení“ → P ukáže „ZÁKAZ (…) – ještě N dní“ (ne „nutné
+   přezkoušení“). F2 → Datum za konec zákazu → P ukazuje skupiny normálně, auto bez hlášky „nemáš řidičák“.
+3. **Podmínka vyprší:** po rozsudku s podmínkou posunout datum za její konec → nový trestný čin už **není** „podmínka porušena“
+   a deník nepíše „Podmínka do …“.
+4. **Odchod od soudu:** v den jednání otevřít menu soudu, zavřít ho (Esc) a odejít → do 15:00 přijde rozsudek
+   v nepřítomnosti (případ nezůstane navždy „u soudu“).
+5. **Načtení pozice bez dluhů:** mít dluh, pak načíst starší save bez dluhů (F9 / pozice z doby před M4.2) → deník J
+   neukazuje dluhy z předchozí hry; po načtení není „Podmínka do 0“ ani „OPP zbývá 0 h“.
+6. **Větve na podpal:** odvětvit strom → hláška „Máš: N× Čerstvé větve, M× Větve (klestí)“; z těch suchých
+   (a polen) jde rozdělat oheň hned.
+7. **Nehody:** pád z kola na silnici / náraz do terénu před vesničanem → **žádný** přestupek; série nárazů do plotu během
+   hodiny → nejvýš jedna „Dopravní nehoda se škodou“.
+8. **Pálení u domova v bytě / koupeném domě:** v červenci přiložit suché větve na ohništi do 30 m od dveří domova →
+   bez „Porušení obecně závazné vyhlášky“.
+9. **Panel P:** po koupi povolenky k lovu / rybolovu ukazuje „platí ještě N dní“, po vypršení „PROŠLÁ“.
+10. **Katastr:** inzeráty domů na úřadě nikdy neobsahují budovu statku (M3.2).

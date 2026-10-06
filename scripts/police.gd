@@ -33,6 +33,9 @@ var last_test_promile := -1.0
 
 var _route_t := 0.0
 var _suspicion := {}                # id hráče → podezření 0..1
+var _crash_t := {}                  # id hráče → herní minuta poslední nehody zapsané svědkem (M4.4)
+const CRASH_CD_MIN := 60.0          # herních minut mezi nehodami ze svědectví (série nárazů = jedna nehoda)
+const CRASH_NO_OFFENSE := ["silnice", "cesta", "terén"]   # pád / náraz do povrchu – bez cizí škody, bez přestupku
 var _lost_t := 0.0
 var _stop_t := 0.0
 var _cp_state := 0                  # 0 nic, 1 hráč se blíží, 2 minul blízko
@@ -297,11 +300,17 @@ func report_crash(pos: Vector3, what: String, pl: Player) -> void:
 	for cop in [patrol, checkpoint_car]:
 		if cop and is_instance_valid(cop) and cop.global_position.distance_to(pos) < 90.0 and pl.car:
 			if _los(cop.global_position + Vector3(0, 1.3, 0), pos + Vector3(0, 1.0, 0)):
-				world.commit_offense(pl.id, "nehoda_skoda", {"severity": 0.5})     # M4.4: oživený přestupek
+				if not (what in CRASH_NO_OFFENSE):
+					world.commit_offense(pl.id, "nehoda_skoda", {"severity": 0.5})     # M4.4: oživený přestupek
 				start_chase(cop, "nehoda (%s)" % what, pl)
 				return
 	# nikdo z policie: svědek z vesnice nehodu nahlásí, jinak zůstane nenahlášená (M4.4)
+	if what in CRASH_NO_OFFENSE:
+		return
+	if world.clock.minutes - float(_crash_t.get(pl.id, -1.0e9)) < CRASH_CD_MIN:
+		return
 	if pl.car:
+		_crash_t[pl.id] = world.clock.minutes
 		if world.witness_reported(pl.id, pos, "nehoda", 60.0, 60.0):
 			world.commit_offense(pl.id, "nehoda_skoda", {"severity": 0.5})
 		else:

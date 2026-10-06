@@ -106,8 +106,17 @@ func tick() -> void:
 					_open_trial(pid, c)
 				elif h >= TRIAL_HOUR + ATTEND_HOURS or jd > int(c["trial_jd"]):
 					_verdict_absent(pid, c)
-			elif st == "jednani" and Time.get_ticks_msec() - int(c["open_ms"]) > 60000 and _at_court(pid):
-				_open_trial(pid, c)     # menu zavřené bez volby → znovu (nejvýš jednou za minutu)
+			elif st == "jednani":
+				if jd > int(c["trial_jd"]) or h >= TRIAL_HOUR + ATTEND_HOURS + TRIAL_HOURS:
+					_verdict_absent(pid, c)     # odešel od soudu bez volby → rozhodnutí v nepřítomnosti
+				elif Time.get_ticks_msec() - int(c["open_ms"]) > 60000 and _at_court(pid):
+					_open_trial(pid, c)         # menu zavřené bez volby → znovu (nejvýš jednou za minutu)
+	for pid in _probation.keys():           # podmínka uplynula → konec zkušební doby
+		if jd > int((_probation[pid] as Dictionary).get("do_jd", 0)):
+			_probation.erase(pid)
+	for pid in _opp.keys():
+		if float((_opp[pid] as Dictionary).get("h_left", 0.0)) <= 0.0:
+			_opp.erase(pid)
 
 
 func _at_court(pid: int) -> bool:
@@ -147,6 +156,7 @@ func choose(pid: int, cid: String, volba: String) -> void:
 	var c := _case(pid, cid)
 	if c.is_empty() or String(c["stav"]) != "jednani":
 		return
+	c["stav"] = "porada"                 # soud se radí – druhá volba ani tick během zatemnění nic nespustí
 	var score := _score(pid, c, volba)
 	var s := _sentence(pid, c, score, false)
 	await world.blackout(pid, 2.0)
@@ -190,6 +200,8 @@ func _sentence(pid: int, c: Dictionary, score: int, absent: bool) -> Dictionary:
 		int(_tr().get("penize", [10000, 200000])[1]))
 	var traffic: bool = TRAFFIC.has(String(c["oid"]))
 	var prob: Dictionary = _probation.get(pid, {})
+	if not prob.is_empty() and _jd() > int(prob.get("do_jd", 0)):
+		prob = {}                        # zkušební doba už uplynula – nový čin není porušením podmínky
 	if absent:
 		s["pokuta"] = _round10(fine_base * ABSENT_FINE_MULT)
 		if traffic:
@@ -312,7 +324,7 @@ func _set_record(pid: int, c: Dictionary, rozsudek: Dictionary) -> void:
 ## Prázdný stav pro hráče bez případů (kvůli rychlému dotazu z Jobs / deníku).
 func has_open(pid: int) -> bool:
 	for c in _cases.get(pid, []):
-		if String(c["stav"]) in ["obvineni", "predvolan", "jednani"]:
+		if String(c["stav"]) in ["obvineni", "predvolan", "jednani", "porada"]:
 			return true
 	return false
 
@@ -322,8 +334,9 @@ func status_lines(pid: int) -> Array:
 	var out := []
 	for c in _cases.get(pid, []):
 		var st := String(c["stav"])
-		if st in ["obvineni", "predvolan", "jednani"]:
-			out.append("%s – %s" % [c["name"], {"obvineni": "obviněn", "predvolan": "předvolán", "jednani": "u soudu"}.get(st, st)])
+		if st in ["obvineni", "predvolan", "jednani", "porada"]:
+			out.append("%s – %s" % [c["name"], {"obvineni": "obviněn", "predvolan": "předvolán", "jednani": "u soudu",
+				"porada": "u soudu"}.get(st, st)])
 	if _probation.has(pid):
 		out.append("Podmínka do %d (herní den)" % int((_probation[pid] as Dictionary).get("do_jd", 0)))
 	if _opp.has(pid):
@@ -348,6 +361,16 @@ func to_dict(pid: int) -> Dictionary:
 
 func from_dict(pid: int, d: Dictionary) -> void:
 	_cases[pid] = (d.get("cases", []) as Array).duplicate(true)
-	_probation[pid] = (d.get("probation", {}) as Dictionary).duplicate(true)
-	_opp[pid] = (d.get("opp", {}) as Dictionary).duplicate(true)
+	for c in _cases[pid]:                # uloženo uprostřed porady (zatemnění) → po načtení znovu jednání
+		if String((c as Dictionary).get("stav", "")) == "porada":
+			c["stav"] = "jednani"
+	# prázdný slovník = žádná podmínka / OPP (nevkládat, jinak by deník ukazoval „Podmínka do 0“)
+	_probation.erase(pid)
+	_opp.erase(pid)
+	var pr: Dictionary = d.get("probation", {})
+	if not pr.is_empty():
+		_probation[pid] = pr.duplicate(true)
+	var op: Dictionary = d.get("opp", {})
+	if not op.is_empty():
+		_opp[pid] = op.duplicate(true)
 	_seq[pid] = int(d.get("seq", (_cases[pid] as Array).size()))

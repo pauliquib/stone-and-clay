@@ -215,10 +215,7 @@ func _issues(id: int) -> Array:
 
 
 func _control(id: int) -> void:
-	var cl = world.clients.get(id)
-	if cl == null:
-		return
-	var head := "Dobrý večer, myslivecká stráž. Doklady prosím." if role == HAJNY \
+	var head := "Dobrý den, myslivecká stráž. Doklady prosím." if role == HAJNY \
 		else "Dobrý den, rybářská stráž. Lístek a povolenku prosím."
 	var opts := [
 		["Ukázat doklady", _show_docs.bind(id)],
@@ -226,7 +223,7 @@ func _control(id: int) -> void:
 		["Utéct (hajný volá policii)", _flee.bind(id)],
 		["Nechat být", func(): pass],
 	]
-	cl.hud.open_menu("Kontrola", head, opts)
+	world.notify(id, "open_menu", ["Kontrola", head, opts])      # zprávy hráči jen přes World.notify
 
 
 func _apply(id: int, issues: Array) -> void:
@@ -283,9 +280,6 @@ func interactables(id: int) -> Array:
 
 
 func _office_menu(id: int) -> void:
-	var cl = world.clients.get(id)
-	if cl == null:
-		return
 	var opts := [
 		["Zbrojní průkaz – kurz a poplatek (%d Kč)" % PRICES["zbrojni"], _enroll.bind(id, "zbrojni")],
 		["Lovecký lístek – kurz (%d Kč)" % PRICES["lovecky_listek"], _enroll.bind(id, "lovecky_listek")],
@@ -294,7 +288,7 @@ func _office_menu(id: int) -> void:
 		["Povolenka k rybolovu na rok (%d Kč)" % PRICES["povolenka_rybolov"], _buy.bind(id, "povolenka_rybolov")],
 		["Zavřít", func(): pass],
 	]
-	cl.hud.open_menu("Spolek v chatě", "Kurz se zaplatí na místě, zkoušku složíš na počítači doma (eTesty).", opts)
+	world.notify(id, "open_menu", ["Spolek v chatě", "Kurz se zaplatí na místě, zkoušku složíš na počítači doma (eTesty).", opts])
 
 
 func _has_kurz(id: int, kind: String) -> bool:

@@ -719,7 +719,7 @@ func open_katastr_menu() -> void:
 		opts.append(["Prodat %s obci (%d %%)" % [k.parcel_label(key), roundi(Katastr.OBEC_SHARE * 100.0)],
 			func(): k.sell_parcel_obci(pid, key)])
 	lines.append_array(k.status_lines(pid))
-	hud.open_menu("Katastr (úřad)", "\n".join(lines), opts)
+	hud.open_menu("Katastr (úřad)", "\n".join(PackedStringArray(lines)), opts)
 
 
 ## Rozdělí `Place.OFFERS[key]` na kategorie podle záhlaví ("header", M2.3): [[název, [nabídky]], …].

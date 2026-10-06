@@ -580,3 +580,44 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 
 ### Otevřené body (souhrn)
 - Viz oddíly „Otevřené body“ u jednotlivých kroků výše. Pro závěrečnou kontrolu Opus 5.5 hlavně: sloučení `world.gd` a `save_game.gd` (ruční úpravy v několika vlnách), napojení `Court` / `Debts` / `witness_check` a klíče v savu.
+
+## 2026-10-06 – Závěrečná kontrola M4 (Opus 5.5)
+
+### Hotovo (kontrola překladu + čtení kódu – ruční test čeká)
+- **Rozsah:** `git diff 23deab2..HEAD -- scripts data` (~2 900 řádků, 38 souborů): Permits, Law, Debts, Court, witness_check,
+  Favors, Vyhlasky, Katastr, Gamekeeper, M4.8 a úpravy ve sdílených souborech. Existence a podpisy volaných funkcí ověřeny grepem.
+- **`data/zakon.json`:** všech 64 řádků má `nazev, zakon, par, pokuta, misto, trestny_cin, poznamka, drb, karma` (doplněny
+  `drb`/`karma` u 6 řádků `ul_*` z vlny 0); každé doslovné `commit_offense("…")` i id z proměnných (hajný, vyhlášky, policie,
+  záchytka) míří na existující řádek; `misto` jen `na_miste` / `spravni_rizeni` / `soud`.
+- **Opravené chyby:**
+  - M4.8 řádky měly `misto: "urad"` → `commit_offense` je poslal **k soudu** (větev `_`). Data → `spravni_rizeni`;
+    `commit_offense` nově volá Court jen při `misto == "soud"`, neznámé `misto` = správní řízení.
+  - `Permits`: zákaz řízení od soudu (`revoke` s `until_jd`, bez přezkoušení) **nikdy neskončil** → `_active_revoke`
+    (po `until_jd` neplatí; odebrání za 12 bodů s přezkoušením trvá do autoškoly). `license_check`, `auto_enroll` a panel P
+    rozlišují zákaz a přezkoušení (během soudního zákazu se nedá platit „přezkoušení“).
+  - `Court`: podmínka nevypršela (každý pozdější čin = porušení) → kontrola `do_jd` + mazání v `tick`; `from_dict` vkládal
+    prázdné `{}` → deník „Podmínka do 0“ / „OPP zbývá 0 h“; jednání se zavřeným menu zůstalo navždy „u soudu“ → rozsudek
+    v nepřítomnosti po 15:00 / dalším dni; dvojí volba během zatemnění → stav `porada`.
+  - `SaveGame`: starý save bez `debts` nechal dluhy z hrané pozice → `from_dict` vždy; `thc` / `psilo` se před načtením nulují.
+  - `Vyhlasky`: nenahlášený kouř ukládal `pos` jako Vector3 (JSON → řetězec) → pole `[x, y, z]`; vlastní pozemek = usedlost
+    i dveře domova (byt, koupený dům).
+  - `Forestry`: odvětvení dávalo jen čerstvé větve a jiný zdroj suchých není → podpal nešel ~30 dní. `LOP_DRY_SHARE` = ⅓ suchých.
+  - `Police.report_crash`: každý náraz (i pád z kola na silnici) před svědkem = pokuta za nehodu → bez přestupku u
+    `silnice/cesta/terén`, prodleva `CRASH_CD_MIN` 60 herních minut.
+  - `Garden`: hlášení konopí už od 1. rostliny, ač data říkají „do 3 legální“ → `KONOPI_LEGAL` = 3.
+  - `Katastr`: inzeráty mohly nabídnout budovu statku (vlastník v Estate) → filtr `owner_of`.
+  - `Gamekeeper`: menu přes `cl.hud` (porušení toku zpráv) → `World.notify(id, "open_menu", …)`.
+  - Panel P: povolenky k lovu / rybolovu s platností (otevřený bod M4.6), soudní zákaz s počtem dní.
+- **Ukládání:** všechny nové klíče (`debts`, `court`, `favors`, `gamekeeper`, `katastr`, `unreported`, `vyhlasky`,
+  `weather.drought`, `computer.auto_skola`, `body.thc/psilo`, `permits` s migrací B+AM+A) se ukládají i načítají
+  s výchozí hodnotou; starý save (před M4) projde – migrace `law.unpaid_fines` → jeden dluh, `forestry.unreported` → společný registr.
+- **Právní zásady:** nové texty bez reálných jmen, značek a obcí (úřady, soud, spolky, autoškola „smyšlené“);
+  M4.8 jen za volbou „Obsah pro dospělé“ (výchozí vypnuto, `ItemsDB.hidden` v obchodě, eŠuplíku i inventáři).
+- Checklist regresí: `docs/testy_M4.md` → „Závěrečná kontrola M4 – opravené chyby“.
+
+### Otevřené body (beze změny, k M4.9)
+- M4.4 B (hluk, nedělní klid, zalévání z vodovodu, hromada klestí), M4.6 (kufr, zabavení udice, střelnice, posudek),
+  M4.8 (sušák, sběr lysohlávek, test na drogy, efekty obrazu; čísla zákona NEOVĚŘENO).
+- Rozsudek v nepřítomnosti s nepodmíněným trestem se nevykoná (chybí zatčení); OPP jen evidence.
+- `witness_check` bez raycastu (zdi nebrání dohledu); hajný = kapsle bez animací.
+- `Jobs`: rejstřík čistý i během obvinění (záměr M4.3); výpověď z práce při vězení přes událost `jailed`.

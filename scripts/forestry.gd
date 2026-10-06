@@ -47,6 +47,7 @@ const BARK := Color(0.33, 0.23, 0.14)
 const CUT_FACE := Color(0.72, 0.58, 0.38)
 const LEAF_DECID := Color(0.18, 0.32, 0.1)
 const LEAF_CONIF := Color(0.08, 0.2, 0.09)
+const LOP_DRY_SHARE := 0.34      # podíl suchých (spodních odumřelých) větví při odvětvení – zbytek čerstvé (M4.4 B)
 
 var world: World
 var trees: TreeManager
@@ -416,10 +417,17 @@ func _on_lop(id: int, _def: Dictionary, aim: Dictionary, ok: bool) -> void:
 		(cs.shape as CylinderShape3D).height = lg.use_length()
 		cs.position = Vector3(0, lg.use_length() * 0.5, 0)
 	var n := clampi(int(lg.crown_r * 2.0) + 2, 3, 10)
-	p.add_item(Vyhlasky.FRESH_ITEM, n)              # čerstvé větve: schnou ~30 dní (Vyhlasky)
+	var dry := int(floor(n * LOP_DRY_SHARE))       # spodní suché větve jdou na podpal hned
+	var fresh := n - dry
+	p.add_item(Vyhlasky.FRESH_ITEM, fresh)          # čerstvé větve: schnou ~30 dní (Vyhlasky)
+	if dry > 0:
+		p.add_item(Vyhlasky.DRY_ITEM, dry)
 	if world.vyhlasky:
-		world.vyhlasky.add_fresh(id, n)
-	world.notify(id, "show_message", ["Máš: %d× %s" % [n, ItemsDB.name_of(Vyhlasky.FRESH_ITEM)], 2.5])
+		world.vyhlasky.add_fresh(id, fresh)
+	var got := "%d× %s" % [fresh, ItemsDB.name_of(Vyhlasky.FRESH_ITEM)]
+	if dry > 0:
+		got += ", %d× %s" % [dry, ItemsDB.name_of(Vyhlasky.DRY_ITEM)]
+	world.notify(id, "show_message", ["Máš: %s" % got, 2.5])
 	world.emit_game_event(id, "log_lopped", {"pos": lg.base_point(), "length": lg.use_length()})     # M3.3 lesní dělník
 
 

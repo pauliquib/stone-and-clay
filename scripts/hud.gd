@@ -926,7 +926,8 @@ func _update_mouse_mode() -> void:
 
 
 ## Doklady, které panel P ukazuje (i „nemáš“): kind → true.
-const DOC_KINDS := ["ridicsky", "dron_a1a3", "pilot_pg_motor", "pilot_ul", "zbrojni", "lovecky_listek", "rybarsky_listek"]
+const DOC_KINDS := ["ridicsky", "dron_a1a3", "pilot_pg_motor", "pilot_ul", "zbrojni", "lovecky_listek", "povolenka_lov",
+	"rybarsky_listek", "povolenka_rybolov"]
 
 
 ## M4.1 panel dokladů (P): řidičák se skupinami, body a zákaz, drony, létací průkazy; budoucí doklady jako „nemáš“.
@@ -962,9 +963,17 @@ func _documents_text() -> String:
 			line += " (%s)" % d["no"]
 		if not (d["subs"] as Array).is_empty():
 			line += "\n    skupiny: %s" % ", ".join(PackedStringArray(d["subs"]))
+		var vu := int(d.get("valid_until", -1))
+		if vu >= 0:
+			var left: int = vu - int(game.clock.jd())
+			line += "\n    platí ještě %d dní" % left if left >= 0 else "\n    PROŠLÁ – koupit novou v chatě"
 		var rv: Dictionary = d["revoked"]
 		if not rv.is_empty():
-			line += "\n    ODEBRÁNO (%s) – nutné přezkoušení v autoškole" % String(rv.get("reason", ""))
+			if bool(rv.get("retest", false)):
+				line += "\n    ODEBRÁNO (%s) – nutné přezkoušení v autoškole" % String(rv.get("reason", ""))
+			else:
+				line += "\n    ZÁKAZ (%s) – ještě %d dní" % [String(rv.get("reason", "")),
+					maxi(0, int(rv.get("until_jd", 0)) - game.clock.jd())]
 		s += line + "\n"
 	s += "\nŘidičák a skupiny: autoškola Volant (počítač doma, Letectví / eTesty)."
 	return s

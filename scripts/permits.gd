@@ -79,7 +79,7 @@ static func skupina_kryje(drzi: String, potreba: String) -> bool:
 ## přímo nebo přes zahrnutí. Bez `sub` u řidičáku stačí aspoň jedna skupina.
 func has(pid: int, kind: String, sub := "") -> bool:
 	var e: Dictionary = _g(pid).get(kind, {})
-	if e.is_empty() or not (e.get("revoked", {}) as Dictionary).is_empty():
+	if e.is_empty() or not _active_revoke(e).is_empty():
 		return false
 	var vu := int(e.get("valid_until", -1))
 	if vu >= 0 and _now() > vu:
@@ -126,9 +126,21 @@ func restore(pid: int, kind: String) -> void:
 		e["revoked"] = {}
 
 
-## Důvod odebrání: {reason, jd, until_jd, retest} nebo prázdný slovník (platný / neexistuje).
+## Důvod odebrání: {reason, jd, until_jd, retest} nebo prázdný slovník (platný / neexistuje / zákaz už vypršel).
 func is_revoked(pid: int, kind: String) -> Dictionary:
-	return (_g(pid).get(kind, {}) as Dictionary).get("revoked", {})
+	return _active_revoke(_g(pid).get(kind, {}))
+
+
+## Platné odebrání dokladu. Zákaz s termínem a bez přezkoušení (soud, M4.3) po `until_jd` sám skončí;
+## odebrání s přezkoušením (12 bodů) trvá, dokud ho nevrátí autoškola (`restore`).
+func _active_revoke(e: Dictionary) -> Dictionary:
+	var rv: Dictionary = e.get("revoked", {})
+	if rv.is_empty() or bool(rv.get("retest", false)):
+		return rv
+	var until := int(rv.get("until_jd", -1))
+	if until >= 0 and _now() > until:
+		return {}
+	return rv
 
 
 ## Skupiny, které hráč u druhu drží (řidičák: B, AM…).
@@ -154,7 +166,7 @@ func list(pid: int) -> Array[Dictionary]:
 		if e.is_empty():
 			continue
 		out.append({"kind": k, "name": KINDS[k][0], "no": String(e.get("no", "")), "jd": int(e.get("jd", -1)),
-			"subs": subs(pid, k), "revoked": (e.get("revoked", {}) as Dictionary).duplicate()})
+			"subs": subs(pid, k), "revoked": _active_revoke(e).duplicate(), "valid_until": int(e.get("valid_until", -1))})
 	return out
 
 

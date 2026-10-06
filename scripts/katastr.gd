@@ -128,6 +128,8 @@ func market_houses() -> Array:
 			continue
 		if house_owner.has(id) or _pending_has("dum", id):
 			continue
+		if world.estate.owner_of(id) != "":    # cizí vlastník (statek M3.2 – hospodář) se neprodává
+			continue
 		if not in_cadastre(e["center"]):
 			continue
 		if posmod(hash([id, week]), 3) != 0:
