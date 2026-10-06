@@ -567,3 +567,16 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 `scripts/hud.gd`, `scripts/computer.gd`, `data/zakon.json`, `docs/testy_M4.md`, `README.md`, `PROJECT_LOG.md`.
 
 ### Čeká na ruční test uživatele (checklist v `docs/testy_M4.md`, oddíl M4.8).
+
+## 2026-10-06 – Uzavření M4 Zákon a společnost (k závěrečné kontrole)
+
+### Stav kroků
+- Hotovo: M4.1 řidičák a autoškola, M4.2 správní řízení a dluhy, M4.3 soud a vězení, M4.5 dobré skutky a přátelství, M4.7 katastr.
+- Částečně (zůstávají `[ ]`): M4.4 (část A svědci hotová, část B vyhlášky jen částečně – chybí hluk, nedělní klid, zalévání z vodovodu, hromada klestí), M4.6 (chybí kontrola kufru policií, zabavení udice, střelnice a posudek), M4.8 (chybí sušák a ubalování, sběr lysohlávek, test na drogy v policii, efekty psilocybinu; čísla zákona neověřena v úředním znění).
+
+### Kontrola
+- `godot --import` rc 0, `--check-only` nad všemi 153 skripty v `scripts/`: bez chyb.
+- Ruční testy zatím neproběhly. Checklist po krocích je v `docs/testy_M4.md`; uživatel testuje až po celé M4.
+
+### Otevřené body (souhrn)
+- Viz oddíly „Otevřené body“ u jednotlivých kroků výše. Pro závěrečnou kontrolu Opus 5.5 hlavně: sloučení `world.gd` a `save_game.gd` (ruční úpravy v několika vlnách), napojení `Court` / `Debts` / `witness_check` a klíče v savu.
