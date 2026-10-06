@@ -707,3 +707,10 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Otevřené body: zalévání z vodovodu (není vodovodní zdroj), hromada klestí, sekačka, ubalení, sběr lysohlávek, samostatný přepínač efektů obrazu,
   následky nahlášení u zahrádkáře, zákonná čísla NEOVĚŘENO, hajný bez zabavení luku/kuše.
 - Ruční testy: podle `docs/testy_M4.md` (všechny oddíly M4.1–M4.9c). Regresní oddíl „Závěrečná kontrola M4“ na konci.
+
+## 2026-10-06 – Kontrola zákonných čísel M4
+
+- `data/zakon.json`: u všech 65 přestupků v `prestupky` a u bloku `tresty` je `poznamka` označena `NEOVĚŘENO` a obsahuje "Ověřit aktuální znění" (u tří drogových položek s uvedeným sekundárním zdrojem zůstává jejich původní zdroj). Nic dalšího se nemění (hodnoty, paragrafy, logika).
+- Kontrola `commit_offense`: všechna literální id ve `scripts/` existují v `zakon.json`; dynamicky skládaná id (`_offense`, `_law_offense`, `_smoke`, `commit_pending`, `police._recent`) pocházejí z literálů, které také existují.
+- Nesrovnalosti k ruční opravě (nebyly měněny): položky `pg_noc`, `pg_mraky`, `ul_noc`, `ul_mraky`, `ul_pristani_mimo`, `ul_bez_pojisteni` mají `par` jen "ověřit" (chybí §); `strelba_v_obci` a `zbran_pod_vlivem` mají "ověřit číslo § v novém zákoně o zbraních"; `vyhlasky` (`sucho`) nemá poznámku. Horní klíče (`body_limit`, `zakaz_za_body_h`, `body_odpocet` …) nemají vlastní poznámku, kryje je `overeno`. Položky `alkohol_do_1`, `ruseni_nocniho_klidu` aj. mají zákon+§ bez ověření.
+- Kontrola překladu se netýká (měněn jen JSON, žádný .gd).
