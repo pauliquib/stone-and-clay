@@ -784,3 +784,11 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - README (Systémy / Nastavení / Ovládání: „Efekty obrazu“) a `docs/VIZE_A_ROADMAPA.md` neaktualizovány – zadání mělo „nic dalšího neměnit“.
 - Ubalení a pečení jsou okamžité (bez animace a bez oven / kamen).
 - Čeká na ruční test uživatele: `docs/testy_M4.md`, oddíl „M4.8 zbytek“.
+
+## 2026-10-06 – Vlna 0 M4 sloučena do main (dokončení zbytků)
+
+- Sloučeno: M4.4 B zbytek (`4011f90`), M4.6 zbytek (`d56eeae`), M4.8 zbytek (`145fd20`), kontrola zákonných čísel (`4b4fca1`).
+- Konflikty jen v `PROJECT_LOG.md` a `docs/testy_M4.md` (ponechány obě části).
+- Kontrola překladu nad celým `main`: `godot --import` rc 0, `--check-only` na všech `scripts/*.gd` bez chyb.
+- M4.4, M4.6, M4.8 zůstávají `[ ]` s otevřenými body (vodovod, panel P u povolenek, zbraň v kufru, ubalení / sušák bez objektu,
+  zákonná čísla NEOVĚŘENO). Ruční test čeká spolu s M5 (uživatel testuje až po celé M5).
