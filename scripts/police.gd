@@ -58,6 +58,9 @@ var _cp_post := Vector3.INF
 var _cp_yaw := 0.0
 const COP_WALK := 1.7                # m/s
 const TRUNK_CHECK_P := 0.35          # M4.6: šance, že policista u okénka prohlédne kufr auta (ověřit / ladit)
+const DRUG_TEST_P := 0.6             # M4.8: šance, že dechová kontrola (plán „test“) doplní test na drogy (ověřit / ladit)
+const DRUG_THC_MIN := 0.5            # M4.8: THC v krvi nad touto hodnotou = pozitivní test (zástupná hodnota, jako v zakon.json)
+const DRUG_PSILO_MIN := 0.3          # M4.8: psilocybin v krvi nad touto hodnotou = pozitivní test (ladit)
 
 
 func setup(t: Traffic, g: RoadGraph, ter: Terrain, w: Node, c: Clock) -> void:
@@ -627,6 +630,10 @@ func _trunk_search(pl: Player) -> String:
 	if pl.item_count("puska") > 0 and pl.equipped != "puska" and not world.has_permit(pl.id, "zbrojni", pl.global_position):
 		if wpn != null and wpn.police_check(pl.id, "kufr"):
 			found = "zbraň bez zbrojního oprávnění"
+	# M4.8: držení látek (konopí, tabák, lysohlávky) – zjednodušeně jako u zbraně: co hráč veze v autě
+	if ItemsDB.adult_on and _drugs_carried(pl) > 0:
+		world.commit_offense(pl.id, "prechovavani_navykove_latky", {})
+		found += ("; " if found != "" else "") + "látky"
 	var cargo = world.get("cargo")
 	if cargo != null:
 		for e in cargo.vehicle_items(pl.car):
@@ -675,6 +682,25 @@ func _walk_back(delta: float) -> void:
 				cop.collision_layer = 4
 
 
+## M4.8: počet kusů návykových látek u hráče (klíče z ItemsDB, jen při zapnuté volbě pro dospělé).
+func _drugs_carried(pl: Player) -> int:
+	var n := 0
+	for k in ["konopi_kvety", "tabak_susene", "lysohlavky"]:
+		n += pl.item_count(k)
+	return n
+
+
+## M4.8: test na drogy při dechové kontrole – pozitivní při THC / psilocybinu nad prahem (`DRUG_*`).
+## Jen při zapnuté volbě pro dospělé a jen někdy (`DRUG_TEST_P`). Vrací true, pokud test proběhl pozitivně.
+func _drug_test(pl: Player) -> bool:
+	if not ItemsDB.adult_on or pl.body == null or _rng.randf() > DRUG_TEST_P:
+		return false
+	var positive: bool = pl.body.thc >= DRUG_THC_MIN or pl.body.psilo >= DRUG_PSILO_MIN
+	if positive:
+		world.commit_offense(pl.id, "rizeni_pod_vlivem_navykove_latky", {})
+	return positive
+
+
 func breath_test(pl: Player, context: String) -> void:
 	pl.controls_locked = false
 	if pl.car:
@@ -704,6 +730,8 @@ func breath_test(pl: Player, context: String) -> void:
 		msg += " Děkujeme, šťastnou cestu."
 		_banner(pl, msg, 4.0)
 		test_passed.emit(pl.id, p)
+	if _drug_test(pl):
+		_banner(pl, "Test na drogy: pozitivní. Vystupte si, prosím.", 4.0)
 	world.emit_game_event(pl.id, "breath_test", {"promile": p, "context": context})
 
 

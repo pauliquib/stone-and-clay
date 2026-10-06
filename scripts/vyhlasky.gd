@@ -104,6 +104,17 @@ func add_fresh(id: int, n: int) -> void:
 	batches[id] = list
 
 
+## M4.8 sušák: dávka z jiné položky (čerstvá sklizeň) na suchou (`to`) po `days` dnech. Stejná logika jako větve.
+func add_batch(id: int, n: int, from_item: String, to_item: String, days: float) -> void:
+	if n <= 0:
+		return
+	var list: Array = batches.get(id, [])
+	list.append({"n": n, "dny": 0.0, "from": from_item, "to": to_item, "days": days})
+	if list.size() > MAX_BATCHES:
+		list = list.slice(list.size() - MAX_BATCHES)
+	batches[id] = list
+
+
 func _process(_delta: float) -> void:
 	if world == null or world.clock == null:
 		return
@@ -128,15 +139,17 @@ func _tick(dt_min: float) -> void:
 		for b in batches[pid]:
 			var bd: Dictionary = b
 			bd["dny"] = float(bd.get("dny", 0.0)) + dd
-			if float(bd["dny"]) < DRY_DAYS:
+			if float(bd["dny"]) < float(bd.get("days", DRY_DAYS)):
 				keep.append(bd)
 				continue
-			# dávka proschla: kusy, které hráč ještě nese, se změní na suché větve
+			# dávka proschla: kusy, které hráč ještě nese, se změní na suché (větve / sušený tabák nebo konopí)
+			var from_item := String(bd.get("from", FRESH_ITEM))
+			var to_item := String(bd.get("to", DRY_ITEM))
 			if p != null:
-				var have := mini(int(bd.get("n", 0)), p.item_count(FRESH_ITEM))
+				var have := mini(int(bd.get("n", 0)), p.item_count(from_item))
 				if have > 0:
-					p.remove_item(FRESH_ITEM, have)
-					p.add_item(DRY_ITEM, have)
+					p.remove_item(from_item, have)
+					p.add_item(to_item, have)
 		batches[pid] = keep
 
 

@@ -111,6 +111,11 @@ const ITEMS := {
 		"kg": 0.01, "stack": 99, "price": 60, "adult": true, "color": Color(0.55, 0.6, 0.35)},
 	"konopi_kvety": {"name": "Sušené květy konopí (1 dávka)", "short": "Konopí", "type": "smoke", "kg": 0.05, "count": 1,
 		"stack": 99, "price": 0, "adult": true, "thc": 1.0, "color": Color(0.42, 0.52, 0.22)},
+	# M4.8 sušák: čerstvá sklizeň schne ~2 týdny (Garden → Vyhlasky.add_batch), pak je z ní suchý předmět výše
+	"tabak_cerstvy": {"name": "Čerstvé listy tabáku (sušák)", "short": "Čerstvý tabák", "type": "material", "kg": 0.1,
+		"stack": 99, "price": 0, "adult": true, "color": Color(0.4, 0.55, 0.25)},
+	"konopi_cerstve": {"name": "Čerstvé květy konopí (sušák)", "short": "Čerstvé konopí", "type": "material", "kg": 0.1,
+		"stack": 99, "price": 0, "adult": true, "color": Color(0.35, 0.5, 0.2)},
 	"lysohlavky": {"name": "Lysohlávky (čerstvé, záměna s jedovatou houbou možná)", "short": "Lysohlávky", "type": "food",
 		"kg": 0.05, "kcal": 20, "price": 0, "adult": true, "psilo": 1.0, "color": Color(0.8, 0.75, 0.6)},
 	# ------------------------------------------------------------ vybavení

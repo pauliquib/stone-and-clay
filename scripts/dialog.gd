@@ -195,7 +195,10 @@ static func _fill(t: String, ctx: Dictionary) -> String:
 		t = _fill_ext(t, ctx)
 	t = t.replace("{voc}", v).replace(", !", "!").replace(", .", ".").replace(" ,", ",")
 	t = t.replace("{name}", String(pr.get("name", ""))).replace("{first}", String(pr.get("name", "")).split(" ")[0])
-	t = t.replace("{job}", String(pr.get("job", ""))).replace("{hobby}", String(pr.get("hobby", "")))
+	var hobby := String(pr.get("hobby", ""))
+	if ItemsDB.adult_on and pr.has("hobby_adult"):           # M4.8: jedna věta jen při zapnuté volbě pro dospělé
+		hobby += " " + String(pr["hobby_adult"])
+	t = t.replace("{job}", String(pr.get("job", ""))).replace("{hobby}", hobby)
 	# prázdné oslovení: „Ahoj, !“ → „Ahoj!“
 	t = t.replace(", !", "!").replace(", ?", "?").replace(", .", ".").replace(",  ", ", ")
 	return t.strip_edges()

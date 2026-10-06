@@ -136,6 +136,7 @@ const PROFILES := [
 			"moustache": true, "fat": 0.45, "size": 1.0, "sleeves": true, "skin": 0.35}, "speed": 1.05},
 	{"name": "Ladislav Hrubý", "age": 67, "job": "důchodce, zahrádkář na okraji lesa", "trait": "plachy",
 		"hobby": "Záhon mám za chatou u lesa, chodím tam každý den, ať se nenudím.", "topics": ["zahrada", "les", "pocasi"],
+		"hobby_adult": "Na tom záhonu mám taky pár řádků konopí, ale o tom se moc nerozpovídám.",
 		"look": {"shirt": Color(0.35, 0.5, 0.3), "pants": Color(0.3, 0.27, 0.2), "hair": Color(0.6, 0.6, 0.58), "style": 1,
 			"beard": true, "hat": true, "fat": 0.3, "size": 0.98, "sleeves": true, "skin": 0.45}, "speed": 0.9},
 	{"name": "Nikola Dřínková", "age": 19, "job": "brigádnice v sadu", "trait": "mlady",

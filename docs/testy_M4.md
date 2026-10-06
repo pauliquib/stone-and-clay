@@ -164,3 +164,15 @@ Doporučené pořadí testování celé M4: M4.1 → M4.2 → M4.3 → M4.4 A/B 
 8. Zkouška neprošla (4 mimo terč) → hláška „Zkouška neprošla (x z 5 ran dobrých…)“, doklad se nevydá; eTest (počítač doma) dál funguje.
 9. Uložení a načtení: F5 / F9 uprostřed kurzu (zaplacený posudek a kurz) → po načtení zůstane posudek i kurz; starý save bez klíče `gamekeeper` se načte bez chyby.
 10. Legální rybař (lístek + povolenka) a legální lovec: kontroly neberou nic, nic se nezapíše do rejstříku.
+
+## M4.9c – M4.8 a zahrádkář (obsah pro dospělé)
+1. Nová hra (volba vypnuta): u Ladislava Hrubého (zahrádkář, chata u lesa) v rozhovoru žádná věta o konopí; za chatou (duben / květen) žádný záhon.
+2. Esc → Nastavení → zapnout „Obsah pro dospělé“ → F2 → Datum: duben → jdi za chatu: zelený záhon s několika rostlinami je vidět.
+3. Stejný den: v rozhovoru s Ladislavem (T, téma zahrada / koníček) přibude jedna věta o konopí na záhonu.
+4. Stojí-li poblíž soused / hráč v dohledu (~25 m) při výsevu, přijde hlášení „někdo nahlásil konopí na záhonu“; bez hráče v okolí žádné hlášení.
+5. F2 → Datum: září (~110 dní od výsevu) → záhon zmizí (sklizeno), v inventáři žádné konopí a žádný předmět od Ladislava.
+6. Sušák: sklidit tabák nebo konopí (F2 posun času o ~3 měsíce po výsevu) → v inventáři „Čerstvé … (sušák)“; po ~14 dnech (F2 → Datum) se změní na „Sušené …“.
+7. Policejní dechová kontrola s THC / psilocybinem (zapnutá volba): u části kontrol hlášení „Test na drogy: pozitivní“ a přestupek „Řízení pod vlivem“ v rejstříku.
+8. Kufr auta s konopím / tabákem (zapnutá volba) při kontrole kufru → zápis „Držení návykové látky“ (prechovavani_navykove_latky, NEOVĚŘENO) a hlášení „látky“.
+9. Snědení lysohlávek (pokud je nějaké v inventáři, např. F2 → Hráč) → lehce zvlněný obraz; vypnutá volba → obraz bez změn, předměty zmizí.
+10. F5 → F9 a načtení starého save bez klíče `npc_grow` a bez `psilo` / `thc` projde bez chyby; záhon Ladislava se po načtení obnoví.

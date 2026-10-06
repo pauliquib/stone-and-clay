@@ -26,7 +26,7 @@
    "poznamka": "NEOVĚŘENO v úředním znění – ověřit, stav k 2026-10-06. Zdroj (sekundární přehled): doma do 100 g sušiny legální, 100–200 g přestupek, nad 200 g trestný čin; mimo domov do 25 g legální, 25–50 g přestupek, nad 50 g trestný čin. Herní zjednodušení; zatím se nevyhodnocuje (otevřený bod)."},
   "rizeni_pod_vlivem_navykove_latky": {"nazev": "Řízení pod vlivem návykové látky (THC)", "drb": "jel za volant zkouřený", "karma": -4, "zakon": "361/2000 Sb.", "par": "§ 5 písm. f) (ověřit)",
    "pokuta": [20000, 20000], "body": 7, "zakaz_rizeni_h": [24, 24], "trestny_cin": false, "misto": "spravni_rizeni",
-   "poznamka": "NEOVĚŘENO – ověřit aktuální znění, stav k 2026-10-06. Herní zjednodušení: THC v krvi nad 0,5 (zástupná hodnota) = přestupek; test na drogy zatím není (otevřený bod)."},
+   "poznamka": "NEOVĚŘENO – ověřit aktuální znění, stav k 2026-10-06. Herní zjednodušení: THC v krvi nad 0,5 (zástupná hodnota) = přestupek; test na drogy při dechové kontrole (police.gd, _drug_test) je zjednodušený – THC nad 0,5 a psilocybin nad prahem = pozitivní."},
   "zachytka": {"nazev": "Noc na záchytce", "drb": "strávil noc na záchytce", "karma": -1, "zakon": "379/2015 Sb.", "par": "§ 21 a násl. (ověřit)",
    "pokuta": [1500, 1500], "body": 0, "trestny_cin": false, "misto": "na_miste",
    "poznamka": "Poplatek za pobyt, ne přestupek; ověřit."},

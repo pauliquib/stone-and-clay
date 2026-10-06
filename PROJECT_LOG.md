@@ -669,3 +669,29 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - **Zbraň v kufru**: hra zatím neumí uložit zbraň do kufru; policie ji zabaví jen z inventáře mimo ruku.
 - **Lékařský posudek**: zjednodušeně v chatě (v roadmapě je u úřadu jako „posudek“) – čísla ověřit.
 - **Čeká na ruční test uživatele** (checklist v `docs/testy_M4.md`, oddíl „M4.9a – M4.6 doplnění“).
+
+## 2026-10-06 – M4.8 zbytek a zahrádkář Ladislav (obsah pro dospělé; zůstává `[ ]`)
+- **Zahrádkář** (`scripts/npc_grow.gd`, `NpcGrow`, `World.npc_grow`): záhon za chatou (`Place "chata"` door + offset),
+  výsev IV–V jednou za rok, 110 dní, sklizeň jen jako počet rostlin v `state` (nic do inventáře). Vizuál jen při zapnuté
+  volbě. Svědci přes `World.witness_reported(…, "pestovani", 25)`, hláška hráči; následky pro NPC zatím nejsou.
+  Klíč `npc_grow` v `save_game.gd` (starý save = žádný záhon). Profil Ladislava: `hobby_adult` (jedna věta, `dialog.gd`).
+- **Sušák**: čerstvá sklizeň tabáku / konopí (`tabak_cerstvy`, `konopi_cerstve`) → po `SUSENI_DAYS` = 14 dnech suchý předmět
+  přes `Vyhlasky.add_batch` (stejná logika jako větve). Zjednodušeně: bez objektu sušáku, bez vlhkosti a plísně.
+- **Test na drogy** (`police.gd`, `_drug_test`): při dechové kontrole s šancí `DRUG_TEST_P` 0,6; pozitivní při THC ≥ 0,5
+  nebo psilocybinu ≥ 0,3 (zástupné hodnoty, ladit) → `rizeni_pod_vlivem_navykove_latky`. Jen při zapnuté volbě.
+- **Držení v kufru**: `_trunk_search` → při konopí / tabáku / lysohlávkách v inventáři `prechovavani_navykove_latky`
+  (zjednodušeně: nezkoumá množství vůči zákonu).
+- **Obraz psilocybinu**: `DrunkFx` přidá jemné vlnění přes stávající uniform `drunk` (max. 0,5), jen při zapnuté volbě.
+  Samostatný přepínač efektů ve Nastavení zatím není.
+- **Kontrola překladu**: `godot --headless --path . --import` (exit 0) a `--check-only` na všechny změněné `.gd` – bez chyb.
+- **Zdroje právního stavu**: nic nového neověřeno v úředním znění; čísla v `data/zakon.json` zůstávají „NEOVĚŘENO“.
+
+### Otevřené body (M4.8 zůstává `[ ]`)
+- **Ubalení** (akce „ubalit“ z papírků z Potravin) chybí; jedlá varianta konopí chybí.
+- **Lysohlávky – sběr** v lese (sezónní předmět, vzor `hrib` v `World.SEASON_ITEMS`, placement v `meta["items"]`,
+  riziko záměny, dovednost) chybí; ve hře se nedají sehnat.
+- **Efekty obrazu**: samostatný přepínač „Efekty obrazu“ ve Nastavení chybí (teď jen vázané na volbu pro dospělé).
+- **Zahrádkář – následky**: nahlášení nemá pro Ladislava žádný důsledek (přestupek / pokuta / zabavení rostlin).
+- **Sušák** bez objektu a bez vlhkosti / plísně (zjednodušeno).
+- **Zákonná čísla** nejsou ověřena v úředním znění (`poznamka` v `zakon.json`).
+- **Čeká na ruční test uživatele**: `docs/testy_M4.md`, oddíl „M4.9c – M4.8 a zahrádkář“.

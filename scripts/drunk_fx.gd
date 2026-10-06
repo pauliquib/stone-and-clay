@@ -32,6 +32,9 @@ func _process(delta: float) -> void:
 	_t += delta
 	var p := body.promile()
 	var d := body.drunk_level()
+	# M4.8: psilocybin (lysohlávky) jen jemné vlnění přes stávající uniform `drunk` – jen při zapnuté volbě pro dospělé
+	if ItemsDB.adult_on and body.psilo > 0.05:
+		d = maxf(d, clampf(body.psilo * 0.25, 0.0, 0.5))
 	_hurt = move_toward(_hurt, 0.0, delta * 1.2)
 	var dvis := smoothstep(0.9, 2.4, p)
 	var bl := smoothstep(0.7, 2.8, p)

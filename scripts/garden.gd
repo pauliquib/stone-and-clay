@@ -104,11 +104,14 @@ const CROPS := {
 	# M4.8: obsah pro dospělé (jen při zapnuté volbě, viz crop_visible)
 	"tabak": {"name": "Tabák", "item": "tabak_susene", "seed": "tabak_semena", "sow_months": [4, 5], "days": 90,
 		"water_need": 3, "frost_kill": -2.0, "yield": [6, 12], "xp": 8.0, "feed": 0.0, "min_temp": 8.0, "adult": true,
+		"fresh": "tabak_cerstvy",
 		"leaf": Color(0.3, 0.55, 0.22), "ripe": Color(0.45, 0.5, 0.2), "h": 0.9, "wid": 0.1, "lean": 0.15},
 	"konopi": {"name": "Konopí", "item": "konopi_kvety", "seed": "konopi_semena", "sow_months": [4, 5], "days": 110,
 		"water_need": 3, "frost_kill": -2.0, "yield": [4, 8], "xp": 10.0, "feed": 0.0, "min_temp": 8.0, "adult": true,
+		"fresh": "konopi_cerstve",
 		"leaf": Color(0.22, 0.5, 0.2), "ripe": Color(0.4, 0.5, 0.22), "h": 1.6, "wid": 0.06, "lean": 0.1},
 }
+const SUSENI_DAYS := 14.0                # M4.8 sušák: čerstvá sklizeň tabáku / konopí schne tolik dní (ladit)
 const CROP_ORDER := ["brambory", "mrkev", "cibule", "salat", "rajcata", "dyne", "cesnek", "tabak", "konopi"]
 
 ## Plodina je k dispozici (není dospělý obsah, nebo je volba zapnutá).
@@ -790,6 +793,11 @@ func _on_harvest(id: int, _def: Dictionary, aim: Dictionary, ok_: bool) -> void:
 	var yl: Array = spec["yield"]
 	var n := maxi(1, roundi(lerpf(float(yl[0]), float(yl[1]), q)))
 	var item := String(spec["item"])
+	if spec.has("fresh"):
+		# M4.8 sušák: čerstvá sklizeň se suší, suchý předmět vznikne později (Vyhlasky.add_batch)
+		item = String(spec["fresh"])
+		if world.vyhlasky:
+			world.vyhlasky.add_batch(id, n, item, String(spec["item"]), SUSENI_DAYS)
 	p.add_item(item, n)
 	var pl: Plot = aim["plot"]
 	pl.cells[aim["cell"]] = {"s": S_ZRYTO, "w": float(c.get("w", 0.0)) * 0.5, "h": 1.0, "f": float(c.get("f", 0.0))}
