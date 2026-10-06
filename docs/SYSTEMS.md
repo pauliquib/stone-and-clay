@@ -506,7 +506,14 @@
   (`FlightHud` – panel přístrojů + pipání variometru). Stroje jsou data v `Aircraft.SPECS`
   (klíč, nosná plocha S, CL(α) do kritického náběhu s přetáčením, CD0 + indukovaný odpor
   CL²/(π·AR·e), tah v N podle plynu a rychlosti, v_min / v_trim / v_max, nádrž a dolet);
-  testovací „Létající bedna“ má parametry motorového paraglidu (S = 25 m², v_min 7 m/s).
+  testovací „Létající bedna“ má parametry motorového paraglidu (S = 25 m², v_min 9 m/s).
+  **Vlna 0d:** `custom_integrator` + `_integrate_forces` (pracovní `_xf` / `_v`, vzor `Drone`),
+  tlumení REPLACE 0; terén nekoliduje (výjimka na TerrainBody) – zem, dosednutí s hysterezí
+  a náraz do svahu analyticky přes `World.ground_height(x, z)` (za katastrem `Surroundings`).
+  CD0 kalibrované z `glide`, jedna křivka tahu T0·(1 − 0,5·(v/v_max)²), auto-trim drží náběh
+  pro v_trim (`_trim_alpha`), na zemi vodorovná rychlost a náběh = pitch (rotace 0,6·a_crit).
+  Vizuál `vis` posunutý o −gear_h (y = 0 = zem), pilot otočený o 180°, póza `Aircraft.rider`
+  (`rider_pose`), oči `eye_pos`.
   Vítr = `Weather.wind_vector()` s výškovým profilem v(h) = v10·(h/10)^0,14 + turbulence
   (bouřka, les, závětří kopce) + svislá termika (`Thermals.lift_at`): bubliny 0,5–3 m/s
   nad poli a sídly, léto 11–17 h, jasno/polojasno a > 18 °C, táhnou s větrem a žijí 5–15 min;
@@ -535,16 +542,17 @@
   `pg_*` v `zakon.json` – svědek hluku ~800 m (`World.pg_noise_witnessed`), „obec“ ~350 m od místa
   (`pg_over_village`). Spawn i bez batohu: F2 → Vozidla → Paramotor.
 - **Létání – motorové rogalo / trike (M6.5):** `scripts/flight/trike.gd` (`Trike extends Aircraft`,
-  model `trike` v `Aircraft.SPECS` – rogalo 15 m², tah 1 800 N, nádrž 50 l, ~200 kg, 2 sedadla;
+  model `trike` v `Aircraft.SPECS` – rogalo 15 m², tah 1 400 N, nádrž 50 l, ~200 kg, 2 sedadla;
   v_min ~55 km/h, cestovní ~90 km/h, max ~130 km/h) a `scripts/flight/airfield.gd` (`Airfield` –
   polní letiště). **Dráha:** práh A (x −440, z 240), směr 30°, délka 260 m, šířka 16 m – louka
   (landuse 2) JZ od návsi, sklon ~1,4 %, bez stromů/zástavby; konstanty `RWY_A/RWY_HEADING/RWY_LEN`
   nahoře v `airfield.gd`. Vizual: posekaný pás MeshKit + pražce, větrný rukáv (točí se po
   `Weather.wind_vector`, pokles podle síly větru), otevřený hangár s kolizí (static layer 1),
   inzertní cedule → `World.ul_buy_trike` (ojetý trike 350 000 Kč hotově, spawn před hangárem).
-  **Řízení hrazdou:** realisticky obrácené (S = nahoru, A/D zatáčí naopak; `Trike._bank_target`),
-  přepínač „Intuitivní řízení rogala“ v Nastavení → `GameSettings.trike_intuitive`
-  (`nastaveni.cfg` klíč `rogalo_intuitivni`). Plyn = páka držící polohu (`_lever`, Shift/Ctrl);
+  **Řízení hrazdou:** výchozí intuitivní (W = nos nahoru, A = vlevo; vlna 0d), přepínač
+  „Realistické řízení rogala hrazdou“ v Nastavení → `GameSettings.trike_realistic`
+  (`nastaveni.cfg` klíč `rogalo_realisticke`; starý klíč `rogalo_intuitivni` se ignoruje) =
+  obrácené S = nahoru, A/D zatáčí naopak (`Trike._bank_target`). Plyn = páka držící polohu (`_lever`, Shift/Ctrl);
   na zemi A/D příďové kolo + Mezerník brzda (`_mu_ground` = 0,06 – delší rozjezd na trávě).
   Háčky v `aircraft.gd`: `_mu_ground`, `_takeoff_hint`. Vizuál MeshKit: kapotáž, 3 kola (řízené
   příďové), tlačná vrtule, stožár, delta plachtovina (2 trojúhelníkové panely), lanka, A-hrazda.

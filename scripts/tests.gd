@@ -1255,6 +1255,17 @@ static func flight_test(g: Node) -> void:
 	check.call("flying() konzistentní s on_ground", a.flying() == (not a.on_ground))
 	print("  odlepení: v=%.1f m/s, stav=%s" % [a.speed, a.stav_letu()])
 
+	# --- stoupání (vlna 0d, A2-02): plný plyn dál 10 s po odlepení → AGL > 20 m
+	#     (kalibrace SPECS: ~3,3 m/s stoupání při v_trim 13 m/s – PROJECT_LOG)
+	var agl_climb := 0.0
+	if odlepl:
+		t0 = Time.get_ticks_msec()
+		while Time.get_ticks_msec() - t0 < 10000 and not a.on_ground and a.dmg < 100.0:
+			await g.get_tree().physics_frame
+		agl_climb = a.global_position.y - w.ground_height(a.global_position.x, a.global_position.z)
+	print("  10 s po odlepení: %.1f m AGL, v=%.1f m/s, stav=%s" % [agl_climb, a.speed, a.stav_letu()])
+	check.call("stoupání: 10 s po odlepení AGL > 20 m (plný plyn)", odlepl and not a.on_ground and agl_climb > 20.0)
+
 	# --- teleport do výšky ~120 m nad dráhou: stav Vzduch přetrvává, fyzika běží dál.
 	#     ~4 s klidného letu s motorem → drží se vzduchu a chart je ve stavu Let.
 	var hod := Vector3(Airfield.RWY_A.x + d0.x * 130.0, 0.0, Airfield.RWY_A.y + d0.y * 130.0)

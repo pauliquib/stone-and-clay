@@ -630,7 +630,8 @@ func enter_aircraft(a: Aircraft) -> void:
 	visual.top_level = false
 	visual.reparent(a.vis, false)
 	visual.position = a.seat_pos
-	visual.rotation = Vector3.ZERO
+	visual.rotation = Vector3(0.0, PI, 0.0)        # Humanoid kouká do +Z, letouny letí do −Z (A2-05)
+	visual.ride = a.rider                          # vlastní póza stroje (A2-08), ne zbytek z auta
 	visual.pose = "ride"
 	visual.speed = 0.0
 	visual.on_floor = true
@@ -647,6 +648,8 @@ func exit_aircraft() -> Vector3:
 	aircraft = null
 	visual.reparent(self, false)
 	visual.top_level = true
+	visual.rotation = Vector3.ZERO
+	visual.ride = {}
 	visual.pose = "stand"
 	visual.set_first_person(first_person)
 	_exit_settle = 2
@@ -1153,7 +1156,7 @@ func _process_impl(delta: float) -> void:
 		visual.pedal_angle = car.pedal_angle
 		return
 	if aircraft != null:
-		visual.speed = 0.0
+		visual.speed = aircraft.rider_speed()      # paramotor: pilot běží po zemi
 		return
 	if horse != null:
 		visual.speed = 0.0

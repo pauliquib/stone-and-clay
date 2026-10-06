@@ -316,8 +316,8 @@ func _show_settings() -> void:
 	_header("Ovládání")
 	_slider("Citlivost myši", 0.2, 3.0, 0.05, settings.mouse_sens, func(x): settings.mouse_sens = x, "%.2f×")
 	_check("Obrátit osu Y myši", settings.invert_y, func(on): settings.invert_y = on)
-	_check("Intuitivní řízení rogala (W = nos nahoru; výchozí realistické obrácené)", settings.trike_intuitive,
-		func(on): settings.trike_intuitive = on)
+	_check("Realistické řízení rogala hrazdou (obráceně: S = nos nahoru, A = doprava)", settings.trike_realistic,
+		func(on): settings.trike_realistic = on)
 	_slider("Zorné pole (FOV)", 55.0, 95.0, 1.0, settings.fov, func(x): settings.fov = x, "%d°")
 	_header("Zvuk")
 	_slider("Hlasitost", 0.0, 1.0, 0.05, settings.volume, func(x): settings.volume = x, "", true)

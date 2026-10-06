@@ -1903,8 +1903,7 @@ func enter_aircraft(id: int, a: Aircraft) -> void:
 		notify(id, "show_message", ["%s – navlékáš nosiče: čelem PROTI VĚTRU rozběh (W) nahodí křídlo, " % a.spec.get("name", a.model)
 			+ "pak plyn (Shift). Ve vzduchu A/D brzdy, S obě, Mezerník trimry, Ctrl uši.", 7.0])
 	elif a is Trike:
-		notify(id, "show_message", ["%s – páka plynu Shift/Ctrl (drží polohu), na zemi A/D příďové kolo " % a.spec.get("name", a.model)
-			+ "a Mezerník brzda. Ve vzduchu HRAZDA: S nos nahoru, W klesat, A/D zatáčí obráceně. V kamera, F vystoupit.", 8.0])
+		notify(id, "show_message", [(a as Trike).controls_hint(), 8.0])
 	else:
 		notify(id, "show_message", ["%s – W plyn, A/D překlápění, Mezerník zatáhnout / na zemi brzda, " % a.spec.get("name", a.model)
 			+ "Ctrl přiklonit, V kamera, F vystoupit (na zemi)", 6.0])
@@ -3044,6 +3043,16 @@ func can_teleport(_id: int) -> bool:
 	return true
 
 
+## Výška země pro letouny (A2-11): uvnitř katastru terén, za ním hrubé okolí `Surroundings`
+## (Terrain.height_at by za okrajem vracel sevřený okraj → špatné AGL, přistání „ve vzduchu“).
+func ground_height(x: float, z: float) -> float:
+	if terrain == null:
+		return 0.0
+	if terrain.contains(x, z, 4.0) or surroundings == null or surroundings.nx < 2:
+		return terrain.height_at(x, z)
+	return surroundings.height_at(x, z)
+
+
 ## M6.2 – letové hranice pro létající prostředky (dron; M6.3+ letouny se napojí stejně).
 ## Vrací Dictionary:
 ##   "ok"    – uvnitř povolené oblasti (katastr + FLY_LIMIT_M) a pod stropem FLY_CEIL_AGL,
@@ -3068,7 +3077,7 @@ func flight_bounds(pos: Vector3) -> Dictionary:
 		if out > 0.0:
 			var k := clampf((out - (FLY_LIMIT_M - FLY_WARN_M)) / FLY_WARN_M, 0.0, 1.0)
 			push = Vector3(-dx, 0.0, -dz) / out * FLY_PUSH_MS * k
-		agl = pos.y - terrain.height_at(pos.x, pos.z)
+		agl = pos.y - ground_height(pos.x, pos.z)
 	var over_ceil := agl > FLY_CEIL_AGL
 	if over_ceil:
 		push.y = -minf(FLY_CEIL_PUSH + (agl - FLY_CEIL_AGL) * 0.1, FLY_PUSH_MS)
