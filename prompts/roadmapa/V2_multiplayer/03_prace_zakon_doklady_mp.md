@@ -40,4 +40,4 @@ hráči jsou si navzájem **svědky**, a vězení jednoho hráče nezastaví sv�
 6. B uloží profil a připojí se k jinému hostovi → doklady a rejstřík s sebou (profil), svět ne.
 
 ## 5. Závěr
-GDD kap. 6, README, PROJECT_LOG, deník AI, commit „V2.03 Práce a zákon v MP: …“, checklist a čekat.
+GDD kap. 6, README, PROJECT_LOG, commit „V2.03 Práce a zákon v MP: …“, checklist a čekat.

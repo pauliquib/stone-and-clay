@@ -39,4 +39,4 @@ To, co v singleplayeru dělá NPC „jako partner“, může v MP dělat **druh�
 6. A prodá B sekeru za 500 Kč → peníze a sekera se přesunou.
 
 ## 5. Závěr
-GDD kap. 6, README, PROJECT_LOG, deník AI, commit „V2.04 Společné aktivity v MP: …“, checklist a čekat.
+GDD kap. 6, README, PROJECT_LOG, commit „V2.04 Společné aktivity v MP: …“, checklist a čekat.

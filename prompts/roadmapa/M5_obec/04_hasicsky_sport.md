@@ -1,6 +1,6 @@
 # M5.4 – Hasičský sport: požární útok (minihra) a soutěž
 
-> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 4/9
+> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 4/12
 > Předpoklady: M5.3 (spolek, technika), M5.6 nebo aspoň hřiště (poloha) · Navazují: M5.5 (soutěž jako událost v kalendáři)
 
 ## 0. Než začneš – přečti
@@ -59,5 +59,5 @@ přenosnou stříkačkou, rozvine hadice a dvěma proudy nastříká terče. Hra
 6. Vítězství → respekt Hasiči v deníku.
 
 ## 7. Závěr
-README (Systémy → Hasičský sport), `data/hasicsky_sport.json`, VIZE odškrtnout, roadmapa README, PROJECT_LOG, deník AI,
+README (Systémy → Hasičský sport), `data/hasicsky_sport.json`, VIZE odškrtnout, roadmapa README, PROJECT_LOG,
 commit „M5.4 Hasičský sport: …“, checklist a čekat.

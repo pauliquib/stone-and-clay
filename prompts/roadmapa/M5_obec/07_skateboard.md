@@ -1,6 +1,6 @@
 # M5.7 – Skateboard s animacemi
 
-> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 7/9
+> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 7/12
 > Předpoklady: M0.3 (dovednost `skateboarding`) · Navazují: M5.8 (U-rampa za domem)
 
 ## 0. Než začneš – přečti
@@ -62,4 +62,4 @@ Skateboard v e-shopu (M3.4) nebo ve stavebninách v „Sportu“ (M5.1) za 1 890
 8. F5/F9 → skateboard a rekord zůstanou.
 
 ## 7. Závěr
-README (Systémy → Skateboard, Ovládání), VIZE odškrtnout, roadmapa README, PROJECT_LOG, deník AI, commit „M5.7 Skateboard: …“, checklist a čekat.
+README (Systémy → Skateboard, Ovládání), VIZE odškrtnout, roadmapa README, PROJECT_LOG, commit „M5.7 Skateboard: …“, checklist a čekat.

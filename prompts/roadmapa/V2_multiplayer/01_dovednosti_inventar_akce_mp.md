@@ -42,4 +42,4 @@ akcí; ostatní hráči vidí, co kdo drží a dělá.
 6. Odpojení B uprostřed akce → akce se zruší, nic se neduplikuje.
 
 ## 5. Závěr
-README / GDD (MP), PROJECT_LOG, deník AI, commit „V2.01 Dovednosti, inventář a akce v MP: …“, checklist a čekat.
+README / GDD (MP), PROJECT_LOG, commit „V2.01 Dovednosti, inventář a akce v MP: …“, checklist a čekat.

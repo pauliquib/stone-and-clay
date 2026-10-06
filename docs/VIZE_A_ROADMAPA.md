@@ -121,6 +121,18 @@ Postup (zavádí krok **M0.1**):
 | D4 | Hlavní cíl: popularita a cesta na starostu (poctivě i úplatky / podvody), unikátní příběh, hodně sidequestů | 4.7 | M7.1–M7.4 |
 | D5 | Co nejbohatší rozhovor s obyvateli přes T | 3.5 | hotovo mimo milník (doplněk 30. 9. 2026) |
 | D6 | Oprava 3D: končetiny „naruby“, divné držení předmětů | – | hotovo mimo milník (doplněk 30. 9. 2026) |
+| E1 | Pálení větví jen suchých, obecní vyhláška o zákazu pálení, legální táborák na špekáčky / gril | 4.4 | M4.4 |
+| E2 | Úkol: spálit velkou hromadu větví a maskovat to jako opékání špekáčků | 4.7 | M7.3 (mechanika M4.4) |
+| E3 | Sucho → vyhláška: zákaz zalévání a napouštění bazénů z vodovodu (kdo má studnu, nemusí) | 4.4 | M4.4 |
+| E4 | Sekání trávy a otravný hluk na vsi, nedělní klid | 4.4 | M4.4 |
+| E5 | Pouliční osvětlení a světelný smog (viditelnost hvězd) | 4.1 | M5.12 |
+| E6 | Rádio v autě, rozsvěcování vnitřního světla v autě | 4.5 | M5.9 |
+| E7 | Řidiči v NPC autech, nástup a výstup obyvatel | 4.1 | M5.11 (navazuje M4.5 „odvezeš mě“) |
+| E8 | Pěstování, sušení, zpracování a kouření tabáku a konopí, lysohlávky (stavy po užití) – obsah pro dospělé | 4.4 | M4.8 |
+| E9 | Nedělní mše v kapličce a v kostele ve Velkém Oříškově (farář, interiér) | 4.5 | M5.5 |
+| E10 | Studánka, skautský tábor v lese, MTB bikepark | 4.5 | M5.10 |
+| E11 | Editor map, postav, objektů a úkolů | – | milník N (po M7) |
+| E12 | Poznámky ze hry 30. 9. (propad u obchodu, zoom mapy, cigarety, víkendy obchodu, vozík a sprint, doprava) | – | hotovo ve vlně 0 (`docs/audit_vlna0.md`) |
 
 ---
 
@@ -413,10 +425,13 @@ kroky přehazovat, mezi milníky platí závislosti.
 - [x] **M3.4 Počítač** – PC doma s UI: e-shop + doručení, bazar, portál práce, bankovnictví, web obce. *Hotovo i pošta, bankomat, eTesty (rámec + cvičný test), Miny; otevřené body v PROJECT_LOG.*
 
 ### M4 – Zákon a společnost
-- [ ] **M4.1 Řidičská oprávnění a autoškola** – skupiny, e-test na PC, jízdy, zkouška, jízda bez oprávnění.
-- [ ] **M4.2 Správní řízení na úřadě** – příkazy, splatnost pokut, exekuce při nezaplacení, přezkoušení.
-- [ ] **M4.3 Soud a vězení** – trestné činy z katalogu, tresty, časový skok a jeho následky.
-- [ ] **M4.4 Další přestupky** – kácení, oheň, zvířata, krádeže úrody, rušení klidu, drony (po M6.1).
+- [ ] **M4.1 Řidičská oprávnění a autoškola** – rozšíření `Permits` (skupiny, odebrání, přezkoušení), panel dokladů P,
+  e-test na PC, jízdy, zkouška, jízda bez oprávnění.
+- [ ] **M4.2 Správní řízení na úřadě** – blokové pokuty, příkazy poštou, splatnost, odpor, společný systém dluhů a exekucí
+  (`Debts` – použije ho i M4.3 a hypotéka M4.7), schránka, vrácení řidičáku.
+- [ ] **M4.3 Soud a vězení** – trestné činy z katalogu, rejstřík jako pohled na záznamy, tresty, souhrnný časový skok a jeho následky.
+- [ ] **M4.4 Další přestupky a svědci** – jednotný `witness_check`, nenahlášené činy, povolení ke kácení, oživené řádky
+  katalogu; obecní vyhlášky: pálení větví (suché / čerstvé, táborák), sucho (zákaz zalévání z vodovodu), hluk a nedělní klid.
 - [ ] **M4.5 Nové cesty k pověsti / respektu / karmě** – pomoc sousedům, úklid, vrácení věcí, přátelství
   s postavami, drobné dobré skutky (seznam v 3.5).
 - [ ] **M4.6 Zbraně, lov a rybolov podle zákona** – zbrojní oprávnění, lovecký a rybářský lístek,
@@ -425,19 +440,25 @@ kroky přehazovat, mezi milníky platí závislosti.
   na rameni je dopaden hajným a legální lovec s doklady a úlovkem v kufru projde kontrolou policie.
 - [ ] **M4.7 Katastr: koupě a prodej nemovitostí** (D2) – smyšlené parcely z `landuse`, katastr na úřadě / PC,
   vklad se lhůtou, hypotéka, pronájem, vlastnictví řídí kácení / sklizeň / chov. *Hotovo, když:* hráč koupí dům
-  a les, přestěhuje se a v lese smí kácet.
+  a les, přestěhuje se a v lese smí kácet. Nemovitosti jen v domácím katastru (rozhodnutí 6. 10. 2026).
+- [ ] **M4.8 Návykové látky** (E8) – tabák, konopí, lysohlávky za volbou „Obsah pro dospělé“ (výchozí vypnuto),
+  pěstování, sušení, zpracování, stavy v `BodyState`, zákony a důsledky bez glorifikace. *Hotovo, když:* s vypnutou volbou
+  obsah ve hře není; se zapnutou má každý krok právní i tělesné důsledky.
 
 ### M5 – Obec a volný čas
 - [ ] **M5.1 Stavebniny** – budova, obchod, materiál pro kutilství.
 - [ ] **M5.2 Koupaliště a plavání** – úprava nádrže u potoka za stavebninami, plavání, sezóna, šatny.
 - [ ] **M5.3 Hasiči** – zbrojnice, spolek, výjezdy k požárům, hasičské vozidlo.
 - [ ] **M5.4 Hasičský sport** – minihra požární útok, soutěž jako událost.
-- [ ] **M5.5 Systém událostí + zábava s kapelou** – kalendář akcí, plakáty, NPC účast, hudba, bar.
+- [ ] **M5.5 Systém událostí + zábava s kapelou** – kalendář akcí, plakáty, NPC účast, hudba, bar; nedělní mše (E9).
 - [ ] **M5.6 Fotbal** – úprava hřiště, míč, kopaná s NPC, zápas jako událost.
 - [ ] **M5.7 Skateboard** – vozidlo, animace, triky, dovednost.
 - [ ] **M5.8 U-rampa za domem hráče** – rampa (hotová, nebo stavba ze stavebnin), triky na rampě.
 - [ ] **M5.9 Rocková rádia** – Rock Radio a Radio Beat (případně Rock Zone) jako ověřené streamy
-  v `data/radia.json`, právní poznámka v README.
+  v `data/radia.json`, právní poznámka v README; autorádio a vnitřní světlo v autě (E6).
+- [ ] **M5.10 Místa v lese** (E10) – studánka, skautský tábor (letní událost), MTB bikepark s horským kolem a dovedností cyklistika.
+- [ ] **M5.11 Doprava 2** (E7) – řidiči v AI autech, vesničané nastupují a vystupují, spolujezdec v autě hráče.
+- [ ] **M5.12 Pouliční osvětlení a světelný smog** (E5) – lampy v obci, méně hvězd nad obcí, víc v lese.
 
 ### M6 – Létání
 - [x] **M6.1 Dron** – ovládání, kamera, baterie, pravidla ÚVL a přestupky. *Hotovo: `Drone` (RigidBody3D se servo letovým modelem, vítr, režimy vzlet/let/RTH/přistání/pád/strom), `DroneModel` (2 modely, procedurální vizuál), `Permits` (registrace ÚVL + osvědčení A1/A3 přes eTest), 7 přestupků v `zakon.json`, prodej v Potravinách / eŠuplíku, stránka Letectví – ÚVL na PC (registrace, flotila, nabíjení, oprava), fotka do `user://fotky_dron/`, OSD telemetrie, save/load; otevřené body v PROJECT_LOG.*
@@ -468,7 +489,14 @@ Doplňky od uživatele (30. 9. 2026): **M1.7** co nejdřív (před M3 – ať no
 volitelné a může jít až po M7).
 
 Rychlé „radostné“ kroky, které lze vložit kdykoli po M0 bez rozbití pořadí: **M5.9 rádia**, **M5.7–5.8
-skateboard a rampa**, **M5.6 fotbal**.
+skateboard a rampa**, **M5.6 fotbal**, **M5.12 osvětlení**.
+
+Pořadí uvnitř M4 (6. 10. 2026): **M4.1 → M4.2 → M4.3** řetězem; **M4.5** souběžně s nimi; **M4.4** po M4.2; **M4.6** a **M4.8**
+po M4.4 (navzájem souběžně); **M4.7** kdykoli po M4.2. Podrobně `prompts/roadmapa/README.md`.
+
+### N – Nástroje (po M7)
+Editor map, postav, objektů a úkolů (E11). První krok: úkoly jako JSON data (navazuje na M7.3) a editor nad nimi.
+Prompty se napíšou až po M7.
 
 ---
 

@@ -43,4 +43,4 @@ zaktualizovat, aby agent v novém okně nepracoval podle zastaralého zadání.
 4. `PROJECT_LOG.md` → seznam rizik s odkazy na soubory.
 
 ## 5. Závěr
-PROJECT_LOG, deník AI, commit „V2.00 Revize MP promptů po etapě 1“, checklist a čekat.
+PROJECT_LOG, commit „V2.00 Revize MP promptů po etapě 1“, checklist a čekat.

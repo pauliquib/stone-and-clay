@@ -1,6 +1,6 @@
 # M5.6 – Fotbalové hřiště a hraní fotbalu
 
-> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 6/9
+> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 6/12
 > Předpoklady: M5.5 (kalendář – zápas jako událost) nepovinně · Navazují: M5.4 (hřiště pro hasičský sport)
 
 ## 0. Než začneš – přečti
@@ -62,4 +62,4 @@ Hřiště s brankami a čarami, míč s kopáním a driblinkem, penalty, volná 
 7. Déšť → míč těžší.
 
 ## 6. Závěr
-README (Systémy → Fotbal, Ovládání), VIZE odškrtnout, roadmapa README, PROJECT_LOG, deník AI, commit „M5.6 Fotbal: …“, checklist a čekat.
+README (Systémy → Fotbal, Ovládání), VIZE odškrtnout, roadmapa README, PROJECT_LOG, commit „M5.6 Fotbal: …“, checklist a čekat.

@@ -1,6 +1,6 @@
 # M5.3 – Hasiči: zbrojnice, spolek SDH, výjezdy k požárům
 
-> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 3/9
+> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 3/12
 > Předpoklady: M2.2 (oheň, `GrassFire`, `fire_report`), M2.3 (oblečení – zásahový oblek), M1.6 (vozidla), M0.6 (respekt `hasici`) · Navazují: M5.4 (hasičský sport), M5.5 (hasičský bál / soutěž jako událost)
 
 ## 0. Než začneš – přečti
@@ -56,4 +56,4 @@ Zbrojnice, spolek s členstvím, výjezd k požáru trávy (hráč jede s cister
 7. F5/F9 → členství zůstane.
 
 ## 6. Závěr
-README (Systémy → Hasiči), VIZE odškrtnout, roadmapa README, PROJECT_LOG, deník AI, commit „M5.3 Hasiči: …“, checklist a čekat.
+README (Systémy → Hasiči), VIZE odškrtnout, roadmapa README, PROJECT_LOG, commit „M5.3 Hasiči: …“, checklist a čekat.

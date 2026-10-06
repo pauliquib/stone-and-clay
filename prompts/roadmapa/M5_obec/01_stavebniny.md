@@ -1,6 +1,6 @@
 # M5.1 – Stavebniny (nová budova a obchod) + kutilské stavby
 
-> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 1/9
+> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 1/12
 > Předpoklady: M0.2, M0.4, M1.4/M1.5 (interiér – nepovinně) · Navazují: M5.2 (koupaliště hned za stavebninami), M5.8 (U-rampa ze stavebního materiálu), M2.6 (ohrady), M3.3 (prodavač)
 
 ## 0. Než začneš – přečti
@@ -61,4 +61,4 @@ Místo (i s dočasnou pozicí), obchod s nabídkou, doprava materiálu; rámec s
 
 ## 7. Závěr
 README (Systémy → Stavebniny, Stavby), VIZE odškrtnout, roadmapa README, PROJECT_LOG (souřadnice, pokud chybí – otevřený bod),
-deník AI, commit „M5.1 Stavebniny a kutilské stavby: …“, checklist a čekat.
+commit „M5.1 Stavebniny a kutilské stavby: …“, checklist a čekat.

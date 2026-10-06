@@ -38,4 +38,4 @@ zátěžový test zahrne nové systémy.
 6. Spuštění zátěžového scénáře (postup v README) → výstup měření.
 
 ## 5. Závěr
-GDD kap. 6, README, PROJECT_LOG, deník AI, commit „V2.05 Létání a skateboard v MP: …“, checklist a čekat.
+GDD kap. 6, README, PROJECT_LOG, commit „V2.05 Létání a skateboard v MP: …“, checklist a čekat.
