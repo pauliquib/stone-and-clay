@@ -1558,3 +1558,36 @@ dřeva a vývraty po bouři, vazba na houby a zvěř.
 - Zastávka/lavičky/cedule se spawnují jako samostatné uzly přímo pod `World` (`world.add_child`) – při smazání
   jedné z nich (např. budoucí editor) by `from_dict` po načtení vytvořil duplicitní kopie; pro singleplayer bez
   mazání objektů to nevadí, ale stojí to za zapsání pro V2/editor map.
+
+## 2026-10-07 – Uzavření M7 Cesta na starostu
+
+### Stav
+Všechny 4 kroky hotové a sloučené do `main` (M7.1 `9ede586`, M7.2+M7.3 `2bfe8dc`, M7.4 merge po
+`526d71a`), kontrola překladu po každém sloučení bez chyb (`godot --import` + `--check-only` na
+všechny změněné skripty). Checkboxy M7.1–M7.4 odškrtnuty v `prompts/roadmapa/README.md` a
+`docs/VIZE_A_ROADMAPA.md`. `docs/testy_M7.md` doplněn o úvod s doporučeným pořadím testů (M7.1 →
+M7.3 → přeskok času k volbám F2 → M7.2 → M7.4 → ukládání).
+
+### Shrnutí systému
+- `World.politics` (`Politics`) – popularita z pověsti/respektu/přátelství, kritéria kandidatury,
+  petice, mandát 1 461 herních dní (4 roky, realisticky dle uživatelova rozhodnutí).
+- `World.campaign` (`Campaign`) – poctivá kampaň (mítink, letáky) i nečestná (úplatky, pomluvy,
+  zfalšovaný podpis) s rizikem odhalení a skandálem (→ soud M4.3), volební den a vyhlášení výsledků.
+- `scripts/quest_data.gd` + `data/ukoly/*.json` – 10 datových vedlejších úkolů se 2 konci, karma-
+  gating, dopad na respekt/popularitu; žije vedle starých ručně psaných úkolů.
+- `World.mayor_office` (`MayorOffice`) – rozpočet, projekty, zastupitelstvo, 4 konce příběhu
+  (oblíbený starosta / šedá eminence / padlý starosta / starosta proti své vůli).
+
+### Otevřené body (přenesené z jednotlivých kroků, beze změny)
+- Jen 10 vedlejších úkolů místo navrhovaných 15+, bez 3. konců a řetězů tří postav s dopadem na
+  hlasy (M7.3) – lze doplnit dalšími `.json` bez zásahu do kódu.
+- Staré ručně psané úkoly (cigarety, pivo…) nepřevedené na data – systémy žijí vedle sebe.
+- Kompromat na protikandidáta, podpora spolků, debata s protikandidátem (M7.2) nejsou
+  implementované – nad rámec „Minima“.
+- Rozpočet starosty (M7.4) jen paušály a pronájem obecních pozemků, bez vazby na pokuty/nájmy;
+  „starosta proti své vůli“ se počítá jen na konci mandátu, ne jako průběžný stav.
+- Riziko odhalení nečestných cest je zjednodušený okamžitý hod, ne plná svědecká mechanika M4.4.
+- Ruční test celého M7 čeká na uživatele (checklist `docs/testy_M7.md`).
+
+### Další na řadě
+M8 Realistický svět (`prompts/roadmapa/M8_realismus/00_START_M8.md`).

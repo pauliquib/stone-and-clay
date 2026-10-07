@@ -3,6 +3,22 @@
 > Testuje uživatel až po celém M7 (M7.1–M7.4), ne po jednotlivých krocích. Tento soubor sbírá
 > checklisty podle kroků; každý krok má vlastní oddíl.
 
+## Jak testovat (doporučené pořadí)
+
+1. Projdi body **M7.1** na nové hře (popularita, kritéria, petice) – nevyžaduje čekání.
+2. Projdi **M7.3** (vedlejší úkoly) na stejné hře o pár dní dál, než začneš přeskakovat k volbám –
+   úkoly ovlivňují karmu/respekt/popularitu, které se pak odrazí ve volbách.
+3. **Přeskoč čas k volbám**: F2 → „Datum“ → nastav den blízko termínu voleb (deník J → „Obec“ ukazuje
+   přesné `election_jd`/odpočet dní) – funkční období je 1 461 herních dní (4 roky), takže na první
+   volby je potřeba přeskočit výrazně dopředu, ne čekat reálně. Několik dní před volbami přeskakuj
+   po menších krocích (např. po 7–14 dnech), aby se stihly zobrazit popupy odpočtu a šlo si ještě
+   vyzkoušet kampaň (M7.2 – mítink v hospodě, letáky, úplatky/pomluvy).
+4. V den voleb proběhne vyhlášení výsledků (M7.2, bod 8–9) – při výhře pokračuj body **M7.4**
+   (kancelář starosty na úřadě, rozpočet, projekty, zastupitelstvo) až do konce dalšího funkčního
+   období (opět přeskakuj čas), kdy padne jeden ze 4 konců příběhu.
+5. Nakonec zkus uložit/načíst (F5/F9) v různých fázích (kandidatura, kampaň, úřadování) a ověř, že
+   starý save z dřívějších milníků (bez `politics`/`campaign`/`mayor_office`) jde načíst beze pádu.
+
 ## M7.1 Popularita a kritéria kandidatury
 
 1. Nová hra → J (deník) → oddíl „Obec“: popularita nízká / „o tvé kandidatuře zatím neví vůbec
