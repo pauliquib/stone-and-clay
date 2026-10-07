@@ -1,0 +1,22 @@
+{
+	"id": "sud_vinar",
+	"title": "Ukradený sud",
+	"giver": "sklep",
+	"giver_name": "Vinař Zdeněk",
+	"intro": "Vinaři Zdeňkovi zmizel ze sklepa sud mladého vína. Tuší, kam se mohl zatoulat, ale nechce dělat rozruch. Najdeš ho?",
+	"requires": {"day_min": 0},
+	"steps": [
+		{"text": "Najdi ukradený sud v křoví za sklepem", "need": {"type": "near", "place": "sklep", "offset": [25, 30], "radius": 20}}
+	],
+	"choice_text": "Sud jsi našel. Co s ním uděláš?",
+	"branches": [
+		{"id": "vratit", "label": "Vrátit sud vinaři", "honest": true,
+			"result_text": "Zdeněk je rád – pozve tě na skleničku na zdraví.",
+			"reward": {"respect": {"stamgasti": 9}, "karma": 3, "friendship": 8, "reputation": 3}},
+		{"id": "prodat", "label": "Prodat sud jinde a nikomu nic neříct", "honest": false,
+			"result_text": "Sud jsi prodal a peníze si nechal.",
+			"reward": {"money": 900, "karma": -7},
+			"risk": {"chance": 0.5, "text": "Někdo tě se sudem viděl a dal to vinaři echo.",
+				"reward": {"respect": {"stamgasti": -14}}}}
+	]
+}

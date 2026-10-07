@@ -4,6 +4,10 @@
 ## Události přicházejí z world.gd (emit_game_event s id hráče): drank, ate, smoked, opened,
 ## bottle_broken, injured, fell, vomited, passed_out, entered_car, exited_car, car_crash, hit_person,
 ## hit_animal (srážka se zvěří → povinnost nahlásit, viz `hit_report`), prop_damaged, busted…  Zprávy hráči jdou přes World.notify (v MP to bude RPC na jeho klienta).
+## M7.3: vedlejší úkoly s morálním větvením se od teď píšou jako DATA v `data/ukoly/*.json`, ne jako
+## nová GDScript třída – engine a formát JSON je v `scripts/quest_data.gd` (`QuestData.load_all` je
+## přidá do `list` v `setup()` níž). Staré úkoly (cigarety…níž) zůstávají jako třídy (čas na převod
+## nevyšel), obojí sdílí stejné rozhraní `Quest` a stejné ukládání (`save_game.gd`, klíč `id`/`state`).
 class_name Quests
 extends Node
 
@@ -34,6 +38,7 @@ func setup(g: Node, p: Player) -> void:
 		q.mgr = self
 		q.player = p
 		q.pid = pid
+	list.append_array(QuestData.load_all(game, self, p))     # M7.3: vedlejší úkoly z data/ukoly/*.json
 
 
 ## Zpráva do HUD hráče (show_message, popup, quest_started…).

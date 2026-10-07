@@ -1,0 +1,22 @@
+{
+	"id": "pes_ztraceny",
+	"title": "Ztracený pes",
+	"giver": "deda",
+	"giver_name": "Děda Vomáčka",
+	"intro": "Sousedce Markétě uběhl pejsek Punťa, už je to druhý den. Zajdi se po něm podívat k lesu, než ho srazí auto nebo ho sebere liška.",
+	"requires": {"day_min": 0},
+	"steps": [
+		{"text": "Najdi Punťu v podrostu u okraje lesa poblíž chaty", "need": {"type": "near", "place": "chata", "offset": [-35, 20], "radius": 25}}
+	],
+	"choice_text": "Punťa se na tebe lísá a očichává ti ruku. Co s ním uděláš?",
+	"branches": [
+		{"id": "vratit", "label": "Vrátit Punťu Markétě", "honest": true,
+			"result_text": "Markéta se rozplakala radostí a dala ti odměnu.",
+			"reward": {"money": 150, "respect": {"sousede": 8}, "karma": 3, "friendship": 10}},
+		{"id": "necha_si", "label": "Nechat si Punťu sám (nikomu nic neřeknu)", "honest": false,
+			"result_text": "Punťu sis nechal – teď je to tvůj pes.",
+			"reward": {"karma": -6},
+			"risk": {"chance": 0.5, "text": "Markéta tě viděla s jejím psem u tvého domu – sousedé si povídají, že jsi ho ukradl.",
+				"reward": {"respect": {"sousede": -10}, "reputation": -5}}}
+	]
+}

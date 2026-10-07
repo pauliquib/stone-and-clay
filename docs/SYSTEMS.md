@@ -86,6 +86,14 @@
   (do 0,24 ‰ tolerance přístroje), pokuta, zákaz řízení, nad 1 ‰ záchytka.
 - **Úkoly** (`quests.gd`, deník J): Cigarety pro dědu, Páteční pivo, Slivovice pro starostu,
   Autem z hospody, Mejdan na chatě, Degustace ve sklepě – každý s podmínkami; nesplněný lze zkusit znovu.
+- **Vedlejší úkoly jako data** (M7.3, `scripts/quest_data.gd` → `QuestData`/`DataQuest`, definice
+  `data/ukoly/*.json`): kroky (dojít na místo, mít/spotřebovat předmět, herní událost, rozhovor) a na konci
+  morální volba (`branches`) se 2 konci – odměna, respekt komunity, skrytá karma, přátelství, u nečestné
+  volby riziko odhalení (styl M4) s dalším postihem. 10 úkolů: Ztracený pes (děda), Pytlák v lese a Hromada
+  klestí (myslivecká chata), Hádka o mez, Sbírka na kapličku a Hasiči shánějí díl (úřad), Dříví pro paní
+  Hronovou (pila, nabídne se jen s trochou kladné karmy), Ukradený sud (sklep), Motorka ve stodole
+  (Stavebniny, jen bez vysoké karmy), Zatoulaná kráva (Potraviny). Formát JSON popsaný v hlavičce
+  `quest_data.gd`; nový úkol = nový soubor, žádný jiný kód se měnit nemusí.
 - **Zvěř a hráč** (`fauna/hunter.gd`, `fauna/paddock.gd`, `priroda/tracks.gd`, `priroda/nature_log.gd`):
   - **Srážka se zvěří**: poškození auta podle hmotnosti a rychlosti (`World.HIT_DAMAGE_K`), divočák při rychlé srážce
     zraní i řidiče. Vznikne úkol „Srážka se zvěří“ – nahlas ji do 1 herní hodiny na Myslivecké chatě (E), jinak pokuta

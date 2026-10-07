@@ -1,0 +1,22 @@
+{
+	"id": "klesti_hromada",
+	"title": "Hromada klestí",
+	"giver": "chata",
+	"giver_name": "Myslivec Franta",
+	"intro": "Soused u chaty má obrovskou hromadu klestí k spálení, ale teď platí vyhláška o zákazu pálení. Potřebuje ji zmenšit, než mu něco uletí na střechu.",
+	"requires": {"day_min": 0},
+	"steps": [
+		{"text": "Dojdi k hromadě klestí u chaty", "need": {"type": "near", "place": "chata", "offset": [10, 10], "radius": 15}}
+	],
+	"choice_text": "Hromada klestí čeká. Jak ji vyřešíš?",
+	"branches": [
+		{"id": "odvezt", "label": "Poctivě klestí odvézt / nahlásit ke zpracování", "honest": true,
+			"result_text": "Klestí jsi odvezl podle pravidel, žádné kouř se nekonal.",
+			"reward": {"respect": {"zemedelci": 8}, "karma": 3, "reputation": 3}},
+		{"id": "spalit", "label": "Spálit ho „maskovaně“ jako opékání špekáčků", "honest": false,
+			"result_text": "Oheň jsi zamaskoval za grilování a klestí spálil.",
+			"reward": {"karma": -6},
+			"risk": {"chance": 0.5, "text": "Kolemjdoucí poznal, že nejde o špekáčky, a pálení za vyhlášky se rozneslo po vsi.",
+				"reward": {"respect": {"zemedelci": -10}, "reputation": -5}}}
+	]
+}

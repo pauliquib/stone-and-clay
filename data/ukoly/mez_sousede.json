@@ -1,0 +1,22 @@
+{
+	"id": "mez_sousede",
+	"title": "Hádka o mez",
+	"giver": "urad",
+	"giver_name": "Starosta Novák",
+	"intro": "Dva sousedé se hádají o mez mezi zahradami už týden a volají na úřad. Rozsoudíš to, než si jeden z nich vezme kosu?",
+	"requires": {"day_min": 0},
+	"steps": [
+		{"text": "Vyslechni oba sousedy a zjisti, kde mez skutečně je", "need": {"type": "talk"}}
+	],
+	"choice_text": "Jak rozhodneš spor o mez?",
+	"branches": [
+		{"id": "rozsoudit", "label": "Rozsoudit podle skutečné hranice", "honest": true,
+			"result_text": "Oba sousedé to (nerady) uznali – spravedlnost platí.",
+			"reward": {"respect": {"sousede": 10}, "reputation": 4, "karma": 2}},
+		{"id": "podplatit", "label": "Nechat se podplatit jedním ze sousedů", "honest": false,
+			"result_text": "Vzal jsi úplatek a rozhodl ve prospěch dárce.",
+			"reward": {"money": 600, "karma": -8},
+			"risk": {"chance": 0.5, "text": "Druhý soused si stěžoval na úřadě, že jsi vzal úplatek.",
+				"reward": {"respect": {"sousede": -14}, "reputation": -8}}}
+	]
+}

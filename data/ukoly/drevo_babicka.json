@@ -1,0 +1,22 @@
+{
+	"id": "drevo_babicka",
+	"title": "Dříví pro paní Hronovou",
+	"giver": "pila",
+	"giver_name": "Pilař Ondřej",
+	"intro": "Stará paní Hronová potřebuje na zimu dříví a sama na pilu nedojde. Dovezl bys jí trochu polen?",
+	"requires": {"day_min": 0, "karma_min": 10},
+	"steps": [
+		{"text": "Kup na pile 2 pytle polen pro paní Hronovou", "need": {"type": "item", "id": "poleno", "count": 2, "consume": true}}
+	],
+	"choice_text": "Dříví máš – co si za něj od paní Hronové vezmeš?",
+	"branches": [
+		{"id": "zadarmo", "label": "Dát dříví zadarmo", "honest": true,
+			"result_text": "Paní Hronová je šťastná a modlí se za tebe.",
+			"reward": {"respect": {"sousede": 9}, "karma": 5, "reputation": 3}},
+		{"id": "predrazit", "label": "Vzít si za dříví přemrštěnou cenu", "honest": false,
+			"result_text": "Vzal jsi od staré paní peníze, co nemá nazbyt.",
+			"reward": {"money": 400, "karma": -6},
+			"risk": {"chance": 0.5, "text": "Sousedé se dozvěděli, že jsi babičku napálil.",
+				"reward": {"respect": {"sousede": -12}}}}
+	]
+}
