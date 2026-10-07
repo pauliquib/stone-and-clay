@@ -10,6 +10,21 @@
 class_name GameSettings
 extends RefCounted
 
+## M8.1: přepínače realismu – jeden slovník se čte i zapisuje z `World.realism` (stejná instance,
+## `Main._ready` dá `world.realism = client.settings.realism`), aby šlo zapnout/vypnout každý krok
+## M8 zvlášť (Esc → Nastavení → Realismus) bez zásahu do kódu. Klíč = krok (00_PRINCIPY kap. 5),
+## hodnota `bool` (grafické kroky mají výchozí stav podle předvolby – nastaví si ho jejich vlastní krok).
+## Řádky v menu (popisek, nápověda, odhad cfeny) přidává `REALISM_ROWS` – každý krok M8 svůj.
+signal realism_changed(key: String, on: bool)
+
+const REALISM_KEYS := ["site", "species", "wind", "sky", "gait", "soil_water", "treegen", "micro",
+	"animal_gait", "phenology", "crops", "terramech", "ground_veg", "habitat", "thermo", "village_life", "soundscape"]
+## Řádky menu Realismus: [klíč, popisek, nápověda, odhad cena (text)] – prázdné, dokud ho nenaplní krok,
+## který přepínač zavádí (data, ne větvení v `pause_menu.gd`).
+const REALISM_ROWS: Array = []
+
+var realism: Dictionary = {}
+
 const PATH := "user://nastaveni.cfg"
 const VSYNC_NAMES := ["Mailbox (doporučeno)", "Zapnuto (FIFO)", "Vypnuto"]
 const VSYNC_MODES := [DisplayServer.VSYNC_MAILBOX, DisplayServer.VSYNC_ENABLED, DisplayServer.VSYNC_DISABLED]
@@ -80,6 +95,23 @@ var _soft := -1
 var _hooked := false
 
 
+func _init() -> void:
+	for k in REALISM_KEYS:        # M8.1: výchozí zapnuto; grafický krok si svůj klíč podle předvolby doladí sám
+		realism[k] = true
+
+
+## Zapnuto, i když to krok, který klíč zavádí, ještě není hotový (fallback, 00_PRINCIPY kap. 3).
+func realism_on(key: String) -> bool:
+	return bool(realism.get(key, true))
+
+
+func set_realism(key: String, on: bool) -> void:
+	if bool(realism.get(key, true)) == on:
+		return
+	realism[key] = on
+	realism_changed.emit(key, on)
+
+
 func load_file() -> void:
 	var cf := ConfigFile.new()
 	if cf.load(PATH) != OK:
@@ -105,6 +137,8 @@ func load_file() -> void:
 	renderer = String(cf.get_value("grafika", "renderer", renderer))
 	if not RENDERER_VALUES.has(renderer):
 		renderer = RENDERER_VALUES[0]
+	for k in REALISM_KEYS:        # M8.1: přepínače realismu (sekce [realismus]); starý cfg bez klíče = výchozí true
+		realism[k] = bool(cf.get_value("realismus", k, realism.get(k, true)))
 
 
 func save_file() -> void:
@@ -126,6 +160,8 @@ func save_file() -> void:
 	cf.set_value("grafika", "strop_fps", fps_cap)
 	cf.set_value("grafika", "barvy", color_mode)
 	cf.set_value("grafika", "renderer", renderer)
+	for k in REALISM_KEYS:
+		cf.set_value("realismus", k, bool(realism.get(k, true)))
 	cf.save(PATH)
 
 

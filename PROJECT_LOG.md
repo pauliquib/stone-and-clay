@@ -1591,3 +1591,68 @@ M7.3 → přeskok času k volbám F2 → M7.2 → M7.4 → ukládání).
 
 ### Další na řadě
 M8 Realistický svět (`prompts/roadmapa/M8_realismus/00_START_M8.md`).
+
+## 2026-10-08 – M8.1 Základ realismu: přepínače, eko-takt, měřicí scény, ladicí vrstvy
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Přepínače realismu**: `GameSettings.realism: Dictionary` (klíče z 00_PRINCIPY kap. 5, výchozí
+  `true`), `GameSettings.realism_on(key)` / `set_realism(key, on)`, signál `realism_changed`,
+  ukládání do `nastaveni.cfg` sekce `[realismus]`. `World.realism` = **stejný** `Dictionary`
+  (`LocalClient.attach` nastaví `world.realism = settings.realism`), `World.realism_on(key)` jako
+  server-side fallback. Esc → Nastavení → nový řádek „Realismus (M8)…“ → vlastní stránka
+  (`PauseMenu._show_realism`): zatím jen nadpis a vysvětlení (`GameSettings.REALISM_ROWS` je prázdná
+  tabulka – řádky doplní kroky, které přepínač zavádí).
+- **Eko-takt**: `scripts/eko/eco_clock.gd` (`class_name EcoClock`, instance `World.eco`), signály
+  přímo na `World` (`World.eco_hour(dt_h)`, `World.eco_day(jd)`) – jediný zdroj hodinového/denního
+  kroku pro M8. `EcoClock.tick()` (volá `World._process_impl`) hlídá, kolik celých herních hodin
+  uběhlo (`Clock.jd()*24 + floor(hour())`); normální běh = `eco_hour(1.0)` přesně jednou za hodinu.
+  Skok času (spánek, F2, vězení) se dohání po jednotlivých hodinách, rozloženo přes snímky
+  (`SLICE_BUDGET_US = 2000` µs/snímek); skok nad `MAX_CATCHUP_DAYS` (30 dní) se místo stovek signálů
+  dožene jedním hrubým krokem `eco_hour(dt_h=zbytek)` + `eco_day`. `EcoClock.slice(items, per_frame,
+  cb)` – obecný pomocník pro budoucí kroky M8 (fronta prací odbavovaná stejným časovým rozpočtem).
+  Ukládání: klíč `eco` v `SaveGame` (jen poslední dohnaná hodina, žádný dluh – po F5/F9 se eko-takt
+  nerozjíždí od začátku hry).
+- **Měřicí scény**: `Tests.PERF_SCENES` (`ves_poledne`, `les_rano_mlha`, `louka_vitr`, `udoli_noc`,
+  `pole_leto`, `dron_200m` – poloha, směr, datum, hodina, počasí, popis) + `Tests.perf_scene(g, arg)`
+  přes `--perfscene=<jméno>[,sekund]` (`main.gd`): nastaví datum/čas/počasí (`World.set_date/
+  set_time/set_weather`), teleportuje hráče (`World.teleport_player`), u „dron_200m“ přepne na volnou
+  kameru (`LocalClient.freecam`, M6.2) ve výšce nad terénem. Po ustálení (3 s) stejné vzorkování jako
+  `--perf` (výchozí 20 s, `Performance` monitory) → souhrn na konzoli + `user://perf/<jméno>.csv`.
+- **Ladicí vrstvy mapy**: `World.debug_layers: Dictionary` (název → `Callable(x, z) -> Color`),
+  ukázková prázdná vrstva `"realism_off"`. F2 → nová položka „Příroda – ladění…“
+  (`GameMenu.open_debug_layers`) vybere vrstvu (`Hud.set_debug_layer`); mapa M kreslí vybranou
+  vrstvu jako barevnou mřížku (`Hud._draw_map_debug_layer`, vzorek po 16–64 m podle přiblížení,
+  keš se překresluje jen při změně vrstvy/výřezu/velikosti buňky).
+- **Launcher** (zadání uživatele navíc k promptu): `tools/launcher.sh` spustí `./run.sh "$@"`,
+  zachytí stdout/stderr a `tools/launcher_log.py` je zhutní do `logs/m8_perf_<datum_čas>.log`
+  (+ `logs/latest.log`) – tři oddíly (PERF souhrn, chyby/varování, ostatní), s deduplikací
+  opakujících se hlášek („N× stejná hláška“). `logs/` je mimo git. Ověřeno `bash -n`, `--help`
+  a běh `launcher_log.py` nad ručně připraveným syrovým logem (bez spouštění hry) – dedup i
+  rozdělení do oddílů sedí. Hru launcherem nikdo nespustil (to patří uživateli).
+- Soubory: `scripts/eko/eco_clock.gd` (nový), `scripts/game_settings.gd`, `scripts/world.gd`,
+  `scripts/local_client.gd`, `scripts/pause_menu.gd`, `scripts/game_menu.gd`, `scripts/hud.gd`,
+  `scripts/tests.gd`, `scripts/main.gd`, `scripts/save_game.gd`, `tools/launcher.sh` (nový),
+  `tools/launcher_log.py` (nový), `.gitignore` (`logs/`).
+- Dokumentace: `README.md` (přepínače realismu, `--perfscene`, launcher), `docs/DEV.md` (ladicí
+  parametry), `docs/SYSTEMS.md` (odstavec „Eko-takt a realismus (M8.1)“), `docs/testy_M8.md` (nový,
+  oddíl M8.1), `prompts/roadmapa/README.md` (M8.1 odškrtnuto).
+- Kontrola překladu: `godot --headless --import` bez nových chyb (zbylé hlášky jsou z
+  `addons/func_godot`, `addons/godot_state_charts`, `addons/limboai` – beze změny tohoto kroku).
+  `--check-only` na všechny změněné/nové skripty (`game_settings.gd`, `world.gd`, `local_client.gd`,
+  `pause_menu.gd`, `game_menu.gd`, `hud.gd`, `tests.gd`, `main.gd`, `save_game.gd`,
+  `eko/eco_clock.gd`) bez chyby. Jedna vlastní chyba opravena před commitem: `hud.gd`
+  `_draw_map_debug_layer` – `var x0 := floor(...)` nešlo typově odvodit (globální `floor()` v `:=`),
+  doplněn explicitní typ `float`.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M8.md`, oddíl M8.1): `--perfscene=…` měří
+  reálné CPU/GPU ms na jeho GTX 1050 – teprve to ukáže, jestli je výkonový rozpočet (16,6 ms/snímek,
+  Střední) splněný; M8.1 sám nic těžkého nepřidává (eko-takt je prázdný takt bez odběratelů).
+- `GameSettings.REALISM_ROWS` je zatím prázdná (jen tabulka/kontrakt) – menu Realismus nemá žádný
+  konkrétní řádek, dokud ho nepřidá krok, který daný přepínač zavádí (M8.2+).
+- Souřadnice scén `les_rano_mlha`, `louka_vitr`, `udoli_noc`, `pole_leto` jsou odhad podle `pois.json`
+  / rozměrů katastru (les u myslivecké chaty, otevřený bod jinde) – nejsou přesně ověřené biomem;
+  stačí pro měření výkonu, uživatel může souřadnice poladit při prvním spuštění.
+- „Vítr“ ve scéně `louka_vitr` použit přes `bourka` (nejsilnější vítr z existujících typů počasí) –
+  bez vyhrazeného API pro vynucenou rychlost větru (přijde až s M8.4 polem větru).
+- `EcoClock.slice()` nemá zatím žádného odběratele (M8.1 jen zakládá API) – ověří se až v M8.2+.

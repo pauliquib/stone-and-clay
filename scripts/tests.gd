@@ -26,6 +26,8 @@
 ##                 wet_boost asfaltu, north_xz pro sněhové jazyky
 ##   --obcetest   okolní obce (data/obce.json → World.obce, Villages): 5 fiktivních obcí mimo
 ##                katastr, středy ±6 km, zástavba postavená, obec_at(center) → ta obec
+##   --perfscene=jméno[,sekund]  M8.1: měřicí scéna (PERF_SCENES) – pevné místo/čas/počasí/kamera,
+##                stejné vzorkování jako --perf, výpis na konzoli + user://perf/<jméno>.csv
 class_name Tests
 extends RefCounted
 
@@ -2105,6 +2107,99 @@ static func perf_test(g: Node) -> void:
 	for k in top.slice(0, 25):
 		var gg: Array = geo[k]
 		print("PERF   %-40s %7d | %5d (%d cull) | %d" % [k, counts[k], gg[0], gg[1], gg[2]])
+	g.get_tree().quit()
+
+
+## M8.1: měřicí scény (00_PRINCIPY kap. 6) – poloha, směr, datum, hodina, počasí, popis. Každý
+## další krok M8 smí přidat svou scénu (např. stanoviště, vítr, mikroklima). `agl` u „dron_200m“ =
+## kamera (volná, `LocalClient.freecam`) ve výšce nad terénem místo hráče po zemi.
+const PERF_SCENES := {
+	"ves_poledne": {"pos": Vector3(60.0, 0.0, 110.0), "yaw": 0.0, "date": [2026, 7, 15], "hour": 12.0,
+		"weather": "jasno", "popis": "náves v poledne, jasno – běžná hustota NPC a dopravy"},
+	"les_rano_mlha": {"pos": Vector3(-383.0, 0.0, -1010.0), "yaw": PI, "date": [2026, 10, 5], "hour": 6.5,
+		"weather": "mlha", "popis": "les u myslivecké chaty, ráno v mlze – hodně stromů a mlhy"},
+	"louka_vitr": {"pos": Vector3(900.0, 0.0, -500.0), "yaw": 0.5, "date": [2026, 5, 1], "hour": 14.0,
+		"weather": "bourka", "popis": "otevřená louka, silný vítr a bouřka – pole větru, ohyb vegetace"},
+	"udoli_noc": {"pos": Vector3(-700.0, 0.0, 300.0), "yaw": 1.0, "date": [2026, 1, 20], "hour": 2.0,
+		"weather": "jasno", "popis": "noc, bezvětří – radiační mlha a studený vzduch (mikroklima)"},
+	"pole_leto": {"pos": Vector3(600.0, 0.0, 600.0), "yaw": 0.0, "date": [2026, 7, 15], "hour": 12.0,
+		"weather": "jasno", "popis": "pole v létě, poledne – plodiny a fenologie"},
+	"dron_200m": {"pos": Vector3(60.0, 0.0, 110.0), "yaw": 0.0, "date": [2026, 7, 15], "hour": 12.0,
+		"weather": "jasno", "agl": 200.0, "popis": "volná kamera 200 m nad návsí – dohlednost, impostory, obloha"},
+}
+
+
+## `--perfscene=<jméno>[,sekund]`: teleport na scénu z `PERF_SCENES`, pak stejné vzorkování jako
+## `perf_test` (výchozí 20 s), výpis na konzoli + `user://perf/<jméno>.csv` (sloupce sec;fps;frame_ms;…),
+## aby šly výsledky mezi běhy / po změnách M8 kroků porovnat beze zásahu uživatele do textu.
+static func perf_scene(g: Node, arg: String) -> void:
+	var parts := String(arg).split(",")
+	var name := parts[0]
+	var dur := clampi(int(parts[1]) if parts.size() > 1 and parts[1] != "" else 20, 3, 300)
+	if not PERF_SCENES.has(name):
+		print("PERFSCENE: neznámá scéna '%s'. Platné: %s" % [name, ", ".join(PERF_SCENES.keys())])
+		g.get_tree().quit()
+		return
+	var sc: Dictionary = PERF_SCENES[name]
+	var world: World = g.world
+	var p := _pl(g)
+	var dte: Array = sc["date"]
+	world.set_date(int(dte[0]), int(dte[1]), int(dte[2]))
+	world.set_time(float(sc["hour"]))
+	world.set_weather(String(sc["weather"]))
+	var pos: Vector3 = sc["pos"]
+	world.teleport_player(1, pos, float(sc.get("yaw", 0.0)))
+	await g.get_tree().process_frame
+	var agl: float = float(sc.get("agl", 0.0))
+	if agl > 0.0 and g.client.has_method("toggle_freecam"):
+		g.client.toggle_freecam()        # M6.2: volná kamera – scéna „z výšky“ bez letounu a bez pádu fyziky
+		if g.client.freecam:
+			g.client.freecam.global_position.y = world.terrain.height_at(p.global_position.x, p.global_position.z) + agl
+			g.client.freecam.rotation = Vector3(deg_to_rad(-45.0), p.yaw + PI, 0.0)
+	print("PERFSCENE %s – %s" % [name, sc["popis"]])
+	print("PERFSCENE  %s %s · %s" % [world.clock.date_text(), world.clock.text(), world.weather.describe()])
+	PROF_ON = true
+	PROF.clear()
+	await g.get_tree().create_timer(3.0).timeout     # ustálení po teleportu (kratší než --perf: scéna je pevná)
+	var f0 := Engine.get_process_frames()
+	var mons := [Performance.TIME_PROCESS, Performance.TIME_PHYSICS_PROCESS,
+		Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME, Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME,
+		Performance.RENDER_TOTAL_OBJECTS_IN_FRAME, Performance.OBJECT_NODE_COUNT,
+		Performance.PHYSICS_3D_ACTIVE_OBJECTS]
+	var names := ["proc_ms", "phys_ms", "draws", "prims", "obj", "nodes", "phys3d"]
+	var n := mons.size()
+	var fps_sum := 0.0
+	var fps_min := 1e9
+	var fps_max := 0.0
+	var csv := PackedStringArray()
+	csv.append("sec;fps;frame_ms;%s" % ";".join(names))
+	for s in dur:
+		await g.get_tree().create_timer(1.0).timeout
+		var fps := Engine.get_frames_per_second()
+		var frame_ms := 1000.0 / maxf(fps, 0.01)
+		var row := PackedStringArray()
+		row.append(str(s + 1))
+		row.append("%.1f" % fps)
+		row.append("%.1f" % frame_ms)
+		for i in n:
+			var v := Performance.get_monitor(mons[i])
+			row.append("%.1f" % (v * 1000.0 if i < 2 else v))
+		csv.append(";".join(row))
+		fps_sum += fps
+		fps_min = minf(fps_min, fps)
+		fps_max = maxf(fps_max, fps)
+	var avg_fps := fps_sum / dur
+	var avg_frame_ms := 1000.0 / maxf(avg_fps, 0.01)
+	print("PERFSCENE %s hotovo: fps %.1f (min %.1f, max %.1f), frame %.1f ms" % [name, avg_fps, fps_min, fps_max, avg_frame_ms])
+	DirAccess.make_dir_recursive_absolute("user://perf")
+	var f := FileAccess.open("user://perf/%s.csv" % name, FileAccess.WRITE)
+	if f:
+		for line in csv:
+			f.store_line(line)
+		f.close()
+		print("PERFSCENE CSV: %s" % ProjectSettings.globalize_path("user://perf/%s.csv" % name))
+	prof_report(dur, Engine.get_process_frames() - f0)
+	PROF_ON = false
 	g.get_tree().quit()
 
 

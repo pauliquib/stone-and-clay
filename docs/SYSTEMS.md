@@ -483,6 +483,21 @@
   nekrytých slibů a nízká popularita), oblíbený starosta (znovuzvolení beze skandálu) – jen oznamovací scéna,
   hra pokračuje. Ukládání: klíč `mayor_office` v `SaveGame`.
 
+- **Eko-takt a realismus (M8.1)**: základ milníku M8 „Realistický svět“ (`prompts/roadmapa/M8_realismus/`),
+  na kterém stojí všechny další kroky. `World.realism` (= `GameSettings.realism`, Esc → Nastavení →
+  „Realismus (M8)…“) – přepínače jednotlivých kroků M8, výchozí zapnuto; sekce `[realismus]` v
+  `nastaveni.cfg`. `scripts/eko/eco_clock.gd` (`EcoClock` = `World.eco`) je jediný zdroj hodinového
+  a denního kroku pro simulace M8: signály `World.eco_hour(dt_h)` / `World.eco_day(jd)`, normálně
+  jednou za herní hodinu, při skoku času (spánek, F2, vězení) dohnáno po krocích rozložených přes
+  snímky (žádný zásek), nad 30 dní jedním hrubým krokem; `EcoClock.slice(items, per_frame, cb)` –
+  obecný pomocník pro rozložení práce budoucích kroků (mřížka stanovišť, strom po stromu…) přes
+  snímky. `Tests.PERF_SCENES` + `--perfscene=<jméno>[,sekund]` – pevná měřicí scéna (místo, čas,
+  počasí, kamera) se stejným vzorkováním jako `--perf`, pro porovnání výkonu po každém kroku M8
+  (rozpočet v `00_PRINCIPY.md` kap. 6). `World.debug_layers` (F2 → „Příroda – ladění“) – barevná
+  mřížka na mapě M z `Callable(x, z) -> Color`, aby šel model zkontrolovat okem; M8.1 má jen
+  ukázkovou prázdnou vrstvu `realism_off`. `tools/launcher.sh` + `tools/launcher_log.py` – spustí
+  hru a zapíše kompaktní (deduplikovaný) log do `logs/` místo ručního přepisování čísel z konzole.
+
 ## Co ve hře je
 
 - **Celý katastr** (~5,2 × 4,6 km) bez načítacích obrazovek: terén 2 m mřížka (kolize =

@@ -70,6 +70,9 @@ var _mini_t := 0.0                # minipauza mezi překresleními minimapy (ne 
 var _mini_built := false          # keš statických vrstev minimapy hotová?
 var _mini_lines: Array = []       # [světové body (x,z), střed, ohraničující poloměr, barva, šířka]
 var _mini_dir_w: Array = []       # šířky textů kompasu (kompas texty se nemění – shape jednou)
+var map_debug_layer := ""         # M8.1: F2 → Příroda – ladění; klíč do `World.debug_layers`, "" = vypnuto
+var _dbg_key := ""                # keš ladicí mřížky: překreslení jen při změně vrstvy / výřezu / mřížky
+var _dbg_cells: Array = []        # [[Rect2 (svět), Color], …]
 var _quest_pinned := false        # Z – panel úkolu přišpendlený (jinak skrytý)
 var _cross: Label
 var _scope: TextureRect          # tmavé okraje dalekohledu (X)
@@ -1584,6 +1587,16 @@ func _toggle_map() -> void:
 	_mini.queue_redraw()
 
 
+## M8.1: vybrat ladicí vrstvu mapy (F2 → Příroda – ladění) a otevřít mapu, ať je vidět hned.
+func set_debug_layer(name: String) -> void:
+	map_debug_layer = name
+	_dbg_key = ""     # vynutit překreslení i při stejném výřezu (jiná vrstva)
+	if not _map.visible:
+		_toggle_map()
+	else:
+		_map_view.queue_redraw()
+
+
 ## pixely na metr při aktuálním přiblížení (podklad = celý ortho_full)
 func _map_ppm() -> float:
 	var o: Dictionary = meta["ortho_full"]
@@ -1664,6 +1677,38 @@ static func _pts_aabb(pts: PackedVector2Array) -> Rect2:
 	return r
 
 
+## M8.1: ladicí vrstva mapy (F2 → Příroda – ladění) – barevná mřížka z `World.debug_layers[map_debug_layer]`
+## místo podkladu mapy. Vzorkuje po 16–64 m podle přiblížení, mřížka se spočítá znovu jen při
+## změně vrstvy / výřezu / velikosti buňky (ne každý snímek).
+func _draw_map_debug_layer(vrect: Rect2, ppm: float) -> void:
+	if map_debug_layer == "" or not game.debug_layers.has(map_debug_layer):
+		return
+	var cb: Callable = game.debug_layers[map_debug_layer]
+	var cell: float = clampf(snappedf(32.0 / maxf(ppm, 0.02), 16.0), 16.0, 64.0)
+	var key := "%s|%d|%d|%d|%d|%.0f" % [map_debug_layer, int(vrect.position.x), int(vrect.position.y),
+		int(vrect.size.x), int(vrect.size.y), cell]
+	if key != _dbg_key:
+		_dbg_key = key
+		_dbg_cells.clear()
+		var x0: float = floor(vrect.position.x / cell) * cell
+		var z0: float = floor(vrect.position.y / cell) * cell
+		var x: float = x0
+		while x < vrect.position.x + vrect.size.x:
+			var z: float = z0
+			while z < vrect.position.y + vrect.size.y:
+				var c: Color = cb.call(x + cell * 0.5, z + cell * 0.5)
+				if c.a > 0.001:
+					_dbg_cells.append([Rect2(x, z, cell, cell), c])
+				z += cell
+			x += cell
+	if _dbg_cells.is_empty():
+		return
+	_map_view.draw_set_transform(_map_view.size * 0.5 - _map_center * ppm, 0.0, Vector2(ppm, ppm))
+	for cc in _dbg_cells:
+		_map_view.draw_rect(cc[0], cc[1])
+	_map_view.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
 func _draw_map_view_wrapped() -> void:
 	var __t0 := Tests.prof_t0()
 	_draw_map_view()
@@ -1715,6 +1760,7 @@ func _draw_map_view() -> void:
 			if Rect2(Vector2.ZERO, _map_view.size).has_point(rp):
 				_map_view.draw_string_outline(font, rp, rn, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 3, Color(0, 0, 0, 0.85))
 				_map_view.draw_string(font, rp, rn, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, rl["col"])
+	_draw_map_debug_layer(vrect, ppm)
 	for it in items_root.get_children():
 		if it is Item and not it._taken and it.active:
 			_map_view.draw_circle(_w2v(it.global_position), 3.0 if it.kind != "zalud" else 6.0, COLORS[it.kind])

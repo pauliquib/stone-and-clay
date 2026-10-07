@@ -18,6 +18,10 @@ extends Node3D
 
 signal loading(text: String)
 signal sound(pos: Vector3, name: String, pitch: float, vol: float, max_dist: float)
+## M8.1: jediný zdroj hodinového / denního kroku pro všechny simulace M8 (`EcoClock` = `World.eco`,
+## 00_PRINCIPY kap. 3) – odběratelé se připojují přímo na `World.eco_hour` / `World.eco_day`.
+signal eco_hour(dt_h: float)
+signal eco_day(jd: int)
 
 const N_VILLAGERS := 28
 const N_DOGS := 7
@@ -59,6 +63,14 @@ const FLY_CEIL_PUSH := 6.0       # jak rychle stroj tlačí dolů nad stropem (m
 
 var args := {}
 var meta: Dictionary
+## M8.1: `World.realism` je odkaz na `GameSettings.realism` (stejný Dictionary – `Main._ready` je
+## spojí), aby přepnutí v Esc → Nastavení → Realismus platilo hned i v simulaci. Bez klienta (nebo
+## dřív, než se klient připojí) zůstává prázdný → `realism_on()` padá na výchozí `true` (fallback).
+var realism: Dictionary = {}
+var eco: EcoClock                # M8.1: eko-takt – jediný zdroj `eco_hour` / `eco_day` (viz výš)
+## M8.1: ladicí vrstvy mapy (F2 → Příroda – ladění, kreslí `Hud._draw_map_view`): název → `Callable`
+## `(x: float, z: float) -> Color` (alfa 0 = nekreslit buňku). Každý krok M8 přidá svou vrstvu.
+var debug_layers: Dictionary = {}
 var obce: Array = []             # okolní obce z data/obce.json (id, name, center, radius, boundary, roads…)
 var _obec_bounds := {}           # id obce → Rect2 hranice katastru – počítá obec_bounds() jednou (mapa, obec_at)
 var terrain: Terrain
@@ -190,6 +202,18 @@ func init_clock() -> void:
 	weather.name = "Pocasi"
 	add_child(weather)
 	weather.setup(clock, 78.37, String(args.get("weather", "")))
+	eco = EcoClock.new(self)      # M8.1: eko-takt – musí existovat dřív, než první systém M8 naslouchá eco_hour/eco_day
+	debug_layers["realism_off"] = Callable(self, "_debug_layer_none")   # M8.1: ukázková (prázdná) ladicí vrstva
+
+
+## M8.1: vzorová ladicí vrstva mapy – nekreslí nic (alfa 0); ukázka API pro budoucí kroky M8.
+func _debug_layer_none(_x: float, _z: float) -> Color:
+	return Color(0.0, 0.0, 0.0, 0.0)
+
+
+## Zapnuto, i když to krok, který klíč zavádí, ještě není hotový (fallback, 00_PRINCIPY kap. 3).
+func realism_on(key: String) -> bool:
+	return bool(realism.get(key, true))
 
 
 func _frames(n: int) -> void:
@@ -3816,6 +3840,8 @@ func _process(_delta: float) -> void:
 func _process_impl(_delta: float) -> void:
 	if not ready_done:
 		return
+	if eco:          # M8.1: eko-takt – jediný zdroj eco_hour/eco_day, dohání skoky času po snímcích
+		eco.tick()
 	# policie – silniční kontrolu hráč uvidí, až je blízko
 	if police.checkpoint_pos != Vector3.INF:
 		for id in players:

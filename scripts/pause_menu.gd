@@ -90,7 +90,7 @@ func open() -> void:
 func close() -> void:
 	if not is_open:
 		return
-	if _page in ["settings", "graphics"]:
+	if _page in ["settings", "graphics", "realism"]:
 		settings.save_file()
 	is_open = false
 	_dim.visible = false
@@ -122,10 +122,10 @@ func _notification(what: int) -> void:
 
 func _back() -> void:
 	var from := _page
-	if from in ["settings", "graphics"]:
+	if from in ["settings", "graphics", "realism"]:
 		settings.save_file()
 	_status.text = ""
-	if from == "graphics":
+	if from in ["graphics", "realism"]:
 		_show_settings()
 	else:
 		_show_main()
@@ -339,6 +339,24 @@ func _show_settings() -> void:
 	if settings.vsync_from_args:
 		_label(_list, "   (vsync je teď dán parametrem --vsync / --novsync)", 13)
 	_check("Ukazovat FPS", settings.show_fps, func(on): settings.show_fps = on)
+	_header("Realismus")
+	_button("Realismus (M8)…", _show_realism)
+	_button("← Zpět", _back)
+	_focus_first()
+
+
+## M8.1: oddíl Realismus – zatím jen nadpis a vysvětlení; řádky (`GameSettings.REALISM_ROWS`) přidávají
+## jednotlivé kroky M8, každý svůj přepínač (klíč, popisek, nápověda, odhad ceny) – data, ne větvení.
+func _show_realism() -> void:
+	_page = "realism"
+	_clear("Realismus (M8)", "Krajina, rostliny a zvěř se postupně mění ze „kulis“ na propojené " +
+		"zjednodušené modely (terén, voda, slunce, vítr…). Každý krok jde vypnout – bez něj hra běží " +
+		"jako dřív. Zatím žádný konkrétní přepínač není hotový – přidá ho krok M8, který danou část zavádí.")
+	if GameSettings.REALISM_ROWS.is_empty():
+		_label(_list, "Zatím nic k vypnutí (M8.1 jen zakládá přepínače a takt pro další kroky).", 15)
+	for row in GameSettings.REALISM_ROWS:
+		var key: String = row[0]
+		_check("%s – %s" % [row[1], row[2]], settings.realism_on(key), func(on): settings.set_realism(key, on))
 	_button("← Zpět", _back)
 	_focus_first()
 

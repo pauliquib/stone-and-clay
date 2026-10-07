@@ -28,6 +28,8 @@
 ##                   (Puddles) při wetness > 0,7, wet_boost asfaltu, north_xz pro sněhové jazyky
 ##   --obcetest      okolní obce (data/obce.json → World.obce, Villages): 5 fiktivních
 ##                   obcí, obec_at, postavená zástavba; --shot=… navíc snímek mapy okolí
+##   --perfscene=jméno[,sekund]  M8.1: měřicí scéna (Tests.PERF_SCENES) – pevné místo/čas/počasí,
+##                   pak vzorkování jako --perf (výchozí 20 s) do konzole + user://perf/<jméno>.csv
 class_name Main
 extends Node3D
 
@@ -151,6 +153,8 @@ func _ready() -> void:
 		Tests.obec_test(self)
 	if _args.has("perf"):
 		Tests.perf_test(self)
+	if _args.has("perfscene"):
+		Tests.perf_scene(self, String(_args["perfscene"]))
 
 
 func _frames(n: int) -> void:

@@ -550,7 +550,7 @@ kroky přehazovat, mezi milníky platí závislosti.
 
 ### M8 – Realistický svět (transformační upgrade, E14, po M7)
 Start: `prompts/roadmapa/M8_realismus/00_START_M8.md` (orchestrátor, 8 vln), společné principy `00_PRINCIPY.md`.
-- [ ] **M8.1 Základ** – přepínače Realismu, eko-takt (`eco_hour` / `eco_day`), měřicí scény `--perfscene`, ladicí vrstvy mapy.
+- [x] **M8.1 Základ** – přepínače Realismu, eko-takt (`eco_hour` / `eco_day`), měřicí scény `--perfscene`, ladicí vrstvy mapy.
 - [ ] **M8.2 Mapa stanovišť** – `tools/site.py` → `site.bin` (TWI, oslunění se zastíněním, půda, AWC, kotliny, expozice větru), `Site`.
 - [ ] **M8.3 Dřeviny a porosty** – `dreviny.json`, druh / věk / vitalita pro každý strom z mapy, porosty, dřevo podle druhu.
 - [ ] **M8.4 Pole větru** – nárazy běžící krajinou, závětří, hierarchický ohyb, vlny přes obilí, vítr pro létání a kouř.

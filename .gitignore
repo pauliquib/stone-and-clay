@@ -18,3 +18,5 @@ pipeline/logs/
 __pycache__/
 *.pyc
 data/orig/
+# M8.1: launcher (tools/launcher.sh) – kompaktní logy z ručního hraní/měření (user si je čte / posílá)
+logs/

@@ -146,6 +146,25 @@ MultiMeshů a LOD, `--terraintest` mikroreliéf vs. kolize, wetness → shader a
 `--weather=druh` vynucené počasí (`jasno`, `polojasno`, `oblacno`, `zatazeno`, `mlha`, `prehanky`, `dest`,
 `bourka`, `snih`). Náhled modelů zvířat: `godot --path . --script res://tools/dev/zoo.gd -- --series=adresář`.
 
+**M8.1 – měřicí scény a eko-takt:** `--perfscene=<jméno>[,sekund]` (`Tests.PERF_SCENES`: `ves_poledne`,
+`les_rano_mlha`, `louka_vitr`, `udoli_noc`, `pole_leto`, `dron_200m`) teleportuje na pevné místo s pevným
+časem/počasím/kamerou a změří výkon stejně jako `--perf` (výchozí 20 s) → souhrn na konzoli +
+`user://perf/<jméno>.csv`. Každý krok M8 smí do `PERF_SCENES` přidat vlastní scénu. `World.eco_hour(dt_h)` /
+`World.eco_day(jd)` (`World.eco` = `EcoClock`, `scripts/eko/eco_clock.gd`) je jediný zdroj hodinového/denního
+kroku pro simulace M8 – nový krok se připojí přes `World.eco_hour.connect(...)`, nepočítá si vlastní „jednou
+za hodinu“ v `_process`. `World.realism` (= `GameSettings.realism`, Esc → Nastavení → „Realismus (M8)“)
+přepíná jednotlivé kroky M8 za běhu; klíče a kontrakt API mezi kroky M8 jsou v
+`prompts/roadmapa/M8_realismus/00_PRINCIPY.md` kap. 3 a 5. Ladicí vrstvy mapy (F2 → „Příroda – ladění“,
+`World.debug_layers`) kreslí stav modelu (stanoviště, vlhkost, teplota, vítr, druhy…) jako barevnou mřížku
+na mapě M, bez debuggeru.
+
+**Launcher pro ruční testování / měření (`tools/launcher.sh`, M8.1):** `tools/launcher.sh [parametry hry…]`
+spustí `./run.sh` s danými parametry (např. `--perfscene=ves_poledne`), zachytí stdout/stderr a zapíše
+kompaktní log do `logs/m8_perf_<datum_čas>.log` (+ `logs/latest.log`, oba mimo git) – tři oddíly (PERF
+souhrn, chyby/varování, ostatní výstup), opakující se hlášky deduplikované („N× stejná hláška“). Hodí se,
+když uživatel po hraní/měření jen pošle soubor z `logs/`, místo ručního přepisování čísel z konzole.
+`tools/launcher.sh --help` vypíše nápovědu bez spouštění hry.
+
 Letové hranice (M6.2, platí pro dron a budoucí letouny M6.3+ – napojení přes `World.flight_bounds(pos)`
 → `{ok, warn, push, out, agl}`): strop `World.FLY_CEIL_AGL` = 1 500 m nad terénem (měkké odepření –
 tlačí dolů), vodorovná hranice `World.FLY_LIMIT_M` = 2 km za obdélníkem detailního terénu – v pásmu

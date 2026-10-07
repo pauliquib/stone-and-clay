@@ -82,6 +82,7 @@ func attach(p: Player) -> void:
 	settings.maxfps_from_args = args.has("maxfps")
 	if not is_automated():
 		settings.load_file()
+	world.realism = settings.realism     # M8.1: stejný Dictionary – přepnutí v Nastavení platí hned i v simulaci
 	radio_view = RadioView.new(self)
 	radio_view.name = "RadioZblizka"
 	add_child(radio_view)

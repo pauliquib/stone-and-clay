@@ -70,6 +70,7 @@ func open_main() -> void:
 		_opt("Vozidla a kůň…", open_vehicles, may_tp),
 		_opt("Teleport…", open_teleport, may_tp),
 		["Příroda – kde je zvěř…", open_nature],
+		["Příroda – ladění…", open_debug_layers],
 	])
 
 
@@ -281,6 +282,26 @@ func open_nature() -> void:
 	opts.append(["Obnovit přehled", open_nature])
 	opts.append(["← Zpět", open_main])
 	_hud().open_menu("Příroda – kde je zvěř", text, opts)
+
+
+## M8.1: F2 → Příroda – ladění – vybere barevnou mřížku pro mapu M (`World.debug_layers`), ať
+## se model (stanoviště, vlhkost, teplota, vítr, druhy…) jde zkontrolovat okem bez debuggeru.
+## Popisek vrstvy: `DEBUG_LAYER_LABELS` (M8.1 jen „realism_off“; další kroky M8 svůj klíč doplní).
+const DEBUG_LAYER_LABELS := {"realism_off": "Ukázka (prázdná vrstva, M8.1)"}
+
+
+func open_debug_layers() -> void:
+	var opts := [hdr("Vrstva na mapě M")]
+	opts.append(["Vypnuto" + ("  (teď aktivní)" if _hud().map_debug_layer == "" else ""),
+		Callable(_hud(), "set_debug_layer").bind("")])
+	for key in world.debug_layers:
+		var label: String = DEBUG_LAYER_LABELS.get(key, key)
+		if _hud().map_debug_layer == key:
+			label += "  (teď aktivní)"
+		opts.append([label, Callable(_hud(), "set_debug_layer").bind(key)])
+	opts.append(["← Zpět", open_main])
+	_hud().open_menu("Příroda – ladění", "Vybraná vrstva se kreslí na mapě (M) místo podkladu – " +
+		"barevná mřížka po 16–64 m podle přiblížení. Každý krok M8 přidá svou vrstvu.", opts)
 
 
 ## Testovací náklad před hráče (M2.10): srnec, divocak, spalek, pytel, vozik.
