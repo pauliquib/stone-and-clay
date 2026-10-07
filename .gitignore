@@ -2,6 +2,8 @@
 .godot/
 # Generovaná herní data (tools/export_map.py) – velká binární data, reprodukovatelná
 data/*.bin
+# BPEJ syrová prostorová data (tools/fetch_bpej.py) – stažená geodata, reprodukovatelná
+data/bpej_raw.*
 textures/*.jpg
 textures/*.hdr
 tools/out/

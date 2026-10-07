@@ -1656,3 +1656,34 @@ M8 Realistický svět (`prompts/roadmapa/M8_realismus/00_START_M8.md`).
 - „Vítr“ ve scéně `louka_vitr` použit přes `bourka` (nejsilnější vítr z existujících typů počasí) –
   bez vyhrazeného API pro vynucenou rychlost větru (přijde až s M8.4 polem větru).
 - `EcoClock.slice()` nemá zatím žádného odběratele (M8.1 jen zakládá API) – ověří se až v M8.2+.
+
+## 2026-10-08 – Příprava dat: BPEJ pro M8.2
+
+### Hotovo (staticky ověřeno čtením kódu + reálný běh s přístupem k síti)
+- **Co**: nový `tools/fetch_bpej.py` – stáhne celostátní číselník BPEJ (kód → klimatický
+  region, hlavní půdní jednotka, výměra v ČR, cena Kč/m², bodová výnosnost, třída ochrany ZPF)
+  z veřejného eKatalogu BPEJ (VÚMOP, v. v. i. pro MZe, `https://bpej.vumop.cz/`, bez přihlášení
+  a poplatku) a uloží do `data/bpej_meta.json` (v gitu – jen číselník/dokumentace, ne geodata).
+  Reálně spuštěno: 3022 naparsovaných kódů, 10 klimatických regionů (0–9), 89 HPJ, 5 tříd
+  ochrany ZPF (I.–V.) – žádné prázdné/chybné stažení.
+- Prostorová data BPEJ (geometrie pro tento konkrétní katastr) se nástroj pokusí stáhnout, ale
+  autoritativní zdroj (SPÚ, `geoportal.spucr.cz/web/cz/bpej-open-data`, shapefile, CC BY 4.0)
+  byl v době běhu celý nedostupný (HTTP 500/timeout, ověřeno i mimo tento nástroj) a starší
+  přímý odkaz na stažení (`spu.gov.cz/...`) vede na 404 (stránka SPÚ přesunuta/zrušena). Žádný
+  jiný funkční celostátní WMS/WFS/REST zdroj s geometrií BPEJ pro tento katastr (Zlínský kraj)
+  nebyl dohledán – podrobný rozbor viz `docs/BPEJ.md`. `data/bpej_raw.*` tedy NEVZNIKLO;
+  `data/bpej_meta.json["katastr_codes"]` je `null`.
+- Dokumentace: nový `docs/BPEJ.md` (zdroj, licence, co funguje/nefunguje, co má M8.2 přečíst,
+  jak doplnit geometrii později). `.gitignore`: nová položka `data/bpej_raw.*`.
+
+### Otevřené body
+- Geometrie BPEJ pro katastr chybí (otevřený bod v `docs/BPEJ.md`) – dokud se zdroj neobnoví
+  nebo nenajde jiný funkční, M8.2 musí použít fallback z terénu+landuse (00_PRINCIPY kap. 8
+  „Půda"), ne reálné BPEJ kódy.
+- Číselník BPEJ nedává strojově čitelnou tabulku hodnot 0–9 pro 4. číslici (sklonitost+expozice)
+  a 5. číslici (skeletovitost+hloubka) – jen slovní popis na detailu každého kódu.
+- Tento přípravný krok **nemodeluje** M8.2 samotné (žádná herní mapa stanovišť) – jen podklad.
+- Poznámka pro orchestrátora: subagent běžel ve worktree s divergentní (starou/veřejnou)
+  historií repozitáře – do `main` byly ručně přeneseny jen nové soubory tohoto kroku
+  (`tools/fetch_bpej.py`, `data/bpej_meta.json`, `docs/BPEJ.md`, řádek v `.gitignore`), žádný
+  merge branche jako celku.
