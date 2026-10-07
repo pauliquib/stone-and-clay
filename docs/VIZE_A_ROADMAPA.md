@@ -527,8 +527,10 @@ kroky přehazovat, mezi milníky platí závislosti.
 - [x] **M6.5 Motorové rogalo** (a volitelně další stroje). *Hotovo: `Trike` (weight-shift hrazda – realisticky obrácená, přepínač v Nastavení), `Airfield` (polní dráha ~260 m, práh A x −440 / z 240, směr 30°, sklon ~1,4 %; rukáv + hangár + inzerát na ojetý trike 350 000 Kč), `pilot_ul`/`ul_registrace`/`ul_pojisteni` + škola 75 000 (eTest `ul` + 10 letů), přestupky `ul_*` v `zakon.json`, spolujezdec-vesničan (přátelství ≥ 60), F2 → Letiště; otevřené body (další stroje) v PROJECT_LOG.*
 
 ### M7 – Cesta na starostu (hlavní cíl hry, doplněk D4)
-- [ ] **M7.1 Popularita a kritéria** – popularita z pověsti / respektu / přátelství, kritéria kandidatury, petice,
-  protikandidát, záložka „Obec“ v deníku.
+- [x] **M7.1 Popularita a kritéria** – popularita z pověsti / respektu / přátelství, kritéria kandidatury, petice,
+  protikandidát, záložka „Obec“ v deníku. *Hotovo: `Politics` (`World.politics`), `data/volby.json` (zákon č. 491/2001 Sb.,
+  zjednodušeně, funkční období 1 461 herních dní / 4 roky, volby ve stejném intervalu), petice rozhovorem (téma
+  „petition“), protikandidát Starosta Novák + 1–2 smyšlení kandidáti.*
 - [ ] **M7.2 Kampaň a volby** – poctivé nástroje i úplatky, pomluvy a podvody s rizikem odhalení, volební den.
 - [ ] **M7.3 Vedlejší úkoly s větvením** – úkoly jako data, 15+ úkolů se 2–3 konci, řetězy postav, dopad na hlasy.
 - [ ] **M7.4 Starostování** – rozpočet, projekty s viditelnou změnou, zastupitelstvo, sliby a klam, konce příběhu.
@@ -601,7 +603,8 @@ domácích zvířat. Divočák se přepravuje jen ve dvou, autem nebo na ruční
    (povinné ručení), STK?
 2. ~~**Interiéry ostatních domů** – zamčené, nebo generované?~~ → *generované, stavěné jen zblízka (M1.8, doplněk D3) – hotovo: `InteriorGen` + `InteriorStreamer`, cizí domy zamčené s klepáním.*
 6. **Bytový dům pro start (M1.7)** – který dům v obci (návrh: největší obytná budova s více podlažími)?
-7. **Termín prvních voleb (M7.1)** – návrh po 60 herních dnech, další po 120; ok?
+7. ~~**Termín prvních voleb (M7.1)** – návrh po 60 herních dnech, další po 120; ok?~~ → *rozhodnuto: funkční období
+   1 461 herních dní (4 roky), plně realistické dle ČR; volby se opakují ve stejném intervalu (`data/volby.json`).*
 3. **U-rampa** – hotová od začátku, nebo si ji hráč postaví z materiálu ze stavebnin?
 4. ~~**Létání** – jak vysoko a jak daleko za hranici katastru se smí letět?~~ → *rozhodnuto (M6.2): strop 1 500 m nad terénem, hranice 2 km za katastrem s měkkým odpuzením (`World.FLY_*`).*
 5. **Úrovně dovedností** – souhlas s rozsahem 1–50?

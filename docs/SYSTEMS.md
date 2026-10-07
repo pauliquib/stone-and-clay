@@ -431,7 +431,18 @@
   peníze, inventář, tělo, zákaz řízení, pátrání), vozidla a koně, úkoly, pověst, sebrané předměty, skóre
   a nálady postav, zaměstnání (M3.1; M3.3 i varianta směn a rozdělaná zakázka), obecní údržba – posekaná tráva, odklizený sníh, lavička, odpadky (M3.2),
   vyznačené stromy a hromada dřeva lesního dělníka (M3.3, klíč `les`), počítač (M3.4, klíč `pc`: účet, pohyby, trvalý příkaz, pošta,
-  objednávky a balíky u dveří, drby, výsledky eTestů; v `jobs` i výplata na účet a pozvánky na pohovor). Rozdělaný úkol se po načtení vrátí do nabídky. `--load=slot` načte pozici po startu.
+  objednávky a balíky u dveří, drby, výsledky eTestů; v `jobs` i výplata na účet a pozvánky na pohovor; v `politics` termín voleb,
+  protikandidát a podpisy petice, M7.1). Rozdělaný úkol se po načtení vrátí do nabídky. `--load=slot` načte pozici po startu.
+- **Cesta na starostu** (M7.1, `politics.gd` `Politics` = `World.politics`, zjednodušený volební zákon `data/volby.json`):
+  hlavní cíl hry – **popularita** 0–100 % (`popularity(pid)`) z pověsti (45 %), respektu komunit váhovaného počtem jejich
+  členů (35 %) a přátelství s postavami (20 %); skrytý **klam** (háček pro M7.2 – podplácení, podvody) popularitu uměle
+  zvedá. Bez Výřečnosti ≥ 5 vidí hráč jen slovní odhad, s ní i přesné %. Kritéria kandidatury: trvalý pobyt (M1.7, splněno
+  od začátku), bez odsouzení za úmyslný trestný čin v posledních letech (`World.law[pid].criminal_record()`), petice –
+  podpisy postav v rozhovoru (téma „petition“: „podepíšeš mi petici?“, podepíše podle vřelosti – `attitude`, 1× na postavu).
+  Funkční období **1 461 herních dní (4 roky)**, volby se opakují ve stejném intervalu; první termín vychází z reálného
+  cyklu komunálních voleb v ČR (první pátek října, roky ≡ 2 mod 4). Protikandidát **Starosta Novák** + 1–2 smyšlení
+  kandidáti (losují se podle hry), popularita soupeřů pomalu kolísá. Deník J → oddíl „Obec“: popularita, bloky voličů,
+  kritéria, termín voleb, 3 „přání obce“. Registrace kandidatury, kampaň, úplatky a volební den: M7.2.
 
 ## Co ve hře je
 

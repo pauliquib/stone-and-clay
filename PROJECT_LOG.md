@@ -1316,3 +1316,48 @@ dřeva a vývraty po bouři, vazba na houby a zvěř.
 - Před M8: rozhodnutí uživatele z `00_START_M8.md` (offline generátory, testování po vlnách, měření výkonu, BPEJ).
 - M8 pravidlo „agent smí spustit offline generátor“ je **návrh** – platí jen po souhlasu uživatele na startu M8.
 - Kroky M5 jsou v `prompts/roadmapa/README.md` stále `[ ]` (čekají na ruční test M5 – beze změny).
+
+## 2026-10-07 – M7.1 Popularita a kritéria kandidatury
+
+### Hotovo (staticky ověřeno čtením kódu a `godot --check-only` – ruční test čeká)
+- **`scripts/politics.gd`** (nová třída `Politics`, `World.politics`): popularita 0–100 % (`popularity(pid)` – 45 % pověst
+  `Reputation.score`, 35 % respekt komunit váhovaný počtem jejich členů podle `Characters.PROFILES` → `Reputation.community_of`,
+  20 % průměrné přátelství z `World.personas()`; skrytý **klam** `deceit` je zatím jen háček pro M7.2 – podplácení a podvody).
+  Slovní odhad (`popularity_word`) vždy, přesné % (`popularity_text`) až od Výřečnosti 5 (`POP_SKILL_LEVEL`).
+  Kritéria kandidatury (`criteria(pid)`): trvalý pobyt (`World.estate.home_estate`, splněno od začátku, M1.7), bez odsouzení za
+  úmyslný trestný čin v posledních letech (`World.law[pid].criminal_record()`, zjednodušeno), podpisy petice (15/15, `data/volby.json`).
+  Termín voleb: **1 461 herních dní (4 roky)**, volby se opakují ve stejném intervalu (uživatelovo rozhodnutí nahrazuje starý
+  návrh 60/120 dní v README i VIZE – opraveno). První termín: nejbližší reálný cyklus komunálních voleb v ČR (první pátek
+  října, roky ≡ 2 mod 4), `_first_election_jd`. Protikandidát **Starosta Novák** (už existoval jako NPC u úřadu) + 1–2 smyšlení
+  kandidáti vylosovaní podle hry (`OTHER_CANDIDATES`), popularita soupeřů denní náhodnou procházkou (`tick`, volá se z
+  `World._process_impl`); přesná vazba na konkrétní události (skandály, opravy) je otevřený bod pro M7.3.
+- **`data/volby.json`**: zjednodušený zákon č. 491/2001 Sb., o volbách do zastupitelstev obcí – u každého čísla (funkční období,
+  % petice, lhůta registrace 66 dní, moratorium, roky bez odsouzení) paragraf a poznámka „ověřit aktuální znění“; kauce 0 Kč
+  s vysvětlením, že reálný zákon pro obecní volby žádnou nevyžaduje; katalog 10 „přání obce“ (3 se vylosují na hru).
+- **Petice rozhovorem**: nové téma `"petition"` v `DialogThemes.THEMES` (klíčová slova „petice“, „podepsat“, „kandiduj“…) – auto-
+  registrované jako záměr (`Dialog._words/_order` už to umí přes existující mechanismus pro nová témata, žádný zásah do `WORDS` /
+  `INTENT_ORDER` nebyl potřeba). Skutečný podpis řeší `Politics.sign_petition(pid, per, attitude)` z `World._apply_reply` (signatura
+  rozšířena o `ctx`, aby byla po ruce stejná hodnota `attitude` jako v `dialog_context`); postava podepíše podle vřelosti
+  (`attitude >= 0`), každá jen jednou (`signers[pid]`).
+- **Deník J → „Obec“**: `Hud._politics_bbcode()` (nová funkce na konci `hud.gd`, zavolaná jedním řádkem v `_journal_bbcode()`) –
+  popularita, kdo vede (protikandidát / hráč), okrajoví kandidáti, datum a odpočet dní do voleb, stav registrace kandidátky,
+  kritéria (✓/✗), podpisy X/Y, 3 přání obce.
+- **Ukládání**: `save_game.gd` – `d["politics"] = world.politics.to_dict(id)` / `world.politics.from_dict(id, …)` (starý save bez
+  klíče = nová kandidatura s výchozím termínem, 0 podpisů).
+- Dokumentace: `docs/SYSTEMS.md` (nový bod „Cesta na starostu“ + doplněk v bodu „Ukládání“), `docs/VIZE_A_ROADMAPA.md`
+  (M7.1 odškrtnuto, oprava otevřené otázky č. 7 a mapovací řádek D4), `prompts/roadmapa/README.md` (M7.1 odškrtnuto, oprava
+  řádku „Rozhodnutí, která budou potřeba od uživatele“ na 1 461 dní).
+- Kontrola překladu: `godot --headless --check-only` na `politics.gd`, `world.gd`, `dialog_themes.gd`, `hud.gd`, `save_game.gd` –
+  bez chyb (plné `--import` se v tomto worktree zacyklilo na nesouvisejících SVG ikonách addonu LimboAI, nejde o tento krok).
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M7.md`, po celém M7, ne jen po tomto kroku).
+- Registrace kandidatury samotná (po splnění kritérií) a kampaň (poctivá i nečestná, úplatky, pomluvy) jsou M7.2 – tady jen
+  data a sledování stavu. `deceit` je připravené pole bez jediného místa, které by ho měnilo (M7.2 doplní).
+- Vazba popularity protikandidáta na konkrétní události obce (díry v silnici, skandály, opravy) je zatím jen náhodná procházka –
+  přesnější napojení je otevřený bod pro M7.3/M7.4.
+- Nástěnka obce / web obce (`VillageEvents.register`, `Computer` úřední deska) zatím o blížících se volbách nic nepíší – vazba
+  by potřebovala `Politics` existovat už při `VillageEvents.setup()` (dřív než první hráč); necháno jako nápad pro M7.2.
+- Tento worktree byl při startu výrazně za `main` (jiná, stará historie) – první krok byl neformátovatelný `merge --ff-only`,
+  proveden běžný `git merge main` s jedním konfliktem v `README.md` (vyřešen ve prospěch verze z `main`); zmínka pro orchestrátora,
+  ne chyba tohoto kroku.

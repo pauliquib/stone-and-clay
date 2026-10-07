@@ -91,6 +91,7 @@ var jobs := {}                   # id → Jobs (zaměstnání, směny, docházka
 var favors: Favors               # prosby vesničanů a dobré skutky (M4.5), stav per hráč
 var debts: Debts                 # dluhy a pokuty (M4.2): bloková složenka, příkaz poštou, upomínka, exekuce; stav per hráč
 var court: Court                 # soud a vězení (M4.3): obvinění, předvolání, jednání, rozsudek; stav per hráč
+var politics: Politics           # cesta na starostu (M7.1): popularita, kritéria kandidatury, petice, protikandidát
 var action_runner: ActionRunner  # výběr cíle a průběh kontextových akcí (M0.4)
 var sleep_spots: Array[SleepSpot] = []
 var clients := {}                # id → LocalClient (jen hráči na tomto počítači)
@@ -533,6 +534,9 @@ func add_player(id: int, pos: Vector3, yaw: float) -> Player:
 		court = Court.new()
 		add_child(court)
 		court.setup(self)
+	if politics == null:          # M7.1: cesta na starostu (jedna instance; termín voleb a protikandidát společné, popularita per hráč)
+		politics = Politics.new()
+		politics.setup(self)
 	if gamekeeper == null:        # M4.6: hajný a rybářská stráž (jedna instance každá; svědci přes add_witness_source)
 		gamekeeper = Gamekeeper.new()
 		add_child(gamekeeper)
@@ -1598,6 +1602,7 @@ func emit_game_event(id: int, kind: String, data: Dictionary) -> void:
 		jb.on_event(kind, data)      # M3.1: úkoly směny (action_done), pití v práci, zadržení → výpověď
 	if computer:
 		computer.on_event(id, kind, data)   # M3.4: drby na webu obce, výzvy k zaplacení pokuty, upomínky e-mailem
+	# politics (M7.1) nemá on_event – popularita se čte na požádání z Reputation / Persona, viz Politics.popularity
 
 
 ## Pošle hráči e-mail (M3.4, čte se na počítači doma – Pošta). Pro práci, zákon, události v obci, obchody…
@@ -2994,7 +2999,7 @@ func player_say(id: int, raw: String) -> void:
 	await get_tree().create_timer(0.8).timeout
 	if not is_instance_valid(target) or not players.has(id):
 		return
-	_apply_reply(id, target, r)
+	_apply_reply(id, target, r, ctx)
 	# svědci urážky / vyhrůžky
 	if r["intent"] in ["insult", "threat"]:
 		for w in who:
@@ -3009,9 +3014,13 @@ func player_say(id: int, raw: String) -> void:
 
 
 ## Odpověď postavy: bublina, zápis do rozhovoru v HUD, nálada, pověst, pokuta, přivolání policie.
-func _apply_reply(id: int, target: Node3D, r: Dictionary) -> void:
+func _apply_reply(id: int, target: Node3D, r: Dictionary, ctx: Dictionary) -> void:
 	var per: Persona = target.get("persona")
 	var txt: String = r["text"]
+	if String(r["intent"]) == "petition" and politics:    # M7.1: podpis petice za kandidaturu
+		var pr := politics.sign_petition(id, per, float(ctx.get("attitude", 0.0)))
+		if String(pr.get("text", "")) != "":
+			txt += " " + String(pr["text"])
 	target.say(txt, clampf(2.0 + txt.length() / 14.0, 3.5, 9.0))
 	per.add_mood(id, float(r["mood"]), clock.minutes)
 	per.met[id] = true
@@ -3792,6 +3801,8 @@ func _process_impl(_delta: float) -> void:
 		debts.advance_to(clock.jd())
 	if court:                     # M4.3: předvolání, jednání u soudu, nepřítomnost
 		court.tick()
+	if clock and politics:        # M7.1: denní procházka popularity protikandidáta, oznámení blížících se voleb
+		politics.tick(clock.jd())
 	_season_t -= _delta
 	if _season_t <= 0.0:
 		_season_t = SEASON_CHECK_S
