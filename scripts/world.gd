@@ -93,6 +93,7 @@ var debts: Debts                 # dluhy a pokuty (M4.2): bloková složenka, p�
 var court: Court                 # soud a vězení (M4.3): obvinění, předvolání, jednání, rozsudek; stav per hráč
 var politics: Politics           # cesta na starostu (M7.1): popularita, kritéria kandidatury, petice, protikandidát
 var campaign: Campaign           # M7.2: kampaň a volby (mítinky, letáky, úplatky, pomluvy, podvody), stav per hráč
+var mayor_office: MayorOffice    # M7.4: rozpočet obce, projekty, zastupitelstvo, korupce a konce příběhu starosty
 var street_mailboxes: Array[Vector3] = []   # M7.2: pozice `Prop` poštovních schránek podél silnic (`_spawn_props`), roznos letáků
 var action_runner: ActionRunner  # výběr cíle a průběh kontextových akcí (M0.4)
 var sleep_spots: Array[SleepSpot] = []
@@ -542,6 +543,9 @@ func add_player(id: int, pos: Vector3, yaw: float) -> Player:
 	if campaign == null:          # M7.2: kampaň a volby (jedna instance, stav per hráč)
 		campaign = Campaign.new()
 		campaign.setup(self)
+	if mayor_office == null:      # M7.4: rozpočet obce, projekty, zastupitelstvo (jedna instance, obecní stav + korupce per hráč)
+		mayor_office = MayorOffice.new()
+		mayor_office.setup(self)
 	if gamekeeper == null:        # M4.6: hajný a rybářská stráž (jedna instance každá; svědci přes add_witness_source)
 		gamekeeper = Gamekeeper.new()
 		add_child(gamekeeper)
@@ -2742,6 +2746,8 @@ func interactables(id: int) -> Array:
 		out.append_array(computer.interactables(id))    # bankomaty, balíky z e-shopu u dveří (M3.4)
 	if campaign:
 		out.append_array(campaign.interactables(id))    # M7.2: mítink, letáky do schránek, zfalšovaný podpis
+	if mayor_office:
+		out.append_array(mayor_office.interactables(id))   # M7.4: kancelář starosty u přepážky úřadu (jen starosta/ka)
 	out.append_array(drone_interactables(id))          # M6.1: sebrání zaparkovaného / rozbitého dronu
 	out.append_array(paramotor_interactables(id))      # M6.4: složení křídla paramotoru
 	if airfield:
@@ -3822,6 +3828,8 @@ func _process_impl(_delta: float) -> void:
 		court.tick()
 	if clock and politics:        # M7.1: denní procházka popularity protikandidáta, oznámení blížících se voleb
 		politics.tick(clock.jd())
+	if clock and mayor_office:    # M7.4: měsíční rozpočet, projekty, nabídky úplatků (jen když je hráč starostou)
+		mayor_office.tick(clock.jd())
 	_season_t -= _delta
 	if _season_t <= 0.0:
 		_season_t = SEASON_CHECK_S

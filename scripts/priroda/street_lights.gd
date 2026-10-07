@@ -211,7 +211,9 @@ func _process(delta: float) -> void:
 		return
 	var night := _clock.is_night()
 	var h := _clock.hour()
-	var saving := h >= NIGHT_SAVE_FROM and h < NIGHT_SAVE_TO
+	# M7.4: po dokončení projektu obce „veřejné osvětlení celou noc“ (`MayorOffice.bright_village`)
+	# se úsporný režim (každá druhá lampa zhasnutá 0–4 h) nepoužívá.
+	var saving := (h >= NIGHT_SAVE_FROM and h < NIGHT_SAVE_TO) and not MayorOffice.bright_village
 	var head_mm := _heads.multimesh
 	for k in _lvl.size():
 		var want := 1.0 if (night and not (saving and k % 2 == 1)) else 0.0

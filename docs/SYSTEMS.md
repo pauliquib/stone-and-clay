@@ -440,7 +440,8 @@
   a nálady postav, zaměstnání (M3.1; M3.3 i varianta směn a rozdělaná zakázka), obecní údržba – posekaná tráva, odklizený sníh, lavička, odpadky (M3.2),
   vyznačené stromy a hromada dřeva lesního dělníka (M3.3, klíč `les`), počítač (M3.4, klíč `pc`: účet, pohyby, trvalý příkaz, pošta,
   objednávky a balíky u dveří, drby, výsledky eTestů; v `jobs` i výplata na účet a pozvánky na pohovor; v `politics` termín voleb,
-  protikandidát a podpisy petice (M7.1), v `campaign` mítinky, sliby bez krytí, úplatky a příběh kampaně (M7.2).
+  protikandidát a podpisy petice (M7.1), v `campaign` mítinky, sliby bez krytí, úplatky a příběh kampaně (M7.2),
+  v `mayor_office` rozpočet obce, rozjednaný/hotové projekty, zastupitelstvo a konec příběhu (M7.4).
   Rozdělaný úkol se po načtení vrátí do nabídky. `--load=slot` načte pozici po startu.
 - **Cesta na starostu** (M7.1, `politics.gd` `Politics` = `World.politics`, zjednodušený volební zákon `data/volby.json`):
   hlavní cíl hry – **popularita** 0–100 % (`popularity(pid)`) z pověsti (45 %), respektu komunit váhovaného počtem jejich
@@ -467,6 +468,20 @@
   a soupeřů (s šumem), vyhlásí výsledek na úřadě (`open_menu`). Výhra = `Politics.mayor[pid]` (čte M7.4),
   prohra = nová kandidatura (nová přání, soupeři) za 120 herních dní (`data/volby.json`). Deník J → „Obec“:
   oddíl „Příběh kampaně“ (poslední záznamy, dluh slibů). Ukládání: klíč `campaign` v `SaveGame`.
+- **Starostování** (M7.4, `mayor_office.gd` `MayorOffice` = `World.mayor_office`): po zvolení (`Politics.is_mayor`)
+  přibude u přepážky úřadu (otevírací doba) interakce „Kancelář starosty“ – **rozpočet** (měsíční krok:
+  daně + dotace + pronájem obecních pozemků z M4.7 výkupu parcel, minus údržba, `treasury`), **5 projektů**
+  (`MayorOffice.PROJECTS`: silnice – malý bonus přilnavosti na asfaltu v `car.gd` + cedule, lavičky – 3 nové
+  `Prop` u úřadu, veřejné osvětlení celou noc – `priroda/street_lights.gd` bez noční úspory, zastávka – lavička
+  + cedule u hospody, hasičárna – cedule u zbrojnice; jen jeden najednou, respekt komunity + splátka jednoho
+  nekrytého slibu z kampaně po dokončení), **zastupitelstvo** (2–3 body/měsíc z `COUNCIL_TOPICS`, hlasování
+  ANO/NE – zastupitelé loajální popularitě hráče ho přehlasují méně často), **sliby a klam** (nevyřešené
+  `Campaign.promises` občas strhnou pověst – drby), **úplatky od podnikatelů** (smyšlení, anonymní – přijetí
+  = peníze + riziko odhalení, `World.commit_offense("korupce")`, `data/zakon.json` → soud M4.3). **Konce
+  příběhu** (`on_term_end`, voláno z `Campaign.resolve_election()` před přepsáním `Politics.mayor`): padlý
+  starosta (odsouzení), šedá eminence (brala úplatky beze odsouzení), starosta proti své vůli (hodně
+  nekrytých slibů a nízká popularita), oblíbený starosta (znovuzvolení beze skandálu) – jen oznamovací scéna,
+  hra pokračuje. Ukládání: klíč `mayor_office` v `SaveGame`.
 
 ## Co ve hře je
 

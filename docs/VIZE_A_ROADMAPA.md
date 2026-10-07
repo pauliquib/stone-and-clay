@@ -541,7 +541,12 @@ kroky přehazovat, mezi milníky platí závislosti.
   *Hotovo (minimum): 10 nových úkolů se 2 konci (vrátit/nechat si, udat/krýt, poctivě/nečestně…), nabídka
   rozhovorem i u místa, dopad na respekt komunit, karmu a pověst (→ popularita). Otevřeno: 15+ úkolů,
   3. konce, řetězy postav – viz `PROJECT_LOG.md`.*
-- [ ] **M7.4 Starostování** – rozpočet, projekty s viditelnou změnou, zastupitelstvo, sliby a klam, konce příběhu.
+- [x] **M7.4 Starostování** – rozpočet, projekty s viditelnou změnou, zastupitelstvo, sliby a klam, konce příběhu.
+  *Hotovo: `MayorOffice` (`World.mayor_office`) – měsíční rozpočet (daně, dotace, pronájem obecních pozemků
+  z M4.7, údržba), 5 projektů (silnice, lavičky, veřejné osvětlení celou noc, zastávka, hasičárna) s respektem
+  komunity a viditelnou změnou ve světě, zastupitelstvo (2–3 body/měsíc, hlasování podle popularity), nesplněné
+  sliby z kampaně strhávají pověst a jde je splatit projektem, úplatky od podnikatelů s rizikem odhalení
+  (`commit_offense("korupce")` → soud M4.3), 4 konce příběhu (`ENDINGS`) při konci mandátu.*
 
 ### M8 – Realistický svět (transformační upgrade, E14, po M7)
 Start: `prompts/roadmapa/M8_realismus/00_START_M8.md` (orchestrátor, 8 vln), společné principy `00_PRINCIPY.md`.
