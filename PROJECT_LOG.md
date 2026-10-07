@@ -1486,3 +1486,75 @@ dřeva a vývraty po bouři, vazba na houby a zvěř.
   hlas a `Politics.tick()` náhodnou procházku soupeřů z M7.1; návrh nových náhodných událostí kampaně patří M7.3.
 - `Politics.reroll_for_new_term()` čistí podpisy petice pro všechny hráče (`signatures.clear()`), ne jen pro
   toho, kdo prohrál – v singleplayeru bez dopadu, při budoucím multiplayeru (V2) by to potřebovalo per-hráče klíč.
+
+## 2026-10-07 – M7.4 Starostování a konce příběhu (poslední krok M7 – milník uzavřen)
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Nová třída `mayor_office.gd` `MayorOffice` = `World.mayor_office`** (jedna instance; rozpočet, rozjednaný/hotové
+  projekty a agenda zastupitelstva jsou OBECNÍ/globální – obec má jeden rozpočet –, korupce a konec příběhu jsou
+  per hráč). Napojeno na `World.politics` (`Politics.is_mayor`, `popularity`, `clean_record`, `add_deceit`) a
+  `World.campaign` (`Campaign.promises` = dluh slibů bez krytí z M7.2, nová veřejná `Campaign.fulfill_promise(pid, text)`).
+- **Kancelář starosty**: nová interakce u přepážky úřadu (stejné dveře jako M7.1/M7.2, otevírací doba), zobrazí se
+  jen zvolenému starostovi/starostce (`Politics.is_mayor`); interiér s pracovním stolem a knihovnou „kancelář
+  starosty“ v `public_interiors.gd` už existoval od M1.5 – beze změny.
+- **Rozpočet** (`_monthly_step`, 1×/herní měsíc přes `Clock.from_jdn`): příjmy = paušál daní + státní dotace +
+  pronájem obecních pozemků (`World.katastr.parcel_owner == "obec"`, výkup parcely obcí z M4.7 × Kč/parcelu/měsíc),
+  výdaje = běžná údržba + údržba hotových projektů; zůstatek `treasury` (Kč), popup starostovi při každém kroku.
+- **5 projektů** (`MayorOffice.PROJECTS`, jen jeden najednou, cena se strhne hned při spuštění): silnice (malý
+  bonus přilnavosti na asfaltu – `MayorOffice.road_grip_bonus`, čte `car.gd._surface_grip` přes statickou
+  proměnnou, bez drátování reference `World` do `car.gd` – + cedule u Potravin), lavičky (3 nové `Prop` „lavicka“
+  u úřadu), veřejné osvětlení celou noc (`MayorOffice.bright_village`, čte `priroda/street_lights.gd` – noční
+  úsporný režim 0–4 h se nepoužije), zastávka (lavička + cedule u hospody), hasičárna (cedule u zbrojnice SDH,
+  `World.hasici.door()`). Dokončení: respekt dané komunity (`Reputation.change_respect`) + splátka jednoho
+  nekrytého slibu z kampaně (`Campaign.fulfill_promise`) + popup. Viditelné změny se znovu postaví i po načtení
+  uloženého stavu (`from_dict` → `_apply_visual` pro každý už hotový projekt – nejsou to uložené scény).
+- **Zastupitelstvo**: nová agenda 2–3 bodů/měsíc z fondu `COUNCIL_TOPICS` (prodej pozemku, tancovačka do rána,
+  zákaz parkování na návsi, dotace hasičům, poplatky, pronájem hřiště – smyšlené, satira bez reálné obce).
+  Hlasování ANO/NE: pravděpodobnost, že zastupitelstvo hráče nepřehlasuje, roste s `Politics.popularity(pid)`
+  (zjednodušeně „vztah k hráči“); efekt na pokladnu a respekt komunity podle výsledku.
+- **Sliby a klam**: nevyřešený `Campaign.promises[pid]` občas (25 %/měsíc) strhne pověst a přijde drb v deníku;
+  řeší se jen dokončením projektu (`fulfill_promise`), ne časem samo.
+- **Úplatky od podnikatelů**: anonymní smyšlená nabídka (žádná reálná firma), šance/měsíc, jen když je hráč
+  starostou. Přijetí = peníze + skrytý klam (`Politics.add_deceit`) + riziko odhalení; odmítnutí/udání = malá
+  karma/respekt navíc. Odhalení = skandál (pověst −18, klam −25) + nový přestupek **`korupce`** v `data/zakon.json`
+  (trestný čin, `misto: "soud"`, satira – NEOVĚŘENO jako ostatní paragrafy) → `World.commit_offense` → soud M4.3.
+- **Konce příběhu** (`MayorOffice.on_term_end`, voláno z `Campaign.resolve_election()` těsně před přepsáním
+  `Politics.mayor[pid]`, takže `Politics.is_mayor(pid)` tam ještě znamená „byl(a) starostou“): „padlý starosta“
+  (odsouzení – `Politics.clean_record(pid)` false), „šedá eminence“ (brala úplatky za mandát, ale beze
+  odsouzení), „starosta proti své vůli“ (≥ 3 nekryté sliby a popularita < 40 %), „oblíbený starosta“
+  (znovuzvolení beze skandálu) – jen oznamovací scéna (`open_menu`), hra pokračuje dál (nový mandát/kandidatura
+  řeší `Politics`/`Campaign` samy jako dřív).
+- **Deník J → „Obec“**: nový oddíl „Starostování“ připojený v `Politics.journal_bbcode()` (pokladna, rozjednaný/
+  hotové projekty, čekající zastupitelstvo, čekající nabídka úplatku; po skončení mandátu místo toho text
+  posledního konce příběhu).
+- **Ukládání**: nový klíč `d["mayor_office"]` na konci sekce v `save_game.gd` (save i load, starý save bez klíče
+  = čistý rozpočet, žádný projekt, žádná korupce).
+- **Drobné doplňky**: `computer.gd` `NOTICE_BOARD` – položka „Volby do zastupitelstva“ už neříká „(Připravujeme.)“,
+  odkazuje na přepážku úřadu.
+- Dokumentace: `docs/SYSTEMS.md` (nový bod „Starostování“ + doplněk u „Ukládání“), `docs/VIZE_A_ROADMAPA.md` a
+  `prompts/roadmapa/README.md` (M7.4 odškrtnuto → **celé M7 hotové**).
+- Kontrola překladu: `godot --headless --import` bez nových chyb (zbylé hlášky jsou z `addons/func_godot`,
+  `addons/godot_state_charts` a neimportovaného `hospoda.map` – existují beze změny tohoto kroku). Oprava jedné
+  vlastní chyby před commitem: `Cannot infer the type of "p"` v `MayorOffice._spawn_benches` (součet `Vector3 +
+  Variant` z neotypovaného `Array` – opraveno `Array[Vector3]` + explicitní `var p: Vector3`). `--check-only`
+  na `mayor_office.gd`, `world.gd`, `politics.gd`, `campaign.gd`, `save_game.gd`, `car.gd`,
+  `priroda/street_lights.gd`, `computer.gd` bez chyby.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M7.md`, oddíl M7.4 – **testuje se až po celém M7**).
+- **Zjednodušení rozpočtu**: žádná vazba na konkrétní ceny ze hry (nájmy bytů, pokuty z `Debts`) – jen paušály
+  + pronájem obecních pozemků z M4.7. Reálnější provázání (např. část pokut do obecního rozpočtu) by šlo doplnit
+  později beze změny uloženého formátu.
+- **„Starosta proti své vůli“** se vyhodnocuje jen na konci mandátu (při `resolve_election`), ne jako průběžný
+  stav, i když popis v promptu zní spíš jako stav „za chodu“ – zjednodušeno kvůli rozsahu kroku; otevřený bod
+  pro případné rozšíření (např. průběžné varování při záporné pokladně víc měsíců v řadě).
+- **„Šedá eminence“** se počítá podle `corrupt_count > 0` bez ohledu na to, jestli korupce ještě čeká na soud
+  (`Court`, M4.3) v době konce mandátu – pokud by soud dojel odsouzení až po vyhodnocení konce, hráč by o tom
+  „padlý starosta“ retroaktivně nezjistil; mechanika soudu/odvolání samotného starosty uprostřed mandátu (ne
+  jen na konci) nebyla implementována – necháno jako nápad pro budoucí rozšíření.
+- **Kompromat na protikandidáta a podpora spolků** (z `02_kampan_a_volby.md`, přenesené jako nápad do M7.4) ani
+  **debata s protikandidátem** nebyly doplněny – nad rámec „Minima“ tohoto kroku.
+- Projekty mají jen jeden běžící najednou (žádná fronta/paralelní výstavba) – jednodušší UI, menší rozsah kódu.
+- Zastávka/lavičky/cedule se spawnují jako samostatné uzly přímo pod `World` (`world.add_child`) – při smazání
+  jedné z nich (např. budoucí editor) by `from_dict` po načtení vytvořil duplicitní kopie; pro singleplayer bez
+  mazání objektů to nevadí, ale stojí to za zapsání pro V2/editor map.

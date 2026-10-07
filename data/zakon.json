@@ -206,6 +206,9 @@
    "poznamka": "NEOVĚŘENO – M7.2 herní satira (žádná reálná volba, strana ani osoba); ověřit aktuální znění trestního zákoníku. Odsouzení (Court, M4.3) vyřadí z kandidatury přes `Politics.clean_record`."},
   "volebni_podvod": {"nazev": "Volební podvod (lživá pomluva, zfalšované podpisy)", "drb": "šířil lži o protikandidátovi nebo falšoval podpisy petice", "karma": -4, "zakon": "40/2009 Sb.", "par": "§ 351 (ověřit)",
    "pokuta": [15000, 80000], "body": 0, "trestny_cin": true, "misto": "soud",
-   "poznamka": "NEOVĚŘENO – M7.2 herní satira; ověřit aktuální znění trestního zákoníku. Odsouzení (Court, M4.3) vyřadí z kandidatury přes `Politics.clean_record`."}
+   "poznamka": "NEOVĚŘENO – M7.2 herní satira; ověřit aktuální znění trestního zákoníku. Odsouzení (Court, M4.3) vyřadí z kandidatury přes `Politics.clean_record`."},
+  "korupce": {"nazev": "Přijetí úplatku (starosta/starostka)", "drb": "jako starosta brala úplatky od podnikatelů", "karma": -6, "zakon": "40/2009 Sb.", "par": "§ 331 (ověřit)",
+   "pokuta": [30000, 150000], "body": 0, "trestny_cin": true, "misto": "soud",
+   "poznamka": "NEOVĚŘENO – M7.4 herní satira (smyšlený podnikatel, žádná reálná obec ani osoba); ověřit aktuální znění trestního zákoníku. Odsouzení (Court, M4.3) = konec příběhu „padlý starosta“ (`MayorOffice.on_term_end`, `Politics.clean_record`)."}
  }
 }

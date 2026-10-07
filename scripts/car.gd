@@ -1338,9 +1338,12 @@ func _surface_grip(w: Wheel) -> float:
 	if b == null:
 		return 1.0
 	var s: String = b.get_meta("surface", "")
+	# M7.4: obec po projektu „oprava silnice“ opravila výmoly na asfaltu – malý bonus přilnavosti
+	# (statická proměnná, bez drátování referencí World → MayorOffice do `car.gd`).
+	var bonus := MayorOffice.road_grip_bonus if s == "asfalt" else 0.0
 	if weather != null:
-		return weather.surface_grip(s)        # mokro / sníh / náledí / bahno
-	return float(Weather.SURF_GRIP.get(s, 0.9))      # bez počasí (test) – suchá tabulka
+		return weather.surface_grip(s) + bonus        # mokro / sníh / náledí / bahno
+	return float(Weather.SURF_GRIP.get(s, 0.9)) + bonus      # bez počasí (test) – suchá tabulka
 
 
 # ------------------------------------------------------------------ nárazy

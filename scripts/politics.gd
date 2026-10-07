@@ -306,6 +306,8 @@ func journal_bbcode(pid: int) -> String:
 		s += "\n[color=#9f9][b]Jsi starostou/starostkou obce.[/b][/color]\n"
 	if world.campaign:         # M7.2: mítinky, letáky, úplatky, pomluvy – „Příběh kampaně“
 		s += world.campaign.journal_section(pid)
+	if world.mayor_office:     # M7.4: rozpočet, projekty, zastupitelstvo, konec příběhu
+		s += world.mayor_office.journal_section(pid)
 	return s
 
 

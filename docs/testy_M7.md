@@ -86,3 +86,30 @@
    (stejné chování jako staré úkoly – rozdělaný se při načtení resetuje na „available“, bez pádu).
 10. `godot --headless --check-only` na `scripts/quests.gd` a `scripts/quest_data.gd` bez chyby
     (ověřeno před commitem – informační bod).
+
+## M7.4 Starostování a konce příběhu
+
+> Poslední krok M7 – po tomto kroku se celý milník uzavírá. `MayorOffice` (`World.mayor_office`): rozpočet,
+> 5 projektů s viditelnou změnou, zastupitelstvo, sliby a klam, úplatky od podnikatelů, 4 konce příběhu.
+
+1. F2 cheat → vyhrát volby (nebo počkat na výsledek z M7.2) → u přepážky úřadu (otevírací doba) přibude
+   nabídka „Kancelář starosty (rozpočet, projekty, zastupitelstvo)“ – u jiného hráče / bez vítězství se
+   nenabízí.
+2. Kancelář starosty → Rozpočet → vidět zůstatek pokladny obce; na začátku měsíce (F2 přeskočit čas) popup
+   s příjmy/výdaji.
+3. Projekty → spustit „Nové lavičky“ (nejlevnější) → po uplynutí doby (F2 přeskočit čas) se u úřadu objeví
+   3 nové lavičky a popup „Projekt hotový“; respekt sousedů v deníku stoupl.
+4. Spustit „Oprava silnice“ → po dokončení cedule u Potravin a auto má na asfaltu nepatrně lepší přilnavost
+   (těžko postřehnutelné za volantem, ověřit spíš čtením `MayorOffice.road_grip_bonus` v deníku/konzoli).
+5. Spustit „Veřejné osvětlení celou noc“ → po dokončení v noci 0–4 h nezhasíná žádná druhá lampa (dřív ano).
+6. Zastupitelstvo (po měsíčním kroku) → vybrat bod, zvolit ANO/NE → popup s výsledkem (případně „přehlasovali
+   tě“ při nízké popularitě) a odpovídající změna respektu/pokladny.
+7. Dřív v kampani (M7.2) slíbit „bez krytí“ a nedokončit projekt dlouho → občas (ne každý měsíc) popup
+   o drbech a pokles pověsti; po dokončení libovolného projektu klesne „Dluh slibů“ v deníku o 1.
+8. Kancelář starosty → když je k dispozici „Podnikatel s nabídkou“ → přijmout úplatek → +20 000 Kč, riziko
+   skandálu (při odhalení popup „Skandál!“, pokles pověsti, případ u soudu M4.3).
+9. Prohrát/dokončit mandát s odsouzením za „korupce“ → při vyhlášení výsledků voleb navíc okno s koncem
+   příběhu „Padlý starosta“; bez korupce a se znovuzvolením naopak „Oblíbený starosta“.
+10. Uložit (F5) / načíst (F9) → pokladna, rozjednaný/hotové projekty, zastupitelstvo a korupce zůstanou;
+    po načtení se lavičky/cedule znovu objeví ve světě (nejsou to uložené scény, staví se z `done_projects`
+    znovu); starý save bez klíče `mayor_office` se načte beze pádu (čistý rozpočet).

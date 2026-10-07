@@ -49,6 +49,15 @@ func _log(pid: int, text: String) -> void:
 	story[pid] = a
 
 
+## M7.4: splacení jednoho nekrytého slibu z kampaně (volá `MayorOffice` po dokončení projektu obce).
+func fulfill_promise(pid: int, text: String) -> void:
+	var pr := int(promises.get(pid, 0))
+	if pr <= 0:
+		return
+	promises[pid] = pr - 1
+	_log(pid, text)
+
+
 # ------------------------------------------------------------------ poctivě: mítink, letáky, úkoly
 
 ## Nabídka na mítink v sále hospody (M1.5 / M5.5): probere jedno z aktuálních přání obce (`Politics.wishes`).
@@ -300,6 +309,8 @@ func resolve_election() -> void:
 		for k in counts:
 			if k != "hrac":
 				lines += "  %s: %d hlasů\n" % [k, int(counts[k])]
+		if pol.is_mayor(pid) and world.mayor_office:   # M7.4: konec právě končícího mandátu (dřív, než se přepíše mayor[pid])
+			world.mayor_office.on_term_end(pid, win)
 		pol.mayor[pid] = win
 		if win:
 			lines += "\nZvítězil(a) jsi! Zastupitelstvo tě zvolilo starostou/starostkou obce."

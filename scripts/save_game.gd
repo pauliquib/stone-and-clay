@@ -189,6 +189,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["politics"] = world.politics.to_dict(id)      # M7.1: termín voleb, protikandidát, popularita, podpisy petice
 	if world.campaign:
 		d["campaign"] = world.campaign.to_dict(id)       # M7.2: mítinky, sliby bez krytí, úplatky, příběh kampaně
+	if world.mayor_office:
+		d["mayor_office"] = world.mayor_office.to_dict(id)   # M7.4: rozpočet, projekty, zastupitelstvo, korupce, konec příběhu
 	var f := FileAccess.open(path(slot), FileAccess.WRITE)
 	if f == null:
 		push_warning("Uložení se nepovedlo: %s (%s)" % [path(slot), error_string(FileAccess.get_open_error())])
@@ -458,6 +460,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		world.politics.from_dict(id, d.get("politics", {}))   # M7.1: starý save bez klíče = nová kandidatura (výchozí termín)
 	if world.campaign:
 		world.campaign.from_dict(id, d.get("campaign", {}))   # M7.2: starý save bez klíče = čistý start kampaně
+	if world.mayor_office:
+		world.mayor_office.from_dict(id, d.get("mayor_office", {}))   # M7.4: starý save bez klíče = čistý rozpočet, žádný projekt
 	var cl = world.clients.get(id)
 	if cl and d.has("hud"):
 		var hc: Dictionary = d["hud"].get("counts", {})

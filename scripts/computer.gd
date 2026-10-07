@@ -63,7 +63,7 @@ const NOTICE_BOARD := [
 	["Pronájem obecního pole", "Obec pronajímá pole na rok za 1 500 Kč. Zájemci na obecním úřadě (úřední hodiny 7–17 h).", "M2.4"],
 	["Povolení ke kácení dřevin", "Žádosti o povolení ke kácení mimo les přijímá obecní úřad. (Připravujeme.)", "M4.4"],
 	["Prodej a pronájem nemovitostí", "Inzeráty obecních bytů a domů zde brzy zveřejníme. (Připravujeme.)", "M4.7"],
-	["Volby do zastupitelstva", "Termín voleb bude vyhlášen. (Připravujeme.)", "M7"],
+	["Volby do zastupitelstva", "Termín voleb, kandidáti a rozpočet obce – podrobnosti u přepážky úřadu.", ""],
 	["Svoz odpadu", "Popelnice se vyvážejí ve čtvrtek. Bioodpad patří do hnědých nádob, ne do potoka!", ""],
 ]
 
