@@ -118,12 +118,43 @@ a 5.12 osvětlení lze vložit kdykoli po M0; 5.11 a 5.12 jdou souběžně – j
 
 ### M7 – Cesta na starostu (hlavní cíl hry)
 Doplněk od uživatele (30. 9. 2026). Doporučeno po M4 a M5.5; M6 létání je volitelné a může jít až po M7.
+**Start celé M7 jednou session (orchestrátor se subagenty, Sonnet 5):** [`M7_starosta/00_START_M7.md`](M7_starosta/00_START_M7.md).
 | | Krok | Soubor | Předpoklady |
 |---|---|---|---|
 | [ ] | M7.1 Popularita a kritéria kandidatury | [`M7_starosta/01_popularita_a_kriteria.md`](M7_starosta/01_popularita_a_kriteria.md) | M0.6, M4.5, M5.5 |
 | [ ] | M7.2 Kampaň a volby (poctivě i nečestně) | [`M7_starosta/02_kampan_a_volby.md`](M7_starosta/02_kampan_a_volby.md) | M7.1, (M4.3, M4.4) |
 | [ ] | M7.3 Vedlejší úkoly s větvením | [`M7_starosta/03_vedlejsi_ukoly_a_vetveni.md`](M7_starosta/03_vedlejsi_ukoly_a_vetveni.md) | M7.1 |
 | [ ] | M7.4 Starostování a konce příběhu | [`M7_starosta/04_starostovani.md`](M7_starosta/04_starostovani.md) | M7.2 |
+
+### M8 – Realistický svět (transformační upgrade, po M7)
+Zadání uživatele 7. 10. 2026: vdechnout hře realističnost postupnou implementací co nejvíce reálné fyziky a ekologie světa – stanoviště,
+voda, vítr, světlo, mikroklima → stromy, rostliny, plodiny, zvěř → člověk a život vesnice (navazuje na rešerši nástrojů a nápad E13).
+**Start:** [`M8_realismus/00_START_M8.md`](M8_realismus/00_START_M8.md) (orchestrátor, vlny 1–8). **Každý krok čte navíc**
+[`M8_realismus/00_PRINCIPY.md`](M8_realismus/00_PRINCIPY.md) – společná API mezi kroky, jednotky, výkonový rozpočet, offline generátory, zdroje modelů.
+| | Krok | Soubor | Předpoklady |
+|---|---|---|---|
+| [ ] | M8.1 Základ: přepínače realismu, eko-takt, měřicí scény, ladicí vrstvy | [`M8_realismus/01_zaklad_prepinace_takt_mereni.md`](M8_realismus/01_zaklad_prepinace_takt_mereni.md) | M7 |
+| [ ] | M8.2 Mapa stanovišť (TWI, oslunění, půda, mrazové kotliny) | [`M8_realismus/02_mapa_stanovist.md`](M8_realismus/02_mapa_stanovist.md) | M8.1 · **dotaz: půdní data (BPEJ)?** |
+| [ ] | M8.3 Druhy dřevin a porosty podle stanoviště | [`M8_realismus/03_dreviny_a_porosty.md`](M8_realismus/03_dreviny_a_porosty.md) | M8.2 |
+| [ ] | M8.4 Pole větru, nárazy, hierarchický ohyb vegetace | [`M8_realismus/04_pole_vetru.md`](M8_realismus/04_pole_vetru.md) | M8.1, (M8.2) |
+| [ ] | M8.5 Fyzikální obloha, světlo v luxech, expozice | [`M8_realismus/05_obloha_svetlo_expozice.md`](M8_realismus/05_obloha_svetlo_expozice.md) | M8.1 |
+| [ ] | M8.6 Pohyb člověka (biomechanika chůze, IK, postoj) | [`M8_realismus/06_pohyb_cloveka.md`](M8_realismus/06_pohyb_cloveka.md) | M8.1 |
+| [ ] | M8.7 Vodní bilance: vlhkost půdy, odtok, potoky, bláto | [`M8_realismus/07_vodni_bilance.md`](M8_realismus/07_vodni_bilance.md) | M8.2 |
+| [ ] | M8.8 Generátor stromů (space colonization, LOD, impostory) | [`M8_realismus/08_generator_stromu.md`](M8_realismus/08_generator_stromu.md) | M8.3, M8.4 |
+| [ ] | M8.9 Mikroklima: inverze, údolní mlha, rosa, jinovatka | [`M8_realismus/09_mikroklima.md`](M8_realismus/09_mikroklima.md) | M8.2, M8.5, M8.7 |
+| [ ] | M8.10 Lokomoce zvířat 2 a let ptáků | [`M8_realismus/10_lokomoce_zvirat_a_let_ptaku.md`](M8_realismus/10_lokomoce_zvirat_a_let_ptaku.md) | M8.1, (M8.4) |
+| [ ] | M8.11 Fenologie a růst stromů v letech | [`M8_realismus/11_fenologie_a_rust.md`](M8_realismus/11_fenologie_a_rust.md) | M8.3, M8.9, (M8.8) |
+| [ ] | M8.12 Plodiny a zahrada podle růstového modelu | [`M8_realismus/12_plodiny_a_zahrada.md`](M8_realismus/12_plodiny_a_zahrada.md) | M8.7, M8.9, (M8.11) |
+| [ ] | M8.13 Terramechanika: bláto, zaboření, koleje | [`M8_realismus/13_terramechanika.md`](M8_realismus/13_terramechanika.md) | M8.7 |
+| [ ] | M8.14 Přízemní vegetace, seč, sukcese, interaktivní tráva | [`M8_realismus/14_prizemni_vegetace_louky_sukcese.md`](M8_realismus/14_prizemni_vegetace_louky_sukcese.md) | M8.2–M8.4, M8.7 |
+| [ ] | M8.15 Ekologie a populace zvěře | [`M8_realismus/15_ekologie_zvere.md`](M8_realismus/15_ekologie_zvere.md) | M8.2, M8.3, M8.11 |
+| [ ] | M8.16 Tělo 2: tepelná a energetická bilance, žízeň, pád | [`M8_realismus/16_telo_tepelna_a_energeticka_bilance.md`](M8_realismus/16_telo_tepelna_a_energeticka_bilance.md) | M8.9 |
+| [ ] | M8.17 Život vesnice: domácnosti, potřeby, vztahy, drby | [`M8_realismus/17_zivot_vesnice.md`](M8_realismus/17_zivot_vesnice.md) | M8.1 |
+| [ ] | M8.18 Zvuková krajina a drobný život | [`M8_realismus/18_zvukova_krajina_a_drobny_zivot.md`](M8_realismus/18_zvukova_krajina_a_drobny_zivot.md) | M8.9, M8.11, M8.15 |
+| [ ] | M8.19 Kalibrace na realitu, výkon, uzavření | [`M8_realismus/19_kalibrace_vykon_uzavreni.md`](M8_realismus/19_kalibrace_vykon_uzavreni.md) | M8.1–M8.18 + měření uživatele |
+
+**Vlny (souběh):** 1: 8.1 · 2: 8.2 ∥ 8.5 ∥ 8.6 · 3: 8.3 ∥ 8.4 ∥ 8.7 · 4: 8.8 ∥ 8.9 ∥ 8.10 · 5: 8.11 ∥ 8.12 ∥ 8.13 ∥ 8.16 ·
+6: 8.14 ∥ 8.15 ∥ 8.17 · 7: 8.18 · 8: 8.19. Pořadí slučování a sdílené soubory: `00_START_M8.md`.
 
 ### N – Nástroje (po M7, prompty zatím nepsat)
 Editor map, postav, objektů a úkolů (nápad uživatele). **První krok: úkoly jako JSON data** (navazuje na M7.3
@@ -154,3 +185,5 @@ pak síťový základ a nové kroky V2.01–V2.05 (dovednosti a akce, měniteln�
 | M4.8 | ~~návykové látky ano / ne~~ → rozhodnuto: ano, za volbou „Obsah pro dospělé“ (výchozí vypnuto), bez glorifikace; cigarety jen v Potravinách |
 | M5.5 | souřadnice kapličky, pokud není v datech |
 | M5.10 | místo studánky / tábora / bikeparku (agent navrhne, uživatel může upravit) |
+| M8 start | smí agenti spouštět offline generátory dat (`tools/*.py`, Blender headless)? testovat po vlnách? kdo měří `--perfscene`? |
+| M8.2 | má uživatel půdní mapu / BPEJ katastru? (jinak se půda odvodí z terénu a landuse) |

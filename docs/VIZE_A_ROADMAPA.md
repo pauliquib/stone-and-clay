@@ -133,6 +133,8 @@ Postup (zavádí krok **M0.1**):
 | E10 | Studánka, skautský tábor v lese, MTB bikepark | 4.5 | M5.10 |
 | E11 | Editor map, postav, objektů a úkolů | – | milník N (po M7) |
 | E12 | Poznámky ze hry 30. 9. (propad u obchodu, zoom mapy, cigarety, víkendy obchodu, vozík a sprint, doprava) | – | hotovo ve vlně 0 (`docs/audit_vlna0.md`) |
+| E13 | Stromy podle stanoviště: druh, vitalita a tvar odvozené z terénu/vlhkosti/sklonu, ekonomika dřeva | 4.8 | M8.2, M8.3, M8.8, M8.11 |
+| E14 | Transformační upgrade: co nejvíc reálné fyziky a ekologie světa (rostliny, stromy, zvířata, vítr, slunce, „život“, člověk) | 4.9 | M8.1–M8.19 |
 
 ---
 
@@ -351,6 +353,60 @@ hasičská soutěž).
   2–3 konci a řetězy postav rozhodují hlasy komunit. Po zvolení rozpočet, projekty, zastupitelstvo a konce příběhu.
 - Satira se smyšlenými postavami – žádný skutečný starosta, strana, znak ani rozpočet obce.
 
+### 4.8 Nápady k zvážení
+
+Nápady, které vznikly mimo původní poznámky. U každého je zařazení (kurzívou), nebo „nezařazeno“.
+
+- **Stromy podle stanoviště (E13, nápad 7. 10. 2026)** – *→ zařazeno do M8 (M8.2 stanoviště, M8.3 druhy a porosty,
+  M8.8 generátor tvarů, M8.11 růst; viz kap. 4.9)*. Rozšíření sázení stromů (M2.5, hotovo) a lesa
+  obecně o věrohodnější závislost tvaru na místě, bez plné biologické simulace půdy (ta v žádném
+  běžném nástroji ani neexistuje hotová – viz rešerše níže):
+  - **Výběr druhu podle stanoviště, ne jen podle hráče:** z DMR (`terrain_height.bin`) spočítat pro
+    každou buňku nadmořskou výšku, sklon, orientaci ke světovým stranám a index vlhkosti terénu (TWI –
+    jak moc se tam stéká voda) a blízkost vodního toku (`water.gd`). K tomu ruční tabulka druh ↔
+    stanoviště (smrk a borovice na kyselejších/sušších svazích, dub a habr na teplejších jižních,
+    olše a vrba u vody, buk na chladnějších severních svazích). Použije se v `tools/vegetation.py`
+    (podrost) i v budoucím generování lesních ploch (dnes `trees.bin` má jen pozici/druh/měřítko bez
+    vazby na terén). Zpřesnit by šlo přes BPEJ/lesnickou typologii (ÚHÚL), ale to je až druhý krok.
+  - **Vitalita jako jeden odvozený parametr (0–1)** z kvality stanoviště: ovládá výšku, tloušťku kmene,
+    hustotu koruny a zkroucení větví u zasazených stromů (`PlantedTrees` z M2.5). Strom na mělké
+    skalnaté půdě bude drobný a křivý, v nivě potoka mohutný a rovný – bez nutnosti simulovat
+    skutečnou biochemii půdy (ani specializované vědecké nástroje typu CPlantBox / OpenSimRoot
+    nedělají víc než tohle na úrovni tvaru).
+  - **Pár mesh variant na druh podle vitality** (3–5), generovaných stejným postupem jako
+    `tools/gen_vegetation_meshes.gd`, aby zapadly do existujícího MultiMesh + LOD potrubí.
+  - **Ekonomika dřeva:** z výšky/tloušťky (fakticky z vitality a věku) spočítat objem dřeva → cena
+    při prodeji (`M2.1` kácení, `M3.3` lesní dělník). Smrk na podmáčeném jílu = vyšší riziko vývratu
+    po bouři (`priroda/weather.gd` vítr) – pěkná náhodná událost navázaná na počasí.
+  - **Vazba na houby a zvěř:** druh a stáří porostu ovlivní, kde se objevují houby (`World.SEASON_ITEMS`)
+    a kde se drží zvěř (`fauna/`) – malá úprava existujících tabulek, ne nový systém.
+  - **Proč to nejde koupit hotové:** běžné spotřebitelské „zadej druh a půdu → 3D strom“ neexistuje.
+    Vědecké FSPM nástroje (CPlantBox, OpenSimRoot, GroIMP, L-py, iLand) simulují biologii, ale vstupy
+    (půdní profil) musí někdo zadat ručně a výstup není herní mesh. Procedurální generátory (SpeedTree,
+    The Grove, Blender Sapling/Geometry Nodes) naopak půdu vůbec neznají – vitalitu/tvar nastavuje
+    grafik ručně. Pro hru dává smysl jen zjednodušený odvozený model výše, ne integrace cizího nástroje.
+  - **Rozsah práce:** rozšíření `trees.bin`/`PlantedTrees` o druh + vitalitu beze změny rendereru je
+    malý krok; growth curve (Chapman-Richards) podle druhu a vitality je další malý krok. Lesní
+    hospodaření a vývraty jsou větší a navazují na M3.3 a M4.4 (povolení ke kácení).
+
+### 4.9 Realistický svět – transformační upgrade (E14, M8)
+
+Zadání uživatele 7. 10. 2026: postupně implementovat co nejvíce reálné fyziky světa – rostliny, stromy, zvířata, vítr, sluneční
+záře, „život“ a člověk – a tím vdechnout hře realističnost. Principy (podrobně `prompts/roadmapa/M8_realismus/00_PRINCIPY.md`):
+
+- **Krajina určuje život.** Jedna předpočítaná **mapa stanovišť** (sklon, orientace, TWI, vzdálenost k vodě, oslunění, půda, mrazové
+  kotliny) je zdrojem pro vše další: kde je vlhko, kde mrzne, co kde roste, kde se drží zvěř.
+- **Řetěz modelů, ne izolované efekty:** stanoviště → **voda** (vlhkost půdy, odtok, průtok potoků) a **mikroklima** (inverze, údolní mlha,
+  rosa) → **fenologie a růst** (každý druh podle sum teplot, pozdní mrazy) → **plodiny**, **louky** a **zvěř** (potrava, kryt, populace) →
+  **člověk** (tepelná bilance těla, chůze, život domácností) → **zvuk** krajiny. Vítr a fyzikální světlo jsou společné pro všechny.
+- **Věrohodné, ne vědecké:** každý model je nejjednodušší známý vzorec (TWI, SCS-CN, Hargreaves, GDD, Chapman–Richards, space colonization,
+  Rayleigh/Mie, Bekker, Dolbear, Froude) s konstantami v tabulkách a kalibrací na české reálie (ČHMÚ, ČSÚ) v posledním kroku.
+- **Hráč to musí vidět:** strakatý les na jaře, mlha v údolí ráno, kalný potok po bouřce, zapadlé auto v rozmáčené louce, srnci za soumraku
+  na poli, cvrčci rychlejší za tepla, rozsvěcující se kuchyně v zimě v 6:30.
+- **Výkon a bezpečí:** cíl 60 FPS na GTX 1050 (rozpočet na krok), vše jde vypnout přepínačem a bez něj hra běží jako dřív; staré savy se načtou.
+- **Nástroje z rešerše** (SpeedTree, The Grove, OpenSimRoot, GroIMP, iLand…) se do hry neintegrují – převzaly se z nich **postupy**
+  (space colonization, pipe model, stanovištní nároky, růstové křivky) do vlastních offline generátorů v `tools/`.
+
 ---
 
 ## 5. Roadmapa (etapa 1 – singleplayer)
@@ -476,6 +532,28 @@ kroky přehazovat, mezi milníky platí závislosti.
 - [ ] **M7.2 Kampaň a volby** – poctivé nástroje i úplatky, pomluvy a podvody s rizikem odhalení, volební den.
 - [ ] **M7.3 Vedlejší úkoly s větvením** – úkoly jako data, 15+ úkolů se 2–3 konci, řetězy postav, dopad na hlasy.
 - [ ] **M7.4 Starostování** – rozpočet, projekty s viditelnou změnou, zastupitelstvo, sliby a klam, konce příběhu.
+
+### M8 – Realistický svět (transformační upgrade, E14, po M7)
+Start: `prompts/roadmapa/M8_realismus/00_START_M8.md` (orchestrátor, 8 vln), společné principy `00_PRINCIPY.md`.
+- [ ] **M8.1 Základ** – přepínače Realismu, eko-takt (`eco_hour` / `eco_day`), měřicí scény `--perfscene`, ladicí vrstvy mapy.
+- [ ] **M8.2 Mapa stanovišť** – `tools/site.py` → `site.bin` (TWI, oslunění se zastíněním, půda, AWC, kotliny, expozice větru), `Site`.
+- [ ] **M8.3 Dřeviny a porosty** – `dreviny.json`, druh / věk / vitalita pro každý strom z mapy, porosty, dřevo podle druhu.
+- [ ] **M8.4 Pole větru** – nárazy běžící krajinou, závětří, hierarchický ohyb, vlny přes obilí, vítr pro létání a kouř.
+- [ ] **M8.5 Fyzikální obloha a světlo** – Rayleigh/Mie, soumraky, světlo v luxech, adaptace oka, vzdušná perspektiva, stíny mraků.
+- [ ] **M8.6 Pohyb člověka** – fázový cyklus chůze, chodidla bez klouzání, IK na svahu, rovnováha, postoj podle nákladu a stavu těla.
+- [ ] **M8.7 Vodní bilance** – vlhkost půdy, odtok, průtok a hladina potoků, lokální bláto a louže, tání sněhu.
+- [ ] **M8.8 Generátor stromů** – space colonization / přesleny podle druhu, věku a vitality, atlasy listů a kůry, LOD a impostory.
+- [ ] **M8.9 Mikroklima** – inverze a mrazové kotliny, údolní mlha, rosa a jinovatka, teplota v místě hráče.
+- [ ] **M8.10 Lokomoce zvířat 2 a let ptáků** – přechody chodů, páteř, sekundární pohyb, aerodynamika letu, termika, hejna.
+- [ ] **M8.11 Fenologie a růst** – sumy teplot, každý druh raší a barví se jinak, pozdní mrazy, stromy rostou a stárnou v letech.
+- [ ] **M8.12 Plodiny a zahrada** – růstový model (GDD, záření, voda, mráz), výnos podle roku.
+- [ ] **M8.13 Terramechanika** – zaboření, zapadlé auto, trvalé koleje a stopy.
+- [ ] **M8.14 Přízemní vegetace** – louky podle stanoviště, podrost podle druhu, seč a seno, sukcese, interaktivní tráva a pěšiny.
+- [ ] **M8.15 Ekologie zvěře** – stanoviště, denní a roční cyklus, populace, semenné roky, škody.
+- [ ] **M8.16 Tělo 2** – tepelná bilance (MET, clo, vítr, mokro, slunce), žízeň, spánkový dluh, zranění pádem.
+- [ ] **M8.17 Život vesnice** – domácnosti, potřeby, okna a komíny podle obsazenosti, vztahy a drby mezi obyvateli.
+- [ ] **M8.18 Zvuková krajina** – ptačí chorál, cvrčci (Dolbear), žáby, netopýři, světlušky, útlum lesem a ozvěna.
+- [ ] **M8.19 Kalibrace a uzavření** – srovnání s reálnými daty, výkon na GTX 1050, předvolby, dokumentace.
 
 ### Doporučené pořadí v kostce
 

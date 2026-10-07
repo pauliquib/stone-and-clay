@@ -1274,3 +1274,45 @@ Starší historie (M0–M3, M6) se do veřejného snapshotu nepřenesla – stav
 - Hřiště leží na místě hranice čarodějnic (`BONFIRE_POS`); policista u kontroly stojí vedle auta, figurína řidiče sedí dál.
 - Mše v kapličce není napojená (`Krize.chapel_pos()` připraveno); kaplička je 225 m od úřadu podle reálné polohy z OSM.
 - Kroky M5 zůstávají `[ ]` v roadmapě až do ručního testu (většina částečně – viz „Uzavření M5“).
+
+## 2026-10-07 – Nápad E13: stromy podle stanoviště (bez implementace)
+
+### Co se stalo
+Uživatel se ptal (mimo tento repozitář) na nástroje, které z druhu stromu a skladby půdy umí
+vygenerovat 3D model stromu. Doplnil jsem rešerši (vědecké FSPM nástroje jako CPlantBox, OpenSimRoot,
+GroIMP, L-py, iLand, Capsis, ENVI-met vs. procedurální generátory SpeedTree, The Grove, Blender
+Sapling/Geometry Nodes – žádný hotový nástroj obojí nespojuje) a navrhl, jak by se to dalo využít
+ve *Stone & Clay* nad existujícím systémem sázení stromů (M2.5) a terénem (DMR, `water.gd`).
+
+### Výstup
+Nápad zapsán jako **E13** do `docs/VIZE_A_ROADMAPA.md` (mapovací tabulka 2.4 + nová podsekce **4.8
+Nápady k zvážení (nezařazené)**): výběr druhu podle terénu/sklonu/vlhkosti/blízkosti vody, odvozená
+vitalita (0–1) ovlivňující tvar/výšku/sílu zasazených stromů, pár mesh variant na druh, ekonomika
+dřeva a vývraty po bouři, vazba na houby a zvěř.
+
+### Otevřené body
+- Zařazeno téhož dne do milníku M8 (viz následující záznam).
+- Žádný kód nebyl spuštěn ani měněn, jde čistě o zápis nápadu do dokumentace.
+
+## 2026-10-07 – Prompty: start M7 (orchestrátor) a nový milník M8 Realistický svět
+
+### Hotovo (jen dokumentace a prompty – žádný kód)
+- **`prompts/roadmapa/M7_starosta/00_START_M7.md`** – zadání pro jednu session orchestrátora (Sonnet 5, subagenti zdědí model;
+  `CLAUDE_CODE_SUBAGENT_MODEL=claude-sonnet-5`): pravidla šetření kontextu (orchestrátor nečte kód, subagent vrací ≤ 25 řádků),
+  dotazy na uživatele před startem (termín voleb, testování, kaplička), vlny 1: M7.1 · 2: M7.2 ∥ M7.3 (slučovat M7.3 první) · 3: M7.4,
+  šablona zadání subagenta, postup po vlně, závěrečná kontrola pro Opus 5.5.
+  **Krok 0:** orchestrátor na začátku session grepem najde všechna místa vyžadující uživatele (prompty M7, README rozhodnutí,
+  VIZE kap. 7, otevřené body v logu), vyžádá si je najednou a předá odpovědi subagentům; během běhu se už neptá (jen u skutečného bloku).
+- **Nový milník M8 Realistický svět (transformační upgrade, E14)** – `prompts/roadmapa/M8_realismus/`:
+  `00_START_M8.md` (orchestrátor, 8 vln se sdílenými soubory a pořadím slučování), `00_PRINCIPY.md` (filozofie, jednotky, **kontrakt API
+  mezi kroky** – `Site`, `TreeEco`, `WindField`, `SoilWater`, `Microclimate`, `Phenology`, `Habitat`, eko-takt –, konvence barev vrcholů
+  vegetace, přepínače Realismu, výkonový rozpočet GTX 1050, pravidla offline generátorů, zdroje modelů) a 19 kroků M8.1–M8.19
+  (základ, stanoviště, dřeviny, vítr, obloha, chůze, voda, generátor stromů, mikroklima, lokomoce zvířat a let, fenologie a růst,
+  plodiny, terramechanika, přízemní vegetace, ekologie zvěře, tělo 2, život vesnice, zvuková krajina, kalibrace).
+- `prompts/roadmapa/README.md` – oddíl M8, odkaz na start M7, nová rozhodnutí uživatele (M8 start, M8.2 půdní data).
+- `docs/VIZE_A_ROADMAPA.md` – E13 zařazeno do M8, nový řádek E14, kap. 4.9 (principy M8), roadmapa M8 se zaškrtávacími body.
+
+### Otevřené body
+- Před M8: rozhodnutí uživatele z `00_START_M8.md` (offline generátory, testování po vlnách, měření výkonu, BPEJ).
+- M8 pravidlo „agent smí spustit offline generátor“ je **návrh** – platí jen po souhlasu uživatele na startu M8.
+- Kroky M5 jsou v `prompts/roadmapa/README.md` stále `[ ]` (čekají na ruční test M5 – beze změny).
