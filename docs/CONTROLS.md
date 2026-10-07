@@ -29,27 +29,28 @@ kurz, šipku větru a palivo. Palivo chřadne s plynem; s prázdnou nádrží je
 **S paramotorem (M6.4):** křídlo se rozloží z batohu (Tab → detail → *Připravit k letu* – rovná louka,
 sklon < 10°, ~50 m bez stromů). F = navléct nosiče. **Start:** otočit se čelem *proti* větru (šipka na
 přístrojích) a rozběhnout (W) – křídlo se zvedne nad hlavu; boční vítr nebo slabý rozběh ho shodí na
-stranu, vítr > 8 m/s křídlo vytrhne. Pak plyn (Shift) a doběhnutí vzletu. **Let:** A/D = levá/pravá
+stranu, vítr > 8 m/s křídlo vytrhne. Pak plyn (Shift) a doběhnutí vzletu (Shift dřív jen
+varuje – motor bez křídla netáhne). **Let:** A/D = levá/pravá
 brzda (zatáčení), S = obě brzdy (zpomalení; dlouhý hluboký tah = propad křídla), W nebo Shift = plyn,
 držený Mezerník = povolené trimry (větší rychlost), Ctrl = „uši“ (rychlejší klesání). V turbulenci se
 křídlo může částečně zavřít (propad na stranu) – srovná opačná brzda. **Přistání:** proti větru, se
 staženým plynem, ve výšce ~1 m obě brzdy naplno (flare) → dosednutí na nohy a doběh. E u ležícího
 stroje = složit křídlo zpátky do batohu (25 kg). Průkaz (`pilot_pg_motor`), registrace a pojištění:
-počítač doma → *Letectví – ÚCL* (škola 35 000 Kč: eTest „paramotor“ + 5 výcvikových vzletů).
+počítač doma → *Letectví – ÚVL* (škola 35 000 Kč: eTest „paramotor“ + 5 výcvikových vzletů).
 
 **S motorovým rogalem / trikem (M6.5):** ojetý stroj koupíš na inzertní ceduli u hangáru polního
 letiště (dráha ~260 m jihozápadně od návsi; F2 → Teleport → *Letiště*), případně F2 → Vozidla.
 F = nastoupit do předního sedadla. **Plyn drží páka:** Shift přidat, Ctrl ubrat (poloha zůstává,
 na přístrojích „PÁČKA %“). **Na zemi** A/D = řízení příďového kola, Mezerník = brzda kol;
-rozjedeš se po dráze a po ~55 km/h se stroj sám odpoutá. **Ve vzduchu řídíš hrazdou**
-(přenos váhy – realisticky *obráceně* proti letadlu): S = hrazda od sebe → nos nahoru / zpomalit,
-W = hrazda k sobě → klesat / zrychlit, A/D = zatáčka *naopak* (A = doprava). V Esc → Nastavení
-jde přepnout „Intuitivní řízení rogala“ (W = nahoru, A = vlevo). **Přistání** jen na letišti:
+rozjedeš se po dráze a po ~70 km/h se stroj sám odpoutá. **Ve vzduchu** (výchozí intuitivní
+řízení): W = nos nahoru, S = nos dolů, A/D = zatáčka vlevo / vpravo. V Esc → Nastavení jde zapnout
+„Realistické řízení rogala hrazdou“ (přenos váhy – *obráceně* proti letadlu: S = hrazda od sebe →
+nos nahoru, W = k sobě → klesat, A = zatáčka doprava). **Přistání** jen na letišti:
 proti větru ~65 km/h, dosedni na hlavní kola a příďák polož jemně. Přistání mimo dráhu (mimo
 nouzi), let bez průkazu/registrace/pojištění, v noci, v mracích, nízko nad obcí (<150 m AGL)
 nebo nad lidmi = přestupky `ul_*` (svědek = hluk motoru ~800 m). **Spolujezdec:** u stojícího
 triku nabídneš E „vyhlídkový let“ vesničanovi s přátelstvím ≥ 60 – sedí vzadu, komentuje let
 bublinami, po přistání se vysadí (+ přátelství, + pověst). Průkaz ULL (`pilot_ul`, škola
 75 000 Kč = eTest „ultralehké“ + 10 výcvikových letů s instruktorem rádiem), registrace
-`ul_registrace` (1 500 Kč) a pojištění `ul_pojisteni` (3 000 Kč/rok): PC → *Letectví – ÚCL*.
+`ul_registrace` (1 500 Kč) a pojištění `ul_pojisteni` (3 000 Kč/rok): PC → *Letectví – ÚVL*.
 Ukládá se se stroji (`aircrafts`); spolujezdec se před uložením vysadí.

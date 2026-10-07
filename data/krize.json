@@ -1,0 +1,59 @@
+{
+ "version": 1,
+ "generated": "ruční převod OSM → herní souřadnice (transform z tools/obce.py: e=R·Δlon·cos(lat0), n=R·Δlat, otočení north_angle_deg)",
+ "zdroj": "OpenStreetMap © přispěvatelé OpenStreetMap, licence ODbL (https://www.openstreetmap.org/copyright)",
+ "units": "m, herní souřadnice Godot (x, z)",
+ "filtr": "historic=wayside_cross|wayside_shrine, amenity=place_of_worship+religion=christian, building=chapel, pilgrimage, tourism=attraction+religion; katastr + 300 m",
+ "kaplicka": {
+  "id": "kaplicka_navsi",
+  "x": 236.51,
+  "z": 408.96,
+  "yaw": -0.723,
+  "popis": "Kaplička u cesty",
+  "osm_ref": "way/224455858",
+  "vzdalenost_silnice_m": 17.6,
+  "v_katastru": true
+ },
+ "objekty": [
+  {
+   "id": "kriz_1",
+   "typ": "kriz",
+   "x": 115.86,
+   "z": 509.19,
+   "yaw": 2.526,
+   "popis": "Kříž u cesty",
+   "osm_ref": "node/9910375741",
+   "vzdalenost_silnice_m": 7.0
+  },
+  {
+   "id": "kriz_2",
+   "typ": "kriz",
+   "x": 237.14,
+   "z": 337.5,
+   "yaw": 0.94,
+   "popis": "Kříž u cesty",
+   "osm_ref": "node/9910375742",
+   "vzdalenost_silnice_m": 5.3
+  },
+  {
+   "id": "kriz_3",
+   "typ": "kriz",
+   "x": -184.82,
+   "z": 850.94,
+   "yaw": 2.145,
+   "popis": "Kříž u cesty",
+   "osm_ref": "node/9910375743",
+   "vzdalenost_silnice_m": 8.5
+  },
+  {
+   "id": "kriz_4",
+   "typ": "kriz",
+   "x": 67.5,
+   "z": -115.23,
+   "yaw": -2.82,
+   "popis": "Kříž u cesty",
+   "osm_ref": "node/3782257005",
+   "vzdalenost_silnice_m": 9.7
+  }
+ ]
+}

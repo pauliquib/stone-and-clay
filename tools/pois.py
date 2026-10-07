@@ -1,6 +1,6 @@
 """Místa pro questy (hospoda, obchod, pálenice, vinný sklep, chata, obecní úřad, domov) → data/pois.json.
 
-Budovy se berou ze skutečných dat (OSM/RÚIAN, data/buildings_3d*.json):
+Budovy se berou ze skutečných dat (OSM/RÚIAN, pipeline/data/buildings_3d*.json):
   Potraviny (OSM way 279053665, shop=convenience)      – skutečný obchod
   Obecní úřad Dukelčice (761155002, amenity=townhall)   – skutečný
   Myslivecká chata (788743489)                        – skutečná
@@ -21,7 +21,10 @@ import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.dirname(HERE)
-ROOT = os.path.dirname(GAME)
+PIPE = os.path.join(GAME, "pipeline")
+PDATA = os.path.join(PIPE, "data")
+GEO = os.path.join(GAME, "geodata")
+PSCRIPTS = os.path.join(PIPE, "scripts")
 
 PLACES = [
     ("hospoda", "Hospoda U Hřiště", 224455861),
@@ -43,8 +46,8 @@ def seg_closest(p, a, b):
 
 
 def main():
-    blds = json.load(open(os.path.join(ROOT, "data/buildings_3d.json"))) + \
-        json.load(open(os.path.join(ROOT, "data/buildings_3d_full.json")))
+    blds = json.load(open(os.path.join(PDATA, "buildings_3d.json"))) + \
+        json.load(open(os.path.join(PDATA, "buildings_3d_full.json")))
     by_id = {b.get("osm_id"): b for b in blds}
     meta = json.load(open(os.path.join(GAME, "data/map.json")))
     roads_all = meta["roads"]

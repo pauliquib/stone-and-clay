@@ -1,6 +1,9 @@
 ## Obrazovka cvičného testu (M3.4, eTesty na počítači doma) – rámec pro testy autoškoly (M4.1), zbrojní, lovecké a rybářské
 ## zkoušky (M4.6) a drony (M6.1). Otázky jsou v `data/testy/<id>.json`:
-##   {nazev, popis, prah (kolik správně = prošel), poznamka, otazky: [{otazka, odpovedi: [3 texty], spravna: index 0–2}]}
+##   {nazev, popis, prah (kolik správně = prošel, pevně), prah_pct (nebo v % z počtu otázek 0–100; má přednost),
+##    pocet (kolik otázek se z banku vylosuje; 0 / chybí = všechny v daném pořadí), poznamka,
+##    otazky: [{otazka, odpovedi: [3 texty], spravna: index 0–2, vysvetleni}]}
+## Pořadí odpovědí se při každém spuštění míchá (správná odpověď se přesune s textem), takže „vždy B“ neplatí.
 ## Otázky jsou vlastní formulace (NEKOPÍROVAT oficiální testové otázky). Na konci signál `finished(score, total, passed)`.
 class_name TestUI
 extends VBoxContainer
@@ -25,7 +28,7 @@ var _next: Button
 
 func setup(d: Dictionary) -> void:
 	data = d
-	_q = d.get("otazky", [])
+	_q = _prepare(d)
 	add_theme_constant_override("separation", 10)
 	_head = _lbl(17)
 	_question = _lbl(18)
@@ -44,6 +47,48 @@ func setup(d: Dictionary) -> void:
 	_next.pressed.connect(_on_next)
 	add_child(_next)
 	_show()
+
+
+## Připraví otázky pro tento běh: losování `pocet` otázek z banku (jinak všechny v pořadí souboru)
+## a zamíchané odpovědi (index `spravna` se přepočítá). Originální data se nemění.
+func _prepare(d: Dictionary) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var src: Array = (d.get("otazky", []) as Array).duplicate()
+	var pocet := int(d.get("pocet", 0))
+	if pocet > 0 and pocet < src.size():
+		for i in range(src.size() - 1, 0, -1):    # Fisher–Yates
+			var j := rng.randi_range(0, i)
+			var t = src[i]
+			src[i] = src[j]
+			src[j] = t
+		src.resize(pocet)
+	var out: Array = []
+	for q in src:
+		var qq: Dictionary = (q as Dictionary).duplicate()
+		var ans: Array = (qq.get("odpovedi", []) as Array).duplicate()
+		var ok_i := clampi(int(qq.get("spravna", 0)), 0, maxi(ans.size() - 1, 0))
+		var idx: Array = range(ans.size())
+		for i in range(idx.size() - 1, 0, -1):
+			var j := rng.randi_range(0, i)
+			var t = idx[i]
+			idx[i] = idx[j]
+			idx[j] = t
+		var mixed: Array = []
+		for i in idx.size():
+			mixed.append(ans[idx[i]])
+			if int(idx[i]) == ok_i:
+				qq["spravna"] = i
+		qq["odpovedi"] = mixed
+		out.append(qq)
+	return out
+
+
+## Kolik správných odpovědí je potřeba: `prah_pct` (% z počtu otázek), jinak pevný `prah`, jinak 80 %.
+func _need(total: int) -> int:
+	if data.has("prah_pct"):
+		return clampi(ceili(float(total) * float(data["prah_pct"]) / 100.0), 1, maxi(total, 1))
+	return clampi(int(data.get("prah", ceili(total * 0.8))), 0, total)
 
 
 func _lbl(fsize: int) -> Label:
@@ -107,7 +152,7 @@ func _on_next() -> void:
 
 func _finish() -> void:
 	var total := _q.size()
-	var need := int(data.get("prah", ceili(total * 0.8)))
+	var need := _need(total)
 	var passed := _score >= need
 	_head.text = "%s – hotovo" % data.get("nazev", "Test")
 	_question.text = "Výsledek: %d / %d správně (k úspěchu je potřeba %d). %s" % [_score, total, need,

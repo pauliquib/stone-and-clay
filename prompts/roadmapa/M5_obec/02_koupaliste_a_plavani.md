@@ -1,6 +1,6 @@
 # M5.2 – Koupaliště na bývalé hasičské nádrži + plavání
 
-> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 2/9
+> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 2/12
 > Předpoklady: M5.1 (poloha stavebnin – koupaliště je hned za nimi), M2.3 (plavky) · Navazují: M3.3 (plavčík), M5.3 (hasiči – nádrž jako zdroj vody)
 
 ## 0. Než začneš – přečti
@@ -64,5 +64,5 @@ Nádrž s okrajem a kolizí, plavání (všude), teplota vody, vstupné a stáne
 8. Opilý plavec → plavčík zasáhne.
 
 ## 7. Závěr
-README (Systémy → Koupaliště a plavání, Ovládání – plavání), VIZE odškrtnout, roadmapa README, PROJECT_LOG, deník AI,
+README (Systémy → Koupaliště a plavání, Ovládání – plavání), VIZE odškrtnout, roadmapa README, PROJECT_LOG,
 commit „M5.2 Koupaliště a plavání: …“, checklist a čekat.

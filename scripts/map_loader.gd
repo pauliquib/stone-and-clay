@@ -53,7 +53,13 @@ static func tinted_material(tex: String, size_m: float, desat: float, gain: floa
 	return m
 
 
-## Načte DBM1 soubor → seznam dlaždic {mesh: ArrayMesh, faces: PackedVector3Array}.
+## Načte DBM1 soubor → seznam dlaždic {mesh: ArrayMesh, faces: PackedVector3Array, origin: Vector3}.
+## Vrcholy meshe i `faces` jsou LOKÁLNÍ vůči `origin` = střed AABB dlaždice (add_chunks na něj posadí
+## MeshInstance3D i kolizní těleso). Proč: Godot 4.3 ořezává visibility range podle středu AABB instance,
+## ale prolínání VISIBILITY_RANGE_FADE_SELF počítá z POČÁTKU uzlu (RenderForwardClustered:
+## `inst->transform.origin.distance_to(cam)`). S uzlem v počátku světa (dům hráče) a geometrií
+## v absolutních souřadnicích tak každá dlaždice zprůhlednila, jakmile byla kamera dál než dohled
+## od spawnu – „za spawnem nic není“ (vlna 0b).
 ## `drape` – terén: povrch silnic/cest se "přilepí" na terén (konstantní výška nad ním). V exportu
 ## některé silnice (např. III/49010 u úřadu) visely až 1 m nad terénem, zatímco navazující místní
 ## komunikace terén kopírovaly → na křižovatkách vznikaly svislé schody, přes které auto neprojelo.
@@ -78,13 +84,20 @@ static func load_chunks(path: String, mat: Material, drape: Terrain = null, drap
 		v.resize(n)
 		nn.resize(n)
 		cc.resize(n)
+		var box := AABB()
 		for i in n:
 			var k := i * 3
-			v[i] = Vector3(pos[k], pos[k + 1], pos[k + 2])
+			var p := Vector3(pos[k], pos[k + 1], pos[k + 2])
 			if drape:
-				v[i].y = drape.height_at(v[i].x, v[i].z) + drape_h
+				p.y = drape.height_at(p.x, p.z) + drape_h
+			v[i] = p
+			box = AABB(p, Vector3.ZERO) if i == 0 else box.expand(p)
 			nn[i] = Vector3(nrm[k], nrm[k + 1], nrm[k + 2])
 			cc[i] = Color(col[k], col[k + 1], col[k + 2])
+		# posun do lokálních souřadnic dlaždice (střed AABB) – viz komentář nad funkcí
+		var origin := box.get_center()
+		for i in n:
+			v[i] = v[i] - origin
 		var arr := []
 		arr.resize(Mesh.ARRAY_MAX)
 		arr[Mesh.ARRAY_VERTEX] = v
@@ -93,21 +106,26 @@ static func load_chunks(path: String, mat: Material, drape: Terrain = null, drap
 		var m := ArrayMesh.new()
 		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 		m.surface_set_material(0, mat)
-		out.append({"mesh": m, "faces": v})
+		out.append({"mesh": m, "faces": v, "origin": origin})
 	return out
 
 
-## Přidá dlaždice do scény; volitelně s kolizí (ConcavePolygonShape3D).
+## Přidá dlaždice do scény; volitelně s kolizí (ConcavePolygonShape3D). Mesh i těleso stojí ve středu
+## dlaždice (`origin` z load_chunks) – dohled i jeho prolínání se tak měří od dlaždice, ne od spawnu.
 static func add_chunks(parent: Node3D, name: String, chunks: Array, collide: bool, vis_range := 0.0,
 		surface := "") -> void:
 	var root := Node3D.new()
 	root.name = name
 	parent.add_child(root)
 	for ch in chunks:
+		var origin: Vector3 = ch.get("origin", Vector3.ZERO)
 		var mi := MeshInstance3D.new()
 		mi.mesh = ch["mesh"]
+		mi.position = origin
 		if vis_range > 0.0:
 			mi.visibility_range_end = vis_range
+			mi.visibility_range_end_margin = minf(vis_range * 0.08, 60.0)   # jemné dofadování
+			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 		root.add_child(mi)
 		if collide:
 			var body := StaticBody3D.new()
@@ -121,6 +139,7 @@ static func add_chunks(parent: Node3D, name: String, chunks: Array, collide: boo
 			var cs := CollisionShape3D.new()
 			cs.shape = shape
 			body.add_child(cs)
+			body.position = origin           # faces jsou lokální vůči středu dlaždice
 			root.add_child(body)
 
 
@@ -281,9 +300,13 @@ static func build_trees(parent: Node3D, skip := {}, terrain: Terrain = null, mgr
 			_far_mmis.append(mmi)
 			root.add_child(mmi)
 
-	# kolize kmenů – jedno statické těleso na buňku 256 m
+	# kolize kmenů – jedno statické těleso na buňku 256 m. Tvary se přidávají rovnou do fyzikálního
+	# serveru (body_add_shape), NE jako CollisionShape3D uzly: ~50 tisíc uzlů ve scéně jen za existenci
+	# stálo měřitelné ms na frame. `shapes` drží [RID těla, index tvaru] pro vypnutí při pokácení;
+	# `shape_rids` drží RIDy tvarů, aby je TreeManager uvolnil při zániku světa (nová hra).
 	var bodies := {}
 	var shapes: Array = []
+	var shape_rids: Array[RID] = []
 	for t in trunks:
 		var pos: Vector3 = t[0]
 		var key := Vector2i(floori(pos.x / TREE_FAR_CELL), floori(pos.z / TREE_FAR_CELL))
@@ -293,17 +316,18 @@ static func build_trees(parent: Node3D, skip := {}, terrain: Terrain = null, mgr
 			b.collision_mask = 0
 			b.set_meta("surface", "strom")
 			root.add_child(b)
-			bodies[key] = b
-		var s := CylinderShape3D.new()
-		s.radius = maxf(t[1], 0.15)
-		s.height = t[2]
-		var cs := CollisionShape3D.new()
-		cs.shape = s
-		cs.position = pos + Vector3(0, t[2] * 0.5, 0)
-		bodies[key].add_child(cs)
-		shapes.append(cs)
+			bodies[key] = [b, 0]
+		var rec: Array = bodies[key]
+		var b: StaticBody3D = rec[0]
+		var sr := PhysicsServer3D.cylinder_shape_create()
+		PhysicsServer3D.shape_set_data(sr, {"radius": maxf(t[1], 0.15), "height": t[2]})
+		PhysicsServer3D.body_add_shape(b.get_rid(), sr,
+			Transform3D(Basis.IDENTITY, pos + Vector3(0, t[2] * 0.5, 0)))
+		shape_rids.append(sr)
+		shapes.append([b.get_rid(), rec[1]])
+		rec[1] += 1
 	if mgr != null:
-		mgr.set_index(d, meta, near_mm, far_mm, shapes)
+		mgr.set_index(d, meta, near_mm, far_mm, shapes, shape_rids)
 	return trunks
 
 

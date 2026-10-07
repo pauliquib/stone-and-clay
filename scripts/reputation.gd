@@ -43,17 +43,9 @@ const EVENT_EFFECTS := {
 	"hit_person": {"karma": -5.0},
 	"breath_test_ok": {"karma": 0.5},
 }
-## Karma za přestupek z katalogu (id → změna); neuvedený = −1, trestný čin = −5.
-const OFFENSE_KARMA := {
-	"alkohol_do_1": -2.0, "alkohol_nad_1": -5.0, "rizeni_pres_zakaz": -3.0, "zachytka": -1.0,
-	"ruseni_nocniho_klidu": -1.0, "urazka_uredni_osoby": -1.0, "vyhruzka_uredni_osobe": -2.0,
-	"nenahlaseni_srazky": -3.0, "rychlost_obec_20": -1.0, "ujeti_policii": -3.0, "nehoda_skoda": -1.0,
-	"srazeni_chodce": -5.0, "kradez_dreva_trestna": -3.0, "tyrani_zvirat": -4.0,
-	"rybolov_mira_hajeni": -1.5, "rybarske_pytlactvi": -2.0,
-	"nedovolene_ozbrojovani": -5.0, "strelba_v_obci": -2.0, "zbran_pod_vlivem": -3.0, "ublizeni_na_zdravi": -10.0,
-	"poskozeni_veci": -2.0, "pytlactvi_luk_kuse": -5.0,          # M2.8
-	"pytlactvi": -2.0,                                           # M2.9 (karma za každý kus se strhává zvlášť v `Hunting`)
-}
+## Přepis karmy za přestupek (id → změna). Výchozí hodnota je v katalogu `data/zakon.json` (pole `karma`);
+## tady jen výjimky, které se mají lišit od dat. Bez obojího: −1, trestný čin −5.
+const OFFENSE_KARMA := {}
 const INSULT_RESPECT := -3.0
 const INSULT_KARMA := -1.0
 const POLITE_RESPECT := 1.0       # slušný rozhovor: max. +2 za den od jedné postavy (Persona.allow_respect)
@@ -279,7 +271,8 @@ func on_event(kind: String, data: Dictionary) -> void:
 		"offense":
 			# pověst už strhla původní událost (busted, chase…); tady jen skrytá karma
 			var oid := String(data.get("id", ""))
-			var kd := float(OFFENSE_KARMA.get(oid, -5.0 if data.get("criminal", false) else -1.0))
+			var def_k: float = -5.0 if data.get("criminal", false) else -1.0
+			var kd := float(OFFENSE_KARMA.get(oid, Law.offense(oid).get("karma", def_k)))
 			change_karma(kd, "přestupek: %s" % oid)
 		"busted":
 			var p: float = data.get("promile", 0.0)
@@ -344,11 +337,8 @@ func on_event(kind: String, data: Dictionary) -> void:
 func _witnesses(r: float) -> int:
 	var n := 0
 	var pos := game.player_pos(pid)
-	for v in game.bots_root.get_children():
-		if v is Villager and v.global_position.distance_to(pos) < r:
-			n += 1
-	for k in game.npcs:
-		if is_instance_valid(game.npcs[k]) and game.npcs[k].global_position.distance_to(pos) < r:
+	for w in game.witness_check(pid, pos, "pověst", r):      # M4.4: jednotné svědky (vidí = počítá se)
+		if w["sees"]:
 			n += 1
 	return n
 
@@ -360,6 +350,12 @@ static func _pm(p: float) -> String:
 # ------------------------------------------------------------------ průběžně (jízda, opilost, zapomínání)
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("reputation", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if game == null or not game.ready_done or not is_instance_valid(player):
 		return
 	_speed_cool = maxf(_speed_cool - delta, 0.0)
@@ -388,7 +384,7 @@ func _physics_process(delta: float) -> void:
 		var kmh := absf(c.speed) * 3.6
 		var pos := c.global_position
 		if kmh > 65.0 and _speed_cool <= 0.0 and \
-				Vector2(pos.x, pos.z).distance_to(Traffic.VILLAGE_CENTER) < Traffic.VILLAGE_R and _witnesses(35.0) > 0:
+				game.traffic.in_village(Vector2(pos.x, pos.z)) and _witnesses(35.0) > 0:
 			_speed_cool = 45.0
 			change(-3.0, "řítil se obcí %d km/h kolem lidí" % int(kmh), "rychlá jízda obcí")
 	elif c == null and player.horse == null and p > 1.6 and _drunk_cool <= 0.0 and _witnesses(10.0) > 0:

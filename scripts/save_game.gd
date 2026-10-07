@@ -21,7 +21,7 @@ const SLOT_NAMES := {"rychly": "Rychlé uložení (F5)", "auto": "Automaticky (p
 	"2": "Pozice 2", "3": "Pozice 3"}
 const BODY_KEYS := ["weight", "stomach_alc", "body_alc", "stomach_kcal", "nicotine", "tar", "craving", "ever_smoked",
 	"caffeine", "nausea", "health", "alive", "total_alc_g", "total_kcal", "cigarettes_smoked", "drinks",
-	"wetness", "cold"]
+	"wetness", "cold", "addiction", "_smoke_rate", "thc", "psilo"]
 
 
 static func path(slot: String) -> String:
@@ -88,6 +88,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 	for v in veh:
 		var ve := {"model": v.model_id, "pos": _v3(v.global_position), "yaw": v.global_rotation.y, "damage": v.damage,
 			"lights": v.lights_on}
+		if v.has_radio():                 # M5.9 autorádio (stanice, hlasitost, zlost sousedů); starý save bez klíče = bez rádia
+			ve["radio"] = v.radio_to_dict()
 		if world.cargo:
 			var vc := world.cargo.vehicle_to_dict(v)          # náklad v kufru / na ložné ploše / na nosiči (M2.10)
 			if not vc.is_empty():
@@ -99,11 +101,21 @@ static func save(world: World, id: int, slot: String) -> bool:
 	if world.bazaar:
 		d["bazaar"] = world.bazaar.to_dict()
 	if world.forestry:
-		d["forestry"] = world.forestry.to_dict(id)     # pokácené stromy, padlé kmeny, špalky, nenahlášené činy (M2.1)
+		d["forestry"] = world.forestry.to_dict(id)     # pokácené stromy, padlé kmeny, špalky (M2.1)
+	d["unreported"] = world.unreported.get(id, [])     # nenahlášené činy, společný registr (M4.4)
+	if world.vyhlasky:
+		d["vyhlasky"] = world.vyhlasky.to_dict(id)     # čerstvé větve v sušení (M4.4 část B)
+	if world.klesti:
+		d["klesti"] = world.klesti.to_dict(id)       # klestí na hromadě u domu (M4.4 část B)
 	if world.fire_mgr:
 		d["fire"] = world.fire_mgr.to_dict()           # ohniště (i vyhaslá), stav kamen doma (M2.2)
 	if world.garden:
 		d["garden"] = world.garden.to_dict()           # záhony, pronájem pole, zvolená semena, náplň konve (M2.4)
+		d["garden_visuals"] = world.garden.visuals_to_dict()   # kompost + skleník (Fáze 8)
+	if world.npc_grow:
+		d["npc_grow"] = world.npc_grow.to_dict()       # M4.8: záhon zahrádkáře (starý save = žádný)
+	if world.fences:
+		d["fences"] = world.fences.to_dict()           # hráčem postavené úseky plotů (Fáze 7; procedurální se přegenerují)
 	if world.farm:
 		d["farm"] = world.farm.to_dict()               # hospodářská zvířata, branka, čekající vejce (M2.6)
 	if world.udrzba:
@@ -133,9 +145,16 @@ static func save(world: World, id: int, slot: String) -> bool:
 	var lr: Law.LawRecord = world.law.get(id)
 	if lr:
 		d["law"] = lr.to_dict()
+	if world.debts:
+		d["debts"] = world.debts.to_dict(id)           # dluhy, příkazy na cestě, upomínky, exekuce (M4.2)
+	if world.court:
+		d["court"] = world.court.to_dict(id)           # obvinění, předvolání, rozsudky, podmínka, OPP (M4.3)
 	var jb: Jobs = world.jobs.get(id)
 	if jb:
 		d["jobs"] = jb.to_dict()                       # zaměstnání, docházka, napomenutí, nevyplacená mzda, rozdělaná směna (M3.1)
+	var skp: Player = world.players.get(id)
+	if skp:
+		d["skate"] = {"best": skp.board_best}           # M5.7: rekord na skateboardu (starý save bez klíče = 0)
 	if world.computer:
 		d["pc"] = world.computer.to_dict(id)           # účet, pohyby, trvalý příkaz, pošta, objednávky, drby, eTesty (M3.4)
 	if world.nature_log:
@@ -152,10 +171,20 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["radio"] = world.radio.to_dict()
 	if world.estate:
 		d["estate"] = world.estate.to_dict(id)          # domov: nemovitost, byt, nájem (M1.7)
+	if world.katastr:
+		d["katastr"] = world.katastr.to_dict()          # M4.7: vlastnictví domů a parcel, vklady a prodeje (globální)
 	d["drones"] = world.drones_to_dict(id)              # M6.1: flotila (baterie, poškození) + dron zaparkovaný ve světě
 	d["aircrafts"] = world.aircrafts_to_dict(id)        # M6.3: letouny (pozice, yaw, palivo, dmg) + „sedí ve stroji“
 	if world.permits:
-		d["permits"] = world.permits.to_dict(id)        # M6.1: registrace ÚCL, osvědčení A1/A3 (později doklady M4.6)
+		d["permits"] = world.permits.to_dict(id)        # M6.1: registrace ÚVL, osvědčení A1/A3 (později doklady M4.6)
+	if world.gamekeeper:
+		d["gamekeeper"] = world.gamekeeper.to_dict(id)  # M4.6: zaplacené kurzy u myslivce (starý save = žádné)
+	if world.hasici:
+		d["hasici"] = world.hasici.to_dict(id)          # M5.3: členství v SDH a zaplacený příspěvek (starý save = žádné)
+	if world.hasici_sport:
+		d["hasicsport"] = world.hasici_sport.to_dict(id)   # M5.4: forma, osobní rekord, účast v soutěži
+	if world.favors:
+		d["favors"] = world.favors.to_dict(id)          # M4.5: prosby vesničanů (nabídky, slib, splněno / zklamáno)
 	var f := FileAccess.open(path(slot), FileAccess.WRITE)
 	if f == null:
 		push_warning("Uložení se nepovedlo: %s (%s)" % [path(slot), error_string(FileAccess.get_open_error())])
@@ -195,7 +224,7 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	var w := world.weather
 	if wd.has("kind") and Weather.TYPES.has(wd["kind"]):
 		w._set_kind(String(wd["kind"]))
-	for k in ["cloud", "rain", "fog", "wind", "wind_bearing", "temp", "snow_cover", "wetness", "storm", "kind_left_h"]:
+	for k in ["cloud", "rain", "fog", "wind", "wind_bearing", "temp", "snow_cover", "wetness", "storm", "kind_left_h", "drought"]:
 		if wd.has(k):
 			w.set(k, float(wd[k]))
 	w.forced = bool(wd.get("forced", false))
@@ -209,6 +238,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		else:
 			world.estate.migrate_legacy(id)      # verze 1: vlastní dům (usedlost) místo pevného čísla
 		world.apply_home(id)
+	if world.katastr:                            # M4.7: starý save bez klíče = nikdo nic nevlastní, nic se neprodává
+		world.katastr.from_dict(d.get("katastr", {}))
 	p.teleport(_to_v3(pd.get("pos")) + Vector3(0, 0.1, 0), float(pd.get("yaw", 0.0)), false)
 	var inside_id := String(pd.get("inside", ""))          # starý save bez klíče = venku
 	if inside_id != "" and world.ensure_interior(inside_id):  # M1.8: interiér se staví až teď (zblízka / při načtení)
@@ -218,6 +249,12 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		var it_in: Interior = world.interiors.get(inside_id)
 		if it_in and p.global_position.distance_to(it_in.global_position) > 50.0:
 			p.teleport(it_in.inside_door, it_in.inside_yaw, false)   # jiná data budov → jiný slot: ke vchodu
+	elif inside_id != "":
+		# A1-08: uložený interiér už neexistuje (jiná data budov / místo zmizelo) – pozice pod mapou by znamenala
+		# propad; hráč se postaví ke dveřím místa, nebo na bezpečný spawn
+		var ex: Array = world.interior_exit(inside_id)
+		p.teleport((ex[0] as Vector3) + Vector3(0, 0.3, 0), float(ex[1]), false)
+		push_warning("SaveGame: interiér „%s“ z pozice neexistuje – hráč postaven ven" % inside_id)
 	p.pitch = float(pd.get("pitch", -0.25))
 	p.spawn_point = _to_v3(pd.get("spawn")) if pd.has("spawn") else p.spawn_point
 	p.spawn_yaw = float(pd.get("spawn_yaw", p.spawn_yaw))
@@ -250,6 +287,10 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		p.first_person = bool(pd.get("first_person", false))
 		p.visual.set_first_person(p.first_person)
 	var bd: Dictionary = d.get("body", {})
+	p.body.addiction = 0.0        # starý save bez závislosti = 0
+	p.body._smoke_rate = 0.0
+	p.body.thc = 0.0              # M4.8: starý save bez klíče = bez látek
+	p.body.psilo = 0.0
 	for k in bd:
 		if not k in BODY_KEYS:
 			continue
@@ -290,6 +331,11 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 			v.damage = dmg
 		if bool(vd.get("lights", false)) != v.lights_on:
 			v.toggle_lights()
+		var rd = vd.get("radio", {})      # M5.9 autorádio
+		if rd is Dictionary and not (rd as Dictionary).is_empty():
+			var rad: Radio = v.ensure_radio(world)
+			if rad != null:
+				rad.from_dict(rd)
 	if world.bazaar:
 		for i in vs.size():
 			var vd: Dictionary = vs[i]
@@ -306,10 +352,22 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 			mapped[i] = nc
 	if world.forestry:
 		world.forestry.restore(d.get("forestry", {}), id)   # starý save bez klíče = žádný pokácený strom
+	# M4.4: nenahlášené činy; starý save je měl v klíči `forestry` → migrace (výchozí = prázdno)
+	var nr = d.get("unreported", (d.get("forestry", {}) as Dictionary).get("unreported", []))
+	world.unreported[id] = (nr as Array).duplicate(true)
+	if world.vyhlasky:
+		world.vyhlasky.restore(id, d.get("vyhlasky", {}))   # starý save bez klíče = žádné čerstvé větve
+	if world.klesti:
+		world.klesti.restore(id, d.get("klesti", {}))   # starý save bez klíče = prázdná hromada
 	if world.fire_mgr:
 		world.fire_mgr.restore(d.get("fire", {}))            # starý save bez klíče = žádná ohniště, studená kamna
 	if world.garden:
 		world.garden.restore(d.get("garden", {}))            # starý save bez klíče = prázdná zahrada, žádné pole
+		world.garden.visuals_restore(d.get("garden_visuals", {}))   # starý save = kompost plný, skleník stojí (Fáze 8)
+	if world.npc_grow:
+		world.npc_grow.restore(d.get("npc_grow", {}))         # M4.8: starý save bez klíče = žádný záhon
+	if world.fences:
+		world.fences.restore(d.get("fences", {}))            # starý save bez klíče = žádné hráčské ploty (Fáze 7)
 	if world.farm:
 		world.farm.restore(d.get("farm", {}))                # starý save bez klíče = prázdné hospodářství
 	if world.udrzba:
@@ -359,9 +417,22 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	var lr: Law.LawRecord = world.law.get(id)
 	if lr:
 		lr.from_dict(d.get("law", {}))         # starý save bez klíče = 0 bodů, prázdný rejstřík
+	if world.court:
+		world.court.from_dict(id, d.get("court", {}))   # starý save bez klíče = žádné případy (M4.3)
+	if world.debts:
+		world.debts.from_dict(id, d.get("debts", {}))   # starý save bez klíče = žádné dluhy (ne zbytky z hrané pozice)
+		if lr and lr.unpaid_fines > 0:         # M4.2 migrace: starý save – nezaplacené pokuty → jeden dluh
+			world.debts.add(id, "pokuta", lr.unpaid_fines, world.clock.jd() + Debts.DUE_DAYS,
+				"Nezaplacené pokuty (starší)")
+			lr.unpaid_fines = 0
+		world.debts.reset_clock(world.clock.jd())
 	var jb: Jobs = world.jobs.get(id)
 	if jb:
 		jb.from_dict(d.get("jobs", {}))        # starý save bez klíče = bez zaměstnání (M3.1)
+	var skl: Player = world.players.get(id)
+	if skl:
+		var skd: Dictionary = d.get("skate", {})
+		skl.board_best = int(skd.get("best", 0))      # starý save bez klíče = rekord 0
 	if world.computer:
 		world.computer.from_dict(id, d.get("pc", {}))   # starý save bez klíče = prázdný účet, uvítací pošta (M3.4)
 	if world.nature_log:
@@ -371,6 +442,14 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	world.aircrafts_from_dict(id, d.get("aircrafts", {})) # M6.3: starý save bez klíče = žádné letouny
 	if world.permits:
 		world.permits.from_dict(id, d.get("permits", {})) # M6.1: starý save bez klíče = žádná oprávnění
+	if world.gamekeeper:
+		world.gamekeeper.from_dict(id, d.get("gamekeeper", {}))   # M4.6: starý save bez klíče = žádné kurzy
+	if world.hasici:
+		world.hasici.from_dict(id, d.get("hasici", {}))   # M5.3: starý save bez klíče = nejsi členem
+	if world.hasici_sport:
+		world.hasici_sport.from_dict(id, d.get("hasicsport", {}))   # M5.4: starý save bez klíče = nulová forma
+	if world.favors:
+		world.favors.from_dict(id, d.get("favors", {}))   # M4.5: starý save bez klíče = žádné prosby
 	var cl = world.clients.get(id)
 	if cl and d.has("hud"):
 		var hc: Dictionary = d["hud"].get("counts", {})

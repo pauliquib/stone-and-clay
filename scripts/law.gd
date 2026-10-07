@@ -7,6 +7,9 @@ extends RefCounted
 const PATH := "res://data/zakon.json"
 const MAX_RECORDS := 200
 
+## Přejmenovaná id přestupků (staré uložené pozice / rejstříky) → dnešní id.
+const ALIASES := {"rychlost_obec_20": "rychlost_obec"}
+
 static var _cache := {}
 
 ## Načte (a uloží do cache) celý katalog; při chybě prázdný slovník.
@@ -19,7 +22,7 @@ static func load_catalog() -> Dictionary:
 
 
 static func offense(id: String) -> Dictionary:
-	return (load_catalog().get("prestupky", {}) as Dictionary).get(id, {})
+	return (load_catalog().get("prestupky", {}) as Dictionary).get(ALIASES.get(id, id), {})
 
 
 static func setting(key: String, def: float) -> float:
@@ -36,8 +39,8 @@ static func _lerp_range(r, sev: float) -> float:
 class LawRecord:
 	extends RefCounted
 	var points := 0
-	var records: Array = []          # {t, id, pokuta, body, zaplaceno, trestny_cin}
-	var unpaid_fines := 0            # součet nezaplacených zbytků pokut (placení řeší M4.2)
+	var records: Array = []          # {t, id, pokuta, body, zaplaceno, trestny_cin, misto, stav}
+	var unpaid_fines := 0            # jen pro migraci starého save (od M4.2 pokuty drží `World.debts`)
 	var last_offense_t := -1.0       # herní minuty posledního přestupku s body
 	var _decay_t := 0.0              # odkdy se počítá odpočet bodů
 
@@ -53,7 +56,16 @@ class LawRecord:
 			points = maxi(points - n * int(Law.setting("body_odpocet", 4.0)), 0)
 			_decay_t = base + n * year
 
-	## Zapíše přestupek. data: severity 0..1 (rozmezí pokuty / zákazu), player (Player – peníze a zákaz řízení).
+	## M4.3: rejstřík trestů = pohled nad `records` – trestné činy, u kterých soud vynesl rozsudek (`rozsudek`).
+	func criminal_record() -> Array:
+		var out := []
+		for r in records:
+			if bool((r as Dictionary).get("trestny_cin", false)) and (r as Dictionary).has("rozsudek"):
+				out.append(r)
+		return out
+
+	## Zapíše přestupek. data: severity 0..1 (rozmezí pokuty / zákazu), player (Player – zákaz řízení).
+	## Pokutu nestrhává – řeší `World.commit_offense` podle `misto` (bloková / příkaz / soud).
 	## Vrací {ok, id, name, par, fine, paid, points, total_points, ban_h, points_ban, criminal, text}.
 	func commit(id: String, data: Dictionary, now: float) -> Dictionary:
 		var o := Law.offense(id)
@@ -64,12 +76,7 @@ class LawRecord:
 		var fine := int(roundf(Law._lerp_range(o.get("pokuta"), sev) / 10.0) * 10.0)
 		var pts := int(o.get("body", 0))
 		var ban_h := Law._lerp_range(o.get("zakaz_rizeni_h"), sev)
-		var pl = data.get("player")
-		var paid := fine
-		if pl != null:
-			paid = mini(fine, int(pl.money))
-			pl.money -= paid
-		unpaid_fines += fine - paid
+		var pl = data.get("player")          # M4.2: peníze se tu NESTRHÁVAJÍ – platbu řeší World.commit_offense (misto)
 		points += pts
 		if pts > 0:
 			last_offense_t = now
@@ -82,10 +89,12 @@ class LawRecord:
 		if pl != null and ban_h > 0.0:
 			pl.license_suspended_until = maxf(pl.license_suspended_until, now + ban_h * 60.0)
 		var crim := bool(o.get("trestny_cin", false))
-		records.append({"t": now, "id": id, "pokuta": fine, "body": pts, "zaplaceno": paid >= fine, "trestny_cin": crim})
+		records.append({"t": now, "id": id, "pokuta": fine, "body": pts, "zaplaceno": false, "trestny_cin": crim,
+			"misto": String(o.get("misto", "na_miste")), "stav": "na_miste"})
 		if records.size() > Law.MAX_RECORDS:
 			records = records.slice(records.size() - Law.MAX_RECORDS)
-		return {"ok": true, "id": id, "name": String(o.get("nazev", id)), "par": _par(o), "fine": fine, "paid": paid,
+		return {"ok": true, "id": id, "name": String(o.get("nazev", id)), "par": _par(o), "fine": fine, "paid": 0,
+			"misto": String(o.get("misto", "na_miste")),
 			"points": pts, "total_points": points, "ban_h": ban_h, "points_ban": points_ban, "criminal": crim}
 
 	static func _par(o: Dictionary) -> String:

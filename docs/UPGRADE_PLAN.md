@@ -333,21 +333,21 @@ func _on_stall_detected():
 
 ### Fáze 3 (AI)
 
-- [ ] Instalace LimboAI
-- [ ] Vytvoření `villager_routine.tres`
-- [ ] Implementace 3 základních action nodů (GoTo, Wait, Animate)
-- [ ] Přiřazení stromu k 5 testovacím vesničanům
+- [x] Instalace LimboAI (v1.3.1 GDExtension, `addons/limboai`)
+- [x] Vytvoření `villager_routine.tres` (`ai/villager_routine.tres`, generátor `tools/gen_villager_bt.gd`)
+- [x] Implementace 3 základních action nodů (`scripts/ai/actions/` – go_to, wait, animate + `scripts/ai/conditions/`)
+- [x] Přiřazení stromu k 5 testovacím vesničanům (`Villager.BT_VILLAGERS`, `--villagertest` OK)
 
 ### Fáze 4 (Letadla)
 
-- [ ] Instalace State Charts
-- [ ] Refaktor `aircraft.gd` na stavový automat
-- [ ] Test vzletu/přistání s paramotorem
+- [x] Instalace State Charts (v0.22.5, `addons/godot_state_charts`)
+- [x] Refaktor `aircraft.gd` na stavový automat (Zeme/Vzduch/Let/Pretazeni, fallback bez addonu)
+- [x] Test vzletu/přistání s paramotorem (`--flighttest` OK)
 
 ### Fáze 5 (Dokumentace)
 
-- [ ] Aktualizace `README.md` o nových závislostech
-- [ ] Přidání `THIRD_PARTY.md` s licencemi (Jolt je MIT, Qodot MIT, LimboAI MIT)
+- [x] Aktualizace `README.md` o nových závislostech (sekce „Add-ony a nástroje" + nové testy a generátory v `docs/DEV.md`)
+- [x] Přidání `THIRD_PARTY.md` s licencemi (Jolt je MIT, Qodot MIT, LimboAI MIT)
 
 ## 7. RIZIKA A ŘEŠENÍ PROBLÉMŮ
 
@@ -629,32 +629,32 @@ V `weather.gd` přidej `wetness_ground` (0-1):
 
 ### Fáze 6 (Vegetace)
 
-- [ ] Vytvořit `vegetation.py` exportér (čte `surface.bin` + `landuse.bin`)
-- [ ] Vytvořit 5 základních modelů vegetace (`grass_tall`, `nettle`, `bush_hazel`, `wheat`, `weed`)
-- [ ] Implementovat `VegetationManager` s MultiMesh
-- [ ] Propojit vítr s `Weather.wind_vector()`
-- [ ] Optimalizace: LOD pro vegetaci (zmizet nad 100m)
+- [x] Vytvořit `vegetation.py` exportér (čte `surface.bin` + `landuse.bin` + `trees.bin` + vozovky → `data/vegetation.bin`, ~73k instancí)
+- [x] Vytvořit 5 základních modelů vegetace (7 low-poly `.res` v `assets/models/vegetation/` – vč. `bush_blackthorn`, `garden_veg`; generátor `tools/gen_vegetation_meshes.gd`)
+- [x] Implementovat `VegetationManager` s MultiMesh (`scripts/vegetation/vegetation_manager.gd`, chunky 64×64 m)
+- [x] Propojit vítr s `Weather.wind_vector()` (`wind_strength`/`wind_dir` do `shaders/vegetation.gdshader`)
+- [x] Optimalizace: LOD pro vegetaci (per-chunk `view_range` 75–220 m × nastavení Detail; `--vegetationtest` 16/16)
 
 ### Fáze 7 (Ploty)
 
-- [ ] Rozhodnout: OSM data vs procedurální (doporučuji procedurální pro zahrady)
-- [ ] Vytvořit 3 modely plotů (`wooden_slat`, `wire`, `hedge`)
-- [ ] Implementovat `FenceManager` s generováním kolem `Garden` a `Paddock`
-- [ ] Přidat kolize (`StaticBody3D`)
-- [ ] Test: Kůň nesmí projít plotem, ale skrz branku ano
+- [x] Rozhodnout: OSM data vs procedurální → procedurální (varianta B)
+- [x] Vytvořit modely plotů → místo `.tscn` scén procedurální geometrie přes `MeshKit` (5 typů vč. `stone_wall`)
+- [x] Implementovat `FenceManager` s generováním kolem `Garden` a `Paddock` (`scripts/structures/fence_manager.gd`)
+- [x] Přidat kolize → jedno `StaticBody3D` s `BoxShape3D` na úsek (ne `ConcavePolygonShape3D`)
+- [x] Test: Kůň nesmí projít plotem, ale skrz branku ano (`--fencetest`, 22/22 OK)
 
 ### Fáze 8 (Zahrady)
 
-- [ ] Rozšířit `garden.gd` o vizuální stavy růstu
-- [ ] Přidat kompost, studna, skleník
-- [ ] Interakce E pro nové objekty
-- [ ] Uložení stavu zahrady do `save_game.gd` (klíč `garden_visuals`)
+- [x] Rozšířit `garden.gd` o vizuální stavy růstu (rostlina roste s `g/days`, plevel od `w>0.5`, zralé plody)
+- [x] Přidat kompost (E → `hnuj`, zásoba `compost_left` 6 dávek, +1/den), studna (E + akce `naplnit_studna` → `konev_plna`), skleník 3×2 m (`gh_cell`, +10 °C, mráz nezabíjí)
+- [x] Interakce E pro nové objekty (`interactables` + registrovaný cíl `studna`, akce `hnojit` s `hnuj` v ruce)
+- [x] Uložení stavu zahrady do `save_game.gd` (klíč `garden_visuals`) – `--gardentest` 31/31 OK
 
 ### Fáze 9 (Terén)
 
-- [ ] Upravit exportér pro mikroreliéf (opatrně, neměnit kolize)
-- [ ] Shader terénu: mokré cesty, sněhové jazyky
-- [ ] Louže jako dekorace (`Decal` nebo shader)
+- [x] Upravit exportér pro mikroreliéf (`tools/export_map.py` `microrelief()` ±0,17 m jen do vizuální heightmapy; `terrain_collision.bin` z čistých dat – efekt po příštím exportu)
+- [x] Shader terénu: mokré cesty, sněhové jazyky (`terrain.gdshader` – koleje třídy 7, `wetness`, sníh v prohlubních/na severních svazích)
+- [x] Louže jako dekorace (`scripts/priroda/puddles.gd` – Decal pool na vozovce při `wetness>0,7`; `--terraintest` 13/13)
 
 ## 14. TECHNICKÉ POZNÁMKY PRO IMPLEMENTAČNÍHO AGENTA
 

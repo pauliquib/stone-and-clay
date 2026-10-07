@@ -61,7 +61,9 @@ func setup(w: World) -> void:
 		mi.multimesh = mm
 		mi.top_level = true
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.visibility_range_end = 220.0
+		# bez visibility_range: Godot ho měří od středu AABB celého bufferu, a ten kvůli volným
+		# instancím v (0, −5000, 0) a stopám kdekoli na mapě leží km od hráče → stopy by se
+		# nekreslily nikde (vlna 0b). Max. ~600 drobných instancí – dohled je zbytečný.
 		add_child(mi)
 		mi.global_transform = Transform3D.IDENTITY
 		_mm[k] = mm

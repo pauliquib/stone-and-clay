@@ -18,6 +18,7 @@ var env: Environment
 var sun: DirectionalLight3D
 var moon: DirectionalLight3D
 var atmosphere: Atmosphere
+var street_lights: StreetLights     # M5.12: pouliční osvětlení obce a světelný smog (klient, vzniká v attach)
 var chimney_smoke: ChimneySmoke   # kouř z komínů podle teploty (M1.3)
 var season_fx: SeasonFx           # pole podle kalendáře, květy v trávě, ovoce a padané listí
 var game_menu: GameMenu          # F2 – roční období, čas, počasí, vozidla, teleport
@@ -62,6 +63,11 @@ func attach(p: Player) -> void:
 	p.make_local()
 	hud.meta = world.meta
 	atmosphere.north_deg = float(world.meta.get("north_angle_deg", 78.37))
+	if street_lights == null:   # M5.12: lampy vznikají až po World.build() (graf silnic)
+		street_lights = StreetLights.new()
+		street_lights.name = "VerejneOsvetleni"
+		add_child(street_lights)
+		street_lights.setup(world, settings)
 	hud.items_root = world.items_root
 	hud.totals = world.item_totals
 	hud.player = p
@@ -180,6 +186,8 @@ func build_environment() -> void:
 
 func _update_daylight(delta: float) -> void:
 	atmosphere.indoor = player.inside != ""
+	if street_lights:
+		atmosphere.light_pollution = street_lights.pollution
 	atmosphere.update(delta)
 
 
@@ -331,7 +339,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				inp.add_look(settings.look(event.relative))
 	elif event is InputEventMouseButton and event.pressed:
-		if player.car == null:
+		# s otevřenou mapou myš ovládá mapu (Hud._input); v menu / chatu kolečko kameru nezoomuje (A1-01)
+		if player.car != null and event.shift_pressed and (event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN):
+			# M5.9: Shift + kolečko v autě = hlasitost autorádia (kamera v autě nezoomuje)
+			world.player_action(pid, "car_radio_vol_up" if event.button_index == MOUSE_BUTTON_WHEEL_UP else "car_radio_vol_down")
+		elif player.car == null and not hud._map.visible and not hud.menu_open and not hud.chat_open:
 			if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not player.controls_locked:
 				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 			elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -346,7 +358,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
 		# otevřenou nabídku / rozhovor zavírá Esc v Hud (dostane ho dřív); jinak pauza
 		if ready_done and not hud.menu_open and not hud.chat_open:
-			pause_menu.open()
+			if hud._map.visible:
+				hud._toggle_map()                      # Esc nejdřív zavře mapu
+			else:
+				pause_menu.open()
 			get_viewport().set_input_as_handled()
 			return
 	if not ready_done or hud.chat_open:
@@ -374,6 +389,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("interact"):
 		_interact()
+	elif event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F4 and player.car != null:
+		world.player_action(pid, "car_cabin_light")      # M5.9: vnitřní světlo v autě
 	elif event.is_action_pressed("car_enter"):
 		world.player_action(pid, "car_enter")
 	elif event.is_action_pressed("car_lights"):
@@ -399,11 +416,23 @@ func _unhandled_input(event: InputEvent) -> void:
 			world.player_action(pid, "drone_photo")    # M6.1: i levé tlačítko fotí za letu
 		elif was_captured and freecam == null and player.car == null and player.horse == null and player.aircraft == null:
 			world.player_action(pid, "use_tool")
+	elif player.car != null and _car_radio_digit(event) >= 0:
+		world.player_action(pid, "car_radio_%d" % _car_radio_digit(event))   # M5.9: za volantem 0–5 = autorádio
 	else:
 		for n in range(1, 6):
 			if event.is_action_pressed("equip_slot_%d" % n):
 				world.player_action(pid, "equip_slot_%d" % n)
 				break
+
+
+## M5.9: číslice 0–5 stisknutá (ne echo) → 0–5; jinak -1. Za volantem jsou to předvolby autorádia.
+func _car_radio_digit(event: InputEvent) -> int:
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return -1
+	var k: int = event.physical_keycode
+	if k < KEY_0 or k > KEY_5:
+		return -1
+	return k - KEY_0
 
 
 func _interact() -> void:
@@ -418,10 +447,42 @@ func _interact() -> void:
 		open_sleep_menu(it["node"])
 	elif it["kind"] == "radio":
 		radio_view.open()
+	elif it["kind"] == "favor":
+		open_favor_menu(it)
 	elif it["kind"] == "custom":
 		(it["action"] as Callable).call(pid)     # krmelec, žlab, včelař, parůžky… (Hunter / Paddock)
 	else:
 		world.talk(pid, it)
+
+
+## Nabídka u vesničana (M4.5): rozhovor, prosba (přijetí / stav), dárek z inventáře, přátelské výhody.
+func open_favor_menu(it: Dictionary) -> void:
+	var v: Node = it["node"]
+	var per: Persona = v.get("persona")
+	if per == null:
+		return
+	var nm := per.display_name()
+	var off: Dictionary = world.favors.offer_for(pid, nm)
+	var fr := per.get_friendship(pid)
+	var lines := ["Přátelství %d / 100" % int(fr)]
+	var perks: Array = world.favors.perks(per, pid)
+	if not perks.is_empty():
+		lines.append("Výhody: " + ", ".join(PackedStringArray(perks)))
+	var opts := []
+	opts.append(["Promluvit", func(): world.talk(pid, {"kind": "villager", "node": v})])
+	if not off.is_empty():
+		var f: Dictionary = Favors.FAVORS.get(off["tpl"], {})
+		if off["state"] == "offer":
+			lines.append("Prosba: %s" % f["title"])
+			opts.append(["★ Přijmout: %s" % f["title"], func(): world.favors.accept(pid, nm)])
+		elif off["state"] == "accepted":
+			lines.append("Slib: %s (%d / %d)" % [f["text"], int(off["progress"]), int(f["n"])])
+	var p: Player = world.players[pid]
+	for item in p.inventory.keys():
+		var n := int(p.inventory[item])
+		if n > 0 and ItemsDB.exists(item):
+			opts.append(["Dát: %s (%d)" % [ItemsDB.name_of(item), n], func(): world.give_to_npc(pid, v, item)])
+	hud.open_menu(nm, "\n".join(PackedStringArray(lines)), opts)
 
 
 ## Nabídka postavy mimo Place (včelař): akce rozdělaného úkolu a úkoly, které postava nabízí.
@@ -585,10 +646,16 @@ func load_game(slot: String) -> void:
 func open_place_menu(key: String) -> void:
 	var q: Quests = world.quests_of(pid)
 	var opts := []
-	for o in q.place_options(key):
-		opts.append(["★ " + o[0], o[1]])
-	for qq in q.available_at(key):
-		opts.append(["★ Úkol: %s%s" % [qq.title, "  (znovu)" if qq.state == "failed" else ""], func(): _offer_quest(qq)])
+	# A1-05 / A4-01: zavřené místo od dveří nenabízí práci, úkoly ani zboží – jen info „Zavřeno, otevřeno …“.
+	# Výplatu a výpověď (Jobs.place_options) schováváme taky: zaměstnavatel tam mimo otevírací dobu není,
+	# nic se neztrácí (výplata zůstává nasbíraná, na účet chodí sama, výpověď jde dát při příští návštěvě).
+	var shut_pl: Place = world.places.get(key)
+	var shut: bool = shut_pl != null and key != "domov" and not shut_pl.is_open(world.clock.hour())
+	if not shut:
+		for o in q.place_options(key):
+			opts.append(["★ " + o[0], o[1]])
+		for qq in q.available_at(key):
+			opts.append(["★ Úkol: %s%s" % [qq.title, "  (znovu)" if qq.state == "failed" else ""], func(): _offer_quest(qq)])
 	var title := ""
 	var text := ""
 	var p := player.body.promile()
@@ -626,7 +693,7 @@ func open_place_menu(key: String) -> void:
 			var keeper := pl.keeper.display_name if pl.keeper else ""
 			text = "%s · otevřeno %s · máš %d Kč" % [keeper, pl.hours_text(), player.money]
 			if not open:
-				text += "\nZAVŘENO – dveře jsou zamčené."
+				text = "Zavřeno, otevřeno %s.\nDveře jsou zamčené. Máš %d Kč." % [pl.hours_text(), player.money]
 			elif key == "hospoda" and p > 2.5:
 				text += "\n„Ty už máš dost, jdi domů!“ (hostinský ti nenalije)"
 			if rep and rep.refused_at(key):
@@ -650,9 +717,34 @@ func open_place_menu(key: String) -> void:
 						if not row.is_empty():
 							opts.append(row)
 			# M1.5: dovnitř (zamčeno mimo otevírací dobu / pro postrach vsi řeší World._may_enter); nabídku od dveří jsme nechali
+			if open and key == "urad" and world.debts and world.debts.total(pid, Debts.FINE_KINDS) > 0:
+				opts.append(["Zaplatit pokuty a dluhy z hotovosti (%s)" % Bazaar.kc(world.debts.total(pid, Debts.FINE_KINDS)),
+					func(): world.pay_debts_office(pid)])     # M4.2: úřad přijímá hotovost
 			if open and player.inside == "" and world.interiors.has(key):
 				opts.insert(0, ["Vejít dovnitř", func(): world.enter_interior(pid, key)])
+			if open and key == "urad" and world.katastr:      # M4.7: katastr – koupě / prodej domů a parcel
+				opts.append(["Katastr – koupě a prodej nemovitostí", open_katastr_menu])
 	hud.open_menu(title, text, opts)
+
+
+## M4.7: nabídka katastru na úřadě (inzeráty z domácího katastru, moje domy a parcely, rozjednané vklady).
+func open_katastr_menu() -> void:
+	var k: Katastr = world.katastr
+	var opts := []
+	var lines := ["Katastr. Peníze: %d Kč. Nemovitosti jen v domácím katastru." % player.money]
+	for id in k.market_houses():
+		opts.append(["Koupit %s – %s" % [k.house_label(id), Bazaar.kc(k.house_price(id))], func(): k.buy_house(pid, id)])
+	for key in k.market_parcels():
+		opts.append(["Koupit %s – %s" % [k.parcel_label(key), Bazaar.kc(k.parcel_price(key))], func(): k.buy_parcel(pid, key)])
+	for id in k.owned_houses():
+		if world.estate.home_estate(pid) != id:
+			opts.append(["Nastavit %s jako domov" % k.house_label(id), func(): k.set_home_house(pid, id)])
+		opts.append(["Nabídnout %s kupci" % k.house_label(id), func(): k.list_house(pid, id)])
+	for key in k.owned_parcels():
+		opts.append(["Prodat %s obci (%d %%)" % [k.parcel_label(key), roundi(Katastr.OBEC_SHARE * 100.0)],
+			func(): k.sell_parcel_obci(pid, key)])
+	lines.append_array(k.status_lines(pid))
+	hud.open_menu("Katastr (úřad)", "\n".join(PackedStringArray(lines)), opts)
 
 
 ## Rozdělí `Place.OFFERS[key]` na kategorie podle záhlaví ("header", M2.3): [[název, [nabídky]], …].
@@ -680,6 +772,8 @@ func _offer_sections(key: String) -> Array:
 ## Jeden řádek nabídky (koupě / natočení / výkup) pro Hud.open_menu, nebo [], má-li se přeskočit
 ## (podnapilému hospoda alkohol nenalije).
 func _shop_item_row(key: String, o: Array) -> Array:
+	if ItemsDB.hidden(String(o[0])):
+		return []     # M4.8: obsah pro dospělé vypnutý – položka v nabídce není
 	var id: String = o[0]
 	var base: int = o[1]
 	var mode: String = o[2]
@@ -720,6 +814,12 @@ func _offer_quest(q) -> void:
 # ------------------------------------------------------------------ smyčka
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("client", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if player == null or not ready_done:
 		return
 	_update_daylight(delta)

@@ -7,7 +7,7 @@
 ## Jídlo: kcal do žaludku → trávení ~500 kcal/h → energetická bilance → hmotnost / BMI
 ##   (herní zrychlení: 1 kg tuku ≈ 7700 kcal / OBESITY_GAIN).
 ## Cigarety: nikotin (poločas ~2 h), chuť na cigaretu, dehet v plicích snižuje výdrž.
-##   Závislost (`addiction`) je klouzavý průměr kouření (poločas 24 h): příležitostný
+##   Závislost (`addiction`) je klouzavý průměr kouření (poločas 12 h): příležitostný
 ##   kuřák (1–2 denně) zůstává hluboko pod 0,1, těžký kuřák (2 krabičky/den, tj. 40 ks)
 ##   se ustálí kolem 1,0. Třes z abstinence se odvíjí od `craving * addiction`, takže
 ##   viditelně třese jen u fakticky závislé postavy a vždy zůstává hratelný (malá amplituda).
@@ -42,9 +42,21 @@ const OVERHEAT_TEMP := 25.0        # °C – nad tuto teplotu v silném oblečen
 const OVERHEAT_INSUL := 0.8        # izolace, od které se přehřívá
 const OVERHEAT_RATE := 0.6         # /h za (°C nad limit × izolace nad limit)
 const OVERHEAT_STAMINA := 0.2      # o tolik přehřátí (1,0) snižuje maximální výdrž
+# --- M4.8 návykové látky (jen při „Obsah pro dospělé“): THC (konopí) a psilocybin (lysohlávky) – mírné, nepříjemné efekty
+const THC_HALF_H := 1.5            # h – poločas THC v krvi (kouření: rychlý nástup, krátké)
+const EDIBLE_THC_DELAY_H := 1.0  # h – nástup THC po snědení (pomalejší než kouření)
+const MUSHROOM_TOXIC_HP := 12.0    # zdraví ztracené při otravě muchomůrkou (× síla jedu) – ladit
+const PSILO_HALF_H := 3.0          # h – poločas psilocybinu (snědení: pomalý nástup, déle)
+const THC_SPEED := 0.12            # zpomalení reakce (speed_mult) na 1,0 THC
+const THC_NAUSEA := 0.02           # nevolnost za hodinu nad THC 1,5
+const PSILO_NAUSEA := 0.03         # nevolnost za hodinu při psilocybinu (1,0)
 # --- závislost na nikotinu (M.smoke)
-const ADDICTION_DECAY_K := 0.02888 # /h – poločas klouzavého průměru kouření ~24 h
-const ADDICTION_NORM := 57.7       # _smoke_rate odpovídající ustálené závislosti 1,0 (~2 krabičky/den)
+const ADDICTION_DECAY_K := 0.0578  # /h – poločas klouzavého průměru kouření ~12 h
+const ADDICTION_NORM := 80.0       # _smoke_rate odpovídající ustálené závislosti 1,0 (~2 krabičky/den)
+const CRAVING_NICOTINE_MIN := 0.25 # mg – pod touto hladinou nikotinu chuť roste (po cigaretě ~4 h herních)
+const CRAVING_RATE := 0.07         # /h – růst chuti (do plné chuti zhruba 14 h herních, tj. ~30 min reálně)
+const CRAVING_BASE_CAP := 0.35     # strop chuti u nezávislé postavy; závislost ho zvedá až k 1,0
+const CRAVING_SLEEP_K := 0.2       # násobek růstu chuti ve spánku (spící po ránu nevstává s 100% chutí)
 
 var weight := 82.0                 # kg
 var stomach_alc := 0.0             # g ethanolu v žaludku
@@ -56,6 +68,9 @@ var craving := 0.0                 # 0..1 chuť na cigaretu
 var ever_smoked := false
 var addiction := 0.0               # 0..1 skutečná závislost (klouzavý průměr kouření, ne jen poslední cigareta)
 var _smoke_rate := 0.0             # interní akumulátor pro `addiction` (viz ADDICTION_NORM)
+var thc := 0.0                     # M4.8: THC v krvi (0..~2), konopí; výchozí 0 = starý save bez klíče
+var _thc_later: Array = []          # M4.8: snědené THC, které ještě nezačalo působit [zbývá h, síla] (neukládá se)
+var psilo := 0.0                   # M4.8: psilocybin (0..~2), lysohlávky; výchozí 0
 var caffeine := 0.0                # 0..1
 var nausea := 0.0                  # 0..1 → zvracení
 var health := 100.0
@@ -161,6 +176,7 @@ func speed_mult() -> float:
 	if p > 1.2:
 		m -= (p - 1.2) * 0.12
 	m -= cold * 0.08                     # prochladlý ujede míň
+	m -= clampf(thc, 0.0, 1.5) * THC_SPEED   # M4.8: THC zpomaluje reakce
 	return clampf(m, 0.45, 1.0)
 
 
@@ -207,6 +223,14 @@ func drink(id: String, ml: float) -> float:
 
 func eat(id: String) -> void:
 	var kcal := float(Consumables.info(id)["kcal"])
+	dose_psilo(float(Consumables.info(id).get("psilo", 0.0)))   # M4.8: lysohlávky (0 u běžného jídla)
+	var te := float(Consumables.info(id).get("thc_eat", 0.0))   # M4.8: konopné pečivo – THC nastoupí až po EDIBLE_THC_DELAY_H
+	if te > 0.0:
+		_thc_later.append([EDIBLE_THC_DELAY_H, te])
+	var tox := float(Consumables.info(id).get("toxic", 0.0))     # M4.8: muchomůrka – otrava (nevolnost, zdraví)
+	if tox > 0.0:
+		nausea = minf(nausea + 0.5 * tox, 1.0)
+		hurt(MUSHROOM_TOXIC_HP * tox, "otrava houbou")
 	stomach_kcal += kcal
 	total_kcal += kcal
 	_add_energy(kcal)
@@ -255,6 +279,18 @@ func skip_hours(hours: float, sleeping := true) -> void:
 	var steps := int(ceil(hours * 12.0))
 	for i in steps:
 		_step(hours / steps, 0.0, sleeping, {})
+
+
+## M4.8: vykouření konopí (THC). Tabák jde přes `smoke()`; zde jen stav THC, bez nikotinu a závislosti.
+func smoke_thc(strength: float) -> void:
+	thc += strength
+	if thc > 1.5:
+		nausea += 0.05       # silná dávka = nevolnost (ne odměna)
+
+
+## M4.8: snědení lysohlávek (psilocybin). Efekty obrazu jsou zatím jen HUD stav (viz otevřené body).
+func dose_psilo(strength: float) -> void:
+	psilo += strength
 
 
 func _add_energy(kcal: float) -> void:
@@ -327,11 +363,29 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 	# --- nikotin, dehet, chuť
 	nicotine *= exp(-dt_h * 0.35)
 	tar = maxf(tar - dt_h * 0.04, 0.0)
-	if ever_smoked and nicotine < 0.4:
-		craving = minf(craving + dt_h * 0.22, 1.0)
+	if ever_smoked and nicotine < CRAVING_NICOTINE_MIN:
+		var crave_cap := CRAVING_BASE_CAP + (1.0 - CRAVING_BASE_CAP) * addiction
+		var grow := CRAVING_RATE * (CRAVING_SLEEP_K if sleeping else 1.0)
+		if craving < crave_cap:
+			craving = minf(craving + dt_h * grow, crave_cap)
 	_smoke_rate *= exp(-dt_h * ADDICTION_DECAY_K)
 	addiction = clampf(_smoke_rate / ADDICTION_NORM, 0.0, 1.0)
 	caffeine = maxf(caffeine - dt_h * 0.25, 0.0)
+	# --- M4.8: THC a psilocybin odeznívají; při vyšší hladině nevolnost (žádné bonusy)
+	var keep := []
+	for e in _thc_later:
+		e[0] = float(e[0]) - dt_h
+		if float(e[0]) <= 0.0:
+			thc += float(e[1])
+		else:
+			keep.append(e)
+	_thc_later = keep
+	thc *= exp(-dt_h * log(2.0) / THC_HALF_H)
+	psilo *= exp(-dt_h * log(2.0) / PSILO_HALF_H)
+	if thc > 1.5:
+		nausea = minf(nausea + THC_NAUSEA * dt_h, 1.0)
+	if psilo > 0.3:
+		nausea = minf(nausea + PSILO_NAUSEA * psilo * dt_h, 1.0)
 	# --- nevolnost
 	var p := promile()
 	var rate := (p - _prev_promile) / dt_h

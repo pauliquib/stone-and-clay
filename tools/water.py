@@ -3,6 +3,7 @@
 Zdroj: OpenStreetMap (ODbL) z regionálního extraktu geodata/pbf/zlinsky-latest.osm.pbf – toky v ČR
 v OSM pocházejí převážně z DIBAVOD (VÚV T. G. M.): Březnice (řeka), Černý potok, Kaňovický potok,
 Oskorušný, Neradovský, Zlámanecký potok a bezejmenné přítoky; nádrže natural=water.
+Ve výstupu se názvy přepisují na fiktivní (FICTIONAL_NAMES) – reálná jména obcí/toků se ve hře neukazují.
 
 Postup:
   1. waterway=river|stream|ditch|drain|canal (bez propustků tunnel=culvert) a natural=water (bez
@@ -25,14 +26,18 @@ import sys
 
 import numpy as np
 import osmium
+from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.dirname(HERE)
-ROOT = os.path.dirname(GAME)
-sys.path.insert(0, os.path.join(ROOT, "scripts"))
+PIPE = os.path.join(GAME, "pipeline")
+PDATA = os.path.join(PIPE, "data")
+GEO = os.path.join(GAME, "geodata")
+PSCRIPTS = os.path.join(PIPE, "scripts")
+sys.path.insert(0, PSCRIPTS)
 from phase2_osm_to_local import make_transform  # noqa: E402
 
-PBF = os.path.join(ROOT, "geodata", "pbf", "zlinsky-latest.osm.pbf")
+PBF = os.path.join(GEO, "pbf", "zlinsky-latest.osm.pbf")
 DATA = os.path.join(GAME, "data")
 
 # druh → poloviční šířka dna, hloubka zahloubení, hloubka vody, sklon břehu (m/m), max. zářez, šířka hladiny/2
@@ -46,6 +51,93 @@ KINDS = {
 STEP = 2.0
 SNAP_R = 6.0
 POND_DEPTH = 0.9
+
+# Ve hře nesmí figurovat reálné názvy obcí/toků → fiktivní názvy (geometrie zůstává z OSM/DIBAVOD)
+FICTIONAL_NAMES = {
+    "Březnice": "Břehatice",
+    "Bohuslavice u Zlína": "Bohulečice",
+    "Březůvky": "Březouchy",
+    "Velký Ořechov": "Velký Oříškov",
+    "Hřivínův Újezd": "Hřiváčův Újezd",
+    "Černý potok": "Blatný potok",
+    "Kaňovický potok": "Havraní potok",
+    "Neradovský potok": "Sojčí potok",
+    "Oskorušný potok": "Jeřabinový potok",
+    "Zlámanecký potok": "Sokolí potok",
+    # reálné názvy ulic (sjednoceno s tools/obce.py a export_map.py)
+    "Švambovce": "Štambovce",
+    "Březovská": "Březoucká",
+}
+
+
+def fname(name, place_names=()):
+    """Jméno toku/nádrže → fiktivní podoba nebo "" (zahodit).
+
+    Hygienický filtr dle vzoru fname_road v tools/obce.py:
+    1) přesná shoda s FICTIONAL_NAMES (obec/řeka/potok),
+    2) substring náhrada mapovaných toponym („Kaňovický potok“→„Havraní potok“ aj.),
+    3) obsahuje-li název reálné toponymum z okolí (place uzel z union extraktu,
+       len ≥ 4 znaky, případně jeho přídavný kmen typu Kaňovice→Kaňovic),
+       které fiktivní protějšek nemá → "" (raději bez jména než reálný název)."""
+    if not name:
+        return ""
+    if name in FICTIONAL_NAMES:
+        return FICTIONAL_NAMES[name]
+    out = name
+    replaced = False
+    for real, fic in sorted(FICTIONAL_NAMES.items(), key=lambda kv: -len(kv[0])):
+        if real in out:
+            out = out.replace(real, fic)
+            replaced = True
+    for pl in place_names:
+        if len(pl) < 4:
+            continue
+        if pl in out:
+            return ""
+        # přídavné kmeny toponym: Březůvky→Březův(ecký), Doubravy→Doubrav(ský),
+        # Hřivínův Újezd→Hřivín(ovský), Kaňovice→Kaňovic(ký)
+        words = [pl] + ([pl.split()[0]] if " " in pl else [])
+        for w in words:
+            for k in (1, 2):
+                stem = w[:-k]
+                if len(stem) >= 4 and stem in out:
+                    return ""
+    # přísná hygiena: názvy vod jsou reálná jména z DIBAVOD (Holomňa, Milenov,
+    # Jaroslavický potok…) – zobrazit smí jen jméno, ve kterém se skutečně
+    # provedla fiktivní náhrada; ostatní zahodit
+    if not replaced:
+        return ""
+    return out
+
+
+def load_place_names():
+    """Reálná toponyma pro fname() – place_names z celého kraje v union extraktu
+    (chytnou i města za hranou: Zlín, Luhačovice…), jinak place uzly z bbox."""
+    out = set()
+    for fn in ("osm_raw_union.json", "osm_raw_full.json"):
+        p = os.path.join(PDATA, fn)
+        if not os.path.exists(p):
+            continue
+        try:
+            raw = json.load(open(p, encoding="utf-8"))
+        except Exception:
+            continue
+        out.update(raw.get("place_names", ()))
+        for e in raw.get("elements", []):
+            if e.get("type") == "node" and "place" in e.get("tags", {}) and e["tags"].get("name"):
+                out.add(e["tags"]["name"])
+        if out:
+            break
+    return out
+
+
+def osm_raw_bbox():
+    """bbox lat/lon pro Collector – preferuje union extrakt (B2), jinak full (katastr)."""
+    for fn in ("osm_raw_union.json", "osm_raw_full.json"):
+        p = os.path.join(PDATA, fn)
+        if os.path.exists(p):
+            return json.load(open(p, encoding="utf-8"))["bbox_latlon_margin"], fn
+    raise FileNotFoundError("chybí pipeline/data/osm_raw_{union,full}.json")
 
 
 class Collector(osmium.SimpleHandler):
@@ -95,8 +187,19 @@ class Grid:
                 self.z0 + margin < z < self.z0 + (self.h - 1) * self.sp - margin)
 
 
+# šířky silničních pásů pro ochranu mřížky v novém území (budovy/silnice se tam
+# staví až ve fázi B3 – osy z okoli_union_local.geojson); ≈ phase13 ROAD_W
+LINE_ROAD_W = {"motorway": 10, "trunk": 9, "primary": 8, "secondary": 7, "tertiary": 6.5,
+               "unclassified": 5.5, "residential": 5.5, "living_street": 5, "service": 3.5,
+               "track": 3, "path": 1.5, "footway": 1.8, "cycleway": 2}
+
+
 def road_mask(g):
-    """Body mřížky pod silnicemi / cestami (trojúhelníky asphalt.bin + gravel.bin), rozšířené o 2 buňky."""
+    """Body mřížky pod silnicemi / cestami, rozšířené o 2 buňky.
+
+    Dvě vrstvy: trojúhelníky asphalt.bin + gravel.bin (starý blok – přesná geometrie)
+    a osy highway=* z okoli_union_local.geojson (nové území – silniční pásy vzniknou
+    až v B3; bez ochrany by se koryto toku zařízlo pod budoucí vozovku)."""
     mask = np.zeros((g.h, g.w), bool)
     for fn in ("asphalt.bin", "gravel.bin"):
         b = open(os.path.join(DATA, fn), "rb").read()
@@ -116,6 +219,27 @@ def road_mask(g):
                 iz = np.round((p[:, 2] - g.z0) / g.sp).astype(int)
                 ok = (ix >= 0) & (ix < g.w) & (iz >= 0) & (iz < g.h)
                 mask[iz[ok], ix[ok]] = True
+    n_dbm = int(mask.sum())
+    # --- osy silnic z union extraktu (chrání i nové území, kde DBM1 ještě není)
+    gj_path = os.path.join(PDATA, "okoli_union_local.geojson")
+    if os.path.exists(gj_path):
+        img = Image.new("L", (g.w, g.h), 0)
+        dr = ImageDraw.Draw(img)
+        n_lines = 0
+        for ft in json.load(open(gj_path, encoding="utf-8"))["features"]:
+            p = ft["properties"]
+            if p.get("kind") != "highway" or ft["geometry"]["type"] != "LineString":
+                continue
+            wid = LINE_ROAD_W.get(p.get("highway", ""))
+            if wid is None:
+                continue
+            line = [((q[0] - g.x0) / g.sp - 0.5, (-q[1] - g.z0) / g.sp - 0.5)
+                    for q in ft["geometry"]["coordinates"]]
+            if len(line) >= 2:
+                dr.line(line, fill=1, width=max(1, int(round(wid / g.sp))))
+                n_lines += 1
+        mask |= np.array(img, bool)
+        print(f"ROAD MASK lines: {n_lines} os z okoli_union_local.geojson")
     for _ in range(2):
         m = mask.copy()
         m[1:, :] |= mask[:-1, :]
@@ -123,7 +247,8 @@ def road_mask(g):
         m[:, 1:] |= mask[:, :-1]
         m[:, :-1] |= mask[:, 1:]
         mask = m
-    print(f"ROAD MASK: {int(mask.sum())} grid vertices protected")
+    print(f"ROAD MASK: {int(mask.sum())} grid vertices protected "
+          f"(z toho DBM1 {n_dbm})")
     return mask
 
 
@@ -203,8 +328,10 @@ def carve_stream(g, P, bed, spec, protect):
 
 def main():
     meta = json.load(open(os.path.join(DATA, "map.json")))
-    ref = json.load(open(os.path.join(ROOT, "data", "scene_reference.json")))
-    bbox = json.load(open(os.path.join(ROOT, "data", "osm_raw_full.json")))["bbox_latlon_margin"]
+    ref = json.load(open(os.path.join(PDATA, "scene_reference.json")))
+    bbox, bbox_src = osm_raw_bbox()
+    pnames = load_place_names()
+    print(f"OSM bbox: {bbox_src}; place_names pro filtr: {len(pnames)}")
     tf = make_transform(ref)
     g = Grid(meta)
     protect = road_mask(g)
@@ -226,7 +353,7 @@ def main():
             poly = pts[:-1]
             if not all(g.inside(x, z) for x, z in poly):
                 continue
-            ponds.append({"id": w["id"], "name": t.get("name", ""), "poly": poly})
+            ponds.append({"id": w["id"], "name": fname(t.get("name", ""), pnames), "poly": poly})
             continue
         if t.get("tunnel") in ("culvert", "yes") or t.get("layer", "0").startswith("-"):
             continue
@@ -239,12 +366,12 @@ def main():
             if g.inside(*p):
                 run.append(p)
             elif len(run) >= 2:
-                streams.append({"id": w["id"], "kind": kind, "name": t.get("name", ""), "pts": run})
+                streams.append({"id": w["id"], "kind": kind, "name": fname(t.get("name", ""), pnames), "pts": run})
                 run = []
             else:
                 run = []
         if len(run) >= 2:
-            streams.append({"id": w["id"], "kind": kind, "name": t.get("name", ""), "pts": run})
+            streams.append({"id": w["id"], "kind": kind, "name": fname(t.get("name", ""), pnames), "pts": run})
 
     out_streams = []
     total_len = 0.0

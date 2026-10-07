@@ -50,5 +50,5 @@ s hlasováním postav a výsledkem.
 7. Úplatek před policistou / přísnou postavou → přestupek / trestný čin a následky.
 
 ## 6. Závěr
-README, VIZE a roadmapa README odškrtnout, PROJECT_LOG, deník AI, commit „M7.2 Kampaň a volby: …“,
+README, VIZE a roadmapa README odškrtnout, PROJECT_LOG, commit „M7.2 Kampaň a volby: …“,
 checklist a čekat.

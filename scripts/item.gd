@@ -51,6 +51,10 @@ func _ready() -> void:
 			_add(_cyl(0.07, 0.09, 0.22), Vector3(0, 0.11, 0), Color(0.92, 0.88, 0.78))
 			var cap := _add(_sphere(0.17), Vector3(0, 0.24, 0), Color(0.45, 0.24, 0.1))
 			cap.scale = Vector3(1, 0.6, 1)
+		"lysohlavky":
+			_add(_cyl(0.05, 0.06, 0.12), Vector3(0, 0.07, 0), Color(0.92, 0.88, 0.7))
+			var lcap := _add(_sphere(0.12), Vector3(0, 0.15, 0), Color(0.8, 0.72, 0.5))
+			lcap.scale = Vector3(1, 0.5, 1)
 		"jablko":
 			_add(_sphere(0.1), Vector3(0, 0.12, 0), Color(0.8, 0.1, 0.08), 0.35)
 			_add(_cyl(0.01, 0.01, 0.06), Vector3(0, 0.24, 0), Color(0.3, 0.2, 0.1))
@@ -122,6 +126,7 @@ func _add(m: Mesh, pos: Vector3, c: Color, rough := 0.7, metal := 0.0, emit := 0
 	var mi := MeshInstance3D.new()
 	mi.mesh = m
 	mi.position = pos
+	mi.visibility_range_end = 110.0      # drobotina – dál než ~110 m ji nikdo nepozná
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = c
 	mat.roughness = rough

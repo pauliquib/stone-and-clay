@@ -5,6 +5,8 @@
 ## Grafika (Esc → Nastavení → Grafika): předvolba Nízká / Střední / Vysoká / Ultra nebo Vlastní –
 ## rozlišení 3D a upscaling, vyhlazování, stíny slunce, dohlednost (násobí visibility_range všech modelů,
 ## i těch přidaných později – `node_added`), vegetace kolem hráče (květy, ovoce, listí), záře, SSAO, strop FPS.
+## Podání barev světa (tonemapping, sytost, kontrast) stojí mimo předvolby – je to věc vkusu, tak přepnutí
+## předvolby nezhasne oblíbené barvy (stejně jako renderer a strop FPS).
 class_name GameSettings
 extends RefCounted
 
@@ -22,8 +24,11 @@ var fov := 72.0              # základní zorné pole postavy (°)
 var volume := 1.0            # hlavní hlasitost 0–1
 var fullscreen := false
 var vsync := 0               # index do VSYNC_MODES
-var trike_intuitive := false # M6.5: arkádové řízení rogala hrazdou (W = nahoru); výchozí realistické obrácené
+var trike_realistic := false # M6.5 / vlna 0d: realistické obrácené řízení rogala hrazdou; výchozí intuitivní (W = nahoru, A = vlevo)
 var show_fps := true
+var withdrawal_shake := true # třes obrazu při abstinenci a zimě (Esc → Nastavení → Třes obrazu)
+var image_fx := true        # M4.8: Efekty obrazu (opilost, látky, zranění) – nezávisle na obsahu pro dospělé; ovládá DrunkFx
+var adult_content := false   # M4.8: obsah pro dospělé (návykové látky) – výchozí vypnuto; vypnuto = obsah ve hře není (Esc → Nastavení)
 var vsync_from_args := false # --vsync / --novsync na příkazové řádce má přednost před uloženým nastavením
 var maxfps_from_args := false
 var renderer := "forward_plus"  # uloženo do nastaveni.cfg, čte ho run.sh (projeví se až po restartu hry)
@@ -42,20 +47,33 @@ const VIEWS := [0.6, 0.8, 1.0, 1.25]
 const VIEW_NAMES := ["Krátká", "Střední", "Daleká", "Velmi daleká"]
 const VEGS := [0.0, 0.5, 0.75, 1.0]
 const VEG_NAMES := ["Vypnuto", "Málo", "Středně", "Plně"]
+## aktivita světa: poloměr plné simulace okolo hráče (NPC, zvířata, doprava)
+const SIMS := [250.0, 400.0, 600.0, 900.0]
+const SIM_NAMES := ["Malá", "Střední", "Velká", "Maximální"]
 const FPS_CAPS := [0, 30, 60, 75, 120, 144]
 const FPS_NAMES := ["Bez omezení", "30", "60", "75", "120", "144"]
-## předvolby: scale, upscale, aa, shadows, view, veg, glow, ssao
+## předvolby: scale, upscale, aa, shadows, view, veg, sim, glow, ssao
 const PRESETS := [
-	{"scale": 0, "upscale": 1, "aa": 0, "shadows": 0, "view": 0, "veg": 0, "glow": false, "ssao": false},
-	{"scale": 3, "upscale": 1, "aa": 1, "shadows": 2, "view": 1, "veg": 1, "glow": true, "ssao": false},
-	{"scale": 4, "upscale": 0, "aa": 2, "shadows": 3, "view": 2, "veg": 3, "glow": true, "ssao": false},
-	{"scale": 4, "upscale": 0, "aa": 3, "shadows": 4, "view": 3, "veg": 3, "glow": true, "ssao": true},
+	{"scale": 0, "upscale": 1, "aa": 0, "shadows": 0, "view": 0, "veg": 0, "sim": 0, "glow": false, "ssao": false},
+	{"scale": 3, "upscale": 1, "aa": 1, "shadows": 2, "view": 1, "veg": 1, "sim": 1, "glow": true, "ssao": false},
+	{"scale": 4, "upscale": 0, "aa": 2, "shadows": 3, "view": 2, "veg": 3, "sim": 2, "glow": true, "ssao": false},
+	{"scale": 4, "upscale": 0, "aa": 3, "shadows": 4, "view": 3, "veg": 3, "sim": 3, "glow": true, "ssao": true},
 ]
-const GFX_KEYS := ["scale", "upscale", "aa", "shadows", "view", "veg", "glow", "ssao"]
+const GFX_KEYS := ["scale", "upscale", "aa", "shadows", "view", "veg", "sim", "glow", "ssao"]
+## podání barev: [tonemapper, sytost, kontrast, bílá (tonemap_white)] – Přirozené odpovídá původnímu
+## vzhledu (LocalClient.build_environment); sytější režimy jedou přes ACES (víc kontrastu a nasycení
+## než Filmic; AgX je až od Godotu 4.4)
+const COLOR_NAMES := ["Přirozené", "Syté (truecolor)", "Živé"]
+const COLORS := [
+	[Environment.TONE_MAPPER_FILMIC, 1.08, 1.0, 6.0],
+	[Environment.TONE_MAPPER_ACES, 1.18, 1.05, 6.0],
+	[Environment.TONE_MAPPER_ACES, 1.32, 1.1, 4.5],
+]
 
 var preset := 2
 var gfx: Dictionary = PRESETS[2].duplicate()
 var fps_cap := 0
+var color_mode := 0
 var _view_applied := 1.0
 var _atlas := -1                 # naposledy nastavená velikost mapy stínů (přealokace = záškub – jen při změně)
 var _soft := -1
@@ -68,16 +86,22 @@ func load_file() -> void:
 		return
 	mouse_sens = clampf(float(cf.get_value("ovladani", "citlivost", mouse_sens)), 0.2, 3.0)
 	invert_y = bool(cf.get_value("ovladani", "obratit_y", invert_y))
-	trike_intuitive = bool(cf.get_value("ovladani", "rogalo_intuitivni", trike_intuitive))
+	trike_realistic = bool(cf.get_value("ovladani", "rogalo_realisticke", trike_realistic))   # starý klíč rogalo_intuitivni se ignoruje
 	fov = clampf(float(cf.get_value("obraz", "fov", fov)), 55.0, 95.0)
 	fullscreen = bool(cf.get_value("obraz", "cela_obrazovka", fullscreen))
 	vsync = clampi(int(cf.get_value("obraz", "vsync", vsync)), 0, VSYNC_MODES.size() - 1)
 	show_fps = bool(cf.get_value("obraz", "fps", show_fps))
+	withdrawal_shake = bool(cf.get_value("obraz", "tres", withdrawal_shake))
+	image_fx = bool(cf.get_value("obraz", "efekty", image_fx))
+	DrunkFx.enabled = image_fx     # M4.8: DrunkFx ví, jestli kreslit efekty
+	adult_content = bool(cf.get_value("obsah", "dospeli", adult_content))
+	ItemsDB.adult_on = adult_content     # M4.8: katalog hned ví, jestli je obsah pro dospělé zapnutý
 	volume = clampf(float(cf.get_value("zvuk", "hlasitost", volume)), 0.0, 1.0)
 	preset = clampi(int(cf.get_value("grafika", "predvolba", preset)), 0, PRESET_NAMES.size() - 1)
 	for k in GFX_KEYS:
 		gfx[k] = cf.get_value("grafika", k, gfx[k])
 	fps_cap = clampi(int(cf.get_value("grafika", "strop_fps", fps_cap)), 0, FPS_CAPS.size() - 1)
+	color_mode = clampi(int(cf.get_value("grafika", "barvy", color_mode)), 0, COLORS.size() - 1)
 	renderer = String(cf.get_value("grafika", "renderer", renderer))
 	if not RENDERER_VALUES.has(renderer):
 		renderer = RENDERER_VALUES[0]
@@ -87,16 +111,20 @@ func save_file() -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("ovladani", "citlivost", mouse_sens)
 	cf.set_value("ovladani", "obratit_y", invert_y)
-	cf.set_value("ovladani", "rogalo_intuitivni", trike_intuitive)
+	cf.set_value("ovladani", "rogalo_realisticke", trike_realistic)
 	cf.set_value("obraz", "fov", fov)
 	cf.set_value("obraz", "cela_obrazovka", fullscreen)
 	cf.set_value("obraz", "vsync", vsync)
 	cf.set_value("obraz", "fps", show_fps)
+	cf.set_value("obraz", "tres", withdrawal_shake)
+	cf.set_value("obraz", "efekty", image_fx)
+	cf.set_value("obsah", "dospeli", adult_content)
 	cf.set_value("zvuk", "hlasitost", volume)
 	cf.set_value("grafika", "predvolba", preset)
 	for k in GFX_KEYS:
 		cf.set_value("grafika", k, gfx[k])
 	cf.set_value("grafika", "strop_fps", fps_cap)
+	cf.set_value("grafika", "barvy", color_mode)
 	cf.set_value("grafika", "renderer", renderer)
 	cf.save(PATH)
 
@@ -113,6 +141,7 @@ func apply(client: Node) -> void:
 	AudioServer.set_bus_mute(0, volume <= 0.0)
 	if client.player:
 		client.player.base_fov = fov
+		client.player.shake_enabled = withdrawal_shake
 	if client.hud:
 		client.hud.show_fps = show_fps
 	apply_graphics(client)
@@ -171,11 +200,21 @@ func apply_graphics(client: Node) -> void:
 	if env:
 		env.glow_enabled = bool(gfx["glow"])
 		env.ssao_enabled = bool(gfx["ssao"])
+		var cc: Array = COLORS[clampi(color_mode, 0, COLORS.size() - 1)]
+		env.tonemap_mode = cc[0]
+		env.adjustment_saturation = cc[1]
+		env.adjustment_contrast = cc[2]
+		env.tonemap_white = cc[3]
 	# vegetace kolem hráče
 	var veg: float = VEGS[clampi(int(gfx["veg"]), 0, VEGS.size() - 1)]
 	if client.season_fx and client.season_fx.flowers:
 		client.season_fx.flowers.set_detail(veg)
 		client.season_fx.decor.set_detail(veg)
+	if client.world and client.world.vegetation:   # Fáze 9: statická vegetace – 0 = vypnuto
+		client.world.vegetation.set_detail(veg)
+	# aktivita světa – poloměr plné simulace NPC/fauny/dopravy okolo hráče
+	if client.world:
+		client.world.sim_radius = SIMS[clampi(int(gfx.get("sim", 2)), 0, SIMS.size() - 1)]
 	# strop FPS (--maxfps má přednost)
 	if not maxfps_from_args:
 		Engine.max_fps = FPS_CAPS[clampi(fps_cap, 0, FPS_CAPS.size() - 1)]

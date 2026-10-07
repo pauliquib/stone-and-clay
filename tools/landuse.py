@@ -30,11 +30,14 @@ from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.dirname(HERE)
-ROOT = os.path.dirname(GAME)
-sys.path.insert(0, os.path.join(ROOT, "scripts"))
+PIPE = os.path.join(GAME, "pipeline")
+PDATA = os.path.join(PIPE, "data")
+GEO = os.path.join(GAME, "geodata")
+PSCRIPTS = os.path.join(PIPE, "scripts")
+sys.path.insert(0, PSCRIPTS)
 from phase2_osm_to_local import make_transform  # noqa: E402
 
-PBF = os.path.join(ROOT, "geodata", "pbf", "zlinsky-latest.osm.pbf")
+PBF = os.path.join(GEO, "pbf", "zlinsky-latest.osm.pbf")
 DATA = os.path.join(GAME, "data")
 CELL = 4.0
 
@@ -78,8 +81,11 @@ class Collector(osmium.SimpleHandler):
 
 def main():
     meta = json.load(open(os.path.join(DATA, "map.json")))
-    ref = json.load(open(os.path.join(ROOT, "data", "scene_reference.json")))
-    b0 = json.load(open(os.path.join(ROOT, "data", "osm_raw_full.json")))["bbox_latlon_margin"]
+    ref = json.load(open(os.path.join(PDATA, "scene_reference.json")))
+    raw_name = "osm_raw_union.json" if os.path.exists(os.path.join(PDATA, "osm_raw_union.json")) \
+        else "osm_raw_full.json"
+    b0 = json.load(open(os.path.join(PDATA, raw_name)))["bbox_latlon_margin"]
+    print(f"OSM bbox: {raw_name}")
     m = 0.03      # rezerva ve stupních – bbox z osm_raw je užší než výšková mřížka; pořadí (lon0, lat0, lon1, lat1)
     bbox = [b0[0] - m, b0[1] - m, b0[2] + m, b0[3] + m]
     tf = make_transform(ref)

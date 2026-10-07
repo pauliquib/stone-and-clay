@@ -121,6 +121,20 @@ Postup (zavádí krok **M0.1**):
 | D4 | Hlavní cíl: popularita a cesta na starostu (poctivě i úplatky / podvody), unikátní příběh, hodně sidequestů | 4.7 | M7.1–M7.4 |
 | D5 | Co nejbohatší rozhovor s obyvateli přes T | 3.5 | hotovo mimo milník (doplněk 30. 9. 2026) |
 | D6 | Oprava 3D: končetiny „naruby“, divné držení předmětů | – | hotovo mimo milník (doplněk 30. 9. 2026) |
+| E1 | Pálení větví jen suchých, obecní vyhláška o zákazu pálení, legální táborák na špekáčky / gril | 4.4 | M4.4 |
+| E2 | Úkol: spálit velkou hromadu větví a maskovat to jako opékání špekáčků | 4.7 | M7.3 (mechanika M4.4) |
+| E3 | Sucho → vyhláška: zákaz zalévání a napouštění bazénů z vodovodu (kdo má studnu, nemusí) | 4.4 | M4.4 |
+| E4 | Sekání trávy a otravný hluk na vsi, nedělní klid | 4.4 | M4.4 |
+| E5 | Pouliční osvětlení a světelný smog (viditelnost hvězd) | 4.1 | M5.12 |
+| E6 | Rádio v autě, rozsvěcování vnitřního světla v autě | 4.5 | M5.9 |
+| E7 | Řidiči v NPC autech, nástup a výstup obyvatel | 4.1 | M5.11 (navazuje M4.5 „odvezeš mě“) |
+| E8 | Pěstování, sušení, zpracování a kouření tabáku a konopí, lysohlávky (stavy po užití) – obsah pro dospělé | 4.4 | M4.8 |
+| E9 | Nedělní mše v kapličce a v kostele ve Velkém Oříškově (farář, interiér) | 4.5 | M5.5 |
+| E10 | Studánka, skautský tábor v lese, MTB bikepark | 4.5 | M5.10 |
+| E11 | Editor map, postav, objektů a úkolů | – | milník N (po M7) |
+| E12 | Poznámky ze hry 30. 9. (propad u obchodu, zoom mapy, cigarety, víkendy obchodu, vozík a sprint, doprava) | – | hotovo ve vlně 0 (`docs/audit_vlna0.md`) |
+| E13 | Stromy podle stanoviště: druh, vitalita a tvar odvozené z terénu/vlhkosti/sklonu, ekonomika dřeva | 4.8 | M8.2, M8.3, M8.8, M8.11 |
+| E14 | Transformační upgrade: co nejvíc reálné fyziky a ekologie světa (rostliny, stromy, zvířata, vítr, slunce, „život“, člověk) | 4.9 | M8.1–M8.19 |
 
 ---
 
@@ -168,7 +182,7 @@ nástroje v ruce, akce má **trvání** (průběh na HUD), stojí výdrž, dá X
 Katalog `přestupků / trestných činů`: druh → zákon a § (např. 361/2000 Sb. silniční provoz,
 251/2016 Sb. přestupky, 40/2009 Sb. trestní zákoník, 114/1992 Sb. ochrana přírody, 289/1995 Sb. lesy,
 133/1985 Sb. požární ochrana, 449/2001 Sb. myslivost, 99/2004 Sb. rybářství, zákon o zbraních
-a střelivu – od 2026 nový zákon č. 90/2024 Sb., letecké předpisy ÚCL), rozpětí pokuty, body v bodovém systému, zákaz
+a střelivu – od 2026 nový zákon č. 90/2024 Sb., letecké předpisy ÚVL), rozpětí pokuty, body v bodovém systému, zákaz
 činnosti, zda jde o trestný čin (→ soud). Konkrétní částky a body se doplní z **aktuálního znění** při
 implementaci (bodový systém byl novelizován v roce 2024).
 
@@ -322,7 +336,7 @@ hasičská soutěž).
   a podmínky. Radio Skyrock se nepřidává. Smyšlené *Rádio Kovadlina* (metal) zůstává.
 
 ### 4.6 Létání (1)
-- **Dron:** pohled z kamery, baterie, dosah, vítr; pravidla ÚCL (registrace provozovatele, online test
+- **Dron:** pohled z kamery, baterie, dosah, vítr; pravidla ÚVL (registrace provozovatele, online test
   A1/A3, max. 120 m, ne nad lidmi a cizími pozemky) → přestupky, dron může spadnout a něco poškodit.
 - **Motorový paraglide (paramotor):** rozběh, trim, plyn, vítr a termika, přistání; pilotní průkaz
   (sportovní létání – LAA ČR).
@@ -338,6 +352,60 @@ hasičská soutěž).
 - **Unikátnost:** seed hry mění protikandidáty, přání obce, skandály a události kampaně; vedlejší úkoly se
   2–3 konci a řetězy postav rozhodují hlasy komunit. Po zvolení rozpočet, projekty, zastupitelstvo a konce příběhu.
 - Satira se smyšlenými postavami – žádný skutečný starosta, strana, znak ani rozpočet obce.
+
+### 4.8 Nápady k zvážení
+
+Nápady, které vznikly mimo původní poznámky. U každého je zařazení (kurzívou), nebo „nezařazeno“.
+
+- **Stromy podle stanoviště (E13, nápad 7. 10. 2026)** – *→ zařazeno do M8 (M8.2 stanoviště, M8.3 druhy a porosty,
+  M8.8 generátor tvarů, M8.11 růst; viz kap. 4.9)*. Rozšíření sázení stromů (M2.5, hotovo) a lesa
+  obecně o věrohodnější závislost tvaru na místě, bez plné biologické simulace půdy (ta v žádném
+  běžném nástroji ani neexistuje hotová – viz rešerše níže):
+  - **Výběr druhu podle stanoviště, ne jen podle hráče:** z DMR (`terrain_height.bin`) spočítat pro
+    každou buňku nadmořskou výšku, sklon, orientaci ke světovým stranám a index vlhkosti terénu (TWI –
+    jak moc se tam stéká voda) a blízkost vodního toku (`water.gd`). K tomu ruční tabulka druh ↔
+    stanoviště (smrk a borovice na kyselejších/sušších svazích, dub a habr na teplejších jižních,
+    olše a vrba u vody, buk na chladnějších severních svazích). Použije se v `tools/vegetation.py`
+    (podrost) i v budoucím generování lesních ploch (dnes `trees.bin` má jen pozici/druh/měřítko bez
+    vazby na terén). Zpřesnit by šlo přes BPEJ/lesnickou typologii (ÚHÚL), ale to je až druhý krok.
+  - **Vitalita jako jeden odvozený parametr (0–1)** z kvality stanoviště: ovládá výšku, tloušťku kmene,
+    hustotu koruny a zkroucení větví u zasazených stromů (`PlantedTrees` z M2.5). Strom na mělké
+    skalnaté půdě bude drobný a křivý, v nivě potoka mohutný a rovný – bez nutnosti simulovat
+    skutečnou biochemii půdy (ani specializované vědecké nástroje typu CPlantBox / OpenSimRoot
+    nedělají víc než tohle na úrovni tvaru).
+  - **Pár mesh variant na druh podle vitality** (3–5), generovaných stejným postupem jako
+    `tools/gen_vegetation_meshes.gd`, aby zapadly do existujícího MultiMesh + LOD potrubí.
+  - **Ekonomika dřeva:** z výšky/tloušťky (fakticky z vitality a věku) spočítat objem dřeva → cena
+    při prodeji (`M2.1` kácení, `M3.3` lesní dělník). Smrk na podmáčeném jílu = vyšší riziko vývratu
+    po bouři (`priroda/weather.gd` vítr) – pěkná náhodná událost navázaná na počasí.
+  - **Vazba na houby a zvěř:** druh a stáří porostu ovlivní, kde se objevují houby (`World.SEASON_ITEMS`)
+    a kde se drží zvěř (`fauna/`) – malá úprava existujících tabulek, ne nový systém.
+  - **Proč to nejde koupit hotové:** běžné spotřebitelské „zadej druh a půdu → 3D strom“ neexistuje.
+    Vědecké FSPM nástroje (CPlantBox, OpenSimRoot, GroIMP, L-py, iLand) simulují biologii, ale vstupy
+    (půdní profil) musí někdo zadat ručně a výstup není herní mesh. Procedurální generátory (SpeedTree,
+    The Grove, Blender Sapling/Geometry Nodes) naopak půdu vůbec neznají – vitalitu/tvar nastavuje
+    grafik ručně. Pro hru dává smysl jen zjednodušený odvozený model výše, ne integrace cizího nástroje.
+  - **Rozsah práce:** rozšíření `trees.bin`/`PlantedTrees` o druh + vitalitu beze změny rendereru je
+    malý krok; growth curve (Chapman-Richards) podle druhu a vitality je další malý krok. Lesní
+    hospodaření a vývraty jsou větší a navazují na M3.3 a M4.4 (povolení ke kácení).
+
+### 4.9 Realistický svět – transformační upgrade (E14, M8)
+
+Zadání uživatele 7. 10. 2026: postupně implementovat co nejvíce reálné fyziky světa – rostliny, stromy, zvířata, vítr, sluneční
+záře, „život“ a člověk – a tím vdechnout hře realističnost. Principy (podrobně `prompts/roadmapa/M8_realismus/00_PRINCIPY.md`):
+
+- **Krajina určuje život.** Jedna předpočítaná **mapa stanovišť** (sklon, orientace, TWI, vzdálenost k vodě, oslunění, půda, mrazové
+  kotliny) je zdrojem pro vše další: kde je vlhko, kde mrzne, co kde roste, kde se drží zvěř.
+- **Řetěz modelů, ne izolované efekty:** stanoviště → **voda** (vlhkost půdy, odtok, průtok potoků) a **mikroklima** (inverze, údolní mlha,
+  rosa) → **fenologie a růst** (každý druh podle sum teplot, pozdní mrazy) → **plodiny**, **louky** a **zvěř** (potrava, kryt, populace) →
+  **člověk** (tepelná bilance těla, chůze, život domácností) → **zvuk** krajiny. Vítr a fyzikální světlo jsou společné pro všechny.
+- **Věrohodné, ne vědecké:** každý model je nejjednodušší známý vzorec (TWI, SCS-CN, Hargreaves, GDD, Chapman–Richards, space colonization,
+  Rayleigh/Mie, Bekker, Dolbear, Froude) s konstantami v tabulkách a kalibrací na české reálie (ČHMÚ, ČSÚ) v posledním kroku.
+- **Hráč to musí vidět:** strakatý les na jaře, mlha v údolí ráno, kalný potok po bouřce, zapadlé auto v rozmáčené louce, srnci za soumraku
+  na poli, cvrčci rychlejší za tepla, rozsvěcující se kuchyně v zimě v 6:30.
+- **Výkon a bezpečí:** cíl 60 FPS na GTX 1050 (rozpočet na krok), vše jde vypnout přepínačem a bez něj hra běží jako dřív; staré savy se načtou.
+- **Nástroje z rešerše** (SpeedTree, The Grove, OpenSimRoot, GroIMP, iLand…) se do hry neintegrují – převzaly se z nich **postupy**
+  (space colonization, pipe model, stanovištní nároky, růstové křivky) do vlastních offline generátorů v `tools/`.
 
 ---
 
@@ -413,34 +481,46 @@ kroky přehazovat, mezi milníky platí závislosti.
 - [x] **M3.4 Počítač** – PC doma s UI: e-shop + doručení, bazar, portál práce, bankovnictví, web obce. *Hotovo i pošta, bankomat, eTesty (rámec + cvičný test), Miny; otevřené body v PROJECT_LOG.*
 
 ### M4 – Zákon a společnost
-- [ ] **M4.1 Řidičská oprávnění a autoškola** – skupiny, e-test na PC, jízdy, zkouška, jízda bez oprávnění.
-- [ ] **M4.2 Správní řízení na úřadě** – příkazy, splatnost pokut, exekuce při nezaplacení, přezkoušení.
-- [ ] **M4.3 Soud a vězení** – trestné činy z katalogu, tresty, časový skok a jeho následky.
-- [ ] **M4.4 Další přestupky** – kácení, oheň, zvířata, krádeže úrody, rušení klidu, drony (po M6.1).
-- [ ] **M4.5 Nové cesty k pověsti / respektu / karmě** – pomoc sousedům, úklid, vrácení věcí, přátelství
+- [x] **M4.1 Řidičská oprávnění a autoškola** – rozšíření `Permits` (skupiny, odebrání, přezkoušení), panel dokladů P,
+  e-test na PC, jízdy, zkouška, jízda bez oprávnění.
+- [x] **M4.2 Správní řízení na úřadě** – blokové pokuty, příkazy poštou, splatnost, odpor, společný systém dluhů a exekucí
+  (`Debts` – použije ho i M4.3 a hypotéka M4.7), schránka, vrácení řidičáku.
+- [ ] **M4.4 Další přestupky a svědci** – **část A hotová** (jednotný `witness_check`, nenahlášené činy, oživené řádky
+  katalogu; zbývá povolení ke kácení). **Část B částečně:** hotovo – vyhlášky na úřední desce (zákaz pálení, sucho,
+  nedělní klid), čerstvé vs. suché větve (sušení ~30 dní, kouř u ohně, přestupky), `Weather.drought`. **Zbývá:** hromada
+  klestí jako objekt, zákaz zalévání z vodovodu (vodovodní zdroj neexistuje), sekačka a hluk z auta / rádia / výstřelu
+  (registr `World.noise` hotov jen pro motorovou pilu a nedělní klid), vyhlášky poštou a v drbech.
+- [x] **M4.3 Soud a vězení** – trestné činy z katalogu, rejstřík jako pohled na záznamy, tresty, souhrnný časový skok a jeho následky.
+- [x] **M4.5 Nové cesty k pověsti / respektu / karmě** – pomoc sousedům, úklid, vrácení věcí, přátelství
   s postavami, drobné dobré skutky (seznam v 3.5).
-- [ ] **M4.6 Zbraně, lov a rybolov podle zákona** – zbrojní oprávnění, lovecký a rybářský lístek,
+- [ ] **M4.6 Zbraně, lov a rybolov podle zákona** (částečně – zbývá: hajný bez zabavení luku/kuše a bez pověsti/respektu, rybářská stráž chodí jen kolem chaty (ne podél vody), povolenky v panelu P – viz PROJECT_LOG; kontrola kufru, zabavení udice, střelnice a posudek jsou hotové zjednodušeně) – zbrojní oprávnění, lovecký a rybářský lístek,
   povolenky (kurzy a zkoušky přes PC / střelnici), hajný a rybářská stráž v terénu, svědci hlásí
   pytláctví, kontroly dokladů a kufru policií, zabavení, trestné činy. *Hotovo, když:* pytlák s úlovkem
   na rameni je dopaden hajným a legální lovec s doklady a úlovkem v kufru projde kontrolou policie.
-- [ ] **M4.7 Katastr: koupě a prodej nemovitostí** (D2) – smyšlené parcely z `landuse`, katastr na úřadě / PC,
+- [x] **M4.7 Katastr: koupě a prodej nemovitostí** (D2) – smyšlené parcely z `landuse`, katastr na úřadě / PC,
   vklad se lhůtou, hypotéka, pronájem, vlastnictví řídí kácení / sklizeň / chov. *Hotovo, když:* hráč koupí dům
-  a les, přestěhuje se a v lese smí kácet.
+  a les, přestěhuje se a v lese smí kácet. Nemovitosti jen v domácím katastru (rozhodnutí 6. 10. 2026).
+- [ ] **M4.8 Návykové látky** (E8, částečně – zbývá ubalení a sběr lysohlávek; viz PROJECT_LOG) – tabák, konopí, lysohlávky za volbou „Obsah pro dospělé“ (výchozí vypnuto),
+  pěstování, sušení, zpracování, stavy v `BodyState`, zákony a důsledky bez glorifikace. *Hotovo, když:* s vypnutou volbou
+  obsah ve hře není; se zapnutou má každý krok právní i tělesné důsledky.
 
 ### M5 – Obec a volný čas
 - [ ] **M5.1 Stavebniny** – budova, obchod, materiál pro kutilství.
 - [ ] **M5.2 Koupaliště a plavání** – úprava nádrže u potoka za stavebninami, plavání, sezóna, šatny.
 - [ ] **M5.3 Hasiči** – zbrojnice, spolek, výjezdy k požárům, hasičské vozidlo.
 - [ ] **M5.4 Hasičský sport** – minihra požární útok, soutěž jako událost.
-- [ ] **M5.5 Systém událostí + zábava s kapelou** – kalendář akcí, plakáty, NPC účast, hudba, bar.
+- [ ] **M5.5 Systém událostí + zábava s kapelou** – kalendář akcí, plakáty, NPC účast, hudba, bar; nedělní mše (E9).
 - [ ] **M5.6 Fotbal** – úprava hřiště, míč, kopaná s NPC, zápas jako událost.
 - [ ] **M5.7 Skateboard** – vozidlo, animace, triky, dovednost.
 - [ ] **M5.8 U-rampa za domem hráče** – rampa (hotová, nebo stavba ze stavebnin), triky na rampě.
 - [ ] **M5.9 Rocková rádia** – Rock Radio a Radio Beat (případně Rock Zone) jako ověřené streamy
-  v `data/radia.json`, právní poznámka v README.
+  v `data/radia.json`, právní poznámka v README; autorádio a vnitřní světlo v autě (E6).
+- [ ] **M5.10 Místa v lese** (E10) – studánka, skautský tábor (letní událost), MTB bikepark s horským kolem a dovedností cyklistika.
+- [ ] **M5.11 Doprava 2** (E7) – řidiči v AI autech, vesničané nastupují a vystupují, spolujezdec v autě hráče.
+- [ ] **M5.12 Pouliční osvětlení a světelný smog** (E5) – lampy v obci, méně hvězd nad obcí, víc v lese.
 
 ### M6 – Létání
-- [x] **M6.1 Dron** – ovládání, kamera, baterie, pravidla ÚCL a přestupky. *Hotovo: `Drone` (RigidBody3D se servo letovým modelem, vítr, režimy vzlet/let/RTH/přistání/pád/strom), `DroneModel` (2 modely, procedurální vizuál), `Permits` (registrace ÚCL + osvědčení A1/A3 přes eTest), 7 přestupků v `zakon.json`, prodej v Potravinách / eŠuplíku, stránka Letectví – ÚCL na PC (registrace, flotila, nabíjení, oprava), fotka do `user://fotky_dron/`, OSD telemetrie, save/load; otevřené body v PROJECT_LOG.*
+- [x] **M6.1 Dron** – ovládání, kamera, baterie, pravidla ÚVL a přestupky. *Hotovo: `Drone` (RigidBody3D se servo letovým modelem, vítr, režimy vzlet/let/RTH/přistání/pád/strom), `DroneModel` (2 modely, procedurální vizuál), `Permits` (registrace ÚVL + osvědčení A1/A3 přes eTest), 7 přestupků v `zakon.json`, prodej v Potravinách / eŠuplíku, stránka Letectví – ÚVL na PC (registrace, flotila, nabíjení, oprava), fotka do `user://fotky_dron/`, OSD telemetrie, save/load; otevřené body v PROJECT_LOG.*
 - [x] **M6.2 Pozadí za okrajem mapy** – nízkorozlišený terén okolí, horizont, hranice letu. *Hotovo: `Surroundings` (LOD dlaždice okolí + díra pod katastrem, MultiMesh kužely lesa, fallback prstenec bez dat), `tools/surroundings.py` (DMR 5G ČÚZK + maska OSM → `surround_height/surface.bin`), `World.flight_bounds` (strop 1 500 m AGL, hranice 2 km za katastrem – rozhodnutí uživatele), mlha z řídne z výšky, F2 → Teleport → volná kamera; otevřené body v PROJECT_LOG.*
 - [x] **M6.3 Letový model** – společný základ (vztlak, odpor, vítr, termika) pro paraglide a rogalo.
 - [x] **M6.4 Motorový paraglide** – rozběh, řízení, přistání, pilotní průkaz.
@@ -452,6 +532,28 @@ kroky přehazovat, mezi milníky platí závislosti.
 - [ ] **M7.2 Kampaň a volby** – poctivé nástroje i úplatky, pomluvy a podvody s rizikem odhalení, volební den.
 - [ ] **M7.3 Vedlejší úkoly s větvením** – úkoly jako data, 15+ úkolů se 2–3 konci, řetězy postav, dopad na hlasy.
 - [ ] **M7.4 Starostování** – rozpočet, projekty s viditelnou změnou, zastupitelstvo, sliby a klam, konce příběhu.
+
+### M8 – Realistický svět (transformační upgrade, E14, po M7)
+Start: `prompts/roadmapa/M8_realismus/00_START_M8.md` (orchestrátor, 8 vln), společné principy `00_PRINCIPY.md`.
+- [ ] **M8.1 Základ** – přepínače Realismu, eko-takt (`eco_hour` / `eco_day`), měřicí scény `--perfscene`, ladicí vrstvy mapy.
+- [ ] **M8.2 Mapa stanovišť** – `tools/site.py` → `site.bin` (TWI, oslunění se zastíněním, půda, AWC, kotliny, expozice větru), `Site`.
+- [ ] **M8.3 Dřeviny a porosty** – `dreviny.json`, druh / věk / vitalita pro každý strom z mapy, porosty, dřevo podle druhu.
+- [ ] **M8.4 Pole větru** – nárazy běžící krajinou, závětří, hierarchický ohyb, vlny přes obilí, vítr pro létání a kouř.
+- [ ] **M8.5 Fyzikální obloha a světlo** – Rayleigh/Mie, soumraky, světlo v luxech, adaptace oka, vzdušná perspektiva, stíny mraků.
+- [ ] **M8.6 Pohyb člověka** – fázový cyklus chůze, chodidla bez klouzání, IK na svahu, rovnováha, postoj podle nákladu a stavu těla.
+- [ ] **M8.7 Vodní bilance** – vlhkost půdy, odtok, průtok a hladina potoků, lokální bláto a louže, tání sněhu.
+- [ ] **M8.8 Generátor stromů** – space colonization / přesleny podle druhu, věku a vitality, atlasy listů a kůry, LOD a impostory.
+- [ ] **M8.9 Mikroklima** – inverze a mrazové kotliny, údolní mlha, rosa a jinovatka, teplota v místě hráče.
+- [ ] **M8.10 Lokomoce zvířat 2 a let ptáků** – přechody chodů, páteř, sekundární pohyb, aerodynamika letu, termika, hejna.
+- [ ] **M8.11 Fenologie a růst** – sumy teplot, každý druh raší a barví se jinak, pozdní mrazy, stromy rostou a stárnou v letech.
+- [ ] **M8.12 Plodiny a zahrada** – růstový model (GDD, záření, voda, mráz), výnos podle roku.
+- [ ] **M8.13 Terramechanika** – zaboření, zapadlé auto, trvalé koleje a stopy.
+- [ ] **M8.14 Přízemní vegetace** – louky podle stanoviště, podrost podle druhu, seč a seno, sukcese, interaktivní tráva a pěšiny.
+- [ ] **M8.15 Ekologie zvěře** – stanoviště, denní a roční cyklus, populace, semenné roky, škody.
+- [ ] **M8.16 Tělo 2** – tepelná bilance (MET, clo, vítr, mokro, slunce), žízeň, spánkový dluh, zranění pádem.
+- [ ] **M8.17 Život vesnice** – domácnosti, potřeby, okna a komíny podle obsazenosti, vztahy a drby mezi obyvateli.
+- [ ] **M8.18 Zvuková krajina** – ptačí chorál, cvrčci (Dolbear), žáby, netopýři, světlušky, útlum lesem a ozvěna.
+- [ ] **M8.19 Kalibrace a uzavření** – srovnání s reálnými daty, výkon na GTX 1050, předvolby, dokumentace.
 
 ### Doporučené pořadí v kostce
 
@@ -468,7 +570,14 @@ Doplňky od uživatele (30. 9. 2026): **M1.7** co nejdřív (před M3 – ať no
 volitelné a může jít až po M7).
 
 Rychlé „radostné“ kroky, které lze vložit kdykoli po M0 bez rozbití pořadí: **M5.9 rádia**, **M5.7–5.8
-skateboard a rampa**, **M5.6 fotbal**.
+skateboard a rampa**, **M5.6 fotbal**, **M5.12 osvětlení**.
+
+Pořadí uvnitř M4 (6. 10. 2026): **M4.1 → M4.2 → M4.3** řetězem; **M4.5** souběžně s nimi; **M4.4** po M4.2; **M4.6** a **M4.8**
+po M4.4 (navzájem souběžně); **M4.7** kdykoli po M4.2. Podrobně `prompts/roadmapa/README.md`.
+
+### N – Nástroje (po M7)
+Editor map, postav, objektů a úkolů (E11). První krok: úkoly jako JSON data (navazuje na M7.3) a editor nad nimi.
+Prompty se napíšou až po M7.
 
 ---
 

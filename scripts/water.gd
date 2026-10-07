@@ -85,7 +85,7 @@ func build(w: World, t: Terrain) -> void:
 			mi.mesh = _ribbon(streams[si])
 			mi.material_override = m
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			mi.visibility_range_end = VIS_RANGE
+			mi.visibility_range_end = _vis_end(mi.mesh)
 			add_child(mi)
 	# rybníky
 	var mp := _material(ntex, 0.0)
@@ -121,12 +121,20 @@ func build(w: World, t: Terrain) -> void:
 		mi.mesh = am
 		mi.material_override = mp
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.visibility_range_end = VIS_RANGE
+		mi.visibility_range_end = _vis_end(am)
 		add_child(mi)
 		var r := Rect2(poly[0], Vector2.ZERO)
 		for q in poly:
 			r = r.expand(q)
 		ponds.append({"name": String(pd.get("name", "")), "level": level, "poly": poly, "aabb": r.grow(1.0)})
+
+
+## Dohled hladiny: Godot ho měří od STŘEDU AABB meshe. Tok je jeden mesh dlouhý i několik km
+## (union mapa), takže pevný VIS_RANGE by ho schoval i hráči stojícímu na břehu daleko od
+## středu toku → dohled + půlka vodorovné úhlopříčky (každý kus toku vidět aspoň do VIS_RANGE).
+static func _vis_end(m: Mesh) -> float:
+	var ab := m.get_aabb()
+	return VIS_RANGE + Vector2(ab.size.x, ab.size.z).length() * 0.5
 
 
 func _material(ntex: Texture2D, flow: float) -> ShaderMaterial:
@@ -235,6 +243,12 @@ func nearest_stream(pos: Vector3, r: float) -> Array:
 # ------------------------------------------------------------------ led, vlnky, brodění hráčů
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("water", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if world == null or world.clock == null:
 		return
 	_tick += delta
@@ -244,7 +258,12 @@ func _process(delta: float) -> void:
 	# hráči ve vodě (Player.wade brzdí chůzi)
 	for pl in world.players.values():
 		var pp: Vector3 = pl.global_position
-		pl.wade = 0.0 if pl.car or pl.horse else maxf(info_at(pp.x, pp.z)["depth"], 0.0) * (1.0 - ice_flow)
+		var inf := info_at(pp.x, pp.z)
+		pl.wade = 0.0 if pl.car or pl.horse else maxf(float(inf["depth"]), 0.0) * (1.0 - ice_flow)
+		pl.water_level = float(inf["level"])
+		# teplota vody (M5.2): sezóna + vzduch – chladí tělo ve vodě (Player._update_body)
+		if world.weather != null and world.clock != null:
+			pl.water_temp = Koupaliste.water_temp(world.clock.day_of_year(), world.weather.temp)
 	# zamrzání podle teploty (herní čas): rybník pod −1 °C, potok pod −5 °C, tání nad nulou
 	var now: float = world.clock.minutes
 	if _last_min < 0.0:

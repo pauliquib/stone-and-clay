@@ -107,6 +107,12 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("flock", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	var w = fauna.world
 	var near: bool = w.nearest_player_dist(spot) < 450.0
 	if near != _near:

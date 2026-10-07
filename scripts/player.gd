@@ -18,6 +18,16 @@ signal jumped
 signal landed(impact: float)
 signal game_event(kind: String, data: Dictionary)
 
+## Třes obrazu (abstinence od cigaret, zima) – laditelné hodnoty. Amplitudy v radiánech (náklon pohledu).
+const SHAKE_WITHDRAWAL_MIN := 0.6    # od jaké hodnoty `craving × addiction` třes začne
+const SHAKE_WITHDRAWAL_AMP := 0.0009 # nejvyšší amplituda třesu z abstinence
+const SHAKE_FIT_PERIOD := 60.0       # s – záchvat třesu se opakuje jednou za tuto dobu
+const SHAKE_FIT_LEN := 5.0           # s – délka záchvatu
+const SHAKE_COLD_MIN := 0.3          # od jaké úrovně prochladnutí (body.cold) se třese
+const SHAKE_COLD_AMP := 0.003        # amplituda při plném prochladnutí
+const SHAKE_COLD_MAX := 0.003        # pevný strop třesu zimou
+const SHAKE_FREQ := 9.0              # rychlost chvění (vstup do šumu: _t × tato hodnota)
+
 @export var walk_speed := 4.6
 @export var sprint_speed := 8.4
 @export var crouch_speed := 2.2
@@ -34,6 +44,7 @@ signal game_event(kind: String, data: Dictionary)
 @export var slide_boost := 1.8
 @export var slide_friction := 3.2
 @export var mouse_sensitivity := 0.0024
+var shake_enabled := true       # třes obrazu zapnut (Esc → Nastavení → Třes obrazu)
 var base_fov := 72.0             # základní zorné pole (Esc → Nastavení)
 
 const STAND_HEIGHT := 1.8
@@ -71,6 +82,16 @@ var shelter_min := 18.0          # nejnižší pocitová teplota pod střechou /
 var license_suspended_until := -1.0   # zákaz řízení do (herní minuty)
 var wanted_until := -1.0              # hledaný policií do (herní minuty)
 var wade := 0.0                       # hloubka vody, ve které hráč stojí (m) – nastavuje Water
+var water_level := -INF               # hladina vody v místě hráče (m) – nastavuje Water (M5.2)
+var water_temp := 15.0                # teplota vody v místě hráče (°C) – nastavuje Water (M5.2)
+var breath := 15.0                    # dech pod vodou (s); plavání M5.2, obnoví se nad hladinou
+const SWIM_DEPTH := 1.2               # od této hloubky (m) se plave (bez gravitace, vztlak)
+const SWIM_SPEED := 1.2               # m/s plavání (Shift = SWIM_SPRINT, výdrž ubývá rychle)
+const SWIM_SPRINT := 2.0
+const SWIM_VY := 1.4                  # m/s svislý pohyb: Mezerník nahoru, Ctrl (C) potopit
+const BREATH_MAX := 15.0              # s dechu pod hladinou (10–20 s)
+const HEAD_H := 1.6                   # výška hlavy nad nohama (m)
+const DROWN_DPS := 2.0                # ztráta zdraví za sekundu, když dech dojde
 var scope_on := false                 # drží dalekohled (X) – nastavuje LocalClient
 var scope := 0.0                      # 0..1 zapnutí dalekohledu (plynule), zužuje zorný úhel kamery
 var outfit := {}                       # oblečení: slot → id předmětu (M2.3, `Wardrobe`); ukládá se
@@ -81,6 +102,28 @@ var beekeeper_suit: bool:
 		return Wardrobe.has_tag(outfit, "vcelar")
 	set(v):
 		Wardrobe.set_beekeeper(self, v)
+# --- skateboard (M5.7): režim pohybu – deska pod nohama, `board_on`; jízdu řeší `_board_step`
+const BOARD_PUSH := 1.5                 # m/s – přídavek rychlosti jedním odrazem (W)
+const BOARD_PUSH_CD := 0.45             # s – minimální rozestup odrazů
+const BOARD_MAX_FLAT := 6.0             # m/s – nejvyšší rychlost odrazem po rovině (z kopce víc)
+const BOARD_DRAG := 0.35                # m/s² – valivý odpor na asfaltu
+const BOARD_BRAKE := 7.0                # m/s² – brzda patou (S)
+const BOARD_TURN := 1.9                 # rad/s – zatáčení (A/D) při plné rychlosti
+const BOARD_G := 9.8                    # m/s² – gravitace pro jízdu z kopce
+const BOARD_OLLIE_VY := 3.2             # m/s – vertikální rychlost ollie (~0,5 m)
+const BOARD_OLLIE_PTS := 10             # body za čistý ollie (dopad rovně)
+const BOARD_WOBBLE_V := 12.0            # m/s – od této rychlosti deska kmitá
+const BOARD_FALL_V := 15.0              # m/s – nad touto rychlostí pád
+const BOARD_WALL_V := 3.0               # m/s – náraz do zdi nad touto rychlostí = pád
+const BOARD_FLOOR_ANGLE := 75.0         # ° – nejstrmější povrch, který je ještě „podlaha“ (přechod U-rampy ~68°)
+var board_on := false                   # hráč stojí na skateboardu
+var board_score := 0                    # body z aktuální jízdy (ollie)
+var board_best := 0                     # rekord (ukládá SaveGame, klíč skate)
+var _board_push_cd := 0.0
+var _board_jump_prev := false
+var _board_air := 0.0                   # s ve vzduchu od ollie (pro bodování dopadu)
+var _board_node: Node3D
+
 const SCOPE_FOV := 12.0               # zorný úhel dalekohledu (°)
 const SCOPE_SENS := 0.22              # citlivost myši v dalekohledu (násobek)
 # M2.8 míření se zbraní (pravé tlačítko): `Weapons` nastavuje `aim_on` / `aim_fov` / `aim_optic` / `aim_sway` / `weapon_status`
@@ -118,6 +161,7 @@ var _zoom := 4.2
 var _arm_len := 4.2
 var _t := 0.0
 var _noise := FastNoiseLite.new()
+var _shake_noise := FastNoiseLite.new()   # hladký šum pro třes obrazu (abstinence, zima)
 var _input_hist: Array = []
 var _stumble_cool := 2.0
 var _action := ""
@@ -162,6 +206,8 @@ func _ready() -> void:
 	add_child(_col)
 	_noise.frequency = 0.35
 	_noise.seed = 122
+	_shake_noise.seed = 77
+	_shake_noise.frequency = 1.0
 
 	body = BodyState.new()
 	body.name = "Telo"
@@ -234,6 +280,17 @@ func _recover_from_void() -> void:
 	var w := get_parent() as World
 	if w == null or w.terrain == null:
 		return
+	if inside != "":
+		# v interiéru je terén pod mapou – na povrch bychom hráče vyhodili pod / nad dům; vrátíme ho ke dveřím
+		var it: Interior = w.interiors.get(inside)
+		push_warning("Hráč %d propadl v interiéru '%s' (pozice %s, rychlost %s, interiér postaven: %s) – vracím ke dveřím." % [
+			id, inside, str(global_position), str(velocity), str(it != null and is_instance_valid(it))])
+		if it != null and is_instance_valid(it):
+			teleport(it.inside_door, it.inside_yaw, false)
+		else:
+			w.exit_interior(id, false)        # interiér už neexistuje → ven před dveře
+		w.notify(id, "show_message", ["Propadl ses podlahou – vrátil jsem tě ke dveřím.", 3.5])
+		return
 	var gy := w.terrain.height_at(global_position.x, global_position.z) + 0.3
 	teleport(Vector3(global_position.x, gy, global_position.z), yaw, false)
 	w.notify(id, "show_message", ["Propadl ses terénem – vrátil jsem tě zpátky na povrch.", 3.5])
@@ -300,9 +357,11 @@ func _update_overload(warn: bool) -> void:
 	overloaded = now
 
 
+## Přidá `n` kusů předmětu. Balení (předmět s polem `count` v katalogu, dnes krabička cigaret = 20 ks) se
+## do inventáře rozbalí na jednotlivé kusy – nákup tedy dává `n × count` ks (A3-11: žádné skryté pravidlo
+## jen pro jedno id, řídí to katalog).
 func add_item(id: String, n := 1) -> void:
-	if id == "cigarety":
-		n *= int(Consumables.info(id)["count"])
+	n *= maxi(int(ItemsDB.info(id).get("count", 1)), 1) if ItemsDB.exists(id) else 1
 	inventory[id] = int(inventory.get(id, 0)) + n
 	_update_overload(true)
 
@@ -405,6 +464,60 @@ func equipped_text() -> String:
 
 
 ## Ubere výdrž (akce); po dobu akce se výdrž nedobíjí.
+## Modifikátory rychlosti pohybu: zdroj (např. "vozik", "rameno") → {walk_k: násobek chůze a sprintu (výchozí 1),
+## no_sprint: bool (sprint zakázán), jump: strop rychlosti výskoku}. Žádný zdroj nesahá na `walk_speed` /
+## `sprint_speed` (zůstávají výchozími `@export` hodnotami), takže se modifikátory nemohou „zaseknout“
+## ani se obnovit v opačném pořadí (A3-06). Zdroj modifikátor sám nastaví a po skončení smaže.
+var speed_mods: Dictionary = {}
+
+
+func set_speed_mod(source: String, mod: Dictionary) -> void:
+	speed_mods[source] = mod
+
+
+func clear_speed_mod(source: String) -> void:
+	speed_mods.erase(source)
+
+
+func has_speed_mod(source: String) -> bool:
+	return speed_mods.has(source)
+
+
+## Součin `walk_k` všech modifikátorů.
+func speed_mod_k() -> float:
+	var k := 1.0
+	for src in speed_mods:
+		k *= float((speed_mods[src] as Dictionary).get("walk_k", 1.0))
+	return k
+
+
+func sprint_blocked() -> bool:
+	for src in speed_mods:
+		if bool((speed_mods[src] as Dictionary).get("no_sprint", false)):
+			return true
+	return false
+
+
+## Efektivní rychlost chůze (výchozí `walk_speed` × modifikátory).
+func effective_walk() -> float:
+	return walk_speed * speed_mod_k()
+
+
+## Efektivní rychlost sprintu (s `no_sprint` je rovna chůzi).
+func effective_sprint() -> float:
+	return effective_walk() if sprint_blocked() else sprint_speed * speed_mod_k()
+
+
+## Efektivní rychlost výskoku (nejnižší strop `jump` z modifikátorů).
+func effective_jump() -> float:
+	var j := jump_velocity
+	for src in speed_mods:
+		var m: Dictionary = speed_mods[src]
+		if m.has("jump"):
+			j = minf(j, float(m["jump"]))
+	return j
+
+
 func drain_stamina(v: float) -> void:
 	stamina = maxf(stamina - v, 0.0)
 	_stamina_delay = 0.9
@@ -416,6 +529,8 @@ func is_stamina_locked() -> bool:
 
 ## Použije předmět z inventáře (napije se / sní / zapálí si). Vrací false, když nejde.
 func use_item(id: String) -> bool:
+	if ItemsDB.hidden(id):
+		return false     # M4.8: obsah pro dospělé vypnutý – předmět ve hře není
 	if busy or car != null or horse != null or aircraft != null or drone_flying() or fallen > 0.0:
 		return false
 	var info := Consumables.info(id)
@@ -439,6 +554,28 @@ func use_item(id: String) -> bool:
 			if not remove_item(id):
 				return false
 			_begin("smoke", id, 0.0)
+	return true
+
+
+## M4.8: ruční úprava z ItemsDB.RECIPES (ubalení, pečení). Vrací false, když chybí některý vstup.
+func craft(id: String, recipe: Dictionary) -> bool:
+	if not craft_ok(id, recipe):
+		return false
+	var need: Dictionary = recipe["need"]
+	remove_item(id, 1)
+	for k in need:
+		remove_item(String(k), int(need[k]))
+	add_item(String(recipe["out"]), 1)
+	return true
+
+
+func craft_ok(id: String, recipe: Dictionary) -> bool:
+	if item_count(id) < 1:
+		return false
+	var need: Dictionary = recipe["need"]
+	for k in need:
+		if item_count(String(k)) < int(need[k]):
+			return false
 	return true
 
 
@@ -472,7 +609,11 @@ func _begin(act: String, id: String, ml: float) -> void:
 			_action_len = 1.0
 			visual.start_action("smoke")
 			_smoke_t = 14.0
-			body.smoke()
+			var thc_s := float(Consumables.info(id).get("thc", 0.0))   # M4.8: konopí = THC, ostatní = nikotin
+			if thc_s > 0.0:
+				body.smoke_thc(thc_s)
+			else:
+				body.smoke()
 			game_event.emit("sfx", {"name": "lighter"})
 			game_event.emit("smoked", {"id": id})
 
@@ -536,6 +677,153 @@ func fall(duration: float, reason: String) -> void:
 			remove_item(id)
 			game_event.emit("bottle_broken", {"id": id})
 			break
+
+
+# ------------------------------------------------------------------ skateboard (M5.7)
+
+## Stoupnutí na skateboard (F, když hráč nic nejede). Deska zůstává v inventáři.
+func board_mount() -> bool:
+	if board_on or item_count("skateboard") <= 0 or car != null or horse != null or aircraft != null or busy or fallen > 0.0:
+		return false
+	board_on = true
+	floor_max_angle = deg_to_rad(BOARD_FLOOR_ANGLE)   # M5.8: přechody U-rampy jsou strmější než chůze
+	board_score = 0                        # nová jízda = nové skóre (rekord `board_best` zůstává)
+	_board_air = 0.0
+	_board_jump_prev = true                # Mezerník, kterým se stoupá, neudělá hned ollie
+	_board_build()
+	_board_node.visible = true
+	visual.pose = "stand"
+	return true
+
+
+## Seskok (F). Při rychlosti nad 2 m/s hlídá volání (World) – tady jen sundání desky.
+func board_dismount() -> void:
+	board_on = false
+	floor_max_angle = deg_to_rad(46.0)     # jako při chůzi (viz _ready)
+	if _board_node:
+		_board_node.visible = false
+	velocity.x = 0.0
+	velocity.z = 0.0
+
+
+func _board_build() -> void:
+	if _board_node != null:
+		return
+	_board_node = Node3D.new()
+	_board_node.top_level = true
+	add_child(_board_node)
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.72, 0.52, 0.28)
+	wood.roughness = 0.7
+	var wheel := StandardMaterial3D.new()
+	wheel.albedo_color = Color(0.93, 0.9, 0.82)
+	wheel.roughness = 0.5
+	var deck := MeshInstance3D.new()
+	var dm := BoxMesh.new()
+	dm.size = Vector3(0.2, 0.015, 0.8)     # deska 80 × 20 cm (šířka 20 cm, délka 80 cm)
+	deck.mesh = dm
+	deck.material_override = wood
+	deck.position = Vector3(0, 0.07, 0)
+	_board_node.add_child(deck)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var w := MeshInstance3D.new()
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.03
+			cm.bottom_radius = 0.03
+			cm.height = 0.035
+			w.mesh = cm
+			w.material_override = wheel
+			w.rotation_degrees = Vector3(0, 0, 90)
+			w.position = Vector3(sx * 0.09, 0.03, sz * 0.27)
+			_board_node.add_child(w)
+	_board_node.visible = false
+
+
+## Jízda: W = odraz, S = brzda, A/D = zatáčení, Mezerník = ollie, F = seskok (řeší World).
+func _board_step(delta: float) -> void:
+	var inp := _read_input()
+	var move_in: Vector2 = inp[0]
+	var jump_edge: bool = bool(inp[3]) and not _board_jump_prev
+	_board_jump_prev = bool(inp[3])
+	var on_floor := is_on_floor()
+	_board_push_cd = maxf(_board_push_cd - delta, 0.0)
+	# zatáčení podle rychlosti (stojící deska se netočí)
+	var hv := Vector3(velocity.x, 0.0, velocity.z)
+	var spd := hv.length()
+	if not controls_locked and absf(move_in.x) > 0.05:
+		yaw -= move_in.x * BOARD_TURN * clampf(spd / 2.5, 0.0, 1.0) * delta
+	var fwd := Basis(Vector3.UP, yaw) * Vector3.FORWARD
+	var right := Basis(Vector3.UP, yaw) * Vector3.RIGHT
+	var s := hv.dot(fwd)                   # rychlost ve směru desky
+	var lat := hv - fwd * s                # boční skluz se rychle utlumí (deska nejede do stran)
+	lat = lat.move_toward(Vector3.ZERO, 8.0 * delta)
+	var grip := _ground_traction()
+	var acc := 0.0
+	if on_floor:
+		var n := get_floor_normal()
+		var g_t := Vector3(0.0, -BOARD_G, 0.0) - n * Vector3(0.0, -BOARD_G, 0.0).dot(n)
+		acc += g_t.dot(fwd)                # svah: z kopce zrychluje, do kopce zpomaluje
+		var drag := BOARD_DRAG + (1.0 - grip) * 6.0    # mokro / tráva brzdí víc
+		if absf(s) > 0.02:
+			acc -= signf(s) * drag
+		if move_in.y > 0.1:                # S = brzda patou
+			acc -= (signf(s) * BOARD_BRAKE if absf(s) > 0.02 else 0.0)
+		if move_in.y < -0.1 and _board_push_cd <= 0.0 and s < BOARD_MAX_FLAT:
+			s += BOARD_PUSH * clampf(grip, 0.3, 1.0)
+			_board_push_cd = BOARD_PUSH_CD
+		s += acc * delta
+		if absf(s) < 0.05 and absf(acc) < 0.5:
+			s = 0.0
+		# jednou za čas kmitne jen při vysoké rychlosti
+		if absf(s) > BOARD_WOBBLE_V:
+			lat += right * sin(_t * 14.0) * 1.6 * delta
+		# jízda po nerovném povrchu (tráva, bahno, mokro): přepadneš dopředu
+		if absf(s) > 2.5 and grip < 0.45:
+			board_dismount()
+			fall(1.2, "pad_skate")
+			return
+		velocity.y = minf(velocity.y, 0.0)
+		_board_air = 0.0
+	else:
+		_board_air += delta
+	if jump_edge and on_floor and fallen <= 0.0 and not busy:
+		velocity.y = BOARD_OLLIE_VY
+		_board_air = 0.0001
+	elif not on_floor:
+		velocity.y = maxf(velocity.y - gravity * delta, -55.0)
+	if absf(s) > BOARD_FALL_V:
+		board_dismount()
+		fall(1.5, "pad_skate")
+		return
+	velocity.x = fwd.x * s + lat.x
+	velocity.z = fwd.z * s + lat.z
+	var was_air := _board_air
+	var sprev := absf(s)
+	_prev_vy = velocity.y
+	move_and_slide()
+	# náraz do zdi nebo obrubníku rychlostí = pád
+	if is_on_wall() and sprev > BOARD_WALL_V:
+		board_dismount()
+		fall(1.5, "pad_skate")
+		return
+	# čistý ollie: dopad rovně, deska pod nohama (natočení dopadu do 25°)
+	if not on_floor and is_on_floor() and was_air > 0.2:
+		if get_floor_normal().angle_to(Vector3.UP) < deg_to_rad(25.0):
+			board_score += BOARD_OLLIE_PTS
+			board_best = maxi(board_best, board_score)
+			game_event.emit("skate_trick", {"name": "ollie", "pts": BOARD_OLLIE_PTS, "score": board_score})
+	_update_body(delta, absf(s))
+	# deska se natáčí podle povrchu pod ní (rampa, svah); na rovině zůstává vodorovně
+	var up := Vector3.UP
+	if is_on_floor():
+		up = get_floor_normal()
+	var tilt := Basis(Quaternion(Vector3.UP, up))
+	_board_node.global_transform = Transform3D(tilt * Basis(Vector3.UP, yaw), global_position)
+	_prev_pos = global_position
+	_cur_pos = global_position
+	if is_on_floor():
+		_air_top_y = global_position.y
 
 
 # ------------------------------------------------------------------ auto
@@ -630,7 +918,8 @@ func enter_aircraft(a: Aircraft) -> void:
 	visual.top_level = false
 	visual.reparent(a.vis, false)
 	visual.position = a.seat_pos
-	visual.rotation = Vector3.ZERO
+	visual.rotation = Vector3(0.0, PI, 0.0)        # Humanoid kouká do +Z, letouny letí do −Z (A2-05)
+	visual.ride = a.rider                          # vlastní póza stroje (A2-08), ne zbytek z auta
 	visual.pose = "ride"
 	visual.speed = 0.0
 	visual.on_floor = true
@@ -647,6 +936,8 @@ func exit_aircraft() -> Vector3:
 	aircraft = null
 	visual.reparent(self, false)
 	visual.top_level = true
+	visual.rotation = Vector3.ZERO
+	visual.ride = {}
 	visual.pose = "stand"
 	visual.set_first_person(first_person)
 	_exit_settle = 2
@@ -756,6 +1047,12 @@ func _read_input() -> Array:
 # ------------------------------------------------------------------ fyzika
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("player_phys", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	_t += delta
 	if car != null or horse != null or aircraft != null:
 		# poloha v autě / na koni / v letounu (vozidlo posouvá hráč jen následuje)
@@ -765,6 +1062,9 @@ func _physics_process(delta: float) -> void:
 		_cur_pos = global_position
 		_air_top_y = global_position.y
 		_update_body(delta, 0.0)
+		return
+	if board_on:
+		_board_step(delta)
 		return
 	if _exit_settle > 0:
 		_exit_settle -= 1
@@ -830,8 +1130,8 @@ func _physics_process(delta: float) -> void:
 	# --- sprint a výdrž (obezita a kouření snižují)
 	var smax := body.stamina_max()
 	var sprinting := sprint_in and move_in.length() > 0.1 and not _crouching \
-		and not _stamina_lock and move_in.y < 0.3 and not busy and not overloaded and not aim_on
-	if sprinting and on_floor and hvel.length() > walk_speed:
+		and not _stamina_lock and move_in.y < 0.3 and not busy and not overloaded and not aim_on and not sprint_blocked()
+	if sprinting and on_floor and hvel.length() > effective_walk():
 		stamina = maxf(stamina - delta * 0.11 * body.stamina_drain_mult(), 0.0)
 		_stamina_delay = 0.9
 		if stamina <= 0.0:
@@ -849,9 +1149,9 @@ func _physics_process(delta: float) -> void:
 		sm *= OVERLOAD_SPEED_MULT
 	if aim_on:
 		sm *= AIM_SPEED_MULT
-	var target_speed := walk_speed * sm
+	var target_speed := effective_walk() * sm
 	if sprinting:
-		target_speed = sprint_speed * sm
+		target_speed = effective_sprint() * sm
 	elif _crouching:
 		target_speed = crouch_speed
 	if busy and _action != "smoke":
@@ -859,6 +1159,11 @@ func _physics_process(delta: float) -> void:
 	if wade > 0.05:
 		# brodění potokem / řekou: voda brzdí (po kolena ~ poloviční rychlost)
 		target_speed *= lerpf(1.0, 0.4, clampf(wade / 0.6, 0.0, 1.0))
+	if _swimming():
+		# plavání (M5.2): pomalé tempo, Shift rychleji za cenu výdrže
+		target_speed = SWIM_SPRINT if sprint_in and stamina > 0.05 else SWIM_SPEED
+		if sprint_in and wish.length() > 0.05:
+			drain_stamina(delta * 0.12)
 	var target := wish * target_speed
 
 	# --- opilost: drift do stran a dopředu/dozadu, i ve stoje
@@ -902,8 +1207,11 @@ func _physics_process(delta: float) -> void:
 	velocity.x = hvel.x
 	velocity.z = hvel.z
 
-	# --- gravitace
-	if not on_floor:
+	# --- gravitace (plavání M5.2: vztlak, žádná gravitace; Mezerník nahoru, Ctrl potopit)
+	if _swimming():
+		var up := (1.0 if input.jump else 0.0) - (1.0 if input.crouch else 0.0)
+		velocity.y = move_toward(velocity.y, up * SWIM_VY, 9.0 * delta)
+	elif not on_floor:
 		var g := gravity
 		if velocity.y < 0.0:
 			g *= fall_multiplier
@@ -916,8 +1224,8 @@ func _physics_process(delta: float) -> void:
 			velocity += Vector3(fn.x, 0.0, fn.z).normalized() * gravity * 0.6 * delta
 
 	# --- skok
-	if _jump_buffer > 0.0 and _coyote > 0.0 and _can_stand() and fallen <= 0.0 and not busy:
-		velocity.y = (jump_velocity + (0.6 if _sliding else 0.0)) * body.jump_mult()
+	if _jump_buffer > 0.0 and _coyote > 0.0 and _can_stand() and fallen <= 0.0 and not busy and not _swimming():
+		velocity.y = (effective_jump() + (0.6 if _sliding else 0.0)) * body.jump_mult()
 		_jump_buffer = 0.0
 		_coyote = 0.0
 		_sliding = false
@@ -928,6 +1236,8 @@ func _physics_process(delta: float) -> void:
 
 	_prev_vy = velocity.y
 	move_and_slide()
+
+	_swim_breath(delta)
 
 	# --- strkání do fyzikálních objektů
 	_wall_bump_cool = maxf(_wall_bump_cool - delta, 0.0)
@@ -1047,6 +1357,22 @@ func _weather_msgs() -> void:
 		game_event.emit("warmed", {})
 
 
+## Plave se od hloubky SWIM_DEPTH (ne v autě / na koni / na skateboardu / v letadle).
+func _swimming() -> bool:
+	return wade > SWIM_DEPTH and car == null and horse == null and aircraft == null and not board_on and fallen <= 0.0
+
+
+## Dech pod hladinou (M5.2): pod vodou (Ctrl, nebo hlava pod hladinou) ubývá `breath`; pak se hráč topí (zdraví).
+func _swim_breath(delta: float) -> void:
+	var under := wade > SWIM_DEPTH and (input.crouch or global_position.y + HEAD_H < water_level)
+	if under:
+		breath = maxf(breath - delta, 0.0)
+		if breath <= 0.0:
+			body.hurt(DROWN_DPS * delta, "utopení")
+	else:
+		breath = minf(breath + 3.0 * delta, BREATH_MAX)
+
+
 func _update_body(delta: float, hs: float) -> void:
 	# výdej energie: chůze ~250 kcal/h, sprint ~700 kcal/h (herní hodiny)
 	var act := 0.0
@@ -1071,6 +1397,9 @@ func _update_body(delta: float, hs: float) -> void:
 			"heat": heat, "shelter_min": shelter_min}
 		if wade > 0.2:
 			body.wetness = maxf(body.wetness, minf(wade * 1.5, 1.0))
+			# voda chladí víc než vzduch (M5.2): pocitová teplota nejvýš na teplotu vody
+			if not sheltered:
+				env["temp"] = minf(float(env["temp"]), water_temp)
 	body.update(delta * Clock.TIME_SCALE / 3600.0, act, env)
 	_weather_msgs()
 	# probíhající akce
@@ -1131,6 +1460,12 @@ func say(text: String, dur := 4.0) -> void:
 
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("player", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if _say_t > 0.0:
 		_say_t -= delta
 	_say_label.visible = _say_t > 0.0 and not (camera != null and first_person and car == null)
@@ -1141,7 +1476,7 @@ func _process(delta: float) -> void:
 		visual.pedal_angle = car.pedal_angle
 		return
 	if aircraft != null:
-		visual.speed = 0.0
+		visual.speed = aircraft.rider_speed()      # paramotor: pilot běží po zemi
 		return
 	if horse != null:
 		visual.speed = 0.0
@@ -1187,10 +1522,18 @@ func _process(delta: float) -> void:
 	var craving := body.craving if body.ever_smoked else 0.0
 	var withdrawal := craving * body.addiction   # jen fakticky závislá postava, ne po jedné cigaretě
 	var shake := Vector3.ZERO
-	if withdrawal > 0.35:   # třes rukou / nervozita – mírný, jen u silné závislosti
-		shake = Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * 0.0022 * (withdrawal - 0.35) / 0.65
-	if body.cold > 0.3:   # třes zimou
-		shake += Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * 0.005 * (body.cold - 0.3) * 8.0
+	if shake_enabled and not aim_on and not scope_on:
+		var tremor := 0.0
+		if withdrawal > SHAKE_WITHDRAWAL_MIN:   # abstinence: jen krátké „záchvaty“, mezi nimi klid
+			var ph := fposmod(_t, SHAKE_FIT_PERIOD)
+			if ph < SHAKE_FIT_LEN:
+				var env := sin(PI * ph / SHAKE_FIT_LEN)
+				tremor += SHAKE_WITHDRAWAL_AMP * env * env * (withdrawal - SHAKE_WITHDRAWAL_MIN) / (1.0 - SHAKE_WITHDRAWAL_MIN)
+		if body.cold > SHAKE_COLD_MIN:          # zima: plynulý třes
+			tremor += minf(SHAKE_COLD_AMP * (body.cold - SHAKE_COLD_MIN) / (1.0 - SHAKE_COLD_MIN), SHAKE_COLD_MAX)
+		if tremor > 0.0:
+			# hladký šum (ne bílý): jemné chvění o frekvenci SHAKE_FREQ, ne skákání každý snímek
+			shake = Vector3(_shake_noise.get_noise_1d(_t * SHAKE_FREQ), _shake_noise.get_noise_1d(_t * SHAKE_FREQ + 313.0), 0.0) * tremor
 	rig.rotation = Vector3(pitch + sway_pitch + shake.x + aim_sway.y, yaw + sway_yaw + shake.y + aim_sway.x, sway_roll)
 	var want_len := 0.0 if first_person else _zoom
 	_arm_len = lerpf(_arm_len, want_len, 1.0 - exp(-10.0 * delta))

@@ -27,7 +27,8 @@ const MINE_COLORS := [Color(0.1, 0.2, 0.8), Color(0.1, 0.5, 0.1), Color(0.8, 0.1
 const SITES := [["eshop", "eŠuplík", "vesnet://esuplik/"], ["bazar", "Bazárek", "vesnet://bazarek/"],
 	["prace", "Práce v kraji", "vesnet://prace-v-kraji/"], ["banka", "Moje banka", "vesnet://moje-banka/"],
 	["obec", "Obecní web", "vesnet://obec/"], ["etesty", "eTesty", "vesnet://etesty/"],
-	["letectvi", "Letectví – ÚCL", "vesnet://letectvi/"]]
+	["letectvi", "Letectví – ÚVL", "vesnet://letectvi/"],
+	["autoskola", "Autoškola Volant", "vesnet://autoskola-volant/"]]
 
 var client: Node
 var world: World
@@ -280,6 +281,9 @@ func _show(page: String) -> void:
 			_p_etesty(pc)
 		"letectvi":
 			_p_letectvi()
+		"autoskola":
+			title = "Autoškola Volant"
+			_p_autoskola()
 		"posta":
 			title = "Pošta"
 			_p_posta(pc)
@@ -488,24 +492,22 @@ func _p_banka(pc: Computer) -> void:
 			_show("banka"))
 	else:
 		_text("Bydlíš ve vlastním – nájem neplatíš.", DIM)
-	_h2("Pokuty")
+	_h2("Pokuty a dluhy")
 	var due := pc.unpaid_fines(pid)
 	if due <= 0:
 		_text("Žádné nezaplacené pokuty.", DIM)
 	else:
-		var lr: Law.LawRecord = world.law.get(pid)
-		if lr:
-			for r in lr.records:
-				if not bool(r.get("zaplaceno", true)):
-					var o := Law.offense(String(r["id"]))
-					_text("• %s – pokuta %s (%s)" % [o.get("nazev", r["id"]), Bazaar.kc(int(r["pokuta"])), Law.LawRecord._par(o)])
+		for dl in world.debts.list(pid):
+			_text("• %s – %s (splatnost %s, stav: %s)" % [dl["text"], Bazaar.kc(int(dl["kc"])),
+				_jd_text(int(dl["due_jd"])),
+				Debts.STAGE_NAMES.get(String(dl["stage"]), String(dl["stage"]))])
 		var row := _row()
 		_label(row, "Nezaplaceno celkem: %s  " % Bazaar.kc(due), FONT).add_theme_color_override("font_color", BAD_COL)
 		var b := _btn(row, "Zaplatit z účtu", func():
 			_say(pc.pay_fines(pid))
 			_show("banka"))
-		b.disabled = player.bank < due
-		_text("Zjednodušená herní simulace – lhůty, splátky a exekuce doplní M4.2.", DIM)
+		b.disabled = player.bank <= 0
+		_text("Zaplatit jde i na úřadě (hotovost). Při nezaplacení: upomínka (+%s), po %d dnech exekuce z účtu." % [Bazaar.kc(Debts.REMINDER_FEE), Debts.ENFORCE_DAYS], DIM)
 	var jb: Jobs = world.jobs.get(pid)
 	if jb and jb.current != "" and not Jobs.is_contract(Jobs.job(jb.current)):
 		_h2("Výplata z práce")
@@ -546,7 +548,7 @@ func _p_obec(pc: Computer) -> void:
 	for h in pc.opening_hours():
 		_text("• %s: %s%s" % [h[0], h[1], "  [color=#1a7f2a](teď otevřeno)[/color]" if h[2] else "  [color=#8a8a8a](teď zavřeno)[/color]"])
 	_h2("Úřední deska")
-	for n in Computer.NOTICE_BOARD:
+	for n in Computer.NOTICE_BOARD + (world.vyhlasky.board_lines() if world.vyhlasky else []):
 		_text("• [b]%s[/b] – %s" % [n[0], n[1]])
 	_h2("Diskuse – co se povídá")
 	_text("Příspěvky jsou anonymní, obec za ně neodpovídá.", DIM)
@@ -593,15 +595,51 @@ func _run_test(tid: String) -> void:
 	_btn(row, "← Zpět na eTesty", func(): _show("etesty"))
 
 
-# ------------------------------------------------------------------ Letectví – ÚCL (M6.1)
+# ------------------------------------------------------------------ Letectví – ÚVL (M6.1)
 
-## Portál bezpilotních letů (smyšlený ÚCL): registrace provozovatele, osvědčení A1/A3 (eTest „drony“),
+## Portál bezpilotních letů (smyšlený ÚVL): registrace provozovatele, osvědčení A1/A3 (eTest „drony“),
 ## flotila dronů (baterie, poškození), nabíjení a opravy. Pravidla ve hře: max 120 m, ne nad lidmi,
 ## VLOS 500 m, soukromí nad cizími pozemky – zjednodušená simulace, ne právní rada.
+## M4.1 autoškola: kurz skupiny (platba z účtu), teorie (eTest „autoskola“), výcvikové jízdy, přezkoušení po 12 bodech.
+func _p_autoskola() -> void:
+	_h1("Autoškola Volant (smyšlená)")
+	_text("Smyšlená autoškola obce. Zjednodušená herní simulace pravidel (361/2000 Sb.) – nejde o právní radu ani oficiální zkoušku.", DIM)
+	var rp: Permits = world.permits
+	var skupiny := ", ".join(PackedStringArray(rp.subs(pid, "ridicsky")))
+	_text("Tvoje skupiny řidičáku: [b]%s[/b]" % (skupiny if skupiny != "" else "žádné"), OK_COL if skupiny != "" else DIM)
+	var odebrano := not rp.is_revoked(pid, "ridicsky").is_empty()
+	if odebrano:
+		_text("Řidičák je [b]odebrán[/b] (12 bodů) – nutné přezkoušení. Po zákazu řízení složíš teorii a jízdy znovu.", BAD_COL)
+	var s: Dictionary = world.auto_school(pid)
+	if not bool(s.get("zaplaceno", false)):
+		_h2("Kurzy")
+		for g in World.AUTO_KURZ_KC:
+			if g == "B":
+				continue
+			var gg: String = g
+			_btn(_row(), "Kurz skupiny %s (%s z účtu)" % [gg, Bazaar.kc(int(World.AUTO_KURZ_KC[gg]))], func():
+				_say(world.auto_enroll(pid, gg))
+				_show("autoskola"))
+		if odebrano:
+			_btn(_row(), "Přezkoušení – skupina B (%s z účtu)" % Bazaar.kc(World.AUTO_PREZKOUSENI_KC), func():
+				_say(world.auto_enroll(pid, "B"))
+				_show("autoskola"))
+	else:
+		_h2("Výcvik – skupina %s" % String(s.get("skupina", "")))
+		var teorie := bool(s.get("teorie", false))
+		var jizdy := int(s.get("jizdy", 0))
+		_text("• Teorie: %s" % ("[b]složeno[/b]" if teorie else "nesloženo – slož eTest „autoskola“"), OK_COL if teorie else TEXT)
+		if not teorie:
+			_btn(_row(), "Složit teorii (eTest autoškola)", func(): _run_test("autoskola"))
+		_text("• Výcvikové jízdy: [b]%d / %d[/b] – nasedni do vozidla skupiny %s, odjeď aspoň %d m od úřadu " % [
+			jizdy, World.AUTO_JIZD_NUTNE, String(s.get("skupina", "")), int(World.AUTO_JIZDA_MIN_M)] +
+			"a vrať se k jeho dveřím (instruktor hodnotí rádiem).")
+
+
 func _p_letectvi() -> void:
 	_h1("Letectví – portál bezpilotních letů")
-	_text("Smyšlený portál pro registraci a kvalifikaci pilotů UAS. Zjednodušená herní simulace pravidel " +
-		"(EU 2019/947, ÚCL) – nejde o právní radu ani oficiální stránky.", DIM)
+	_text("Smyšlený portál Úřadu pro vzdušné lety (ÚVL) pro registraci a kvalifikaci pilotů UAS. Zjednodušená herní simulace pravidel " +
+		"(EU 2019/947, ÚVL) – nejde o právní radu ani oficiální stránky.", DIM)
 	# --- registrace provozovatele
 	_h2("Registrace provozovatele (zdarma, okamžitá)")
 	if world.permits == null:
@@ -997,3 +1035,9 @@ func _desk_icon(parent: Node, caption: String, col: Color, cb: Callable) -> void
 static func _hm(t: float) -> String:
 	var m := int(fmod(t, 1440.0))
 	return "%02d:%02d" % [m / 60, m % 60]
+
+
+## Datum splatnosti z juliánského dne (M4.2 – pokuty a dluhy).
+func _jd_text(j: int) -> String:
+	var d := Clock.from_jdn(j)
+	return "%d. %d. %d" % [int(d["day"]), int(d["month"]), int(d["year"])]

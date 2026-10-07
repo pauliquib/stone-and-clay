@@ -13,6 +13,8 @@ const FRIEND_GIFT := 6.0          # základ za dárek (× hodnota předmětu, vi
 const FRIEND_HIGH := 60.0         # od této hodnoty postava zdraví přátelsky a pomůže (M2.10)
 
 var profile := {}                 # name, trait, job, hobby, topics, age, female, role, place
+var daily_routine = null          # Fáze 3: klon behavior stromu postavy (LimboAI `BehaviorTree`);
+                                  # netypované – addon nemusí být nainstalovaný, plní `Villager._bt_start`
 var mood := {}                    # id hráče → −1..1
 var met := {}                     # id hráče → true: už se představili
 var friendship := {}              # id hráče → 0..100
@@ -92,6 +94,51 @@ func add_friendship(id: int, d: float, _now_min: float, day: int, gift := false)
 			return
 		_friend_day[id] = day
 	friendship[id] = clampf(get_friendship(id) + d, 0.0, 100.0)
+
+
+## Oblíbené předměty (M4.5) – odvozené deterministicky z povolání a koníčku (neukládá se).
+const LIKE_RULES := [
+	["vin", ["vino_cervene", "vino_bile", "vino_sklenka"]],
+	["pivo", ["pivo", "pivo10"]],
+	["hospod", ["pivo", "pivo10"]],
+	["pek", ["med", "svestka", "rohlik"]],
+	["cukr", ["med", "svestka", "rohlik"]],
+	["koláč", ["med", "svestka", "rohlik"]],
+	["zahrád", ["rajce", "mrkev", "brambory"]],
+	["zeměd", ["brambory", "cibule", "rajce"]],
+	["včel", ["med"]],
+	["rybář", ["ryba_pecena"]],
+	["myslivec", ["jitrnice", "pecene_maso"]],
+	["sestra", ["voda", "kava"]],
+]
+## Neoblíbené: přísné a plaché postavy nemají rády tvrdý alkohol.
+const DISLIKE_TRAITS := {"prisny": ["slivovice", "panak_slivovice", "vodka", "panak_vodky"],
+	"plachy": ["slivovice", "panak_slivovice", "vodka", "panak_vodky"]}
+
+
+func likes() -> Array:
+	var txt := (String(profile.get("job", "")) + " " + String(profile.get("hobby", ""))).to_lower()
+	var out := []
+	for r in LIKE_RULES:
+		if txt.contains(String(r[0])):
+			for id in r[1]:
+				if not out.has(id):
+					out.append(id)
+	return out
+
+
+func dislikes() -> Array:
+	var out: Array = DISLIKE_TRAITS.get(String(profile.get("trait", "")), [])
+	return out
+
+
+## Násobič přátelství za dárek: oblíbené ×2, neoblíbené −1 (mírné mínus), jinak ×1.
+func gift_mult(item_id: String) -> float:
+	if likes().has(item_id):
+		return 2.0
+	if dislikes().has(item_id):
+		return -1.0
+	return 1.0
 
 
 func to_dict() -> Dictionary:

@@ -46,5 +46,5 @@ aspoň 2 konce.
 7. Uložit / načíst → rozpočet a projekty zůstanou.
 
 ## 6. Závěr
-README, VIZE a roadmapa README odškrtnout, PROJECT_LOG, deník AI, commit „M7.4 Starostování: …“,
+README, VIZE a roadmapa README odškrtnout, PROJECT_LOG, commit „M7.4 Starostování: …“,
 checklist a čekat.

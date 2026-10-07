@@ -12,7 +12,12 @@
   úřad 7–17, Myslivecká chata a domov nonstop. Doma: spánek do 7:00, lednička, kafe, oprava auta.
 - **Doprava** (`traffic.gd`, `car.gd`): 5 AI aut jezdí pravým pruhem, brzdí před zatáčkami a před
   překážkou v pruhu (auto, chodec, pes, popelnice), stojící překážku objedou, vzájemné zablokování
-  na křižovatce řeší přednost; zaseknutá auta mimo dohled hráče se přesunou. **M1.6:** modely se losují
+  na křižovatce řeší přednost; zaseknutá auta mimo dohled hráče se přesunou, u hráče dostanou novou trasu
+  z místa, kde stojí. **Vlna 0d:** pure pursuit na bod interpolovaný L = clamp(0,6·v + 3, 4, 14) m před autem,
+  body trasy se odbavují až za rovinou rohu, brzdí podle poloměru zatáčky už k tečnému bodu (`Car.AI_*`),
+  vidí i statickou překážku (dům, strom, plot – vrstva 1 bez terénu a vozovky); pruh má mitre korekci
+  a zaoblené ostré rohy (`RoadGraph.LANE_*`, `ROUND_*`), trasy nezačínají ani nekončí na service větvích
+  (`RoadGraph.END_KINDS`). **M1.6:** modely se losují
   podle vah (`Traffic.AI_WEIGHTS` – hodně osobních, občas dodávka / pickup); **malotraktor Traktůrek** jezdí
   jen v sezóně polních prací (duben–říjen, 6–19 h) a jen po okreskách a polních cestách, max. ~27 km/h.
 - **Nová vozidla a bazar (M1.6):** katalog `CarModel.MODELS` má pole `kategorie`, `skupina_rp` (AM/A1/A2/B/T pro M4.1),
@@ -58,8 +63,9 @@
   Javor 250 Kývačka. Kolo se šlape (W, max. ~30 km/h, bez motoru, zvonek), motorka má 4 stupně a ~95 km/h.
   Jednostopá vozidla se naklánějí do zatáček; při tvrdším nárazu jezdec spadne. Postava drží řídítka
   a šlape / má nohy na stupačkách (IK v `humanoid.gd`).
-- **Potoky, řeka a rybníky** (`water.gd`, `tools/water.py`): skutečné toky z OSM (převzaté z DIBAVOD) – Březnice,
-  Černý, Kaňovický, Oskorušný, Neradovský a Zlámanecký potok s přítoky (~35 km) a dvě nádrže. Osa toku je
+- **Potoky, řeka a rybníky** (`water.gd`, `tools/water.py`): skutečné toky z OSM (převzaté z DIBAVOD) – řeka
+  Břehatice a Blatný, Havraní, Jeřabinový, Sojčí a Sokolí potok s přítoky (~35 km) a dvě nádrže (názvy jsou
+  fiktivní – přepis z OSM jmen dělá `FICTIONAL_NAMES` v `tools/water.py` a `tools/export_map.py`). Osa toku je
   „sklouznutá“ do údolnice DMR 5G, koryto je vyhloubené v terénu (kolize i vzhled), hladina klesá po proudu;
   pod silnicemi a cestami tok podtéká (propustek). Voda se vlní podle proudu, v dešti a větru víc, v mrazu
   zamrzá (rybník pod −1 °C, potok pod −5 °C). Brodění zpomaluje chůzi, kroky šplouchají, u potoka je slyšet
@@ -489,23 +495,30 @@
   návrat domů (RTH) při vybití (5 %), ztrátě signálu nebo na přání (F); baterie zkracuje mráz i sport;
   poškozený dron klesá, nad 55 % poškození nevzlétne (oprava na PC). Nárazy: ťuknutí = poškrábání,
   > 4 m/s = havárie a volný pád, strom = zaseknutí na 6 s, osoba / zvíře = zranění + přestupek; bzučení
-  plaší zvěř do 45 m. **Pravidla ÚCL (zjednodušená herní simulace, ne právní rada):** registrace
-  provozovatele povinná u dronu s kamerou (zdarma na PC → *Letectví – ÚCL*, evidenční číslo + e-mail),
+  plaší zvěř do 45 m. **Pravidla ÚVL (zjednodušená herní simulace, ne právní rada):** registrace
+  provozovatele povinná u dronu s kamerou (zdarma na PC → *Letectví – ÚVL*, evidenční číslo + e-mail),
   eTest „drony“ (10 otázek, práh 8) = osvědčení A1/A3 pro > 250 g; max **120 m** nad zemí (dron odepře
   stoupání), vizuální **dohled 500 m** (60 s mimo = přestupek), **ne nad lidmi** (~25 m), **soukromí**
   (> 30 s vrtění pod 30 m nad cizím pozemkem). Sedm nových přestupků v `data/zakon.json` – zapisují se
   jen když drona někdo uvidí nebo uslyší (svědci ~150 m v obci, policejní hlídka 400 m). Telemetrie a
   varování v OSD, fotky do `user://fotky_dron/`, smyčka bzučení `Sfx.drone_loop`. Stav flotily
   (baterie, poškození) i zaparkovaný dron se ukládají (`SaveGame` klíče `drones`, `permits`); nabíjení
-  a oprava na počítači doma → *Letectví – ÚCL*. XP Letectví za uletěnou vzdálenost. Cheat F2 → Hráč
-  „Drony + registrace ÚCL + A1/A3“. Ladění: `DroneModel.MODELS` (specifikace modelů), konstanty nahoře
+  a oprava na počítači doma → *Letectví – ÚVL*. XP Letectví za uletěnou vzdálenost. Cheat F2 → Hráč
+  „Drony + registrace ÚVL + A1/A3“. Ladění: `DroneModel.MODELS` (specifikace modelů), konstanty nahoře
   v `dron.gd` (limity, prahy, časovače), `Permits.KINDS`.
 - **Létání – model (M6.3):** `scripts/flight/` = `aircraft.gd` (`Aircraft` extends `RigidBody3D`,
   vlastní integrátor), `thermals.gd` (`Thermals` – uzem světa „Termika“), `flight_hud.gd`
   (`FlightHud` – panel přístrojů + pipání variometru). Stroje jsou data v `Aircraft.SPECS`
   (klíč, nosná plocha S, CL(α) do kritického náběhu s přetáčením, CD0 + indukovaný odpor
   CL²/(π·AR·e), tah v N podle plynu a rychlosti, v_min / v_trim / v_max, nádrž a dolet);
-  testovací „Létající bedna“ má parametry motorového paraglidu (S = 25 m², v_min 7 m/s).
+  testovací „Létající bedna“ má parametry motorového paraglidu (S = 25 m², v_min 9 m/s).
+  **Vlna 0d:** `custom_integrator` + `_integrate_forces` (pracovní `_xf` / `_v`, vzor `Drone`),
+  tlumení REPLACE 0; terén nekoliduje (výjimka na TerrainBody) – zem, dosednutí s hysterezí
+  a náraz do svahu analyticky přes `World.ground_height(x, z)` (za katastrem `Surroundings`).
+  CD0 kalibrované z `glide`, jedna křivka tahu T0·(1 − 0,5·(v/v_max)²), auto-trim drží náběh
+  pro v_trim (`_trim_alpha`), na zemi vodorovná rychlost a náběh = pitch (rotace 0,6·a_crit).
+  Vizuál `vis` posunutý o −gear_h (y = 0 = zem), pilot otočený o 180°, póza `Aircraft.rider`
+  (`rider_pose`), oči `eye_pos`.
   Vítr = `Weather.wind_vector()` s výškovým profilem v(h) = v10·(h/10)^0,14 + turbulence
   (bouřka, les, závětří kopce) + svislá termika (`Thermals.lift_at`): bubliny 0,5–3 m/s
   nad poli a sídly, léto 11–17 h, jasno/polojasno a > 18 °C, táhnou s větrem a žijí 5–15 min;
@@ -529,31 +542,46 @@
   ~10 m rozpětí jako kyvadlo ~6,6 m nad pilotem. Koupě: obchod/eŠuplík (`paramotor` 180 000 Kč,
   `paramotor_ojety` 90 000 Kč – položky 25 kg, `Cargo.CARGO["paramotor"]`). Průkaz
   `pilot_pg_motor` + registrace `pg_registrace` + pojištění `pg_pojisteni` (`Permits.KINDS`, PC →
-  Letectví – ÚCL; škola 35 000 Kč = eTest `data/testy/paramotor.json` + 5 výcvikových vzletů s
+  Letectví – ÚVL; škola 35 000 Kč = eTest `data/testy/paramotor.json` + 5 výcvikových vzletů s
   instruktorem „rádiem“, stav `Computer.pg_school` / save klíč `pg_skola`). Nové přestupky
   `pg_*` v `zakon.json` – svědek hluku ~800 m (`World.pg_noise_witnessed`), „obec“ ~350 m od místa
   (`pg_over_village`). Spawn i bez batohu: F2 → Vozidla → Paramotor.
 - **Létání – motorové rogalo / trike (M6.5):** `scripts/flight/trike.gd` (`Trike extends Aircraft`,
-  model `trike` v `Aircraft.SPECS` – rogalo 15 m², tah 1 800 N, nádrž 50 l, ~200 kg, 2 sedadla;
+  model `trike` v `Aircraft.SPECS` – rogalo 15 m², tah 1 400 N, nádrž 50 l, ~200 kg, 2 sedadla;
   v_min ~55 km/h, cestovní ~90 km/h, max ~130 km/h) a `scripts/flight/airfield.gd` (`Airfield` –
   polní letiště). **Dráha:** práh A (x −440, z 240), směr 30°, délka 260 m, šířka 16 m – louka
   (landuse 2) JZ od návsi, sklon ~1,4 %, bez stromů/zástavby; konstanty `RWY_A/RWY_HEADING/RWY_LEN`
   nahoře v `airfield.gd`. Vizual: posekaný pás MeshKit + pražce, větrný rukáv (točí se po
   `Weather.wind_vector`, pokles podle síly větru), otevřený hangár s kolizí (static layer 1),
   inzertní cedule → `World.ul_buy_trike` (ojetý trike 350 000 Kč hotově, spawn před hangárem).
-  **Řízení hrazdou:** realisticky obrácené (S = nahoru, A/D zatáčí naopak; `Trike._bank_target`),
-  přepínač „Intuitivní řízení rogala“ v Nastavení → `GameSettings.trike_intuitive`
-  (`nastaveni.cfg` klíč `rogalo_intuitivni`). Plyn = páka držící polohu (`_lever`, Shift/Ctrl);
+  **Řízení hrazdou:** výchozí intuitivní (W = nos nahoru, A = vlevo; vlna 0d), přepínač
+  „Realistické řízení rogala hrazdou“ v Nastavení → `GameSettings.trike_realistic`
+  (`nastaveni.cfg` klíč `rogalo_realisticke`; starý klíč `rogalo_intuitivni` se ignoruje) =
+  obrácené S = nahoru, A/D zatáčí naopak (`Trike._bank_target`). Plyn = páka držící polohu (`_lever`, Shift/Ctrl);
   na zemi A/D příďové kolo + Mezerník brzda (`_mu_ground` = 0,06 – delší rozjezd na trávě).
   Háčky v `aircraft.gd`: `_mu_ground`, `_takeoff_hint`. Vizuál MeshKit: kapotáž, 3 kola (řízené
   příďové), tlačná vrtule, stožár, delta plachtovina (2 trojúhelníkové panely), lanka, A-hrazda.
   **Průkazy:** `pilot_ul` (škola 75 000 Kč = eTest `data/testy/ul.json` práh 8/10 + 10 výcvikových
   vzletů, stav `Computer.ul_school` / save klíč `ul_skola`, řízení `World.ul_enroll /
   ul_theory_passed / ul_training_takeoff / _ul_try_grant`), `ul_registrace` (1 500 Kč),
-  `ul_pojisteni` (3 000 Kč) – PC → Letectví – ÚCL. **Přestupky `ul_*`** v `zakon.json`
+  `ul_pojisteni` (3 000 Kč) – PC → Letectví – ÚVL. **Přestupky `ul_*`** v `zakon.json`
   (`ul_bez_prukazu/registrace/pojisteni`, `ul_pristani_mimo`, `ul_nizko_nad_obci`, `ul_nad_lidmi`,
   `ul_noc`, `ul_mraky`) – svědek hluku ~800–900 m (`World.pg_noise_witnessed`), `Airfield.on_runway`
   pro přistání na dráze (nouze vyjmuta – zjednodušeně jen svědek). **Spolujezdec:** vesničan s
   přátelstvím ≥ 60 v dosahu 14 m (`World.trike_interactables`, `Trike.board_passenger/_pax_off`) –
   bubliny `PAX_LINES`, +8 přátelství a +3 pověst za svezení. Teleport F2 → *Letiště*
   (`Airfield.teleport_spot`). Další stroje (samostatný UL letoun, vrtulník) = otevřené body.
+
+### Vlna 0d – F5 (NPC, zákon, obsah)
+- **Katalog přestupků** (`data/zakon.json`): každý přestupek má pole `drb` (věta do drbů na obecním webu, `Computer.on_event`)
+  a `karma` (změna skryté karmy; `Reputation.OFFENSE_KARMA` je jen přepis výjimek). `rychlost_obec_20` → `rychlost_obec`
+  (starý klíč řeší `Law.ALIASES`). eTesty (`TestUI`): míchané odpovědi, volitelné `pocet` (losování z banku) a `prah_pct`.
+
+### Řidičák a autoškola (M4.1)
+- **Doklady (P):** panel ukazuje řidičák se skupinami (B, AM; nová hra), body `x / 12`, zákaz řízení a stav dokladů.
+- **Skupiny vozidel:** `CarModel.MODELS[*].skupina_rp`. Vozidlo bez skupiny (kolo) jde bez řidičáku. Nasednutí bez skupiny
+  jde, ale hláška upozorní; jízda bez ní je přestupek `rizeni_bez_opravneni` při policejní kontrole.
+- **Autoškola Volant** (počítač doma → vesnet://autoskola-volant/): kurz skupiny z účtu, eTest „autoskola“ (`data/testy/autoskola.json`),
+  3 výcvikové jízdy (nástup ≥ 300 m od úřadu, výstup u úřadu). Složeno → řidičák se skupinou.
+- **12 bodů:** řidičák se odebere (`revoked`) → přezkoušení v autoškole (skupina B, poplatek).
+- Starý save bez klíče `ridicsky` dostane B + AM + A (`Permits.from_dict`).

@@ -13,7 +13,7 @@
 7. `scripts/law.gd`, `data/zakon.json`, `scripts/permits.gd`, `scripts/computer_ui.gd` (eTesty)
 
 ## 1. Proč
-První „létající prostředek“ z poznámek uživatele. Malý, levný, s jasnými pravidly (EU / ÚCL), zábavný
+První „létající prostředek“ z poznámek uživatele. Malý, levný, s jasnými pravidly (EU / ÚVL), zábavný
 a užitečný (pohled na obec, hledání zvěře, doručení balíčku – humor).
 
 ## 2. Návrh
@@ -39,7 +39,7 @@ a užitečný (pohled na obec, hledání zvěře, doručení balíčku – humor
   `sfx.gd`), slyšet do ~60 m → ptáci vzlétnou, zvěř zpozorní (napoj na `_perceive` jako hluk).
 - Fotky: klávesa (volná, ověř registr) = snímek do `user://screenshots` (využij existující `screenshot()`).
 
-### 2.2 Pravidla ÚCL / EU (zjednodušeně – do `data/zakon.json` sekce `drony`, s poznámkou „ověřit – nařízení EU 2019/947, ÚCL“)
+### 2.2 Pravidla ÚVL / EU (zjednodušeně – do `data/zakon.json` sekce `drony`, s poznámkou „ověřit – nařízení EU 2019/947, ÚVL“)
 - **Registrace provozovatele** (`dron_provozovatel`) – na PC (M3.4) za 0 Kč / symbolicky; číslo provozovatele se „nalepí“ na dron.
   Dron do 250 g bez kamery ji nepotřebuje – dron ve hře má kameru → potřebuje vždy.
 - **Online test A1/A3** (`dron_a1a3`) – eTest 20 vlastních otázek (pro velký dron povinný).

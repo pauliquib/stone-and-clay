@@ -15,6 +15,19 @@
 ##   --testmove / --bottest / --cartest / --drinktest / --questtest / --traffictest / --faunatest / --naturesynctest
 ##   --weathertest  testy (tests.gd); weathertest = přilnavost a brzdná dráha za všech situací
 ##   --interiortest  mapový interiér hospody přes FuncGodot (Fáze 2) + vstup/výstup a fallback
+##   --villagertest  behavior strom vesničana přes LimboAI (Fáze 3): blackboard, větve denní
+##                   rutiny (zahrada, hospoda), chůze za cílem; bez addonu jen fallback
+##   --flighttest    stavový automat letouna přes godot-state-charts (Fáze 4): vzlet z dráhy,
+##                   přetažení/zotavení, dosazení + přímé události; bez addonu fallback flagy
+##   --fencetest     ploty a ohrady (Fáze 7): kolize drží, branky průchodné, kůň projde brankou
+##   --gardentest    zahrada a dvoříště (Fáze 8): růst/plodiny vizuálně, kompost → hnůj → hnojení,
+##                   studna naplní konev, skleník ochrání před mrazem, garden_visuals save
+##   --vegetationtest vegetace (Fáze 9): vegetation.bin VEG1, chunky MultiMeshů, LOD podle
+##                   vzdálenosti, detail=0 skryje, wind_strength z Weather, field_lut u obilí
+##   --terraintest   terén (Fáze 9 / §12): mikroreliéf vs. kolize, wetness → shader, louže
+##                   (Puddles) při wetness > 0,7, wet_boost asfaltu, north_xz pro sněhové jazyky
+##   --obcetest      okolní obce (data/obce.json → World.obce, Villages): 5 fiktivních
+##                   obcí, obec_at, postavená zástavba; --shot=… navíc snímek mapy okolí
 class_name Main
 extends Node3D
 
@@ -101,7 +114,7 @@ func _ready() -> void:
 	if _args.has("bottest"):
 		Tests.bot_test(self)
 	if _args.has("map"):
-		client.hud._map.visible = true
+		client.hud._toggle_map()
 	if _args.has("testmove"):
 		Tests.move_test(self)
 	if _args.has("exittest"):
@@ -122,6 +135,22 @@ func _ready() -> void:
 		Tests.weather_test(self)
 	if _args.has("interiortest"):
 		Tests.interior_test(self)
+	if _args.has("villagertest"):
+		Tests.villager_test(self)
+	if _args.has("flighttest"):
+		Tests.flight_test(self)
+	if _args.has("fencetest"):
+		Tests.fence_test(self)
+	if _args.has("gardentest"):
+		Tests.garden_test(self)
+	if _args.has("vegetationtest"):
+		Tests.vegetation_test(self)
+	if _args.has("terraintest"):
+		Tests.terrain_test(self)
+	if _args.has("obcetest"):
+		Tests.obec_test(self)
+	if _args.has("perf"):
+		Tests.perf_test(self)
 
 
 func _frames(n: int) -> void:

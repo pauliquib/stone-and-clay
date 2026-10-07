@@ -1,7 +1,7 @@
 # Checklisty ručních testů – M6.1 Dron
 
 > `./run.sh` před testem (obnoví seznam tříd – nové `Drone`, `DroneModel`, `Permits`).
-> Cheat: F2 → Hráč → „Drony + registrace ÚCL + A1/A3 (M6.1)" dá oba drony, náhradní baterii a doklady.
+> Cheat: F2 → Hráč → „Drony + registrace ÚVL + A1/A3 (M6.1)" dá oba drony, náhradní baterii a doklady.
 
 ## Základní let
 1. F2 → Hráč → cheat drony → Tab → detail „Dron Ptáček Mini" → **Vzlétnout**: dron se objeví ~1,4 m
@@ -25,7 +25,7 @@
    vesničanem), `dron_mimo_dohled` (odleť > 500 m / za budovu na 60 s – zprvu RTH na ztrátu signálu
    ~1500 m volno / ~400 m za překážkou), `narusovani_soukromi_dron` (vrtěj > 30 s pod 30 m nad cizí
    zahradou v zástavbě).
-6. **Registrace a A1/A3**: počítač doma → Letectví – ÚCL → „Registrovat provozovatele (zdarma)" →
+6. **Registrace a A1/A3**: počítač doma → Letectví – ÚVL → „Registrovat provozovatele (zdarma)" →
    evidenční číslo CZ-DB-…, potvrzovací e-mail v Poště; „Složit test A1/A3" → 10 otázek, práh 8 →
    po složení osvědčení A1A3-… + e-mail. Velký dron (Pro XL) pak letí bez přestupku
    `dron_bez_kvalifikace`; bez něj se svědkem pokuta. V deníku / na stránce flotila s % baterie
@@ -34,7 +34,7 @@
 ## Baterie, poškození, nárazy
 7. Baterie: sport (Shift) a mráz (F2 → Počasí → Teplota −10) vybíjejí rychleji; na 15 % banner
    „baterie 15 %!", na 5 % automatický RTH, na 0 % dron padá (rotory ztuhnou, volný pád).
-   Nabíjení: dron v batohu → PC → Letectví – ÚCL → „Nabít baterii" = 100 %; se skoro vybitou
+   Nabíjení: dron v batohu → PC → Letectví – ÚVL → „Nabít baterii" = 100 %; se skoro vybitou
    baterií v dronu a náhradní v batohu se při startu baterie sama vymění.
 8. Nárazy: pomalý ťuk (< ~4 m/s) do zdi = jen cuknutí + poškrábání; rychlý let do zdi / stromu =
    havárie (volný pád, hláška, drb na obecním webu); do koruny stromu = visí 6 s, pak spadne;

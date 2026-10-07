@@ -49,10 +49,10 @@ const START_BANK := 0                 # nová hra: prázdný účet (peníze jso
 ## Cvičné testy (eTesty): id → [název, soubor s otázkami nebo "" = připravujeme, krok roadmapy].
 const TESTS := {
 	"pravidla_cvicny": ["Pravidla silničního provozu – cvičný", "res://data/testy/pravidla_cvicny.json", ""],
-	"autoskola": ["Autoškola – ostrý test", "", "M4.1"],
-	"zbrojni": ["Zbrojní průkaz", "", "M4.6"],
-	"lovecky": ["Lovecký lístek", "", "M4.6"],
-	"rybarsky": ["Rybářský lístek", "", "M4.6"],
+	"autoskola": ["Autoškola – teorie řidičáku (cvičný)", "res://data/testy/autoskola.json", ""],
+	"zbrojni": ["Zbrojní průkaz", "res://data/testy/zbrojni.json", ""],
+	"lovecky": ["Lovecký lístek", "res://data/testy/lovecky.json", ""],
+	"rybarsky": ["Rybářský lístek", "res://data/testy/rybarsky.json", ""],
 	"drony": ["Dron A1/A3 – pilot v otevřené kategorii", "res://data/testy/drony.json", ""],
 	"paramotor": ["Létací škola – teorie paramotoru", "res://data/testy/paramotor.json", ""],
 	"ul": ["Létací škola – teorie ultralehkého (rogalo)", "res://data/testy/ul.json", ""],
@@ -78,7 +78,7 @@ const GOSSIP_EVENTS := {
 	"snow_volunteer": ["Někdo nám ráno odházel sníh u zastávky. Díky, dobrá duše!"],
 	"fines_paid": ["Prý někdo zaplatil všechny pokuty najednou. To se hned tak nevidí."],
 	"drone_crash": ["Někomu prý spadl dron – slyšeli jste to řinčení? Majitel prý poletí další.", "Prý zase něco bzučelo a spadlo do zahrady. Drony, povídám, drony!"],
-	"drone_registered": ["Někdo tu prý registroval drona u ÚCL. Už se asi chystá špehovat sousedy."],
+	"drone_registered": ["Někdo tu prý registroval drona u ÚVL. Už se asi chystá špehovat sousedy."],
 }
 ## Výplň diskuse, když se nic neděje (výběr podle dne).
 const GOSSIP_FILLER := [
@@ -286,23 +286,21 @@ func pay_rent(pid: int, due: int, what := "Nájem") -> bool:
 	return true
 
 
-## Nezaplacené pokuty z rejstříku (Law). Vrací Kč.
+## Nezaplacené pokuty a dluhy z `World.debts` (M4.2). Vrací Kč.
 func unpaid_fines(pid: int) -> int:
-	var lr: Law.LawRecord = world.law.get(pid)
-	return lr.unpaid_fines if lr else 0
+	return world.debts.total(pid, Debts.FINE_KINDS) if world.debts else 0
 
 
-## Zaplatí všechny nezaplacené pokuty z účtu (M4.2 doplní platbu jednotlivě a lhůty).
+## Zaplatí všechny otevřené pokuty z účtu, od nejstarší (M4.2: jednotlivé dluhy v `Debts`).
 func pay_fines(pid: int) -> String:
-	var lr: Law.LawRecord = world.law.get(pid)
-	if lr == null or lr.unpaid_fines <= 0:
+	var due := unpaid_fines(pid)
+	if due <= 0:
 		return "Žádné nezaplacené pokuty."
-	var due := lr.unpaid_fines
-	if not withdraw_bank(pid, due, "Pokuty – úhrada (správní orgán)"):
+	if world.players[pid].bank < due:
 		return "Na účtu nemáš dost peněz (pokuty %s)." % Bazaar.kc(due)
-	lr.unpaid_fines = 0
-	for r in lr.records:
-		r["zaplaceno"] = true
+	for dl in world.debts.list(pid):
+		if Debts.FINE_KINDS.has(dl["kind"]):
+			world.debts.pay(pid, String(dl["id"]), int(dl["kc"]), "bank")
 	world.play_sfx(pid, "cash")
 	world.emit_game_event(pid, "fines_paid", {"kc": due})
 	send_mail(pid, "Správní orgán (smyšlený)", "Potvrzení o zaplacení pokut", "Přijali jsme platbu %s. Děkujeme.\n(Zjednodušená herní simulace.)" % Bazaar.kc(due))
@@ -360,6 +358,8 @@ func catalog() -> Array:
 	for o in Place.OFFERS.get("obchod", []):
 		var id := String(o[0])
 		var mode := String(o[2])
+		if mode != "header" and ItemsDB.hidden(id):
+			continue     # M4.8: obsah pro dospělé vypnutý – semena nejsou ani v eŠuplíku
 		if mode == "header":
 			if not rows.is_empty():
 				out.append([sec, rows])
@@ -669,6 +669,8 @@ func calendar(days := 60) -> Array:
 		var h := Clock.holiday_on(j)
 		if h != "":
 			out.append([j, "Státní svátek: %s (Potraviny zavřeno)" % h])
+	if world.village_events:
+		out.append_array(world.village_events.upcoming(days))   # M5.5: taneční zábavy a registrované akce
 	out.sort_custom(func(a, b): return int(a[0]) < int(b[0]))
 	return out
 
@@ -681,7 +683,7 @@ func date_text(jd: int) -> String:
 ## Otevírací doby dnes: [[název, text]].
 func opening_hours() -> Array:
 	var out := []
-	for k in ["obchod", "hospoda", "urad", "palenice", "sklep", "chata", "statek"]:
+	for k in ["obchod", "stavebniny", "hospoda", "urad", "palenice", "sklep", "chata", "statek"]:
 		var pl: Place = world.places.get(k)
 		if pl:
 			out.append([String(pl.data.get("name", k)), pl.hours_text(), pl.is_open(world.clock.hour())])
@@ -742,12 +744,16 @@ func record_test(pid: int, id: String, score: int, total: int, passed: bool) -> 
 	e["n"] = int(e.get("n", 0)) + 1
 	tests[id] = e
 	world.emit_game_event(pid, "etest_done", {"test": id, "score": score, "total": total, "passed": passed})
-	if id == "drony" and passed:      # M6.1: složený test = osvědčení A1/A3 (ÚCL)
+	if id == "drony" and passed:      # M6.1: složený test = osvědčení A1/A3 (ÚVL)
 		world.drone_pass_test(pid)
 	if id == "paramotor" and passed:  # M6.4: složená teorie létací školy paramotoru
 		world.pg_theory_passed(pid)
 	if id == "ul" and passed:         # M6.5: složená teorie létací školy UL (rogalo)
 		world.ul_theory_passed(pid)
+	if id == "autoskola" and passed:  # M4.1: složená teorie autoškoly (řidičák = teorie + výcvikové jízdy)
+		world.auto_theory_passed(pid)
+	if (id == "zbrojni" or id == "lovecky" or id == "rybarsky") and passed and world.gamekeeper:
+		world.gamekeeper.test_passed(pid, id)   # M4.6: doklad u myslivce (po zaplaceném kurzu v chatě)
 
 
 func test_stats(pid: int, id: String) -> Dictionary:
@@ -760,6 +766,14 @@ func pg_school(pid: int) -> Dictionary:
 	if not s.has("pg_skola"):
 		s["pg_skola"] = {"zaplaceno": false, "teorie": false, "lety": 0}
 	return s["pg_skola"]
+
+
+## Stav kurzu autoškoly (M4.1): {zaplaceno, skupina, teorie, jizdy, retest}. Ukládá se se `st`.
+func auto_school(pid: int) -> Dictionary:
+	var s := _s(pid)
+	if not s.has("auto_skola"):
+		s["auto_skola"] = {"zaplaceno": false, "skupina": "", "teorie": false, "jizdy": 0, "retest": false}
+	return s["auto_skola"]
 
 
 ## Stav výcviku UL školy (M6.5): {zaplaceno, teorie, lety}. Ukládá se se `st`.
@@ -791,14 +805,14 @@ func on_event(pid: int, kind: String, data: Dictionary) -> void:
 	match kind:
 		"offense":
 			var o := Law.offense(String(data.get("id", "")))
-			var what := String(o.get("nazev", "něco provedl")).to_lower()
+			var what := String(o.get("drb", String(o.get("nazev", "něco provedl")).to_lower()))   # A4-13: věta do drbů z dat
 			if not texts.is_empty():
 				_add_gossip(pid, String(texts[r.randi_range(0, texts.size() - 1)]) % what)
-			var lr: Law.LawRecord = world.law.get(pid)
-			if lr and not lr.records.is_empty() and not bool((lr.records[-1] as Dictionary).get("zaplaceno", true)):
+			var due_kc := unpaid_fines(pid)
+			if due_kc > 0 and String(o.get("misto", "")) != "na_miste":
 				send_mail(pid, "Správní orgán (smyšlený)", "Výzva k zaplacení pokuty",
-					"Za přestupek „%s“ (%s) evidujeme nezaplacenou pokutu. Celkem k úhradě: %s.\nZaplatit můžete v internetovém bankovnictví (Moje banka → Pokuty).\n(Zjednodušená herní simulace – ověřit aktuální znění zákonů.)" % [
-					o.get("nazev", ""), Law.LawRecord._par(o), Bazaar.kc(lr.unpaid_fines)])
+					"Za přestupek „%s“ (%s) evidujeme nezaplacenou pokutu. Celkem k úhradě: %s.\nZaplatit můžete v internetovém bankovnictví (Moje banka → Pokuty) nebo na úřadě.\n(Zjednodušená herní simulace – ověřit aktuální znění zákonů.)" % [
+					o.get("nazev", ""), Law.LawRecord._par(o), Bazaar.kc(due_kc)])
 		"job_hired", "job_fired":
 			var j := Jobs.job(String(data.get("job", "")))
 			var emp := String(j.get("zamestnavatel", "nich"))
@@ -923,7 +937,7 @@ func to_dict(pid: int) -> Dictionary:
 	return {"bank": p.bank if p else 0, "bank_log": s["bank_log"], "standing_rent": s["standing_rent"], "order_no": s["order_no"],
 		"gossip": s["gossip"], "tests": s["tests"], "games_won": s["games_won"], "deda_jd": s["deda_jd"],
 		"event_mailed": s["event_mailed"], "mail": world.mail.get(pid, []), "orders": world.orders.get(pid, []),
-		"pg_skola": pg_school(pid), "ul_skola": ul_school(pid)}
+		"pg_skola": pg_school(pid), "ul_skola": ul_school(pid), "auto_skola": auto_school(pid)}
 
 
 ## Načtení (starý save bez klíče `pc` = prázdný účet, uvítací pošta, žádné objednávky).
@@ -957,6 +971,9 @@ func from_dict(pid: int, d: Dictionary) -> void:
 	var sk: Dictionary = d.get("pg_skola", {})          # M6.4: starý save bez klíče = žádný výcvik
 	s["pg_skola"] = {"zaplaceno": bool(sk.get("zaplaceno", false)), "teorie": bool(sk.get("teorie", false)),
 		"lety": int(sk.get("lety", 0))}
+	var au: Dictionary = d.get("auto_skola", {})        # M4.1: starý save bez klíče = žádný kurz autoškoly
+	s["auto_skola"] = {"zaplaceno": bool(au.get("zaplaceno", false)), "skupina": String(au.get("skupina", "")),
+		"teorie": bool(au.get("teorie", false)), "jizdy": int(au.get("jizdy", 0)), "retest": bool(au.get("retest", false))}
 	var su: Dictionary = d.get("ul_skola", {})          # M6.5: starý save bez klíče = žádný výcvik
 	s["ul_skola"] = {"zaplaceno": bool(su.get("zaplaceno", false)), "teorie": bool(su.get("teorie", false)),
 		"lety": int(su.get("lety", 0))}

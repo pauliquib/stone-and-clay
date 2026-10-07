@@ -1,117 +1,175 @@
-# Stone & Clay – game map version (MVP)
+# Stone & Clay – herní verze mapy (MVP)
 
-An open-world MVP in **Godot 4.3**, built on a map of the whole cadastral area of the village of Dukelčice
-(`mapa_okoli.blend` – DMR 5G terrain, buildings with heights from DMP 1G, roads from OSM, ~21,800 trees;
-the terrain colour is procedural, the ČÚZK orthophoto is only available as a toggle).
+Open-world MVP v **Godot 4.3** nad detailní mapou ~11,3 × 7,5 km – katastr obce Dukelčic
+plus katastry pěti okolních obcí (`blend/mapa_okoli.blend` + rozšíření v Pythonu – terén
+DMR 5G, budovy s výškami z DMP 1G, silnice z OSM, ~51 700 stromů; barva terénu je
+procedurální, ortofoto ČÚZK jen na přepnutí).
 
-> *“This game is a satirical work of art. All characters, events and depicted private objects are fictional.
-> Any resemblance to real persons or specific dwellings is purely coincidental.”*
+> *„Tato hra je satirickým uměleckým dílem. Všechny postavy, události a vyobrazené soukromé objekty
+> jsou smyšlené. Jakákoliv podobnost se skutečnými osobami či konkrétními obydlími je čistě náhodná.“*
 
-*Public snapshot — development happens in a private repository; the commit history is squashed here.*
+*Veřejný snapshot — vývoj probíhá v privátním repozitáři, historie commitů je zde squashnutá.*
 
-## Screenshots
+## Screenshoty
 
-| Aerial view of Dukelčice (drone) | Dialogue with an NPC on the village green |
+| Letecký pohled na Dukelčice (dron) | Dialog s NPC na návsi |
 |---|---|
-| ![Aerial view](docs/screenshots/dron-ves.png) | ![Dialogue with an NPC](docs/screenshots/dialog-kvetoslava.png) |
+| ![Letecký pohled](docs/screenshots/dron-ves.png) | ![Dialog s NPC](docs/screenshots/dialog-kvetoslava.png) |
 
-| Javor 250 Kývačka motorbike at dusk | Distillery interior |
+| Motorka Javor 250 Kývačka za soumraku | Interiér pálenice |
 |---|---|
-| ![Javor 250](docs/screenshots/javor-kyvacka.png) | ![Distillery](docs/screenshots/palenice.png) |
+| ![Javor 250](docs/screenshots/javor-kyvacka.png) | ![Pálenice](docs/screenshots/palenice.png) |
 
-| Radio with stations |
+| Rádio se stanicemi |
 |---|
-| ![Radio](docs/screenshots/radio.png) |
+| ![Rádio](docs/screenshots/radio.png) |
 
-## Running
+## Spuštění
 
 ```bash
-./run.sh            # or: godot --path stone-and-clay
+./run.sh            # nebo: godot --path stone-and-clay
 ```
 
-The first launch imports the textures (~30 s). Loading the world takes ~2 s.
+První spuštění naimportuje textury (~30 s). Načtení světa trvá ~2 s.
 
-## About the game
+## O hře
 
-**Dukelčice** is an open-world life simulator set in a Czech village, on a faithful 3D map of a real
-cadastre. The player moves freely on foot, by car, on horseback and in the air (drone, aeroplane,
-paraglider, microlight). They complete small village tasks and live with the consequences: alcohol in the
-blood, police checks, a damaged car. Under a simple, kindly humorous surface runs a believable simulation:
-physiology, weather and seasons, traffic and police, economy, work, wildlife and hunting, farming,
-gardening and dozens of other systems.
+**Dukelčice** je open-world simulátor života na české vesnici na věrné 3D mapě skutečného
+katastru. Hráč se volně pohybuje pěšky, autem, na koni i ve vzduchu (dron, letadlo, paramotor,
+motorové rogalo), plní drobné vesnické úkoly a nese si jejich následky – alkohol v krvi, policejní
+kontroly, poškozené auto. Pod jednoduchým, laskavě humorným povrchem běží uvěřitelná simulace:
+fyziologie, počasí a roční doby, doprava a policie, ekonomika, práce, zvěř a lov, hospodářství,
+zahrada a desítky dalších systémů.
 
-Vision, pillars and game loop: [`GAME_DESIGN.md`](GAME_DESIGN.md).
-Full technical breakdown of all implemented systems: [`docs/SYSTEMS.md`](docs/SYSTEMS.md).
+Kolem katastru leží pět okolních obcí s fiktivními názvy (Břehatice, Bohulečice, Březouchy,
+Velký Oříškov, Hřiváčův Újezd) – jsou součástí detailní mapy: skutečná zástavba s kolizemi,
+průjezdné silnice a zóna „v obci“ (limit 50 km/h), ale zatím bez vlastního herního obsahu
+(úkoly, práce a příběh zůstávají v Dukelčicích); hráč vždy startuje v Dukelčicích.
 
-## Controls
+Vize, pilíře a herní smyčka: [`GAME_DESIGN.md`](GAME_DESIGN.md).
+Úplný technický rozpis všech implementovaných systémů: [`docs/SYSTEMS.md`](docs/SYSTEMS.md).
 
-| Key | On foot | In a car |
+## Ovládání
+
+| klávesa | pěšky | v autě |
 |---|---|---|
-| WASD / arrows | walk | W throttle, S brake / reverse, A/D steer |
-| Mouse | look around (click into the window) | look around with the camera |
-| Shift | sprint (stamina) | – |
-| Space | jump (hold for higher) | handbrake |
-| Ctrl / C | crouch; slide while sprinting | – |
-| V | 1st ↔ 3rd person | camera behind the car ↔ from inside |
-| Mouse wheel | camera distance | – |
-| E | interact (places, doors, NPCs, sleeping…) | – |
-| T / Enter | say something out loud (the nearest or addressed character replies) | also |
-| F5 / F9 | quick save / load position | also |
-| F | get into a car / onto a bike, motorbike, horse | get out / dismount |
-| L / B / N / R | – | lights / horn / wipers / flip the vehicle |
-| G | pick up / load cargo, or whistle for the horse | – |
-| X (hold) | binoculars | – |
-| Q, 1–5 | choose / switch the tool in hand | – |
-| LMB | context action (collect, fish, shoot…) | – |
-| RMB (hold) | aim the weapon in hand | – |
-| Tab / I / J / K / M / H | inventory / clothing / quest log / skills / map / home | |
-| U | get unstuck | – |
-| F1 / Esc / F2 | help / pause and settings / game menu (time, weather, teleport…) | |
+| WASD / šipky | chůze | W plyn, S brzda / couvání, A/D řízení |
+| myš | rozhlížení (klikni do okna) | rozhlížení kamerou |
+| Shift | sprint (výdrž) | – |
+| Mezerník | skok (delší stisk = výš) | ruční brzda |
+| Ctrl / C | přikrčení, ve sprintu skluz | – |
+| V | 1. ↔ 3. osoba | kamera za autem ↔ z interiéru |
+| kolečko myši | vzdálenost kamery | – |
+| E | interakce (místa, dveře, NPC, nocleh…) | – |
+| T / Enter | říct něco nahlas (nejbližší/oslovená postava odpoví) | také |
+| F5 / F9 | rychlé uložení / načtení pozice | také |
+| F | nastoupit do auta / na kolo, motorku, koně | vystoupit / sesednout |
+| L / B / N / R | – | světla / klakson / stěrače / postavit vozidlo |
+| G | zvednout/naložit náklad, nebo hvízdnout na koně | – |
+| X (držet) | dalekohled | – |
+| Q, 1–5 | vybrat / přepnout nástroj v ruce | – |
+| P | panel dokladů (řidičák, skupiny, body, zákaz) | – |
+| LMB | kontextová akce (sběr, rybaření, střelba…) | – |
+| RMB (držet) | míření se zbraní v ruce | – |
+| Tab / I / J / K / M / H | inventář / oblečení / deník úkolů / dovednosti / mapa / domů | |
+| M (mapa) | kolečko = zoom ke kurzoru, tažení = posun; mapa se překresluje jen při změně pohledu (marker hráče ~4× za s) | zavřít: M / Esc |
+| U | vysvobození ze zaseknutí | – |
+| F1 / Esc / F2 | nápověda / pauza a nastavení (mj. přepínač „Třes obrazu“ – abstinence a zima, ukládá se do `nastaveni.cfg`) / herní menu (čas, počasí, teleport…) | |
 
-A game controller works too. Controls for the horse, drone, aeroplane, paraglider and microlight
-(start-up procedures, landing, licences) are in [`docs/CONTROLS.md`](docs/CONTROLS.md).
+Místa mají otevírací doby (`Place.HOURS` / `WEEK_HOURS`, výpis `hours_text()` ukazuje i víkend). Zavřené místo
+od dveří nenabízí práci, úkoly ani zboží (`World.buy` to hlídá taky) a obsluha stojí venku jen v otevírací době.
+Obecní úřad má úřední dny (Po a St 7–17, Út a Čt 8–14, Pá 8–12, víkend a svátky zavřeno). F2 → Teleport
+má sekci „Okolní obce“ (postaví tě na okraj katastru čelem k obci; obce jsou jen pohled z dálky).
 
-## Documentation
+Funguje i herní ovladač. Ovládání koně, dronu, letadla, paramotoru a motorového rogala
+(startovní procedury, přistání, licence) je v [`docs/CONTROLS.md`](docs/CONTROLS.md).
 
-- [`GAME_DESIGN.md`](GAME_DESIGN.md) – vision, pillars, game loop, target parameters
-- [`docs/SYSTEMS.md`](docs/SYSTEMS.md) – full technical breakdown of all game systems (physiology, economy, law, wildlife, work, aviation…)
-- [`docs/CONTROLS.md`](docs/CONTROLS.md) – controls for the horse, drone, aeroplane, paraglider, trike
-- [`docs/DEV.md`](docs/DEV.md) – how the game map is made from geodata, debug/test launch parameters, code architecture (preparation for multiplayer)
+## Dokumentace
 
-### Guides
+- [`GAME_DESIGN.md`](GAME_DESIGN.md) – vize, pilíře, herní smyčka, cílové parametry
+- [`docs/SYSTEMS.md`](docs/SYSTEMS.md) – úplný technický rozpis všech herních systémů (fyziologie, ekonomika, zákon, zvěř, práce, letectví…)
+- [`docs/CONTROLS.md`](docs/CONTROLS.md) – ovládání koně, dronu, letadla, paramotoru, trikeu
+- [`docs/DEV.md`](docs/DEV.md) – jak vzniká herní mapa z geodat, ladicí/testovací parametry spouštění, architektura kódu (příprava na multiplayer)
 
-- [`BLENDER_UPRAVY.md`](BLENDER_UPRAVY.md) – manual map edits in Blender (buildings, roads, trees, terrain, textures) and export to the game
-- [`VLASTNI_VOZIDLA.md`](VLASTNI_VOZIDLA.md) – new cars (procedural or from your own `.glb` model), wheels and motorbikes
-- [`ASSETS.md`](ASSETS.md) – legal assets from the internet: where to look, licence checklist, import, the `assets/LICENSES.md` register, `tools/assets_check.py`
-- [`ZVIRATA.md`](ZVIRATA.md) – editing animals, birds, weather and seasons (tables, preview with `zoo.gd`)
+### Návody
 
-## Data licences
+- [`BLENDER_UPRAVY.md`](BLENDER_UPRAVY.md) – ruční úpravy mapy v Blenderu (budovy, silnice, stromy, terén, textury) a export do hry
+- [`VLASTNI_VOZIDLA.md`](VLASTNI_VOZIDLA.md) – nová auta (procedurálně i z vlastního `.glb` modelu), kola a motorky
+- [`ASSETY.md`](ASSETY.md) – legální assety z internetu: kde hledat, checklist licencí, import, registr `assets/LICENSES.md`, `tools/assets_check.py`
+- [`ZVIRATA.md`](ZVIRATA.md) – úprava zvířat, ptáků, počasí a ročních období (tabulky, náhled `zoo.gd`)
 
-Geodata © ČÚZK (CC BY 4.0), OSM © OpenStreetMap contributors (ODbL), textures and HDRIs Poly Haven (CC0).
-The ČÚZK orthophoto is not used by default (only via F2 → Terrain; the files `textures/ortho_*.jpg` are kept for now).
-All external assets (models, textures, sounds, music) are listed in the register `assets/LICENSES.md` + `assets/licenses.json`.
-`python3 tools/assets_check.py` flags unregistered files and disallowed licences, and generates `data/credits.json`
-(CC BY credits are shown in the F1 help). Loading in code: `AssetLib.load_model / load_sound / has` (`scripts/asset_lib.gd`).
+## Add-ony a nástroje
 
-## Legal principles for content
+Projekt používá čtyři open-source add-ony (všechny MIT – kompletní rozpis s licencemi
+je v [`THIRD_PARTY.md`](THIRD_PARTY.md)):
 
-A summary from [`PRAVNI_DOPORUCENI.md`](PRAVNI_DOPORUCENI.md) (in Czech) – it applies to all new content:
+| add-on | verze | umístění | k čemu |
+|---|---|---|---|
+| Godot Jolt | 0.13.0-stable | `addons/godot-jolt/` | fyzikální jádro místo Godot Physics (`3d/physics_engine="Jolt Physics"` v `project.godot`) – stabilnější vozidla, letadla a kolize s terénem; `car.gd` má raycast pérování |
+| FuncGodot | 2025.1 | `addons/func_godot/` | mapové interiéry z Quake `.map` souborů (nástupce Qodotu pro Godot 4) – `data/maps/hospoda.map`, fallback na procedurální generování |
+| LimboAI | 1.3.1 | `addons/limboai/` | behavior stromy denních rutin vesničanů (ráno zahrada za vhodného počasí, práce jen když je místo otevřeno, víkendový nákup, večerní hospoda) – `ai/villager_routine.tres` + GDScript tasky v `scripts/ai/` |
+| godot-state-charts | 0.22.5 | `addons/godot_state_charts/` | stavový automat letouna v `aircraft.gd` (Země / Vzduch / Let / Přetažení) |
 
-- **Data sources:** only ČÚZK (DMR/DMP, orthophoto – CC BY 4.0) and OSM (ODbL). Nothing from Google Maps / Earth /
-  Street View or Bing. Sources are listed in `data/map.json` (`license`), on the splash screen and in the F1 help
+FuncGodot a godot-state-charts jsou editorové pluginy (povolené v `project.godot`),
+Godot Jolt a LimboAI se načítají jako GDExtension. Když add-on chybí, příslušný systém
+přejde na vestavěný fallback (procedurální interiéry, jednoduché rutiny, flagy stavů,
+Godot Physics).
+
+Generované soubory a jejich nástroje (výstupy se commitují, kromě `data/*.bin`):
+
+| nástroj | výstup | kdy spustit |
+|---|---|---|
+| `python3 tools/vegetation.py [--year=RRRR]` | `data/vegetation.bin` (**není v gitu** – `data/*.bin` je v `.gitignore`, vygenerovat ručně) | po přegenerování `surface.bin`/`landuse.bin`/`trees.bin` a na přelomu roku (plodiny polí se odvozují z `Fields.crop_of` pro aktuální rok) |
+| `godot --headless --path . --script tools/gen_vegetation_meshes.gd` | `assets/models/vegetation/*.res` | po změně tvarů low-poly rostlin |
+| `godot --headless --path . --script tools/gen_villager_bt.gd` | `ai/villager_routine.tres` | po změně struktury behavior stromu (vyžaduje načtený LimboAI GDExtension); `.tres` je zatím upravený ručně shodně s generátorem |
+| `python3 tools/gen_hospoda_map.py` | `data/maps/hospoda.map` | po změně mapy hospody (editovatelná i v TrenchBroomu) |
+| `python3 tools/gen_interior_textures.py` | `assets/textures/interiors/*.png` | po změně vzhledu interiérových textur (vyžaduje Pillow) |
+| `python3 tools/obce.py` | `data/obce.json` | po změně výběru/geometrie okolních obcí (5 fiktivních katastrů; vyžaduje `osmium`, `numpy`) |
+
+Binární data mapy (`data/*.bin`) se regenerují exportem z Blenderu přes `tools/export_map.py`
+(postup v [`docs/DEV.md`](docs/DEV.md)); `data/vegetation.bin` navíc přes `tools/vegetation.py`.
+Mikroreliéf terénu z `export_map.py` (vizuál, kolize zůstává z DMR) se projeví až po dalším
+exportu mapy. Testy nových systémů (`--interiortest`, `--villagertest`, `--flighttest`,
+`--fencetest`, `--gardentest`, `--vegetationtest`, `--terraintest`) jsou popsány
+v `docs/DEV.md` → „Ladicí parametry".
+
+## Licence dat
+
+Geodata © ČÚZK (CC BY 4.0), OSM © přispěvatelé OpenStreetMap (ODbL), textury a HDRI Poly Haven (CC0).
+Ortofoto ČÚZK se ve výchozím stavu nepoužívá (jen na přepnutí F2 → Terén, soubory `textures/ortho_*.jpg` zatím zůstávají).
+Všechny externí assety (modely, textury, zvuky, hudba) jsou v registru `assets/LICENSES.md` + `assets/licenses.json`;
+`python3 tools/assets_check.py` hlídá neevidované soubory a nepovolené licence a generuje `data/credits.json`
+(titulky CC BY se ukážou v nápovědě F1). Načítání v kódu: `AssetLib.load_model / load_sound / has` (`scripts/asset_lib.gd`).
+Licence enginu a add-onů v `addons/` (Godot, Godot Jolt, FuncGodot, LimboAI, godot-state-charts – vše MIT):
+[`THIRD_PARTY.md`](THIRD_PARTY.md).
+
+## Obsah pro dospělé (návykové látky, M4.8)
+Esc → Nastavení → „Obsah pro dospělé“ (výchozí vypnuto). Vypnuto = semena tabáku a konopí, sušený tabák, konopí
+a lysohlávky ve hře nejsou. Zapnuto = zjednodušená herní simulace, nejde o návod ani právní radu: látky mají věcné
+důsledky (THC zpomaluje reakce, nevolnost), svědci a policie mohou nahlásit nedovolené pěstování. Zákonná čísla jsou
+označena „NEOVĚŘENO – ověřit“ v `data/zakon.json`. Sušák, ubalování a sběr lysohlávek zatím nejsou (viz PROJECT_LOG).
+
+## Právní zásady obsahu
+
+Shrnutí z [`PRAVNI_DOPORUCENI.md`](PRAVNI_DOPORUCENI.md) – platí pro všechen nový obsah:
+
+- **Zdroje dat:** jen ČÚZK (DMR/DMP, ortofoto – CC BY 4.0) a OSM (ODbL). Nic z Google Maps / Earth /
+  Street View ani z Bingu. Uvedení zdrojů je v `data/map.json` (`license`), na úvodní obrazovce a v nápovědě F1
   (`Hud.CREDITS`).
-- **No real identifiers:** all house numbers in the game are fictional (`Estate` – numbered from the village green using a seed,
-  nothing from RÚIAN / ČÚZK; the real number of the player's original house is never shown). Number plates have a generic look
-  with no municipality sign, there are no names on mailboxes and bells, and no views into private yards or windows. Number plates
-  are generated with the letter Q, which Czech plates do not use (`Traffic.plate()`).
-- **Characters:** only fictional names, no likenesses and no hints at real residents of the village. Villagers have invented,
-  rather humorous names and generic jobs; new names must not match real residents, and texts must not mention real neighbouring
-  villages, companies or authorities.
-- **Brands:** instead of trademarks, fictional or parody names are used (cars Oktávka / Fábička / Stodvacka, the Javor motorbike,
-  the Favorín bike, Bylinkovka, Hořká; fictional businesses Hospoda U Hřiště, Pálenice U Kotla…).
-- **Municipal symbols:** the village coat of arms and flag are not used in the game.
-- **Radio:** the game's own stations are fictional and the music is generated. The internet stations in `data/radia.json`
-  are only links to public Czech Radio streams, which the game plays for the player like an ordinary internet radio
-  (it neither records nor redistributes anything, and there are no logos). Station names are trademarks of their operator – before
-  publishing the game widely, empty `radia.json` or get permission.
-- **Disclaimer:** the splash screen, the F1 help and the start of this README (`Hud.DISCLAIMER`).
+- **Žádné reálné identifikátory:** všechna čísla popisná ve hře jsou smyšlená (`Estate` – číslování od návsi ze seedu, nic
+  z RÚIAN / ČÚZK; skutečné číslo původního domu hráče se nezobrazí), cedulky s číslem mají obecný vzhled bez znaku obce,
+  žádná jména na schránkách a zvoncích, žádné průhledy do soukromých dvorů a oken. SPZ se generují
+  s písmenem Q, které se v českých SPZ nevydává (`Traffic.plate()`).
+- **Postavy:** jen smyšlená jména, žádné podobizny ani narážky na skutečné obyvatele obce. Vesničané
+  mají vymyšlená, spíš humorná jména a obecná povolání; nová jména nesmí odpovídat
+  skutečným obyvatelům a texty nesmí zmiňovat skutečné sousední obce, firmy ani úřady.
+- **Značky:** místo ochranných známek se používají smyšlené nebo parodické názvy (auta Oktávka / Fábička /
+  Stodvacka, motorka Javor, kolo Favorín, Bylinkovka, Hořká; smyšlené podniky Hospoda U Hřiště, Pálenice U Kotla…).
+- **Obecní symboly:** znak a prapor obce se ve hře nepoužívají.
+- **Rádio:** vlastní stanice ve hře jsou smyšlené a hudba je generovaná. Internetové stanice v `data/radia.json`
+  jsou jen odkazy na veřejné streamy Českého rozhlasu, které hra přehrává u hráče jako běžný internetový
+  přijímač (nic nenahrává ani nešíří, žádná loga). Názvy stanic jsou ochranné známky provozovatele – před
+  veřejným šířením hry je vhodné `radia.json` vyprázdnit, nebo si vyžádat souhlas. Stejné pravidlo platí pro
+  případné další stanice (Rock Radio, Radio Beat, Rock Zone): zatím nejsou přidány, dokud nebude souhlas provozovatelů
+  nebo jiné ověřené řešení. Hra je přehrává jen u hráče, nic nenahrává ani nešíří.
+- **Doložka:** úvodní obrazovka, nápověda F1 a začátek tohoto README (`Hud.DISCLAIMER`).

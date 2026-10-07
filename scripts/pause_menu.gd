@@ -99,7 +99,7 @@ func close() -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE     # zpět u rádia (pauza při ztrátě fokusu)
 	elif not client.hud.menu_open:
 		client.player.controls_locked = false
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		client.hud._update_mouse_mode()                 # může být otevřená mapa → viditelný kurzor
 
 
 func _input(event: InputEvent) -> void:
@@ -316,9 +316,13 @@ func _show_settings() -> void:
 	_header("Ovládání")
 	_slider("Citlivost myši", 0.2, 3.0, 0.05, settings.mouse_sens, func(x): settings.mouse_sens = x, "%.2f×")
 	_check("Obrátit osu Y myši", settings.invert_y, func(on): settings.invert_y = on)
-	_check("Intuitivní řízení rogala (W = nos nahoru; výchozí realistické obrácené)", settings.trike_intuitive,
-		func(on): settings.trike_intuitive = on)
+	_check("Realistické řízení rogala hrazdou (obráceně: S = nos nahoru, A = doprava)", settings.trike_realistic,
+		func(on): settings.trike_realistic = on)
 	_slider("Zorné pole (FOV)", 55.0, 95.0, 1.0, settings.fov, func(x): settings.fov = x, "%d°")
+	_check("Třes obrazu (abstinence, zima)", settings.withdrawal_shake, func(on): settings.withdrawal_shake = on)
+	_check("Efekty obrazu (opilost, látky, zranění) – nezávisle na obsahu pro dospělé", settings.image_fx, _set_image_fx)
+	_check("Obsah pro dospělé (návykové látky) – výchozí vypnuto; vypnuto = v hře není", settings.adult_content,
+		_set_adult)
 	_header("Zvuk")
 	_slider("Hlasitost", 0.0, 1.0, 0.05, settings.volume, func(x): settings.volume = x, "", true)
 	_header("Výkon")
@@ -357,10 +361,15 @@ func _show_graphics() -> void:
 	_gfx_option("Rozlišení 3D", GameSettings.SCALE_NAMES, "scale")
 	_gfx_option("Zvětšení obrazu", GameSettings.UPSCALE_NAMES, "upscale")
 	_gfx_option("Vyhlazování hran", GameSettings.AA_NAMES, "aa")
+	_header("Barvy")
+	_option("Podání barev světa", GameSettings.COLOR_NAMES, settings.color_mode, func(i):
+		settings.color_mode = i
+		settings.apply_graphics(client))
 	_header("Scéna")
 	_gfx_option("Stíny", GameSettings.SHADOW_NAMES, "shadows")
 	_gfx_option("Dohlednost", GameSettings.VIEW_NAMES, "view")
 	_gfx_option("Vegetace (květy, ovoce, listí)", GameSettings.VEG_NAMES, "veg")
+	_gfx_option("Aktivita světa (NPC, zvířata, doprava)", GameSettings.SIM_NAMES, "sim")
 	_check("Záře (bloom)", bool(settings.gfx["glow"]), func(on):
 		settings.set_gfx("glow", on)
 		_refresh_preset_label())
@@ -432,6 +441,18 @@ func _slider(text: String, lo: float, hi: float, step: float, val: float, setter
 		setter.call(x)
 		show_val.call(x)
 		settings.apply(client))
+
+
+## M4.8: přepnutí „Efekty obrazu“ – DrunkFx hned přestane (nebo začne) kreslit.
+func _set_image_fx(on: bool) -> void:
+	settings.image_fx = on
+	DrunkFx.enabled = on
+
+
+## M4.8: přepnutí „Obsah pro dospělé“ – hned se projeví v katalogu (předměty a plodiny s `adult` zmizí / vrátí se).
+func _set_adult(on: bool) -> void:
+	settings.adult_content = on
+	ItemsDB.adult_on = on
 
 
 func _check(text: String, on: bool, setter: Callable) -> void:

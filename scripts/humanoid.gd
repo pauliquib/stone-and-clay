@@ -633,6 +633,12 @@ func head_node() -> Node3D:
 # ---------------------------------------------------------------- animace
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("humanoid", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	var run := clampf((speed - 3.5) / 4.0, 0.0, 1.0)
 	var moving := clampf(speed / 1.5, 0.0, 1.0)
 	_phase += delta * (speed * (2.2 - run * 0.5) + 0.0001)

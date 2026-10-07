@@ -6,6 +6,8 @@ extends Node3D
 
 const N_AI := 5
 const N_PARKED := 14
+# M5.11: vzhled řidiče policejního auta (uniforma – tmavomodrá košile, tmavé kalhoty)
+const POLICE_DRIVER_LOOK := {"look": {"shirt": Color(0.1, 0.16, 0.36), "pants": Color(0.12, 0.13, 0.18), "hair": Color(0.22, 0.16, 0.1), "style": 0, "skin": 0.4}}
 const COLORS := [Color(0.75, 0.75, 0.78), Color(0.1, 0.1, 0.12), Color(0.15, 0.25, 0.55), Color(0.55, 0.08, 0.06),
 	Color(0.9, 0.9, 0.9), Color(0.3, 0.35, 0.3), Color(0.55, 0.45, 0.3), Color(0.2, 0.4, 0.35)]
 # M1.6: váhy výskytu modelů (hodně osobních, občas dodávka / pickup). Traktor jezdí zvlášť (sezóna, okresky).
@@ -13,10 +15,14 @@ const AI_WEIGHTS := {"octavia": 3.0, "fabia": 3.0, "sedan120": 1.5, "rodinka": 2
 const PARKED_WEIGHTS := {"octavia": 3.0, "fabia": 3.0, "sedan120": 1.5, "rodinka": 2.5, "van": 0.6, "bednar": 0.8, "lesak": 1.0,
 	"pionyrek": 0.5, "vcelka": 0.5, "armadka": 0.3, "krosak": 0.2}
 const TRACTOR_KINDS := ["tertiary", "unclassified", "service", "track"]   # jen okresky a polní cesty (DOPLNIT: podle grafu silnic)
+const TRACTOR_END_KINDS := ["tertiary", "unclassified", "track"]   # start / cíl traktoru (ne vjezdy – service)
 const TRACTOR_ID := "traktorek"
 const TRACTOR_CHECK_S := 15.0
 const VILLAGE_CENTER := Vector2(120.0, 180.0)
 const VILLAGE_R := 520.0
+const STUCK_S := 25.0             # stojí bez překážky tak dlouho → zaseknuté (respawn / přeplánování)
+const BLOCKED_S := 40.0           # dlouho zablokované překážkou (dům v silnici, stojící auto)
+const REPLAN_COOL_S := 15.0       # přeplánování jednoho auta u hráče nejvýš jednou za tolik s
 
 var graph: RoadGraph
 var terrain: Terrain
@@ -24,11 +30,15 @@ var world: Node                   # World – seznam hráčů
 var player_cars := {}             # id hráče → Car (auto hráče)
 var player_vehicles := {}         # id hráče → [Car] všechna jeho vozidla (auto, dědovo kolo, Jawa)
 var ai_cars: Array[Car] = []
+var _police_cars: Array[Car] = []    # M5.11 policejní vozy (patrol, kontrola) – řidič v uniformě, LOD
 var parked: Array[Car] = []
 var rng := RandomNumberGenerator.new()
 var _stuck := {}
+var _replan_at := {}              # auto → čas posledního přeplánování u hráče (ms)
 var _plate_n := 1000
 var _tractor_t := 0.0
+var _sleep_t := 0.0             # periodika uspávání / probouzení vozidel podle vzdálenosti hráčů
+var _zones: Array = []           # [Vector3(x, z, r)] zóny „v obci“ – Dukelčice + katastry z obce.json
 var respawn_log: Array = []      # [čas ms, auto, důvod] – pro --traffictest
 
 
@@ -37,6 +47,27 @@ func setup(g: RoadGraph, t: Terrain, w: Node) -> void:
 	terrain = t
 	world = w
 	rng.seed = 490
+	# zóny „v obci“ (limit 50 km/h, svědci u policie/pověsti): Dukelčice + každá obec
+	# z World.obce (střed + ekvivalentní poloměr katastru); parkování zůstává jen Dukelčice
+	_zones = [Vector3(VILLAGE_CENTER.x, VILLAGE_CENTER.y, VILLAGE_R)]
+	var obce: Variant = w.get("obce") if w != null else null
+	if obce is Array:
+		for o in obce:
+			var c: Array = o.get("center", [])
+			if c.size() >= 2:
+				_zones.append(Vector3(float(c[0]), float(c[1]), float(o.get("radius", 500.0))))
+
+
+## Je bod (x, z) uvnitř některé obce – Dukelčice (VILLAGE_CENTER/R) nebo katastru okolní
+## obce z data/obce.json (střed ± radius)? Sdílený test pro limit 50 km/h AI aut
+## a pro svědky/hlídky (police.gd, reputation.gd).
+func in_village(p: Vector2) -> bool:
+	if _zones.is_empty():
+		return p.distance_to(VILLAGE_CENTER) < VILLAGE_R
+	for z in _zones:
+		if p.distance_to(Vector2(z.x, z.y)) < z.z:
+			return true
+	return false
 
 
 ## Smyšlená SPZ – písmeno Q se v českých SPZ nevydává, takže se nemůže shodovat s reálným vozidlem.
@@ -61,6 +92,7 @@ func place_car(c: Car, pos: Vector2, yaw: float) -> void:
 	c._prev_xf = c.global_transform
 	c._cur_xf = c.global_transform
 	c._prev_vel = Vector3.ZERO
+	c.set_asleep(false)
 
 
 ## Vážený náhodný výběr modelu z tabulky {id: váha}.
@@ -110,6 +142,7 @@ func _update_tractor(delta: float) -> void:
 	elif t != null and world.nearest_player_dist(t.global_position) > 60.0:
 		ai_cars.erase(t)
 		_stuck.erase(t)
+		_replan_at.erase(t)
 		t.queue_free()
 
 
@@ -119,6 +152,9 @@ func make_car(model_id: String, color: Color, police := false, plate_text := "")
 	c.weather = world.weather
 	c.clock = world.clock
 	add_child(c)
+	if police:
+		c.add_ai_driver(POLICE_DRIVER_LOOK)
+		_police_cars.append(c)
 	return c
 
 
@@ -235,6 +271,7 @@ func spawn_ai() -> void:
 	for i in N_AI:
 		var c := make_car(pick_model(AI_WEIGHTS), COLORS[rng.randi() % COLORS.size()])
 		c.name = "AI_%d" % i
+		c.add_ai_driver(Characters.profile(rng.randi() % Characters.count()))
 		ai_cars.append(c)
 		_respawn(c, true)
 
@@ -245,52 +282,147 @@ func _respawn(c: Car, first := false) -> void:
 	var pp := Vector2(anchor.x, anchor.z)
 	var is_tractor := c.model_id == TRACTOR_ID
 	var a := graph.astar(TRACTOR_KINDS if is_tractor else RoadGraph.CAR_KINDS)
+	# start i cíl jen na „opravdových“ silnicích – service větve jsou vjezdy do dvorů (auto by tam
+	# začínalo / končilo v zahradě); trasa jimi může jen projet
+	var ends := graph.astar(TRACTOR_END_KINDS if is_tractor else RoadGraph.END_KINDS)
 	for attempt in 30:
 		var ang := rng.randf() * TAU
 		var r := rng.randf_range(120.0, 450.0) if not first else rng.randf_range(60.0, 500.0)
-		var s := a.get_closest_point(pp + Vector2(cos(ang), sin(ang)) * r)
+		var s := ends.get_closest_point(pp + Vector2(cos(ang), sin(ang)) * r)
+		if s < 0 or not a.has_point(s):
+			continue
 		var sp := graph.nodes[s]
 		if sp.distance_to(pp) < 90.0:
 			continue
 		var ang2 := rng.randf() * TAU
-		var e := a.get_closest_point(sp + Vector2(cos(ang2), sin(ang2)) * rng.randf_range(500.0, 1600.0))
+		var e := ends.get_closest_point(sp + Vector2(cos(ang2), sin(ang2)) * rng.randf_range(500.0, 1600.0))
+		if e < 0 or not a.has_point(e):
+			continue
 		var ids := a.get_id_path(s, e)
 		if ids.size() < 6:
 			continue
 		var pts := graph.lane_points(ids, terrain)
 		var d := Vector2(pts[1].x - pts[0].x, pts[1].z - pts[0].z)
 		place_car(c, Vector2(pts[0].x, pts[0].z), atan2(d.x, d.y))
-		var in_village := sp.distance_to(VILLAGE_CENTER) < VILLAGE_R
-		c.set_ai_route(pts, minf(13.9 if in_village else 19.0, float(c.model.spec.get("ai_vmax", 99.0))))
+		var v_obci := in_village(sp)
+		c.set_ai_route(pts, minf(13.9 if v_obci else 19.0, float(c.model.spec.get("ai_vmax", 99.0))))
 		_stuck[c] = 0.0
 		return
 
 
+## Nová trasa z místa, kde auto stojí (bez teleportu) – do náhodného cíle 300–1200 m daleko.
+## Body trasy za autem `Car.reroute` rovnou odbaví. Vrací false, když trasu nenašlo.
+func _replan(c: Car) -> bool:
+	var is_tractor := c.model_id == TRACTOR_ID
+	var a := graph.astar(TRACTOR_KINDS if is_tractor else RoadGraph.CAR_KINDS)
+	var ends := graph.astar(TRACTOR_END_KINDS if is_tractor else RoadGraph.END_KINDS)
+	var here := Vector2(c.global_position.x, c.global_position.z)
+	var s := a.get_closest_point(here)
+	if s < 0:
+		return false
+	for attempt in 10:
+		var ang := rng.randf() * TAU
+		var e := ends.get_closest_point(here + Vector2(cos(ang), sin(ang)) * rng.randf_range(300.0, 1200.0))
+		if e < 0 or e == s or not a.has_point(e):
+			continue
+		var ids := a.get_id_path(s, e)
+		if ids.size() < 4:
+			continue
+		c.reroute(graph.lane_points(ids, terrain))
+		_stuck[c] = 0.0
+		return true
+	_stuck[c] = 0.0
+	return false
+
+
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("traffic", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if world.players.is_empty():
 		return
 	_update_tractor(delta)
+	_sleep_t -= delta
+	if _sleep_t <= 0.0:
+		_sleep_t = 0.4
+		_update_car_sleep()
+		_update_driver_lod()
 	var respawns := 0                  # hledání trasy (A*) je drahé – nejvýš jedno přeplánování za krok
 	for c in ai_cars:
 		if c.drive != Car.Drive.AI:
 			continue
 		var d: float = world.nearest_player_dist(c.global_position)
-		# rychlostní limit podle obce
-		var in_village := Vector2(c.global_position.x, c.global_position.z).distance_to(VILLAGE_CENTER) < VILLAGE_R
-		c.ai_speed_limit = minf(13.9 if in_village else 19.0, float(c.model.spec.get("ai_vmax", 99.0)))
+		if c.kinematic:
+			c.kinematic_step(delta)      # mimo simulační bublinu – posun po trase bez fyziky
+		# rychlostní limit podle obce (Dukelčice + katastry okolních obcí)
+		var v_obci := in_village(Vector2(c.global_position.x, c.global_position.z))
+		c.ai_speed_limit = minf(13.9 if v_obci else 19.0, float(c.model.spec.get("ai_vmax", 99.0)))
 		if absf(c.speed) < 0.6 and c.ai_blocked <= 0.0:
 			_stuck[c] = float(_stuck.get(c, 0.0)) + delta
 		else:
 			_stuck[c] = 0.0
 		# zaseknuté / dlouho zablokované auto daleko od hráče se přesune jinam (hráč to nevidí)
-		var blocked_long := c.ai_blocked > 40.0 and d > 80.0
-		if d > 650.0 or c.ai_done() or float(_stuck.get(c, 0.0)) > 25.0 or c.damage >= 100.0 or blocked_long:
+		var stuck := float(_stuck.get(c, 0.0)) > STUCK_S
+		var blocked_long := c.ai_blocked > BLOCKED_S and d > 80.0
+		if d > 650.0 or c.ai_done() or stuck or c.damage >= 100.0 or blocked_long:
 			if d > 60.0 and respawns == 0:
 				respawns += 1
-				var why := "daleko" if d > 650.0 else ("dojel" if c.ai_done() else ("zaseknutý" if float(_stuck.get(c, 0.0)) > 25.0 \
+				var why := "daleko" if d > 650.0 else ("dojel" if c.ai_done() else ("zaseknutý" if stuck \
 					else ("zničený" if c.damage >= 100.0 else "zablokovaný")))
 				respawn_log.append([Time.get_ticks_msec(), c.name, why])
 				c.repair()
 				_respawn(c)
-		# daleko od hráče → uspat fyziku kol (šetří výkon), ale jen když nestojí na trase
-		c.set_physics_process(true)
+				continue
+		# u hráče (≤ 60 m) se auto nepřesouvá – hráč by to viděl; zaseknuté, dojeté nebo dlouho
+		# zablokované (dům v silnici, stojící auto) dostane novou trasu z místa, kde stojí (dřív stálo navždy)
+		if d <= 60.0 and respawns == 0 and c.damage < 100.0 and (c.ai_done() or stuck or c.ai_blocked > BLOCKED_S) \
+				and Time.get_ticks_msec() - int(_replan_at.get(c, -100000)) > REPLAN_COOL_S * 1000.0:
+			respawns += 1
+			_replan_at[c] = Time.get_ticks_msec()
+			respawn_log.append([Time.get_ticks_msec(), c.name, "přeplánován u hráče"])
+			_replan(c)
+
+
+## M5.11: řidiči AI a policejních aut – zobrazit jen blízko hráče, animovat jen velmi blízko (periodicky).
+func _update_driver_lod() -> void:
+	for arr in [ai_cars, _police_cars]:
+		for c in arr:
+			if c != null and is_instance_valid(c):
+				c.update_driver_lod(world.nearest_player_dist(c.global_position))
+
+
+## Uspávání vozidel podle vzdálenosti k nejbližšímu hráči (výkon na velké mapě): stojící vozidla
+## (zaparkovaná + hráčská bez řidiče) za ~170 m zamraznou – kolize zůstává (jde do nich nabourat
+## i nastoupit), ale raycastová kola, _process ani zvuky už neběží. AI auta mimo simulační
+## bublinu (World.sim_radius) přejdou na levný kinematický posun po trase. Policie se nespí –
+## hlídka a pronásledování potřebují plnou fyziku.
+func _update_car_sleep() -> void:
+	for c in parked:
+		_sleep_still(c)
+	for arr in player_vehicles.values():
+		for c in arr:
+			_sleep_still(c)
+	var simr: float = world.sim_radius
+	for c in ai_cars:
+		if c == null or not is_instance_valid(c) or c.drive != Car.Drive.AI or c.is_police \
+				or c.ai_direct_target != Vector3.INF:
+			continue
+		var d: float = world.nearest_player_dist(c.global_position)
+		if not c._asleep and d > simr:
+			c.set_asleep(true, true)
+		elif c._asleep and d < simr * 0.7:
+			c.set_asleep(false)
+
+
+func _sleep_still(c: Car) -> void:
+	if c == null or not is_instance_valid(c) or c.drive != Car.Drive.NONE:
+		return
+	var d: float = world.nearest_player_dist(c.global_position)
+	if c._asleep:
+		if d < 110.0:
+			c.set_asleep(false)
+	elif d > 170.0:
+		c.set_asleep(true)

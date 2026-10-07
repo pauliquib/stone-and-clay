@@ -122,6 +122,7 @@ var pay_bank := false            # M3.4: výplata na účet (Computer.deposit) m
 var invited := {}                # M3.4: id práce → juliánský den, do kdy platí pozvánka na pohovor (inzerát z PC)
 var _t := 0.0
 var _last_min := -1.0
+var _start_jd := -1              # `Clock.start_jd` při posledním ticku – změna = F2 Datum (viz `_on_date_changed`)
 var _targets: Array = []         # cíle aktuálního úkolu registrované v ActionRunner
 
 
@@ -333,8 +334,9 @@ func can_apply(job_id: String) -> Dictionary:
 		checks.append(["%s aspoň %d (máš %d)" % [Skills.skill_name(String(s)), need, have], have >= need])
 	var rid := String(req.get("ridicak", ""))
 	if rid != "":
-		# zjednodušeně do M4.1: platný řidičák = není zákaz řízení (skupiny oprávnění doplní autoškola)
-		var ok_r := game.police == null or game.police.license_ok(player)
+		# M4.1: řidičák se skupinou z Permits (ridicsky) a zároveň bez zákazu řízení
+		var ok_r := (game.permits == null or game.permits.has(pid, "ridicsky", rid)) \
+			and (game.police == null or game.police.license_ok(player))
 		checks.append(["Řidičské oprávnění sk. %s bez zákazu řízení" % rid, ok_r])
 	var tag := String(req.get("obleceni_tag", ""))
 	if tag != "":
@@ -370,10 +372,7 @@ func _record_clean() -> bool:
 	var lr: Law.LawRecord = game.law.get(pid)
 	if lr == null:
 		return true
-	for r in lr.records:
-		if bool((r as Dictionary).get("trestny_cin", false)):
-			return false
-	return true
+	return lr.criminal_record().is_empty()     # M4.3: rejstřík trestů (jen činy s rozsudkem)
 
 
 ## Oblečení z požadavků: tag (`obleceni_tag`), volitelně na konkrétním slotu (`obleceni_slot`, M3.2 – „pracovní boty“).
@@ -751,6 +750,13 @@ func tick() -> void:
 	var prev := _last_min
 	var dt := now - prev
 	_last_min = now
+	var sj: int = game.clock.start_jd
+	if _start_jd < 0:
+		_start_jd = sj
+	elif sj != _start_jd:
+		_on_date_changed(sj - _start_jd)
+		_start_jd = sj
+		return
 	if current == "":
 		return
 	var j := job(current)
@@ -1342,6 +1348,26 @@ func unlend(item: String, n := 1) -> void:
 			l.erase(item)
 
 
+## F2 → Datum (`Clock.set_date`) posune začátek kalendáře o `delta` dní: absolutní časy směn (odvozené z dne) by
+## byly o ty dny vedle. Rozpracovaná směna / zakázka se proto bez postihu zruší, vyřízené směny se zapomenou
+## (klíče „den:hodina“ by se mohly srazit se starými) a dny v evidenci se posunou s kalendářem.
+func _on_date_changed(delta: int) -> void:
+	if not shift.is_empty():
+		if bool(shift.get("zakazka", false)):
+			_contract_end(false, "")
+		else:
+			_return_lent()
+			shift = {}
+			_clear_targets()
+		game.notify(pid, "show_message", ["Datum se změnilo – rozpracovaná směna se zrušila (bez postihu).", 4.0])
+	resolved.clear()
+	if hired_jd >= 0:
+		hired_jd += delta
+	for k in invited.keys():
+		invited[k] = int(invited[k]) + delta
+	_last_min = game.clock.minutes
+
+
 ## Po směně (i předčasném konci) vrátí zapůjčené kusy, které hráč ještě má.
 func _return_lent() -> void:
 	var l: Dictionary = shift.get("lent", {})
@@ -1733,3 +1759,4 @@ func from_dict(d: Dictionary) -> void:
 		shift["goal"] = int(shift["goal"])
 		shift["tasks"] = int(shift["tasks"])
 	_last_min = game.clock.minutes if game and game.clock else -1.0
+	_start_jd = -1                   # první tick po načtení převezme aktuální počátek kalendáře

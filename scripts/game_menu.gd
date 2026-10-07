@@ -217,6 +217,10 @@ func open_teleport() -> void:
 		opts.append(["K bazaru vozidel (cedule)", world.teleport_player.bind(pid, world.bazaar.pos + Vector3(0, 0, 4.0), 0.0)])
 	if world.airfield and world.airfield.ok:
 		opts.append(["Na letiště (polní dráha, M6.5)", _tp.bind("letiste")])
+	if not world.obce.is_empty():
+		opts.append(hdr("Okolní obce (na okraj katastru, pohled z dálky)"))
+		for o in world.obce:
+			opts.append([String(o.get("name", "obec")), _tp.bind("obec:" + String(o.get("id", o.get("name", ""))))])
 	opts.append(hdr("Zvěř a příroda"))
 	opts.append(["Ke srncům", _tp.bind("zver:srnec")])
 	opts.append(["K divočákům", _tp.bind("zver:divocak")])
@@ -318,6 +322,51 @@ func _tp(what: String) -> void:
 	world.teleport_player(pid, t[0], t[1])
 
 
+## Cheat (test): libovolný předmět z katalogu, po skupinách podle typu. Obsah pro dospělé se řídí volbou
+## v Nastavení (`ItemsDB.hidden`), takže skrytý předmět se v cheatu nenabídne.
+func open_cheat_items() -> void:
+	var groups := {}
+	for id in ItemsDB.ITEMS.keys():
+		if ItemsDB.hidden(id):
+			continue
+		var t := ItemsDB.type_of(id)
+		if not groups.has(t):
+			groups[t] = []
+		(groups[t] as Array).append(id)
+	var opts := []
+	var types := groups.keys()
+	types.sort()
+	for t in types:
+		opts.append([_type_label(t) + " (%d)" % (groups[t] as Array).size(), _cheat_group.bind(String(t))])
+	opts.append(["← Zpět", open_player])
+	_hud().open_menu("Cheat – předměty", "Vyber skupinu. Kliknutím na předmět dostaneš 1 kus (u skladových víc podle velikosti).", opts)
+
+
+func _cheat_group(t: String) -> void:
+	var ids := []
+	for id in ItemsDB.ITEMS.keys():
+		if ItemsDB.type_of(id) == t and not ItemsDB.hidden(id):
+			ids.append(id)
+	ids.sort_custom(func(a, b): return ItemsDB.name_of(a) < ItemsDB.name_of(b))
+	var opts := []
+	for id in ids:
+		opts.append([ItemsDB.name_of(id), _cheat_give.bind(String(id))])
+	opts.append(["← Skupiny", open_cheat_items])
+	_hud().open_menu("Cheat – %s" % _type_label(t), "", opts)
+
+
+func _cheat_give(id: String) -> void:
+	var p: Player = world.players.get(pid)
+	if p == null:
+		return
+	p.add_item(id, 1)
+	world.notify(pid, "show_message", ["Cheat: %s" % ItemsDB.name_of(id), 2.5])
+
+
+func _type_label(t: String) -> String:
+	return String(t) if t != "" else "ostatní"
+
+
 func open_player() -> void:
 	_hud().open_menu("Hráč", "", [
 		hdr("Stav a peníze"),
@@ -330,7 +379,8 @@ func open_player() -> void:
 		["Nástroje do inventáře", world.cheat.bind(pid, "nastroje")],
 		["Zbraně: luk, kuše, šípy (M2.8)", world.cheat.bind(pid, "zbrane")],
 		["Zbrojní oprávnění zap / vyp + puška (M2.8)", world.cheat.bind(pid, "zbrojni")],
-		["Drony + registrace ÚCL + A1/A3 (M6.1)", world.cheat.bind(pid, "drony")],
+		["Drony + registrace ÚVL + A1/A3 (M6.1)", world.cheat.bind(pid, "drony")],
+		["Cheat: libovolný předmět z katalogu…", open_cheat_items],
 		hdr("Práce"),
 		["Přijmout hned – vybrat práci (M3.1/M3.2)", _job_pick],
 		["Splnit požadavky (výřečnost 3, dřevorubectví 8, zahradničení 5, pracovní boty, střízlivost) (M3.2/M3.3)", _job_debug.bind("req")],

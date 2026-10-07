@@ -1,12 +1,12 @@
 {
-	"nazev": "Dron A1/A3 – pilot v otevřené kategorii (ÚCL)",
+	"nazev": "Dron A1/A3 – pilot v otevřené kategorii (ÚVL)",
 	"druh": "dron",
-	"popis": "10 otázek k pravidlům bezpilotního letu v otevřené kategorii. Vlastní formulace – nejde o oficiální testové otázky ÚCL.",
+	"popis": "10 otázek k pravidlům bezpilotního letu v otevřené kategorii. Vlastní formulace – nejde o oficiální testové otázky ÚVL.",
 	"prah": 8,
 	"zdroj": "nařízení (EU) 2019/947 a 2019/945, zákon 49/1997 Sb. o civilním letectví – zjednodušeno, ověřit aktuální znění",
-	"poznamka": "Herní simulace. Skutečná zkouška A1/A3 probíhá online na portálu ÚCL a má jiný rozsah – ověřit aktuální podmínky.",
+	"poznamka": "Herní simulace. Skutečná zkouška A1/A3 probíhá online na portálu ÚVL a má jiný rozsah – ověřit aktuální podmínky.",
 	"otazky": [
-		{"otazka": "Musí se majitel dronu s kamerou (pod 250 g) registrovat u ÚCL jako provozovatel?",
+		{"otazka": "Musí se majitel dronu s kamerou (pod 250 g) registrovat u ÚVL jako provozovatel?",
 			"odpovedi": ["Ne, pod 250 g se neregistruje nikdy", "Ano – s kamerou (senzorem pro osobní údaje) se registrace vyžaduje i pod 250 g", "Jen když létá v obci"], "spravna": 1,
 			"vysvetleni": "Provozovatel se registruje u dronů vybavených senzorem schopným snímání osobních údajů (kamera), pokud není hračka."},
 		{"otazka": "Jak vysoko smí dron v otevřené kategorii letět nad zemí?",
@@ -34,7 +34,7 @@
 			"odpovedi": ["Nikdo – dron je hračka", "Provozovatel/pilot dronu", "Výrobce dronu"], "spravna": 1,
 			"vysvetleni": "Za škodu způsobenou provozem dronu odpovídá provozovatel (a pilot při provozu)."},
 		{"otazka": "Co znamená osvědčení A1/A3?",
-			"odpovedi": ["Kvalifikaci pilota pro základní otevřenou kategorii (online test ÚCL)", "Povolení letat kdekoliv včetně letiště", "Registraci dronu v evidenci"], "spravna": 0,
+			"odpovedi": ["Kvalifikaci pilota pro základní otevřenou kategorii (online test ÚVL)", "Povolení letat kdekoliv včetně letiště", "Registraci dronu v evidenci"], "spravna": 0,
 			"vysvetleni": "A1/A3 = online test pilota pro otevřenou podkategorii; potřebné pro drony nad ~250 g a řeší i let kolem lidí."}
 	]
 }

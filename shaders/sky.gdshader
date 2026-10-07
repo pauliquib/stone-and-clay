@@ -20,6 +20,7 @@ uniform vec2 cloud_offset = vec2(0.0);   // posun větrem (skript)
 uniform float haze = 0.0;                // opar, mlha 0..1
 uniform float flash = 0.0;               // blesk 0..1
 uniform float brightness = 1.0;
+uniform float light_pollution = 0.0;     // M5.12: světelný smog 0..1 (obec svítí) – řídí Atmosphere podle kamery
 
 float hash3(vec3 p) {
 	p = fract(p * vec3(443.897, 441.423, 437.195));
@@ -57,9 +58,12 @@ void sky() {
 	if (!AT_CUBEMAP_PASS && h > 0.0) {
 		vec3 sp = floor(d * 420.0);
 		float st = hash3(sp);
-		float star = step(0.9965, st) * (0.4 + 0.6 * hash3(sp + 3.1));
-		col += vec3(0.85, 0.9, 1.0) * star * night * (1.0 - cloud_cover) * smoothstep(0.0, 0.25, h) * 1.6;
+		// světelný smog: hvězd je míň (vyšší práh) a jsou slabší
+		float star = step(mix(0.9965, 0.9988, light_pollution), st) * (0.4 + 0.6 * hash3(sp + 3.1));
+		col += vec3(0.85, 0.9, 1.0) * star * night * (1.0 - cloud_cover) * smoothstep(0.0, 0.25, h) * 1.6 * (1.0 - 0.45 * light_pollution);
 	}
+	// teplý opar nad obcí při horizontu (sodíkové / LED světla)
+	col += vec3(1.0, 0.6, 0.3) * 0.09 * light_pollution * night * smoothstep(0.4, 0.0, h) * (1.0 - 0.5 * cloud_cover);
 	float moon_disk = smoothstep(0.99993, 0.99996, mcos);
 	col += vec3(0.95, 0.95, 0.88) * (moon_disk * (0.25 + 2.5 * moon_light) + pow(max(mcos, 0.0), 60.0) * 0.06 * moon_light) * night;
 
@@ -83,6 +87,7 @@ void sky() {
 		vec3 cday = mix(vec3(1.0), vec3(0.42, 0.44, 0.48), dens) * lit;
 		cday = mix(cday, cday * vec3(1.15, 0.72, 0.5), low_sun * 0.8);
 		vec3 cnight = vec3(0.02, 0.022, 0.03) + vec3(0.05) * moon_light * night;
+		cnight += vec3(0.08, 0.05, 0.025) * light_pollution * night * smoothstep(0.3, 1.0, cloud_cover);   // mraky nasvícené zespodu
 		vec3 ccol = mix(cnight, cday, day);
 		col = mix(col, ccol, c);
 	}

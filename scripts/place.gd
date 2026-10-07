@@ -11,7 +11,7 @@ const OFFERS := {
 		["panak_slivovice", 55, "serve"], ["panak_vodky", 45, "serve"], ["fernet", 50, "serve"],
 		["vino_sklenka", 45, "serve"], ["kava", 35, "serve"], ["voda", 25, "serve"],
 		["utopenec", 59, "serve"], ["tlacenka", 65, "serve"], ["chleba_sadlo", 45, "serve"],
-		["gulas", 169, "serve"], ["smazak", 189, "serve"], ["cigarety", 170, "buy"], ["pivo", 45, "buy"],
+		["gulas", 169, "serve"], ["smazak", 189, "serve"], ["pivo", 45, "buy"],
 		# M2.7 výkup ryb hostinským (režim "sell", cena za kus; kapr v prosinci ×2 – `World.sell_items`; DOPLNIT: ceny odhad)
 		["Výkup ryb", 0, "header"], ["ryba_kapr", 100, "sell"], ["ryba_lin", 90, "sell"], ["ryba_stika", 160, "sell"],
 		["ryba_candat", 180, "sell"], ["ryba_pstruh", 70, "sell"], ["ryba_okoun", 40, "sell"], ["ryba_cejn", 30, "sell"],
@@ -20,13 +20,16 @@ const OFFERS := {
 		# M2.9 výkup zvěřiny (jen legální, s dokladem o původu – `Hunting.sell_venison`; nelegální bokem u překupníka; DOPLNIT: ceny odhad)
 		["Výkup zvěřiny (s dokladem o původu)", 0, "header"], ["zverina_srnci", 180, "sell"], ["zverina_divocak", 120, "sell"],
 		["zverina_zajic", 150, "sell"], ["trofej_parozky", 100, "sell"]],
+	# M5.1 stavebniny (smyšlené „Stavebniny Cihla a Hřebík“, místo ze `pois.json`): železářství přesunuto z Potravin
+	"stavebniny": [["Nářadí", 0, "header"], ["sekera_stara", 390, "buy"], ["sekera", 1290, "buy"], ["motorova_pila", 6900, "buy"],
+		["Materiál (dvůr)", 0, "header"], ["pisek", 10, "buy"]],
+	# M5.1 pokračování: pila NAD halou stavebnin (budova `279052820`, OSM barn); dřevo a řezivo na venkovní ploše (dvůr)
+	"pila": [["Dřevo a řezivo", 0, "header"], ["prkno", 180, "buy"], ["rezivo", 260, "buy"], ["poleno", 90, "buy"]],
 	"obchod": [["pivo", 25, "buy"], ["nealko", 22, "buy"], ["vino_bile", 129, "buy"], ["vino_cervene", 139, "buy"],
 		["vodka", 229, "buy"], ["rum", 189, "buy"], ["becherovka", 259, "buy"], ["slivovice", 520, "buy"],
 		["voda", 19, "buy"], ["rohlik", 8, "buy"], ["chipsy", 45, "buy"], ["jablko", 6, "buy"],
-		["tlacenka", 49, "buy"], ["parek", 39, "buy"], ["cigarety", 165, "buy"], ["spacak", 890, "buy"],
+		["tlacenka", 49, "buy"], ["parek", 39, "buy"], ["cigarety", 165, "buy"], ["tabak_semena", 45, "buy"], ["papirky", 25, "buy"], ["konopi_semena", 60, "buy"], ["spacak", 890, "buy"],  # M4.8: semena jen při „Obsah pro dospělé“ (ItemsDB.hidden)
 		["sirky", 12, "buy"], ["zapalovac", 39, "buy"], ["burt", 25, "buy"],
-		# „Železářství“ – zatím v Potravinách, do M5.1 (stavebniny) se přesune
-		["sekera_stara", 390, "buy"], ["sekera", 1290, "buy"], ["motorova_pila", 6900, "buy"],
 		# M2.3 oblečení: sekce „Textil“, „Pracovní“, „Slavnostní“ (záhlaví = režim "header", jen text v nabídce)
 		["Textil", 0, "header"], ["triko_modre", 199, "buy"], ["triko_zelene", 199, "buy"], ["mikina_seda", 690, "buy"],
 		["platenka", 249, "buy"], ["vetrovka", 890, "buy"], ["bunda_zimni", 2490, "buy"], ["kratasy", 349, "buy"],
@@ -68,10 +71,10 @@ const OFFERS := {
 		["puska", 18000, "buy"], ["naboje", 40, "buy"],
 		# M2.10 doprava nákladu: ruční vozík (po koupi stojí u domova hráče, DOPLNIT: později stavebniny M5.1) a plachta (schová náklad)
 		["Doprava a náklad", 0, "header"], ["rucni_vozik", 2490, "buy"], ["plachta", 180, "buy"],
-		# M6.1 drony: malý do 250 g (bez zkoušky, jen registrace ÚCL zdarma na PC), velký vyžaduje osvědčení A1/A3
-		# (eTest „drony“). Nabíjení a opravy na počítači doma (Letectví – ÚCL). Ceny odhad (DOPLNIT: elektro M5.x?)
+		# M6.1 drony: malý do 250 g (bez zkoušky, jen registrace ÚVL zdarma na PC), velký vyžaduje osvědčení A1/A3
+		# (eTest „drony“). Nabíjení a opravy na počítači doma (Letectví – ÚVL). Ceny odhad (DOPLNIT: elektro M5.x?)
 		["Drony a technika", 0, "header"], ["dron", 7990, "buy"], ["dron_velky", 32900, "buy"], ["dron_baterie", 1490, "buy"],
-		# M6.4 paramotor: nový (i v eŠuplíku) a ojetý za polovinu; průkaz/registrace na PC → Letectví – ÚCL
+		# M6.4 paramotor: nový (i v eŠuplíku) a ojetý za polovinu; průkaz/registrace na PC → Letectví – ÚVL
 		["Letectví", 0, "header"], ["paramotor", 180000, "buy"], ["paramotor_ojety", 90000, "buy"]],
 	"palenice": [["slivovice", 450, "buy"], ["panak_slivovice", 40, "serve"], ["polena", 30, "sell"]],
 	"sklep": [["vino_bile", 150, "buy"], ["vino_cervene", 170, "buy"], ["vino_sklenka", 40, "serve"],
@@ -85,14 +88,19 @@ const OFFERS := {
 	"statek": [["Prodej ze dvora", 0, "header"], ["vejce", 6, "buy"], ["mleko", 22, "buy"], ["seno", 20, "buy"], ["zrni", 12, "buy"]],
 }
 const HOURS := {"hospoda": [10, 26], "obchod": [6, 21], "palenice": [8, 22], "sklep": [12, 24],
-	"chata": [0, 24], "urad": [7, 17], "domov": [0, 24], "statek": [5, 20]}
+	"chata": [0, 24], "urad": [8, 14], "domov": [0, 24], "statek": [5, 20], "stavebniny": [7, 17], "pila": [7, 17]}
 ## Výjimky z otevírací doby podle dne v týdnu (0 = pondělí … 6 = neděle): [od, do] nebo [] = zavřeno.
 ## Svátky (Clock.holiday) mají obchod zavřený; svátky a události v obci mění hodiny přes VillageEvents.event_hours.
 const WEEK_HOURS := {
 	"obchod": {5: [7, 11], 6: []},                        # sobota jen dopoledne, v neděli zavřeno
+	"stavebniny": {5: [7, 12], 6: []},                    # M5.1: sobota jen dopoledne, v neděli zavřeno
+	"pila": {5: [7, 12], 6: []},                          # M5.1 pokračování: jako stavebniny
 	"hospoda": {4: [10, 27], 5: [10, 27], 6: [10, 24]},    # pá a so do 3:00, v neděli do půlnoci
+	# A4-02: obecní úřad má úřední dny – Po a St déle, Út a Čt základní doba, v pátek krátce, víkend zavřeno
+	"urad": {0: [7, 17], 2: [7, 17], 4: [8, 12], 5: [], 6: []},
 }
-const CLOSED_ON_HOLIDAY := ["obchod"]
+const CLOSED_ON_HOLIDAY := ["obchod", "urad"]
+const DAY_NAMES := ["po", "út", "st", "čt", "pá", "so", "ne"]
 ## V pátek večer sedí v hospodě u druhého stolu víc štamgastů
 const FRIDAY_EXTRA := [["Standa", Color(0.45, 0.5, 0.3)], ["Vašek", Color(0.6, 0.35, 0.25)], ["Honza", Color(0.3, 0.4, 0.55)]]
 const FRIDAY_HOURS := [17.0, 24.0]
@@ -104,6 +112,8 @@ const KEEPERS := {
 	"chata": ["Myslivec Franta", "hunter", Color(0.25, 0.32, 0.2)],
 	"urad": ["Starosta Novák", "", Color(0.3, 0.3, 0.45)],
 	"statek": ["Hospodář Vladimír", "", Color(0.35, 0.42, 0.28)],      # M3.2 (smyšlený)
+	"stavebniny": ["Prodavač Miroslav", "", Color(0.6, 0.45, 0.2)],  # M5.1 (smyšlený)
+	"pila": ["Pilař Ondřej", "", Color(0.4, 0.3, 0.2)],              # M5.1 pokračování (smyšlený)
 }
 ## Povaha obsluhy pro rozhovor (Persona / Dialog): [povaha, povolání, věk, o sobě, témata]
 const KEEPER_PERSONA := {
@@ -113,6 +123,8 @@ const KEEPER_PERSONA := {
 	"sklep": ["veselak", "vinař", 55, "Víno je poezie v lahvi.", ["vino", "pocasi", "pole"]],
 	"chata": ["bruclavy", "myslivec", 60, "V lese se chodí potichu, ať nevyplašíš zvěř.", ["les", "zver", "vcely"]],
 	"urad": ["prisny", "starosta obce", 57, "Obec musí mít pořádek i rozpočet.", ["urad", "poradek", "silnice"]],
+	"stavebniny": ["prisny", "prodavač ve Stavebninách Cihla a Hřebík", 49, "Hřebík do zdi, cihla do základu. Plot bez prken nepostavíte.", ["drby", "pocasi", "zahrada"]],
+	"pila": ["bruclavy", "pilař", 52, "Dřevo musí aspoň rok volně vyschnout, jinak vám to ve stodole popraská.", ["pocasi", "zahrada", "drby"]],
 	"statek": ["bruclavy", "hospodář na Statku Na Kopci", 58, "Kráva nepočká, ta se dojí i na Štědrý den.", ["pole", "zvirata", "pocasi"]],
 }
 const REGULARS_PERSONA := [
@@ -208,6 +220,8 @@ func _sign_color() -> Color:
 	match key:
 		"hospoda": return Color(0.45, 0.25, 0.1)
 		"obchod": return Color(0.1, 0.4, 0.2)
+		"stavebniny": return Color(0.55, 0.4, 0.15)
+		"pila": return Color(0.42, 0.28, 0.14)
 		"palenice": return Color(0.35, 0.15, 0.4)
 		"sklep": return Color(0.45, 0.08, 0.15)
 		"chata": return Color(0.25, 0.3, 0.15)
@@ -344,19 +358,28 @@ func hours_text() -> String:
 		return "dnes zavřeno (svátek)" if clock and clock.holiday() != "" and key in CLOSED_ON_HOLIDAY else "dnes zavřeno"
 	if h[0] == 0 and h[1] == 24:
 		return "nonstop"
-	return "%d:00–%d:00" % [h[0], int(h[1]) % 24]
+	var txt := "%d:00–%d:00" % [h[0], int(h[1]) % 24]
+	# A1-06: u míst s výjimkami podle dne (víkend, úřední dny) se vypíšou i ty
+	if WEEK_HOURS.has(key):
+		var parts := []
+		for wd in range(7):
+			if WEEK_HOURS[key].has(wd):
+				var e: Array = WEEK_HOURS[key][wd]
+				parts.append("%s %s" % [DAY_NAMES[wd], "zavřeno" if e.is_empty() else "%d:00–%d:00" % [e[0], int(e[1]) % 24]])
+		txt += " (%s)" % ", ".join(parts)
+	return txt
 
 
 # ------------------------------------------------------------------ páteční hosté
 
 func _process(delta: float) -> void:
-	if key != "hospoda":
-		return
 	_fri_t -= delta
 	if _fri_t > 0.0:
 		return
 	_fri_t = 4.0
-	_place_people()
+	_place_people()                 # obsluha mimo otevírací dobu zmizí (A1-05); hospoda i hosté
+	if key != "hospoda":
+		return
 	var clock: Clock = world.get("clock") if world else null
 	var want := 0
 	if clock and clock.weekday() == 4 and clock.hour() >= FRIDAY_HOURS[0] and clock.hour() < FRIDAY_HOURS[1] \
@@ -411,11 +434,19 @@ func set_inside(on: bool, it: Interior) -> void:
 	_place_people()
 
 
+## Je místo teď otevřené? (bez hodin světa vždy ano)
+func _open_now() -> bool:
+	var clock: Clock = world.get("clock") if world else null
+	return clock == null or is_open(clock.hour())
+
+
 ## Zahrádka je venku jen v létě, za tepla, ve dne a bez deště; jinak štamgasti sedí uvnitř (zahrádka zůstane prázdná).
 func _garden_open() -> bool:
 	var clock: Clock = world.get("clock") if world else null
 	if clock == null:
 		return true
+	if not is_open(clock.hour()):
+		return false
 	var w = world.get("weather")
 	var dry: bool = w == null or (not w.is_raining() and w.temp >= 15.0)
 	return clock.season() == "léto" and clock.hour() >= 10.0 and clock.hour() < 22.0 and dry
@@ -428,8 +459,11 @@ func _place_people() -> void:
 		if player_inside and keeper_inside_pos != Vector3.INF:
 			keeper.global_position = keeper_inside_pos
 			keeper.base_yaw = keeper_inside_yaw
-		else:
+		elif _open_now():
 			keeper.position = _keeper_home
+			keeper.base_yaw = _keeper_home_yaw
+		else:
+			keeper.position = _keeper_home + HIDDEN_OFFSET     # zavřeno: obsluha není venku 24/7
 			keeper.base_yaw = _keeper_home_yaw
 	if key != "hospoda":
 		return

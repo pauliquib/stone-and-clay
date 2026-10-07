@@ -32,8 +32,12 @@ const SEASON_ITEMS := {
 	"hrib": {"from": 182, "to": 305, "regrow": 3},       # červenec–říjen
 	"jablko": {"from": 213, "to": 305, "regrow": 5},     # srpen–říjen
 	"sipek": {"from": 305, "to": 60, "regrow": 7},       # listopad–únor
+	"lysohlavky": {"from": 244, "to": 320, "regrow": 10},  # M4.8 září–listopad, vzácné
 }
 const HRIB_DRY := 0.25
+## M4.8 (obsah pro dospělé): lysohlávky – září–listopad, vzácné; u části hřibů. Mimo volbu jsou neaktivní (`_item_present`).
+## Záměna s muchomůrkou: šance klesá s dovedností `myslivost` (znalost lesa); správný nález dává XP.
+const LYSOHLAVKY_ZAMENA_P := 0.3
 ## Srážka auta se zvěří: poškození auta v % = HIT_DAMAGE_K × hmotnost (kg) × rychlost² (m/s)² – zajíc ~2 %,
 ## srnec při 70 km/h ~15 %, divočák při 50 km/h ~28 %. Kůň (550 kg) je nižší a pružnější → násobek HIT_HORSE_K.
 ## Jolt (2024): přesnější kolize → práh poškození ~+15 % v rychlosti → K = 0,0022 / 1,15² ≈ 0,00166.
@@ -55,8 +59,12 @@ const FLY_CEIL_PUSH := 6.0       # jak rychle stroj tlačí dolů nad stropem (m
 
 var args := {}
 var meta: Dictionary
+var obce: Array = []             # okolní obce z data/obce.json (id, name, center, radius, boundary, roads…)
+var _obec_bounds := {}           # id obce → Rect2 hranice katastru – počítá obec_bounds() jednou (mapa, obec_at)
 var terrain: Terrain
 var water: Water                 # potoky, řeka, rybníky (OSM / DIBAVOD)
+var koupaliste: Koupaliste       # koupaliště na bývalé hasičské nádrži (M5.2)
+var u_rampa: URampa              # U-rampa na mýtince SV od obce (M5.8)
 var radio: Radio                 # rádio doma (u vchodu domova, uvnitř na komodě) – hudba a sousedi
 var interiors := {}              # id → Interior (M1.4): oddělené prostory pod mapou, viz enter_interior; M1.8: jen postavené
 var interior_streamer: InteriorStreamer   # M1.8: stavba interiérů zblízka (nejvýš 3), generované interiéry všech budov
@@ -80,29 +88,40 @@ var skills := {}                 # id → Skills (dovednosti a XP každého hrá
 var talk_recent := {}            # id → {druh herní události → herní minuty}: nedávné události pro rozhovor (DialogData.RECENT_MAP)
 var law := {}                    # id → Law.LawRecord (rejstřík přestupků a body, M0.5)
 var jobs := {}                   # id → Jobs (zaměstnání, směny, docházka, výplata – M3.1, data/prace.json)
+var favors: Favors               # prosby vesničanů a dobré skutky (M4.5), stav per hráč
+var debts: Debts                 # dluhy a pokuty (M4.2): bloková složenka, příkaz poštou, upomínka, exekuce; stav per hráč
+var court: Court                 # soud a vězení (M4.3): obvinění, předvolání, jednání, rozsudek; stav per hráč
 var action_runner: ActionRunner  # výběr cíle a průběh kontextových akcí (M0.4)
 var sleep_spots: Array[SleepSpot] = []
 var clients := {}                # id → LocalClient (jen hráči na tomto počítači)
 var ready_done := false
+## Simulační bublina kolem nejbližšího hráče (m) – za její hranicí přejdou vesničané, psi, NPC
+## a AI auta do levného režimu (kinematika ~2 Hz, schovaný vizuál) nebo zamraznou. Nastavuje
+## GameSettings dle volby „Aktivita světa“ (GameSettings.SIMS: 250–900 m).
+var sim_radius := 320.0
 var _blackout := {}              # id → true: hráč právě „nevidí“ (okno, spánek, záchytka)
 var _cheat_permits := {}         # id → {druh oprávnění: true} – jen ladicí cheat (F2 → Hráč), dokud nejsou doklady (M4.6)
+var _auto_start := {}            # id → Vector3 místo nástupu do auta (výcvikové jízdy autoškoly, M4.1)
 # M6.1 drony: `drones[pid]` = aktivní dron ve světě (letí / leží / visí ve stromě); `drone_states[pid][model]`
 # = trvalý stav flotily (baterie a poškození se drží i v inventáři). `permits` = registry oprávnění
-# (registrace provozovatele ÚCL, osvědčení A1/A3). Akce z klienta přes `player_action`
+# (registrace provozovatele ÚVL, osvědčení A1/A3). Akce z klienta přes `player_action`
 # ("drone_launch:<model>", "car_enter" = přistát/návrat, "drone_photo" = fotka), HUD telemetrie z `Drone.status()`.
 var drones := {}                # pid → Drone (uzel ve světě, vč. zaparkovaného)
 var drone_states := {}          # pid → {model: {"bat": sekundy letu, "dmg": 0..100}}
 var aircrafts := {}             # M6.3: pid → [Aircraft] – letouny hráče ve světě (jen na katastru)
 var thermals: Thermals          # M6.3: stoupavé bubliny (pole/sídla, poledne, léto) + bouřkové proudy
-var permits: Permits            # registry oprávnění (Permits.KINDS) – ÚCL i budoucí doklady (M4.6)
+var permits: Permits            # registry oprávnění (Permits.KINDS) – ÚVL i budoucí doklady (M4.6)
 var _item_nodes := {}            # pořadí předmětu v map.json → Item (dokud ho nikdo nesebral)
 var _collected := {}             # pořadí předmětu → true: už sebraný (ukládá se)
 var _collected_jd := {}          # pořadí předmětu → juliánský den sběru (znovuvyrůstání sezónních předmětů)
 var surface: SurfaceMap          # maska povrchu terénu (data/surface.bin) – procedurální materiály, minimapa
 var surroundings: Surroundings   # M6.2: levná krajina za katastrem (bez kolizí, bez dat fallback prstenec)
+var villages: Villages           # vizuální zástavba 5 okolních vesnic (data/obce.json; jen pohled z dálky)
 var building_details: BuildingDetails   # okna, dveře, vrata a komíny budov (data/buildings.json; null bez dat)
 var estate: Estate               # registr nemovitostí (M1.7): čísla popisná, cedulky, domov = vlastnictví / nájem bytu
+var katastr: Katastr             # M4.7: koupě / prodej domů a parcel v domácím katastru (vklad 20 dní), vlastnictví
 var fields: Fields               # pole a louky (data/landuse.bin) – barvy polí kreslí terén podle kalendáře
+var vegetation: VegetationManager   # Fáze 9: trsy, kopřivy, keře, obilné řádky, plevel (data/vegetation.bin)
 var village_events: VillageEvents   # svátky a události v obci (výzdoba, průvod, oheň, ohňostroj)
 var hunter: Hunter               # myslivec, krmelce, posed, sběr uhynulé zvěře, včelař
 var paddock: Paddock             # výběh pro koně u usedlosti (Estate.lot_id; ohrada, žlab, napáječka)
@@ -110,10 +129,22 @@ var bazaar: Bazaar               # bazar vozidel u silnice (M1.6): nabídka na t
 var airfield: Airfield           # M6.5: polní letiště – trávníková dráha, větrný rukáv, hangár triku
 var trees: TreeManager           # stromy za běhu (M2.1): index instancí, pokácené stromy, pařezy
 var forestry: Forestry           # kácení a zpracování dřeva (M2.1): pád stromu, kmeny, špalky, zákon
+var unreported := {}             # M4.4: id hráče → [{...}] činy, které nikdo neviděl (sdílený registr, viz `add_unreported`)
+var witness_sources: Array[Callable] = []   # M4.4/M4.6: další zdroje svědků (hajný, stráže) – `add_witness_source`
 var fire_mgr: FireManager        # oheň a topení (M2.2): ohniště, opékání, zákon u lesa, požár trávy, kamna doma
+var hasici: Hasici               # M5.3: sbor dobrovolných hasičů – zbrojnice u úřadu, členství, výjezdy k požáru trávy
+var studanka: Studanka           # M5.10: studánka v lese (pití, konev) a skautský tábor na mýtince (červenec)
+var hasici_sport: HasiciSport    # M5.4: požární útok u hřiště – trénink, soutěž, výsledky
+var krize: Krize                 # kříže u cest, poutní místa, kaplička na návsi (data/krize.json)
+var npc_grow: NpcGrow            # M4.8 obsah pro dospělé: záhon zahrádkáře Ladislava (konopí), jen při zapnuté volbě
+var vyhlasky: Vyhlasky           # obecní vyhlášky (pálení, sucho, nedělní klid) a sušení čerstvých větví (M4.4 část B)
+var klesti: Klesti                # hromada klestí u domu (M4.4 část B): čerstvé větve schnou, suché se berou zpět
+var noise: NoiseRegistry                # M4.4 část B: hluk (motorová pila, hudba, výstřel) a noční / nedělní klid
 var garden: Garden             # zahrada u domu a pronajaté pole (M2.4): záhony, růst podle dnů, sklizeň
+var fences: FenceManager       # ploty a ohrady (Fáze 7): obvody výběhu, zahrady a pole + hráčské úseky
 var farm: Farm                   # hospodářská zvířata u usedlosti (M2.6): výběh, kurník, chlívek, přístřešek
 var fishing: Fishing             # rybaření (M2.7): nahození, záběr, zdolávání, úlovek, zákon (háčky)
+var football: FotbalHriste        # fotbalové hřiště u hospody (M5.6): míč, kop, branky, skóre
 var weapons: Weapons             # zbraně a střelba (M2.8): luk, kuše, puška, balistika, střelnice u chaty, zákon o zbraních
 var cargo: Cargo                # náklad a přeprava (M2.10): rameno, kufr, nosič, ruční vozík (G, E u vozíku)
 var statek: Statek               # M3.2: Statek Na Kopci – pracoviště pomocníka na farmě (místo „statek“, výběh, stodola, záhony)
@@ -126,6 +157,8 @@ var palenice: PalenicePrace      # M3.3: pomocník v pálenici – kvas, topení
 var computer: Computer           # M3.4: počítač doma – banka, e-shop s balíky, bazar, práce, pošta, web obce, eTesty; bankomaty
 var mail := {}                   # M3.4: id → [{t, from, subject, body, read}] – e-maily (World.send_mail)
 var orders := {}                 # M3.4: id → [{no, items, total, cod, jd, state}] – objednávky z e-shopu (den doručení)
+var gamekeeper: Gamekeeper        # M4.6: myslivecký hajný (lesy, výstřely, kontrola dokladů, kurzy v chatě)
+var rybar_straz: Gamekeeper       # M4.6: rybářská stráž (víkendová obchůzka, kontrola lístků a povolenek)
 var hunting: Hunting             # lov zvěře (M2.9): zásah, postřelení, krvavá stopa, úlovek (Carcass), vyvrhnutí, pytláctví, překupník
 var fires: Array = []            # ohniště (Fire) – hořící, žhavé i vyhaslé kamenné kruhy
 var grass_fires: Array = []      # probíhající požáry trávy (GrassFire)
@@ -165,6 +198,7 @@ func build() -> void:
 	await _frames(2)
 	meta = JSON.parse_string(FileAccess.get_file_as_string("res://data/map.json"))
 	weather.north_deg = float(meta.get("north_angle_deg", 78.37))
+	obce = _load_obce()            # okolní obce pro mapu (HUD) a „nacházíš se v X"; 3D zástavbu staví Villages
 
 	loading.emit("Terén (DMR 5G, 2 m) a povrch…")
 	await _frames(1)
@@ -183,6 +217,16 @@ func build() -> void:
 	surroundings.name = "Okoli"
 	add_child(surroundings)
 	surroundings.setup(terrain)
+	villages = Villages.new()                # zástavba okolních obcí (jen vzhled; potřebuje mřížku okolí)
+	villages.name = "Vesnice"
+	add_child(villages)
+	villages.setup(surroundings, terrain)
+	if not villages.stats.is_empty():        # ladění: kolik budov se v které obci postavilo
+		var _vs := []
+		for k in villages.stats:
+			_vs.append(("%s skipped (detailní mapa)" % k) if villages.stats[k].get("skipped", false)
+				else "%s %d budov" % [k, int(villages.stats[k]["buildings"])])
+		print("Okolní obce (villages.stats): %s" % ", ".join(_vs))
 
 	loading.emit("Budovy a cesty…")
 	await _frames(1)
@@ -196,10 +240,16 @@ func build() -> void:
 		Color(0.55, 0.52, 0.47).linear_to_srgb(), 0.7)
 	m_asph.set_shader_parameter("snow_amount", 0.35)   # silnice se prohrnují
 	m_grav.set_shader_parameter("snow_amount", 0.8)
-	MapLoader.add_chunks(map_root, "Budovy_steny", MapLoader.load_chunks("res://data/walls.bin", m_wall), true, 0.0, "budova")
-	MapLoader.add_chunks(map_root, "Budovy_strechy", MapLoader.load_chunks("res://data/roofs.bin", m_roof), true, 0.0, "budova")
+	m_asph.set_shader_parameter("wet_boost", 1.6)      # Fáze 9: mokrý asfalt znatelně lesklejší (§12.3)
+	m_grav.set_shader_parameter("wet_boost", 1.25)
+	# zdi/střechy mají konečný dohled – dosah dost velký, aby domy byly vidět i při Dohlednosti
+	# „Krátká“ (násobič 0.6 → reálně ~960/1020 m); dláždice se mimo dosah skipují po chunkách.
+	# Dohled se měří od středu dlaždice 256 m (MapLoader.load_chunks posouvá uzel do středu AABB –
+	# prolínání FADE_SELF by jinak počítalo od spawnu a za ~1,3 km od domu by mapa zmizela, vlna 0b)
+	MapLoader.add_chunks(map_root, "Budovy_steny", MapLoader.load_chunks("res://data/walls.bin", m_wall), true, 1600.0, "budova")
+	MapLoader.add_chunks(map_root, "Budovy_strechy", MapLoader.load_chunks("res://data/roofs.bin", m_roof), true, 1700.0, "budova")
 	MapLoader.add_chunks(map_root, "Silnice", MapLoader.load_chunks("res://data/asphalt.bin", m_asph, terrain, 0.1), true, 1800.0, "asfalt")
-	MapLoader.add_chunks(map_root, "Cesty", MapLoader.load_chunks("res://data/gravel.bin", m_grav, terrain, 0.09), true, 1200.0, "sterk")
+	MapLoader.add_chunks(map_root, "Cesty", MapLoader.load_chunks("res://data/gravel.bin", m_grav, terrain, 0.09), true, 1400.0, "sterk")
 
 	loading.emit("Potoky a rybníky…")
 	await _frames(1)
@@ -208,13 +258,27 @@ func build() -> void:
 	water.load_data()
 	add_child(water)
 	water.build(self, terrain)
+	koupaliste = Koupaliste.new()          # M5.2: koupaliště na potoku č. 275 (vlastní nádrž, registrace do Water)
+	koupaliste.name = "Koupaliste"
+	add_child(koupaliste)
+	koupaliste.build(self, terrain, water)
+	u_rampa = URampa.new()                 # M5.8: U-rampa na mýtince SV od obce (vlastní mesh a kolize)
+	u_rampa.name = "URampa"
+	add_child(u_rampa)
+	u_rampa.build(self, terrain)
 
-	loading.emit("Stromy (21 800)…")
+	loading.emit("Stromy (51 736)…")
 	await _frames(1)
 	trees = TreeManager.new()
 	add_child(trees)
 	trees.setup(self, terrain)
 	MapLoader.build_trees(map_root, water.drop_trees, terrain, trees)
+
+	loading.emit("Vegetace…")
+	await _frames(1)
+	vegetation = VegetationManager.new()   # Fáze 9: detailní vegetace (trsy, keře, obilí; data/vegetation.bin)
+	add_child(vegetation)
+	vegetation.setup(self)
 
 	loading.emit("Hráč, vesničané, předměty, auta…")
 	await _frames(1)
@@ -233,6 +297,9 @@ func build() -> void:
 	estate = Estate.new()          # M1.7: po místech, fasádách a interiérech (čte dveře budov a místo „domov“)
 	add_child(estate)
 	estate.setup(self)
+	katastr = Katastr.new()        # M4.7: parcely z pole (fields) a domácí katastr (meta.boundary) – po registru nemovitostí
+	add_child(katastr)
+	katastr.setup(self)
 	interior_streamer.add_estates(estate)     # M1.8: generované interiéry budov s dveřmi (stavějí se až zblízka)
 	if npcs.has("deda") and (npcs["deda"] as Npc).persona:
 		(npcs["deda"] as Npc).persona.profile["job"] = "důchodce, soused z %s" % estate.deda_label()
@@ -262,6 +329,10 @@ func build() -> void:
 	village_events.name = "Udalosti"
 	add_child(village_events)
 	village_events.setup(self)
+	football = FotbalHriste.new()
+	football.name = "Fotbal"
+	add_child(football)
+	football.setup(self)
 	tracks = Tracks.new()
 	tracks.name = "Stopy"
 	add_child(tracks)
@@ -288,7 +359,21 @@ func build() -> void:
 	fire_mgr = FireManager.new()
 	add_child(fire_mgr)
 	fire_mgr.setup(self)
-	apply_home(1)                  # M1.7: domov místního hráče (nová hra = nájemní byt) – před default_spawn a add_player
+	studanka = Studanka.new()     # M5.10: až po kalendáři (village_events) a terénu
+	add_child(studanka)
+	studanka.setup(self)
+	vyhlasky = Vyhlasky.new()
+	add_child(vyhlasky)
+	vyhlasky.setup(self)
+	klesti = Klesti.new()
+	add_child(klesti)
+	klesti.setup(self)
+	npc_grow = NpcGrow.new()
+	add_child(npc_grow)
+	npc_grow.setup(self)
+	noise = NoiseRegistry.new()
+	noise.setup(self)
+	apply_home(1)                 # M1.7: domov místního hráče (nová hra = nájemní byt) – před default_spawn a add_player
 
 
 ## Spustí provoz (zaparkovaná a AI auta, hlídka) – až jsou ve světě hráči (auta se rozmístí kolem nich).
@@ -432,11 +517,35 @@ func add_player(id: int, pos: Vector3, yaw: float) -> Player:
 		add_child(computer)
 		computer.setup(self)
 	computer.add_player(id)
-	if permits == null:           # M6.1: registry oprávnění (ÚCL registrace, A1/A3…; doklady M4.6 použijí stejně)
+	if permits == null:           # M6.1: registry oprávnění (ÚVL registrace, A1/A3…; doklady M4.6 použijí stejně)
 		permits = Permits.new()
 		add_child(permits)
 		permits.setup(self)
 	permits.add_player(id)
+	if favors == null:            # M4.5: prosby vesničanů (jedna instance, stav per hráč)
+		favors = Favors.new()
+		favors.setup(self)
+	if debts == null:             # M4.2: dluhy (jedna instance, stav per hráč; denní krok v _process_impl)
+		debts = Debts.new()
+		add_child(debts)
+		debts.setup(self)
+	if court == null:             # M4.3: soud a vězení (jedna instance, stav per hráč; kontrola v _process_impl)
+		court = Court.new()
+		add_child(court)
+		court.setup(self)
+	if gamekeeper == null:        # M4.6: hajný a rybářská stráž (jedna instance každá; svědci přes add_witness_source)
+		gamekeeper = Gamekeeper.new()
+		add_child(gamekeeper)
+		gamekeeper.setup(self, Gamekeeper.HAJNY)
+		add_witness_source(gamekeeper.witness_candidates)
+		rybar_straz = Gamekeeper.new()
+		add_child(rybar_straz)
+		rybar_straz.setup(self, Gamekeeper.STRAZ)
+		add_witness_source(rybar_straz.witness_candidates)
+	if fences == null:            # ploty a ohrady (Fáze 7) – až PO výběhu, zahradě i statku: sondy `_find_spot`
+		fences = FenceManager.new()   # hledají jejich místa kolizním kvádrem a na hotový plot by narazily
+		add_child(fences)
+		fences.setup(self)
 	drone_states[id] = {}
 	aircrafts[id] = []                 # M6.3: letouny hráče (naplní načtení save / F2)
 	return p
@@ -569,6 +678,68 @@ func player_anchor(i: int) -> Vector3:
 	return player_world_pos(players[ids[i % ids.size()]])
 
 
+# ------------------------------------------------------------------ okolní obce (data/obce.json)
+
+## Okolní obce (tools/obce.py → data/obce.json): pole dictů s id / name (fiktivní) / center / radius /
+## boundary / roads / buildings / water / forest ve světových souřadnicích (x, z). Chybí-li soubor
+## nebo má jiný formát → prázdné pole + varování (hra běží dál, jen bez obcí na mapě a ve světě).
+static func _load_obce() -> Array:
+	if not FileAccess.file_exists(Villages.DATA_PATH):
+		push_warning("World: chybí %s – okolní obce bez dat (tools/obce.py)" % Villages.DATA_PATH)
+		return []
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(Villages.DATA_PATH))
+	if data is Dictionary and data.get("obce") is Array:
+		return data["obce"]
+	push_warning("World: neznámý formát %s" % Villages.DATA_PATH)
+	return []
+
+
+## Ohraničující obdélník katastru obce (svět x, z) z `boundary`; bez něj center ± radius.
+## Výsledek se drží v `_obec_bounds` – používá obec_at() i mapa v HUD pro ořez kreslení.
+func obec_bounds(o: Dictionary) -> Rect2:
+	var id := String(o.get("id", o.get("name", "")))
+	if _obec_bounds.has(id):
+		return _obec_bounds[id]
+	var r := Rect2()
+	var first := true
+	for q in o.get("boundary", []):
+		if q is Array and q.size() >= 2:
+			var p := Vector2(float(q[0]), float(q[1]))
+			r = Rect2(p, Vector2.ZERO) if first else r.expand(p)
+			first = false
+	if first:
+		var c: Array = o.get("center", [0.0, 0.0])
+		var rr := float(o.get("radius", 500.0))
+		r = Rect2(Vector2(float(c[0]), float(c[1])) - Vector2(rr, rr), Vector2(2.0 * rr, 2.0 * rr))
+	_obec_bounds[id] = r
+	return r
+
+
+## Obec, v jejímž katastru bod (x, z) leží – pro budoucí „nacházíš se v X". Pravdivá
+## příslušnost je polygon hranice (radius v datech je jen ekvivalentní plochy – jeho kružnice
+## sousedům přesahuje i nedosahuje), při případných překryvech hranic vítězí nejbližší střed.
+## Mimo všechny katastry → {}. Levné: 5 obcí, test v polygonu jen při zásahu obdélníku (obec_bounds).
+func obec_at(pos: Vector3) -> Dictionary:
+	var p := Vector2(pos.x, pos.z)
+	var best: Dictionary = {}
+	var bd := INF
+	for o in obce:
+		if not obec_bounds(o).has_point(p):
+			continue
+		var poly := PackedVector2Array()
+		for q in o.get("boundary", []):
+			if q is Array and q.size() >= 2:
+				poly.append(Vector2(float(q[0]), float(q[1])))
+		if poly.size() < 3 or not Geometry2D.is_point_in_polygon(p, poly):
+			continue
+		var c: Array = o.get("center", [])
+		var d := p.distance_to(Vector2(float(c[0]), float(c[1]))) if c.size() >= 2 else 0.0
+		if d < bd:
+			bd = d
+			best = o
+	return best
+
+
 # ------------------------------------------------------------------ zprávy klientům
 
 ## Kontextové akce (M0.4) – tenké obálky nad `ActionRunner`, ať je volají ostatní systémy jako `World.…`.
@@ -631,6 +802,7 @@ func _spawn_items() -> void:
 	add_child(items_root)
 	var items: Array = meta["items"]
 	_add_hips(items)
+	_add_lysohlavky(items)
 	for i in items.size():
 		_spawn_item(i)
 		item_totals[items[i]["type"]] = item_totals.get(items[i]["type"], 0) + 1
@@ -684,6 +856,8 @@ func _on_collected(item: Item, by: Player) -> void:
 			by.money += 100
 		"jablko", "hrib", "sipek":
 			by.add_item(item.kind)
+		"lysohlavky":
+			by.add_item(_houba_druh(by))
 	emit_game_event(by.id, "collected", {"item": item, "kind": item.kind})
 
 
@@ -715,6 +889,41 @@ func _add_hips(items: Array) -> void:
 	items.append_array(extra)
 
 
+## M4.8: lysohlávky u části hřibových míst (každé 4. hřib), deterministicky, na konec `meta["items"]` (jako šípky).
+func _add_lysohlavky(items: Array) -> void:
+	for it in items:
+		if it["type"] == "lysohlavky":
+			return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1704
+	var extra := []
+	var n_hrib := 0
+	for it in items:
+		if it["type"] != "hrib":
+			continue
+		n_hrib += 1
+		if n_hrib % 4 != 1:
+			continue
+		var a := rng.randf() * TAU
+		var d := rng.randf_range(4.0, 9.0)
+		var x := float(it["x"]) + cos(a) * d
+		var z := float(it["z"]) + sin(a) * d
+		if terrain.contains(x, z, 30.0):
+			extra.append({"type": "lysohlavky", "x": snappedf(x, 0.01), "z": snappedf(z, 0.01)})
+	items.append_array(extra)
+
+
+## M4.8: při sběru lysohlávky – někdy je to muchomůrka (záměna). Dovednost `myslivost` snižuje šanci.
+func _houba_druh(by: Player) -> String:
+	var sk: Skills = skills.get(by.id)
+	var lvl := sk.level("myslivost") if sk else 0
+	var p := LYSOHLAVKY_ZAMENA_P * (1.0 - clampf(float(lvl) / 20.0, 0.0, 1.0) * 0.8)
+	if randf() < p:
+		return "muchomurka"
+	give_xp(by.id, "myslivost", 4.0, "lysohlavky")
+	return "lysohlavky"
+
+
 func _spawn_bots() -> void:
 	graph = RoadGraph.new()
 	graph.build(meta["roads"])
@@ -732,7 +941,9 @@ func _spawn_bots() -> void:
 	_bot_nodes = cand
 	for i in N_VILLAGERS:
 		var v := Villager.new()
-		v.setup(graph, terrain, self, cand[rng.randi() % cand.size()], 1000 + i, Characters.profile(i))
+		# Fáze 3 (LimboAI): prvních `Villager.BT_VILLAGERS` vesničanů řídí behavior strom denních rutin
+		v.setup(graph, terrain, self, cand[rng.randi() % cand.size()], 1000 + i, Characters.profile(i),
+			i < Villager.BT_VILLAGERS)
 		bots_root.add_child(v)
 	for i in N_DOGS:
 		var n: Vector2 = graph.nodes[cand[rng.randi() % cand.size()]]
@@ -893,6 +1104,19 @@ func _spawn_places() -> void:
 		places[k] = pl
 		if pl.keeper:
 			npcs[k] = pl.keeper
+	root.add_child(DvurStavebnin.build(terrain))  # M5.1 pokračování: dvůr stavebnin a pily (hromady materiálu)
+	if hasici == null:                            # M5.3: zbrojnice SDH u úřadu (až po místech a terénu)
+		hasici = Hasici.new()
+		add_child(hasici)
+		hasici.setup(self)
+	if hasici_sport == null:                      # M5.4: základna požárního útoku u hřiště (až po terénu a místech)
+		hasici_sport = HasiciSport.new()
+		add_child(hasici_sport)
+		hasici_sport.setup(self)
+	if krize == null:                             # kříže a kaplička (až po terénu)
+		krize = Krize.new()
+		add_child(krize)
+		krize.setup(self)
 	if places["hospoda"].regulars.size() > 0:
 		npcs["pepa"] = places["hospoda"].regulars[0]
 	# děda Vomáčka na lavičce kousek od usedlosti (místo „domov“ je teď ještě na původním bodu z pois.json;
@@ -966,6 +1190,11 @@ func home_label(id: int) -> String:
 
 func deda_label() -> String:
 	return estate.deda_label() if estate else "vedle"
+
+
+## M4.7: bod (svět x, z) leží v DOMÁCÍM katastru (`meta.boundary`). Koupě a prodej jen tam (okolní obce ne).
+func in_home_cadastre(pos: Vector3) -> bool:
+	return katastr == null or katastr.in_cadastre(Vector2(pos.x, pos.z))
 
 
 ## Dveře usedlosti (původní dům hráče z podkladů): hospodářství, včelař a překupník se měří odsud,
@@ -1052,11 +1281,17 @@ func apply_home(pid: int) -> void:
 			_radio_home = {"pos": rp, "yaw": face}
 	if interior_streamer:
 		interior_streamer.set_home(estate.home_title(pid), estate.is_flat(pid))
-	# zahrada a výběh koně se přestěhují k domovu (při prvním volání z build ještě nejsou – vytvoří se v add_player)
+	# zahrada a výběh koně se přestěhují k domovu (při prvním volání z build ještě nejsou – vytvoří se v add_player);
+	# obvodové ploty (Fáze 7) se před hledáním místa zahodí – jinak by jejich kolize blokovala sondu `_find_spot` –
+	# a po relocate se postaví znovu na nové pozici
+	if fences:
+		fences.clear_auto()
 	if paddock:
 		paddock.relocate()
 	if garden:
 		garden.relocate()
+	if fences:
+		fences.rebuild()
 
 
 ## Kam hráč vyjde z interiéru `iid`: [poloha na zemi ~1 m před dveřmi, yaw od domu]. Dveře modelu z BuildingDetails,
@@ -1113,6 +1348,7 @@ func enter_interior(id: int, iid: String, fade := true, force := false) -> void:
 	if not ensure_interior(iid):                         # M1.8: postavený zblízka; když ještě ne, dostaví se hned
 		return
 	var it: Interior = interiors.get(iid)
+	var was_locked := pl.controls_locked             # A1-17: zámek od otevřeného menu / panelu neodemykat
 	if fade:
 		pl.controls_locked = true
 		blackout(id, 0.6)
@@ -1120,8 +1356,9 @@ func enter_interior(id: int, iid: String, fade := true, force := false) -> void:
 		play_sfx(id, "door")
 	interior_mark(pl, iid)
 	pl.teleport(it.inside_door, it.inside_yaw, false)
-	pl.controls_locked = false
+	pl.controls_locked = was_locked
 	emit_game_event(id, "entered_interior", {"id": iid})
+	_check_floor(it.inside_door, "vstup do „%s“" % iid)
 
 
 ## Veřejná budova: zamčeno mimo otevírací dobu, postrach vsi obsluha nepustí (M1.5). Domov a debug (`force`) vždy.
@@ -1143,6 +1380,31 @@ func _may_enter(id: int, iid: String) -> bool:
 	return true
 
 
+## Výška pevné země pod bodem `pos` (raycast na statiku, vrstva 1, shora dolů); bez zásahu `fallback`.
+## Zásah zahodíme, je-li výrazně nad / pod očekávaným terénem (střecha, převis) – pak platí terén.
+func _ground_y(pos: Vector3, fallback: float) -> float:
+	var space := get_world_3d().direct_space_state if is_inside_tree() else null
+	if space == null:
+		return fallback
+	var q := PhysicsRayQueryParameters3D.create(Vector3(pos.x, maxf(pos.y, fallback) + 1.5, pos.z),
+		Vector3(pos.x, minf(pos.y, fallback) - 3.0, pos.z), 1)
+	var hit := space.intersect_ray(q)
+	if hit.is_empty() or (hit["normal"] as Vector3).y < 0.5:
+		return fallback
+	var hy: float = (hit["position"] as Vector3).y
+	return hy if absf(hy - fallback) < 1.2 else fallback
+
+
+## A1-20: po vstupu do interiéru zkontroluje, že pod bodem `pos` je podlaha; jinak jen zapíše varování do logu.
+## Čeká jeden fyzikální snímek – kolize čerstvě postaveného interiéru se do prostoru zapisují až v něm.
+func _check_floor(pos: Vector3, tag: String) -> void:
+	await get_tree().physics_frame
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(pos + Vector3(0, 0.6, 0), pos + Vector3(0, -3.0, 0), 1)
+	if space.intersect_ray(q).is_empty():
+		push_warning("World: %s – pod bodem y=%.2f není podlaha (kontrolní raycast)" % [tag, pos.y])
+
+
 ## Hráč vyjde ven před dveře (otočený od domu).
 func exit_interior(id: int, fade := true) -> void:
 	var pl: Player = players.get(id)
@@ -1151,6 +1413,7 @@ func exit_interior(id: int, fade := true) -> void:
 	var iid := pl.inside
 	if interior_streamer and interior_streamer.exit_to_stairs(id, iid, fade):
 		return                                       # M1.8: z bytu do chodby bytového domu
+	var was_locked := pl.controls_locked             # A1-17: když je otevřené menu (zámek od něj), po výstupu se neodemyká
 	if fade:
 		pl.controls_locked = true
 		blackout(id, 0.6)
@@ -1158,8 +1421,16 @@ func exit_interior(id: int, fade := true) -> void:
 		play_sfx(id, "door")
 	var spot := interior_exit(iid)
 	interior_clear(pl)
-	pl.teleport((spot[0] as Vector3) + Vector3(0, 0.3, 0), spot[1], false)
-	pl.controls_locked = false
+	# A1-10: propad po odchodu z obchodu (příčina nepotvrzena) – výška se ověří raycastem na statiku
+	# (podlaha / práh / terén) a rozdíl proti terénu se zapíše do logu
+	var ep: Vector3 = spot[0]
+	var ty := terrain.height_at(ep.x, ep.z)
+	var gy := _ground_y(ep, ty)
+	if absf(gy - ep.y) > 0.3 or absf(ty - ep.y) > 0.3:
+		print("exit_interior[%s]: uložený bod y=%.2f, terén y=%.2f, raycast y=%.2f → použito %.2f" % [iid, ep.y, ty, gy, gy])
+	ep.y = gy
+	pl.teleport(ep + Vector3(0, 0.3, 0), spot[1], false)
+	pl.controls_locked = was_locked
 	emit_game_event(id, "exited_interior", {"id": iid})
 
 
@@ -1307,6 +1578,10 @@ func emit_game_event(id: int, kind: String, data: Dictionary) -> void:
 	var cl = clients.get(id)
 	if cl:
 		cl.on_game_event(kind, data)
+	if gamekeeper:
+		gamekeeper.on_event(id, kind, data)   # M4.6: hajný slyší výstřely a pytlácké činy
+	if hasici:
+		hasici.on_event(id, kind, data)       # M5.3: fire_report → výjezd SDH
 	var q: Quests = quests.get(id)
 	if q:
 		q.on_event(kind, data)
@@ -1316,6 +1591,8 @@ func emit_game_event(id: int, kind: String, data: Dictionary) -> void:
 	var sk: Skills = skills.get(id)
 	if sk:
 		sk.on_event(kind, data)
+	if favors:
+		favors.on_event(id, kind, data)     # M4.5: splněné prosby (sklizeň, sníh, dárek jídla)
 	var jb: Jobs = jobs.get(id)
 	if jb:
 		jb.on_event(kind, data)      # M3.1: úkoly směny (action_done), pití v práci, zadržení → výpověď
@@ -1416,9 +1693,12 @@ func _on_busted(id: int, p: float, reason: String) -> void:
 	if reason.begins_with("řízení přes zákaz"):
 		oid = "rizeni_pres_zakaz"
 	var res := commit_offense(id, oid, {"severity": 1.0 if p >= 1.0 else 0.0, "quiet": true})
-	var text := "ZADRŽEN POLICIÍ\n%s\nPokuta %d Kč (zaplaceno %d Kč), zákaz řízení %d h.\n%s" % [
-		reason, res.get("fine", 0), res.get("paid", 0), int(res.get("ban_h", 0.0)),
-		"Kůň zůstal u cesty." if pl.horse else "Auto odtaženo domů."]
+	var text := "ZADRŽEN POLICIÍ\n%s\nPokuta %d Kč (%s), zákaz řízení %d h.\n%s" % [
+		reason, res.get("fine", 0), "zaplaceno %d Kč" % res.get("paid", 0) if int(res.get("paid", 0)) > 0 else "příkaz k úhradě přijde poštou",
+		int(res.get("ban_h", 0.0)), "Kůň zůstal u cesty." if pl.horse else "Auto odtaženo domů."]
+	if String(res.get("misto", "")) == "soud":     # M4.3: trestný čin → obvinění, rozsudek až u soudu
+		text = "ZADRŽEN POLICIÍ\n%s\nObvinění (trestný čin) – rozhodne soud. Předvolání přijde poštou.\nZákaz řízení %d h (do rozsudku).\n%s" % [
+			reason, int(res.get("ban_h", 0.0)), "Kůň zůstal u cesty." if pl.horse else "Auto odtaženo domů."]
 	if int(res.get("points", 0)) > 0:
 		text += "\n+%d bodů (celkem %d / %d)." % [res["points"], res["total_points"], int(Law.setting("body_limit", 12.0))]
 	if res.get("points_ban", false):
@@ -1431,19 +1711,28 @@ func _on_busted(id: int, p: float, reason: String) -> void:
 		dismount_horse(id)
 	move_player_car_to(id, "domov")
 	if p >= 1.0:
-		var zr := commit_offense(id, "zachytka", {"quiet": true})
-		text += "\nNoc strávíš na záchytce (+%s Kč)." % _thousands(int(zr.get("fine", 0)))
-		await blackout(id, 2.0)
-		var h := fmod(31.0 - clock.hour(), 24.0)
-		skip_time(id, maxf(h, 1.0), true)
-		var home: Place = places["domov"]
-		interior_clear(pl)
-		pl.teleport(home.door + Vector3(0, 0.3, 0), pl.yaw, false)
+		text = await _sober_up_cell(id, text)
 	notify(id, "show_message", [text, 9.0])
+
+
+## M4.3: záchytka (poplatek, noc do rána, `skip_time`, návrat domů). Vrací text pro hlášku.
+func _sober_up_cell(id: int, text: String) -> String:
+	var pl: Player = players.get(id)
+	var zr := commit_offense(id, "zachytka", {"quiet": true})
+	text += "\nNoc strávíš na záchytce (+%s Kč)." % _thousands(int(zr.get("fine", 0)))
+	await blackout(id, 2.0)
+	var h := fmod(31.0 - clock.hour(), 24.0)
+	skip_time(id, maxf(h, 1.0), true)
+	var home: Place = places["domov"]
+	interior_clear(pl)
+	pl.teleport(home.door + Vector3(0, 0.3, 0), pl.yaw, false)
+	return text
 
 
 ## Jediná brána pro tresty (M0.5): zapíše přestupek do rejstříku (Law.LawRecord), vybere pokutu, přičte body,
 ## případně dá zákaz řízení a pošle událost „offense“. data: severity 0..1, quiet (bez zprávy o bodech).
+## M4.2 – platba podle `misto` z katalogu: na_miste = bloková pokuta hned z hotovosti (jinak složenka v `debts`),
+## spravni_rizeni = příkaz poštou za 1–3 dny (pak dluh se splatností), soud = obvinění a případ v `Court` (M4.3).
 func commit_offense(id: int, offense_id: String, data := {}) -> Dictionary:
 	var lr: Law.LawRecord = law.get(id)
 	var pl: Player = players.get(id)
@@ -1454,15 +1743,54 @@ func commit_offense(id: int, offense_id: String, data := {}) -> Dictionary:
 	var res := lr.commit(offense_id, d, clock.minutes)
 	if not res.get("ok", false):
 		return res
+	var fine: int = int(res["fine"])
+	var jd := clock.jd()
+	var rec: Dictionary = lr.records[-1] if not lr.records.is_empty() else {}
+	match String(res.get("misto", "na_miste")):
+		"na_miste":
+			if fine > 0 and pl.money >= fine:
+				pl.money -= fine
+				res["paid"] = fine
+				rec["zaplaceno"] = true
+				rec["stav"] = "zaplaceno"
+				play_sfx(id, "cash")
+			elif fine > 0:
+				debts.add(id, "pokuta", fine, jd + Debts.DUE_DAYS, "%s (bloková pokuta)" % res["name"], offense_id)
+				rec["stav"] = "splatne"
+		"soud":    # M4.3: soud – obvinění a předvolání; rozsudek (pokuta, zákaz, vězení) řeší Court
+			if court:
+				court.open_case(id, res, float(rec.get("t", clock.minutes)))
+			rec["stav"] = "obvineni"
+		_:    # spravni_rizeni (i neznámé `misto` – nikdy ne soud omylem)
+			if fine > 0:
+				debts.queue_order(id, fine, jd, "%s (%s)" % [res["name"], res["par"]], offense_id)
+				rec["stav"] = "prikaz"
 	emit_game_event(id, "offense", {"id": offense_id, "fine": res["fine"], "points": res["points"],
 		"criminal": res["criminal"]})
+	if res.get("points_ban", false) and permits:   # M4.1: 12 bodů → řidičák odebrán, nutné přezkoušení
+		var ban_jd: int = clock.jd() + int(ceil(Law.setting("zakaz_za_body_h", 8760.0) / 24.0))
+		permits.revoke(id, "ridicsky", "12 bodů", ban_jd, true)
 	if not data.get("quiet", false):
 		if res["points_ban"]:
-			notify(id, "popup", ["12 bodů – zákaz řízení na rok!", 5.0])
+			notify(id, "popup", ["12 bodů – zákaz řízení na rok! Řidičák se odebírá – nutné přezkoušení v autoškole.", 5.0])
 		elif int(res["points"]) > 0:
 			notify(id, "show_message", ["%s: +%d bodů (celkem %d / %d)" % [res["name"], res["points"],
 				res["total_points"], int(Law.setting("body_limit", 12.0))], 4.0])
 	return res
+
+
+## M4.2 úřad: zaplatí otevřené pokuty a dluhy z hotovosti (od nejstarší). Vrací zaplacenou částku.
+func pay_debts_office(id: int) -> int:
+	var due := debts.total(id, Debts.FINE_KINDS)
+	if due <= 0:
+		notify(id, "show_message", ["Na úřadě nemáš žádné nezaplacené pokuty.", 2.5])
+		return 0
+	var paid := debts.pay_fines_cash(id)
+	if paid > 0:
+		play_sfx(id, "cash")
+	var left := debts.total(id, Debts.FINE_KINDS)
+	notify(id, "show_message", ["Na úřadě zaplaceno %s. Zbývá k úhradě: %s." % [Bazaar.kc(paid), Bazaar.kc(left)], 4.0])
+	return paid
 
 
 static func _thousands(n: int) -> String:
@@ -1521,11 +1849,43 @@ func _on_knocked_out(reason: String, id: int) -> void:
 ## (V multiplayeru se čas posouvat nebude – viz GAME_DESIGN 6.5; řeší úkol 03+.)
 func skip_time(id: int, hours: float, sleeping: bool) -> void:
 	clock.skip_hours(hours)
+	if debts:
+		debts.advance_to(clock.jd())   # M4.2: dluhy dohnat po dnech (ne jedním skokem)
 	for p in players.values():
 		p.body.skip_hours(hours, sleeping and p.id == id)
 	var pl: Player = players.get(id)
 	if pl:
 		pl.stamina = pl.body.stamina_max()
+
+
+## M4.3: dlouhý pobyt mimo hru (výkon trestu). Jeden skok času, bez simulace každého dne:
+## pověst / karma / respekt, dluhy po dnech (`Debts.advance_to`), tělo jen dohnáno omezeně.
+## Zahrada a zvířata se dohánějí samy s limitem MAX_CATCHUP_DAYS (otevřený bod). Vrací {days, summary}.
+func skip_long(id: int, days: int) -> Dictionary:
+	var pl: Player = players.get(id)
+	if pl == null or days <= 0:
+		return {}
+	var rep: Reputation = reputations.get(id)
+	var lines := []
+	var dluh_pred := debts.total(id) if debts else 0
+	if rep:
+		rep.change(-20.0, "výkon trestu")
+		rep.change_karma(5.0, "odpykání trestu")
+		for c in Reputation.COMMUNITIES.keys():
+			rep.change_respect(c, 5.0 if c == "stamgasti" else -10.0, "výkon trestu")
+		lines.append("Pověst −20, respekt komunit −10 (štamgasti +5 – slavný návrat), karma +5.")
+	clock.skip_hours(days * 24.0)
+	if debts:
+		debts.advance_to(clock.jd())
+	for p in players.values():
+		p.body.skip_hours(minf(days * 24.0, 72.0), p.id == id)   # tělo dohnáno omezeně (zjednodušení)
+	pl.stamina = pl.body.stamina_max()
+	var dluh_po := debts.total(id) if debts else 0
+	if dluh_po > dluh_pred:
+		lines.append("Dluhy narostly na %s (upomínky, exekuce)." % Bazaar.kc(dluh_po))
+	lines.append("Auto a zvířata ve tvé péči: zjednodušeně, otevřený bod (doháněno jen do limitu).")
+	emit_game_event(id, "jailed", {"days": days})
+	return {"days": days, "summary": "\n".join(PackedStringArray(lines))}
 
 
 # ------------------------------------------------------------------ akce hráčů
@@ -1554,6 +1914,18 @@ func player_action(id: int, action: String) -> void:
 		return                              # ostatní akce při pilotování neplatí (E, nástroje, equip, respawn…)
 	match action:
 		"car_enter":
+			if p.board_on:                   # M5.7: seskok z desky (jen v pomalé jízdě)
+				if absf(Vector2(p.velocity.x, p.velocity.z).length()) < 2.0:
+					p.board_dismount()
+				else:
+					notify(id, "show_message", ["Nejdřív zpomal, z desky nevyskakuj za jízdy.", 1.5])
+				return
+			if p.car == null and p.horse == null and p.aircraft == null and p.item_count("skateboard") > 0 \
+					and nearest_enterable_car(id) == null and nearest_mountable_horse(id) == null \
+					and nearest_enterable_aircraft(id) == null:
+				if p.board_mount():          # M5.7: stoupnutí na skateboard z inventáře
+					notify(id, "show_message", ["Stoupl jsi na skateboard. W odraz, S brzda, A/D zatáčení, Mezerník ollie.", 3.0])
+				return
 			if p.horse:
 				if absf(p.horse.speed) < 1.5:
 					dismount_horse(id)
@@ -1593,6 +1965,12 @@ func player_action(id: int, action: String) -> void:
 		"car_wipers":
 			if p.car and not p.car.two_wheeler:
 				p.car.toggle_wipers()
+		"car_cabin_light":                      # M5.9: F4 – vnitřní světlo v autě
+			if p.car:
+				p.car.toggle_cabin_light()
+		"car_radio_0", "car_radio_1", "car_radio_2", "car_radio_3", "car_radio_4", "car_radio_5", "car_radio_vol_up", "car_radio_vol_down":   # M5.9: autorádio (1–5 předvolby, 0 vypnout, Shift+kolečko)
+			if p.car:
+				p.car.car_action(id, action)
 		"car_horn":
 			if p.car:
 				p.car.honk()
@@ -1611,6 +1989,10 @@ func player_action(id: int, action: String) -> void:
 			if weapons and weapons.on_click(id):        # zbraň v ruce: luk natáhnout, kuši / pušku vystřelit (M2.8)
 				return
 			if fishing and fishing.on_click(id):       # nahozená udice: stáhnout / zaseknout (M2.7)
+				return
+			if football and football.on_click(id):     # míč na hřišti, prázdné ruce: kop (M5.6)
+				return
+			if hasici_sport and hasici_sport.on_click(id):   # M5.4: plyn strojníka / proudař (LMB)
 				return
 			if vycep and vycep.on_click(id):           # výčepní u pípy: čepování držením LMB (M3.2)
 				return
@@ -1682,7 +2064,14 @@ func enter_car(id: int, c: Car) -> void:
 			(p.license_suspended_until - clock.minutes) / 60.0), 3.0])
 	if p.busy:
 		return
+	var lc := license_check(id, c)            # M4.1: vozidlo vyžaduje skupinu řidičáku (jde to, ale je to přestupek)
+	if not lc["ok"]:
+		notify(id, "show_message", ["Na tohle nemáš řidičák (skupina %s, %s)." % [lc["group"], lc["reason"]], 4.0])
 	p.enter_car(c)
+	c.ensure_radio(self)                      # M5.9 autorádio (jen auta s kabinou)
+	if clock.daylight() < 0.5:                # M5.9 vnitřní světlo: nástup za šera a v noci
+		c.cabin_door_light()
+	_auto_start[id] = p.global_position       # M4.1: nástup – případná výcviková jízda autoškoly
 	play_sfx(id, "door")
 	if c.model.kind == "bike":
 		notify(id, "show_message", ["%s – W šlapat, S brzda (stojíš: couvání), A/D řízení, B zvonek, L dynamo, F sesednout" % c.model.spec["name"], 4.0])
@@ -1734,9 +2123,14 @@ func dismount_horse(id: int) -> void:
 
 
 func exit_car(id: int) -> void:
-	players[id].exit_car()
+	var p: Player = players[id]
+	var c: Car = p.car
+	if c != null and clock.daylight() < 0.5:  # M5.9 výstup za šera a v noci: světlo v kabině na chvíli
+		c.cabin_door_light()
+	var out := p.exit_car()
 	play_sfx(id, "door")
 	emit_game_event(id, "exited_car", {})
+	_auto_jizda_end(id, c, out)
 
 
 # ------------------------------------------------------------------ letouny (M6.3)
@@ -1797,8 +2191,7 @@ func enter_aircraft(id: int, a: Aircraft) -> void:
 		notify(id, "show_message", ["%s – navlékáš nosiče: čelem PROTI VĚTRU rozběh (W) nahodí křídlo, " % a.spec.get("name", a.model)
 			+ "pak plyn (Shift). Ve vzduchu A/D brzdy, S obě, Mezerník trimry, Ctrl uši.", 7.0])
 	elif a is Trike:
-		notify(id, "show_message", ["%s – páka plynu Shift/Ctrl (drží polohu), na zemi A/D příďové kolo " % a.spec.get("name", a.model)
-			+ "a Mezerník brzda. Ve vzduchu HRAZDA: S nos nahoru, W klesat, A/D zatáčí obráceně. V kamera, F vystoupit.", 8.0])
+		notify(id, "show_message", [(a as Trike).controls_hint(), 8.0])
 	else:
 		notify(id, "show_message", ["%s – W plyn, A/D překlápění, Mezerník zatáhnout / na zemi brzda, " % a.spec.get("name", a.model)
 			+ "Ctrl přiklonit, V kamera, F vystoupit (na zemi)", 6.0])
@@ -1880,7 +2273,7 @@ const PG_VILLAGE_R := 350.0                              # „obec“ = do této
 const PG_NOISE_R := 800.0                                # svědek hluku motoru (vodorovně)
 const PG_SCHOOL_KC := 35000                              # létací škola (teorie + 5 výcvikových letů)
 const PG_TRAIN_FLIGHTS := 5                              # povinné výcvikové vzlety s instruktorem
-const PG_REG_KC := 500                                   # registrace stroje u ÚCL
+const PG_REG_KC := 500                                   # registrace stroje u ÚVL
 const PG_INSURANCE_KC := 1200                            # pojištění odpovědnosti (rok, zjednodušeně)
 
 
@@ -2066,8 +2459,8 @@ func _pg_try_grant(id: int) -> void:
 		return
 	var no := "PLA-Q%04d" % randi_range(0, 9999)
 	permits.grant(id, "pilot_pg_motor", no)
-	send_mail(id, "Létací škola – ÚCL", "Pilotní průkaz paramotoru",
-		"Gratulujeme!\nSložil jsi teorii a odletěl %d výcvikových letů.\nVydán průkaz: %s\nNezapomeň stroj registrovat a pojistit (Letectví – ÚCL)." % [
+	send_mail(id, "Létací škola – ÚVL", "Pilotní průkaz paramotoru",
+		"Gratulujeme!\nSložil jsi teorii a odletěl %d výcvikových letů.\nVydán průkaz: %s\nNezapomeň stroj registrovat a pojistit (Letectví – ÚVL)." % [
 		PG_TRAIN_FLIGHTS, no])
 	emit_game_event(id, "pg_license_granted", {"no": no})
 	notify(id, "popup", ["Pilotní průkaz paramotoru vydán (%s)!" % no, 6.0])
@@ -2079,7 +2472,7 @@ func pg_register(id: int) -> String:
 		return "Síť je nedostupná."
 	if has_permit(id, "pg_registrace", Vector3.ZERO):
 		return "Stroj už je registrovaný: %s." % permits.number(id, "pg_registrace")
-	if not computer.withdraw_bank(id, PG_REG_KC, "ÚCL – registrace paramotoru"):
+	if not computer.withdraw_bank(id, PG_REG_KC, "ÚVL – registrace paramotoru"):
 		return "Na účtu nemáš %s. Vlož hotovost v bankomatu." % Bazaar.kc(PG_REG_KC)
 	var no := "OK-Q%04d" % randi_range(0, 9999)
 	permits.grant(id, "pg_registrace", no)
@@ -2104,7 +2497,7 @@ func pg_insure(id: int) -> String:
 
 const UL_SCHOOL_KC := 75000                              # UL létací škola (eTest + 10 letů s instruktorem)
 const UL_TRAIN_FLIGHTS := 10                             # povinné výcvikové vzlety triku
-const UL_REG_KC := 1500                                  # registrace UL stroje u ÚCL
+const UL_REG_KC := 1500                                  # registrace UL stroje u ÚVL
 const UL_INSURANCE_KC := 3000                            # pojištění odpovědnosti UL (rok, zjednodušeně)
 const UL_TRIKE_KC := 350000                              # ojeté rogalo z inzerátu u hangáru
 const UL_PAX_FRIEND := 60.0                              # min. přátelství pro „vyhlídkový let“
@@ -2173,8 +2566,8 @@ func _ul_try_grant(id: int) -> void:
 		return
 	var no := "ULA-Q%04d" % randi_range(0, 9999)
 	permits.grant(id, "pilot_ul", no)
-	send_mail(id, "Létací škola – ÚCL", "Pilotní průkaz UL (rogalo)",
-		"Gratulujeme!\nSložil jsi teorii a odletěl %d výcvikových letů na rogalu.\nVydán průkaz: %s\nNezapomeň stroj registrovat a pojistit (Letectví – ÚCL)." % [
+	send_mail(id, "Létací škola – ÚVL", "Pilotní průkaz UL (rogalo)",
+		"Gratulujeme!\nSložil jsi teorii a odletěl %d výcvikových letů na rogalu.\nVydán průkaz: %s\nNezapomeň stroj registrovat a pojistit (Letectví – ÚVL)." % [
 		UL_TRAIN_FLIGHTS, no])
 	emit_game_event(id, "ul_license_granted", {"no": no})
 	notify(id, "popup", ["Pilotní průkaz UL vydán (%s)!" % no, 6.0])
@@ -2186,7 +2579,7 @@ func ul_register(id: int) -> String:
 		return "Síť je nedostupná."
 	if has_permit(id, "ul_registrace", Vector3.ZERO):
 		return "Stroj už je registrovaný: %s." % permits.number(id, "ul_registrace")
-	if not computer.withdraw_bank(id, UL_REG_KC, "ÚCL – registrace UL stroje"):
+	if not computer.withdraw_bank(id, UL_REG_KC, "ÚVL – registrace UL stroje"):
 		return "Na účtu nemáš %s. Vlož hotovost v bankomatu." % Bazaar.kc(UL_REG_KC)
 	var no := "OK-Q%04d" % randi_range(0, 9999)
 	permits.grant(id, "ul_registrace", no)
@@ -2295,8 +2688,8 @@ func interactables(id: int) -> Array:
 		out.append({"pos": npcs["pepa"].global_position, "r": 2.6, "kind": "place", "key": "hospoda", "text": "Pepa (štamgast)"})
 	for v in bots_root.get_children():
 		if v is Villager and v.global_position.distance_squared_to(p.global_position) < 9.0:
-			out.append({"pos": v.global_position, "r": 2.4, "kind": "villager", "node": v,
-				"text": "%s (drby)   [T] promluvit" % v.persona.display_name()})
+			out.append({"pos": v.global_position, "r": 2.4, "kind": "favor", "node": v,
+				"text": "%s (drby)   [E] promluvit, prosby, dárek" % v.persona.display_name()})
 	for s in sleep_spots:
 		out.append({"pos": s.global_position, "r": 3.0, "kind": "sleep", "key": s.kind, "node": s, "text": "Nocleh: " + s.title()})
 	if radio:
@@ -2305,12 +2698,22 @@ func interactables(id: int) -> Array:
 		out.append({"pos": police.checkpoint_cop.global_position, "r": 2.5, "kind": "cop", "text": "Policista"})
 	if hunter:
 		out.append_array(hunter.interactables(id))
+	if gamekeeper:
+		out.append_array(gamekeeper.interactables(id))   # M4.6: kurzy a povolenky v myslivecké chatě
 	if paddock:
 		out.append_array(paddock.interactables(id))
 	if bazaar:
 		out.append_array(bazaar.interactables(id))
 	if fire_mgr:
 		out.append_array(fire_mgr.interactables(id))
+	if studanka:
+		out.append_array(studanka.interactables(id))   # M5.10: E u studánky (napít se, konev)
+	if hasici:
+		out.append_array(hasici.interactables(id))   # M5.3: vchod zbrojnice SDH (členství)
+	if hasici_sport:
+		out.append_array(hasici_sport.interactables(id))   # M5.4: základna požárního útoku
+	if krize:
+		out.append_array(krize.interactables(id))   # E u kříže / kaple (krátká modlitba)
 	if garden:
 		out.append_array(garden.interactables(id))
 	if farm:
@@ -2377,6 +2780,8 @@ func personas() -> Dictionary:
 	var i := 0
 	for v in bots_root.get_children():
 		if v is Villager:
+			if v in _extra_villagers:
+				continue            # A4-06: víkendoví hosté se neukládají (přibývají a mizí, indexy by míchaly persony)
 			out["v%d" % i] = v.persona
 			i += 1
 	for k in npcs:
@@ -2517,11 +2922,12 @@ func _talk_context(ctx: Dictionary, id: int, p: Player) -> void:
 		ev.append("event_silvestr")
 	if m == 4 and dd == 30:
 		ev.append("event_carodejnice")
-	var e := Clock.easter_jdn(int(d["year"]))
-	if clock.jd() >= e - 52 and clock.jd() <= e - 47:     # masopustní týden (do úterý před Popeleční středou)
-		ev.append("event_masopust")
-	if m == 9 and dd >= 8 and dd <= 21 and clock.weekday() >= 5:   # smyšlené posvícenské hody (víkendy v polovině září)
-		ev.append("event_hody")
+	# A4-09: masopust a hody podle VillageEvents (jediný zdroj pravdy – dialog „ví“ o nich jen když se opravdu konají)
+	if village_events:
+		if village_events.is_active("masopust"):
+			ev.append("event_masopust")
+		if village_events.is_active("hody"):
+			ev.append("event_hody")
 	ctx["events"] = ev
 	var carry := []
 	var eq := p.equipped
@@ -2645,7 +3051,7 @@ func give_to_npc(id: int, npc: Node, item_id: String) -> bool:
 	if p == null or per == null or not ItemsDB.exists(item_id) or not p.remove_item(item_id, 1):
 		return false
 	var price := float(ItemsDB.info(item_id).get("price", 0))
-	var d := Persona.FRIEND_GIFT * clampf(1.0 + price / 200.0, 1.0, 3.0)
+	var d := Persona.FRIEND_GIFT * clampf(1.0 + price / 200.0, 1.0, 3.0) * per.gift_mult(item_id)   # M4.5: oblíbené ×2, neoblíbené mírné mínus
 	per.add_friendship(id, d, clock.minutes, clock.day(), true)
 	per.add_mood(id, 0.3, clock.minutes)
 	notify(id, "show_message", ["%s: „Děkuju, to je od tebe hezké.“" % per.first_name(), 3.0])
@@ -2679,8 +3085,22 @@ func price_for(id: int, base: int) -> int:
 	return roundi(base * (r.price_mult() if r else 1.0))
 
 
+## A1-05: je místo `place` zavřené? Když ano, hráč dostane zprávu a obchodní akce se zruší.
+## Prázdný klíč, „domov“ a neznámá místa se nehlídají.
+func place_shut(id: int, place: String) -> bool:
+	if place == "" or place == "domov" or not places.has(place):
+		return false
+	var pl: Place = places[place]
+	if pl.is_open(clock.hour()):
+		return false
+	notify(id, "show_message", ["Zavřeno, otevřeno %s." % pl.hours_text(), 2.5])
+	return true
+
+
 func buy(id: int, item_id: String, base_price: int, mode: String, place := "") -> void:
 	var p: Player = players[id]
+	if place_shut(id, place):
+		return
 	if mode == "sell":
 		sell_items(id, item_id, base_price, place)
 		return
@@ -2718,7 +3138,7 @@ func buy(id: int, item_id: String, base_price: int, mode: String, place := "") -
 ## Výkup (M2.1, režim „sell“ v `Place.OFFERS`): prodá všechny kusy `item_id` z inventáře za `unit_price` Kč / ks.
 func sell_items(id: int, item_id: String, unit_price: int, place := "") -> void:
 	var p: Player = players.get(id)
-	if p == null:
+	if p == null or place_shut(id, place):
 		return
 	if hunting and Hunting.is_venison(item_id) and hunting.sell_venison(id, item_id, unit_price, place):
 		return                    # M2.9: zvěřina jen legální a s dokladem o původu (nelegální u překupníka)
@@ -2737,6 +3157,128 @@ func sell_items(id: int, item_id: String, unit_price: int, place := "") -> void:
 ## Povolení úřadu (M4.4 / M4.6): `kind` = "kaceni", "zbrojni" (zbrojní oprávnění), "rybarsky_listek", "povolenka_rybolov"…
 ## `pos` = místo. Zatím nikdo žádné nemá (háček pro kácení M2.1, rybaření M2.7, zbraně M2.8), jen ladicí cheat
 ## `cheat(id, "zbrojni")` (F2 → Hráč) – doklady, lístky a jejich platnost doplní M4.6.
+# ------------------------------------------------------------------ řidičák a autoškola (M4.1)
+
+const AUTO_KURZ_KC := {"AM": 3000, "A1": 8900, "A2": 9900, "A": 7900, "T": 6900, "B": 12000}   # orientačně
+const AUTO_PREZKOUSENI_KC := 2500         # přezkoušení po odebrání za 12 bodů (skupina B)
+const AUTO_JIZD_NUTNE := 3                # výcvikové jízdy s instruktorem (každá = odjezd od úřadu a návrat)
+const AUTO_JIZDA_MIN_M := 300.0           # nástup musí být aspoň tak daleko od úřadu
+const AUTO_CIL_M := 30.0                  # výstup musí být nejvýš tak daleko od dveří úřadu
+
+## Stav kurzu autoškoly hráče (computer.gd `auto_skola`): {zaplaceno, skupina, teorie, jizdy, retest}.
+func auto_school(id: int) -> Dictionary:
+	return computer.auto_school(id) if computer else {}
+
+
+## Kontrola řidičáku pro vozidlo: {ok, group, reason}. Kolo / vozidlo bez skupiny = v pořádku.
+func license_check(id: int, c: Car) -> Dictionary:
+	var grp := String(c.model.spec.get("skupina_rp", "")) if c and c.model else ""
+	if grp == "" or permits == null or permits.has(id, "ridicsky", grp):
+		return {"ok": true, "group": grp, "reason": ""}
+	var rv := permits.is_revoked(id, "ridicsky")
+	var why := "chybí skupina"
+	if not rv.is_empty():
+		why = "odebraný řidičák, nutné přezkoušení" if bool(rv.get("retest", false)) else "zákaz řízení"
+	return {"ok": false, "group": grp, "reason": why}
+
+
+## Zápis do autoškoly (kurz skupiny z AUTO_KURZ_KC; po odebrání za 12 bodů přezkoušení skupiny B).
+func auto_enroll(id: int, skupina: String) -> String:
+	if computer == null or permits == null:
+		return "Síť je nedostupná."
+	var s := auto_school(id)
+	if bool(s.get("zaplaceno", false)):
+		return "Kurz už máš zaplacený (skupina %s) – slož teorii a %d výcvikové jízdy." % [s["skupina"], AUTO_JIZD_NUTNE]
+	var rv := permits.is_revoked(id, "ridicsky")
+	if not rv.is_empty() and not bool(rv.get("retest", false)):
+		return "Zákaz řízení (%s) ještě běží – do herního dne %d." % [String(rv.get("reason", "")), int(rv.get("until_jd", -1))]
+	var retest := not rv.is_empty()
+	var grp := "B" if retest else skupina
+	if retest and clock.minutes < float(_license_suspended_until(id)):
+		return "Zákaz řízení ještě běží – přezkoušení až po něm."
+	if not retest and permits.has(id, "ridicsky", grp):
+		return "Skupinu %s už máš." % grp
+	var cena: int = AUTO_PREZKOUSENI_KC if retest else int(AUTO_KURZ_KC.get(grp, 0))
+	if cena <= 0:
+		return "Tuhle skupinu autoškola nenabízí."
+	var nazev := "Autoškola – přezkoušení" if retest else "Autoškola – kurz %s" % grp
+	if not computer.withdraw_bank(id, cena, nazev):
+		return "Na účtu nemáš %s. Vlož hotovost v bankomatu." % Bazaar.kc(cena)
+	s["zaplaceno"] = true
+	s["skupina"] = grp
+	s["teorie"] = false
+	s["jizdy"] = 0
+	s["retest"] = retest
+	emit_game_event(id, "auto_school_enrolled", {"skupina": grp})
+	return "Zaplaceno %s. Teorie: eTest „autoskola“ (tady na PC). Praxe: %d výcvikové jízdy – nasedni do vozidla " % [
+		Bazaar.kc(cena), AUTO_JIZD_NUTNE] + "skupiny %s, odjeď aspoň %d m od úřadu a vrať se k jeho dveřím." % [grp, int(AUTO_JIZDA_MIN_M)]
+
+
+func _license_suspended_until(id: int) -> float:
+	return players[id].license_suspended_until if players.has(id) else -1.0
+
+
+## Složená teorie (volá `Computer.record_test` u eTestu „autoskola“).
+func auto_theory_passed(id: int) -> void:
+	var s := auto_school(id)
+	if not bool(s.get("zaplaceno", false)):
+		return
+	s["teorie"] = true
+	_auto_try_finish(id)
+
+
+## Výcviková jízda: nástup v dálce od úřadu, výstup u úřadu (instruktor hodnotí rádiem).
+func _auto_jizda_end(id: int, c: Car, out: Vector3) -> void:
+	if not _auto_start.has(id):
+		return
+	var start: Vector3 = _auto_start[id]
+	_auto_start.erase(id)
+	var s := auto_school(id)
+	if not bool(s.get("zaplaceno", false)) or c == null or c.model == null:
+		return
+	var grp := String(c.model.spec.get("skupina_rp", ""))
+	if grp == "" or not Permits.skupina_kryje(String(s["skupina"]), grp):
+		return
+	var door: Vector3 = places["urad"].door
+	if Vector2(start.x - door.x, start.z - door.z).length() < AUTO_JIZDA_MIN_M:
+		notify(id, "show_message", ["Instruktor (rádio): „Tohle je krátká jízda, odjeď dál od úřadu.“", 4.0])
+		return
+	if Vector2(out.x - door.x, out.z - door.z).length() > AUTO_CIL_M:
+		notify(id, "show_message", ["Instruktor (rádio): „Vrať se k úřadu, tam končí výcvik.“", 4.0])
+		return
+	s["jizdy"] = int(s.get("jizdy", 0)) + 1
+	notify(id, "show_message", ["Instruktor: „Jízda %d/%d – hezky. Hlídej 50 v obci a STOP značky.“" % [
+		s["jizdy"], AUTO_JIZD_NUTNE], 5.0])
+	_auto_try_finish(id)
+
+
+## Splněno (teorie + všechny jízdy) → řidičák se skupinou, nebo po odebrání obnovení.
+func _auto_try_finish(id: int) -> void:
+	var s := auto_school(id)
+	if not bool(s.get("zaplaceno", false)) or not bool(s.get("teorie", false)) \
+			or int(s.get("jizdy", 0)) < AUTO_JIZD_NUTNE or permits == null:
+		return
+	var grp := String(s["skupina"])
+	var retest := bool(s.get("retest", false))
+	if retest:
+		permits.restore(id, "ridicsky")
+	else:
+		permits.grant(id, "ridicsky", "RP-%04d" % id, grp)
+	s["zaplaceno"] = false
+	s["teorie"] = false
+	s["jizdy"] = 0
+	s["retest"] = false
+	var text := "Přezkoušení složeno – řidičský průkaz je znovu platný." if retest \
+		else "Složil(a) jsi zkoušku – skupina %s je v průkazu." % grp
+	send_mail(id, "Autoškola Volant (smyšlená)", "Výsledek zkoušky", "Gratulujeme!\n%s" % text)
+	if skills.has(id):
+		(skills[id] as Skills).add_xp("rizeni", 100.0, "autoškola")
+	if reputations.has(id):
+		reputations[id].change(1.0, "Složená zkouška z řízení")
+	emit_game_event(id, "auto_license_granted", {"skupina": grp, "retest": retest})
+	notify(id, "popup", ["Řidičský průkaz: %s" % text, 6.0])
+
+
 func has_permit(id: int, kind: String, _pos: Vector3) -> bool:
 	if kind == "kaceni" and les and les.work_permit(id, _pos):
 		return true               # M3.3: lesní dělník na směně kácí vyznačené stromy
@@ -2938,6 +3480,16 @@ func can_teleport(_id: int) -> bool:
 	return true
 
 
+## Výška země pro letouny (A2-11): uvnitř katastru terén, za ním hrubé okolí `Surroundings`
+## (Terrain.height_at by za okrajem vracel sevřený okraj → špatné AGL, přistání „ve vzduchu“).
+func ground_height(x: float, z: float) -> float:
+	if terrain == null:
+		return 0.0
+	if terrain.contains(x, z, 4.0) or surroundings == null or surroundings.nx < 2:
+		return terrain.height_at(x, z)
+	return surroundings.height_at(x, z)
+
+
 ## M6.2 – letové hranice pro létající prostředky (dron; M6.3+ letouny se napojí stejně).
 ## Vrací Dictionary:
 ##   "ok"    – uvnitř povolené oblasti (katastr + FLY_LIMIT_M) a pod stropem FLY_CEIL_AGL,
@@ -2962,7 +3514,7 @@ func flight_bounds(pos: Vector3) -> Dictionary:
 		if out > 0.0:
 			var k := clampf((out - (FLY_LIMIT_M - FLY_WARN_M)) / FLY_WARN_M, 0.0, 1.0)
 			push = Vector3(-dx, 0.0, -dz) / out * FLY_PUSH_MS * k
-		agl = pos.y - terrain.height_at(pos.x, pos.z)
+		agl = pos.y - ground_height(pos.x, pos.z)
 	var over_ceil := agl > FLY_CEIL_AGL
 	if over_ceil:
 		push.y = -minf(FLY_CEIL_PUSH + (agl - FLY_CEIL_AGL) * 0.1, FLY_PUSH_MS)
@@ -3066,6 +3618,26 @@ func teleport_target(id: int, what: String) -> Array:
 	var from := p.global_position
 	if what == "letiste" and airfield and airfield.ok:
 		return airfield.teleport_spot()
+	if what.begins_with("obec:"):
+		# A1-07: střed okolní obce (všech 5 leží uvnitř union mřížky terénu); kdyby obec ležela mimo
+		# mřížku, hráč se postaví na nejbližší okraj terénu čelem k ní
+		var oid := what.substr(5)
+		for o in obce:
+			if String(o.get("id", o.get("name", ""))) != oid:
+				continue
+			var c: Array = o.get("center", [])
+			if c.size() < 2 or terrain == null:
+				return []
+			var tgt := Vector2(float(c[0]), float(c[1]))
+			var xa := terrain.x0 + 12.0
+			var xb := terrain.x0 + (terrain.w - 1) * terrain.spacing - 12.0
+			var za := terrain.z0 + 12.0
+			var zb := terrain.z0 + (terrain.h - 1) * terrain.spacing - 12.0
+			var edge := Vector2(clampf(tgt.x, xa, xb), clampf(tgt.y, za, zb))
+			var dir := tgt - edge
+			var yaw_o := atan2(-dir.x, -dir.y) if dir.length() > 1.0 else 0.0
+			return [Vector3(edge.x, 0.0, edge.y), yaw_o]
+		return []
 	if what in ["krmelec", "posed", "vybeh", "vcelar"]:
 		var spot := Vector3.INF
 		if what == "krmelec" and hunter and not hunter.feeders.is_empty():
@@ -3181,7 +3753,7 @@ func cheat(id: int, what: String) -> void:
 					permits.grant(id, "dron_provozovatel", "CZ-DB-%04d" % id)
 				if not permits.has(id, "dron_a1a3"):
 					permits.grant(id, "dron_a1a3", "A1A3-%04d" % id)
-			notify(id, "show_message", ["Máš drony, náhradní baterii, registraci ÚCL i osvědčení A1/A3 (Tab → Vzlétnout).", 4.0])
+			notify(id, "show_message", ["Máš drony, náhradní baterii, registraci ÚVL i osvědčení A1/A3 (Tab → Vzlétnout).", 4.0])
 			p.add_item("dron_baterie")
 		"zbrojni":
 			# M2.8: přepíná ladicí zbrojní oprávnění (has_permit "zbrojni"); po zapnutí dá pušku a náboje
@@ -3202,6 +3774,12 @@ func cheat(id: int, what: String) -> void:
 # ------------------------------------------------------------------ smyčka
 
 func _process(_delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(_delta)
+	Tests.prof_add("world", __t0)
+
+
+func _process_impl(_delta: float) -> void:
 	if not ready_done:
 		return
 	# policie – silniční kontrolu hráč uvidí, až je blízko
@@ -3210,6 +3788,10 @@ func _process(_delta: float) -> void:
 			if player_pos(id).distance_to(police.checkpoint_pos) < 120.0:
 				police.checkpoint_seen[id] = true
 
+	if clock and debts:           # M4.2: denní krok dluhů (upomínky, exekuce, doručení příkazů)
+		debts.advance_to(clock.jd())
+	if court:                     # M4.3: předvolání, jednání u soudu, nepřítomnost
+		court.tick()
 	_season_t -= _delta
 	if _season_t <= 0.0:
 		_season_t = SEASON_CHECK_S
@@ -3233,6 +3815,8 @@ static func in_season(kind: String, doy: int) -> bool:
 
 ## Je i-tý předmět právě k mání (sezóna, u hřibů navíc vlhko z posledních dnů)?
 func _item_present(i: int, kind: String, doy: int, rain_recent: float) -> bool:
+	if ItemsDB.hidden(kind):
+		return false      # M4.8: obsah pro dospělé vypnutý – předmět ve hře není
 	if not in_season(kind, doy):
 		return false
 	if kind == "hrib":
@@ -3270,6 +3854,18 @@ func refresh_season_items() -> void:
 
 # ------------------------------------------------------------------ víkend: víc lidí venku
 
+## Profil víkendového hosta (A4-06): vzhled a řeč podle náhodného vesničana, ale bez jeho jména – jinak by
+## ve vsi chodili dva stejní pojmenovaní lidé. Jméno je obecné; host se neukládá (viz `personas()`).
+func _weekend_guest_profile(rng: RandomNumberGenerator) -> Dictionary:
+	var prof: Dictionary = Characters.profile(rng.randi() % Characters.count()).duplicate(true)
+	var female: bool = bool((prof.get("look", {}) as Dictionary).get("female", false))
+	prof["name"] = "Výletnice" if female else "Výletník"
+	prof["job"] = "návštěvník na víkend"
+	prof["hobby"] = "O víkendu se jezdím na vesnici zotavit z města."
+	prof["topics"] = ["pocasi", "pivo", "drby"]
+	return prof
+
+
 ## Víkend ve dne přibude ~30 % vesničanů (jeden za kontrolu, mimo dohled hráčů); jinak zase ubývají.
 func _crowd_tick() -> void:
 	if bots_root == null or _bot_nodes.is_empty() or clock == null:
@@ -3289,7 +3885,7 @@ func _crowd_tick() -> void:
 			if nearest_player_dist(pos) < 70.0:
 				continue
 			var v := Villager.new()
-			v.setup(graph, terrain, self, nid, 3000 + rng.randi() % 100000, Characters.profile(N_VILLAGERS + _extra_villagers.size()))
+			v.setup(graph, terrain, self, nid, 3000 + rng.randi() % 100000, _weekend_guest_profile(rng))
 			bots_root.add_child(v)
 			_extra_villagers.append(v)
 			break
@@ -3353,7 +3949,7 @@ func drone_launch_check(pid: int, model: String, in_menu := false) -> Dictionary
 	elif p.fallen > 0.0:
 		no = "Ležíš na zemi."
 	elif float(_drone_rec(pid, model)["dmg"]) >= Drone.CRASH_DMG:
-		no = "Dron je rozbitý – oprav ho na počítači doma (Letectví – ÚCL)."
+		no = "Dron je rozbitý – oprav ho na počítači doma (Letectví – ÚVL)."
 	elif float(_drone_rec(pid, model)["bat"]) < 60.0:
 		no = "Skoro prázdná baterie – nabij na počítači doma nebo vem náhradní."
 	return {"ok": no == "", "why": no}
@@ -3396,7 +3992,7 @@ func drone_launch(pid: int, model: String) -> void:
 	if bool(sp["needs_a1a3"]) and not has_permit(pid, "dron_a1a3", pos):
 		w.append("bez osvědčení A1/A3")
 	if not w.is_empty():
-		notify(pid, "police_banner", ["Letíš %s – vyřiď si to na počítači (Letectví – ÚCL), když tě uvidí, je pokuta!" % ", ".join(w), 6.0])
+		notify(pid, "police_banner", ["Letíš %s – vyřiď si to na počítači (Letectví – ÚVL), když tě uvidí, je pokuta!" % ", ".join(w), 6.0])
 	emit_game_event(pid, "drone_takeoff", {"model": model})
 
 
@@ -3500,7 +4096,7 @@ func drone_repair(pid: int, model: String) -> String:
 	return "Opraveno za %s – dron je jako nový." % Bazaar.kc(cost)
 
 
-## Registrace provozovatele na ÚCL (zdarma, okamžité). Vrací text pro stavový řádek.
+## Registrace provozovatele na ÚVL (zdarma, okamžité). Vrací text pro stavový řádek.
 func drone_register(pid: int) -> String:
 	if permits == null:
 		return "Síť je nedostupná."
@@ -3508,7 +4104,7 @@ func drone_register(pid: int) -> String:
 		return "Už jsi registrovaný: %s." % permits.number(pid, "dron_provozovatel")
 	var no := "CZ-DB-%04d" % pid
 	permits.grant(pid, "dron_provozovatel", no)
-	send_mail(pid, "ÚCL – portál bezpilotních letů", "Registrace provozovatele potvrzena",
+	send_mail(pid, "ÚVL – portál bezpilotních letů", "Registrace provozovatele potvrzena",
 		"Dobrý den,\nvaše registrace provozovatele UAS byla přijata.\nRegistrační číslo: [b]%s[/b] – vyznačte ho na dronu.\n\n" % no +
 		"Připomínky: dron s kamerou = povinná registrace; nad 250 g test A1/A3; max. 120 m; ne nad lidmi; " +
 		"dohled (VLOS); soukromí na cizích pozemcích.\n(Zjednodušená herní simulace.)")
@@ -3525,7 +4121,7 @@ func drone_pass_test(pid: int) -> String:
 		return "Osvědčení A1/A3 už máš."
 	var no := "A1A3-%04d" % pid
 	permits.grant(pid, "dron_a1a3", no)
-	send_mail(pid, "ÚCL – portál bezpilotních letů", "Osvědčení A1/A3 vystaveno",
+	send_mail(pid, "ÚVL – portál bezpilotních letů", "Osvědčení A1/A3 vystaveno",
 		"Gratulujeme – online test jsi složil.\nOsvědčení: [b]%s[/b] (otevřená podkategorie A1/A3).\n" % no +
 		"Teď smíš legálně létat i s drony nad 250 g – 120 m a pravidla stále platí.\n(Zjednodušená herní simulace.)")
 	notify(pid, "police_banner", ["Osvědčení A1/A3 vystaveno: %s" % no, 4.0])
@@ -3533,7 +4129,7 @@ func drone_pass_test(pid: int) -> String:
 	return "Osvědčení %s vystaveno" % no
 
 
-## Stav flotily pro obrazovku Letectví – ÚCL: [{model, name, bat(0..1), dmg, v_ruce, ve_svete}].
+## Stav flotily pro obrazovku Letectví – ÚVL: [{model, name, bat(0..1), dmg, v_ruce, ve_svete}].
 func drone_fleet(pid: int) -> Array:
 	var p: Player = players.get(pid)
 	var out := []
@@ -3589,20 +4185,140 @@ func drones_from_dict(pid: int, d: Dictionary) -> void:
 		drones[pid] = dr
 
 
+# ------------------------------------------------------------------ svědci (M4.4)
+
+## Jednotný systém svědků (M4.4): `witness_check` vrací kandidáty, kteří čin vidí nebo slyší, a zda ho nahlásí.
+## Zkratky `witness_seen` (někdo vidí) a `witness_reported` (někdo nahlásí). Další zdroje (hajný, stráže – M4.6)
+## přidá `add_witness_source(fn)`, `fn(id, pos, see_r, hear_r) -> Array` vrací kandidáty `{node, name, persona, role}`.
+const WITNESS_CONE_COS := 0.17           # cos 80° – NPC vidí zhruba do přední poloviny (±80°)
+const WITNESS_FOG_K := 0.6               # plná mlha sníží dohled o tolik (podíl)
+const WITNESS_FRIEND_MIN := 60.0         # přátelství, od kterého skoro nikdy nenahlásí
+const WITNESS_FRIEND_P := 0.05           # šance nahlášení u přítele
+const WITNESS_DEFAULT_P := 0.4           # šance nahlášení, když povaha není v Weapons.CALL_P
+const UNREPORTED_MAX := 50               # nenahlášených činů na hráče (nejstarší se zahazují)
+
+
+## Dohled podle denní doby (den 1,0 / šero 0,5 / noc 0,25) × mlha.
+func _witness_light() -> float:
+	var f := 1.0
+	if clock:
+		var d := clock.daylight()
+		f = 1.0 if d >= 0.8 else (0.5 if d >= 0.35 else 0.25)
+	if weather:
+		f *= 1.0 - WITNESS_FOG_K * clampf(weather.fog, 0.0, 1.0)
+	return f
+
+
+## M4.8: brána „Obsah pro dospělé“ (Esc → Nastavení, výchozí vypnuto). Nové látky se registrují jen přes ni.
+func adult_ok() -> bool:
+	return ItemsDB.adult_on
+
+
+## Kdo čin uvidí / uslyší. Vrací [{node, name, persona, sees, hears, reports}] jen pro ty, kdo vidí nebo slyší.
+## Vidí: vzdálenost ≤ see_r × světlo a zorný kužel (NPC zhruba dopředu). Slyší: ≤ hear_r, bez kuželu.
+## Nahlásí: podle povahy (`Weapons.CALL_P`), přítele (≥ 60) skoro nikdy; policejní hlídka vždy.
+## Zatím bez raycastu na zdi (dotaz do fyziky mimo fyzikální krok není bezpečný) – viz otevřené body.
+func witness_check(id: int, pos: Vector3, kind: String, see_r: float, hear_r := 0.0) -> Array:
+	var cands: Array = []
+	if bots_root:
+		for v in bots_root.get_children():
+			if v is Villager:
+				var vp: Persona = (v as Villager).persona
+				cands.append({"node": v, "name": vp.display_name() if vp else "vesničan", "persona": vp, "role": "vesnice"})
+	for k in places:
+		var pl: Place = places[k]
+		if pl.keeper != null and is_instance_valid(pl.keeper) and not pl.player_inside:
+			cands.append({"node": pl.keeper, "name": "obsluha (%s)" % String(k), "persona": pl.keeper.persona, "role": "obsluha"})
+	if police and police.patrol != null and is_instance_valid(police.patrol):
+		cands.append({"node": police.patrol, "name": "policejní hlídka", "persona": null, "role": "policie"})
+	for src in witness_sources:
+		if src.is_valid():
+			cands.append_array(src.call(id, pos, see_r, hear_r))
+	var light := _witness_light()
+	var out: Array = []
+	for c in cands:
+		var n: Node3D = c.get("node")
+		if n == null or not is_instance_valid(n):
+			continue
+		var to := pos - n.global_position
+		var sees := false
+		if to.length() <= see_r * light:
+			var f2 := Vector2(-n.global_transform.basis.z.x, -n.global_transform.basis.z.z)
+			var t2 := Vector2(to.x, to.z)
+			sees = t2.length() < 1.0 or f2.length() < 0.01 or f2.normalized().dot(t2.normalized()) >= WITNESS_CONE_COS
+		var hears := to.length() <= hear_r
+		if not sees and not hears:
+			continue
+		var persona: Persona = c.get("persona")
+		var reports := false
+		if String(c.get("role", "")) == "policie" or String(c.get("role", "")) == "hajny":
+			reports = true                # policie a hajný (M4.6) hlásí vždy
+		else:
+			var p := WITNESS_DEFAULT_P
+			if persona:
+				p = float(Weapons.CALL_P.get(String(persona.profile.get("trait", "")), WITNESS_DEFAULT_P))
+				if persona.get_friendship(id) >= WITNESS_FRIEND_MIN:
+					p = WITNESS_FRIEND_P
+			reports = randf() < p
+		out.append({"node": n, "name": String(c.get("name", "")), "persona": persona, "sees": sees, "hears": hears, "reports": reports})
+	return out
+
+
+## Někdo čin vidí (kandidát se `sees`).
+func witness_seen(id: int, pos: Vector3, kind: String, see_r: float, hear_r := 0.0) -> bool:
+	for w in witness_check(id, pos, kind, see_r, hear_r):
+		if w["sees"]:
+			return true
+	return false
+
+
+## Někdo čin nahlásí (kandidát se `reports`) – vede k přestupku hned, jinak zůstane nenahlášený.
+func witness_reported(id: int, pos: Vector3, kind: String, see_r: float, hear_r := 0.0) -> bool:
+	for w in witness_check(id, pos, kind, see_r, hear_r):
+		if w["reports"]:
+			return true
+	return false
+
+
+## Přidá zdroj svědků (M4.6: hajný, stráže). `fn(id, pos, see_r, hear_r) -> Array` vrací kandidáty ve tvaru výše.
+func add_witness_source(fn: Callable) -> void:
+	if not witness_sources.has(fn):
+		witness_sources.append(fn)
+
+
+## Zapíše nenahlášený čin hráče (zjistí ho později hajný / policie přes `pending_offenses`).
+func add_unreported(id: int, entry: Dictionary) -> void:
+	var list: Array = unreported.get(id, [])
+	list.append(entry)
+	if list.size() > UNREPORTED_MAX:
+		list = list.slice(list.size() - UNREPORTED_MAX)
+	unreported[id] = list
+
+
+## Nenahlášené činy hráče (položky jako v `Forestry._check_law`).
+func pending_offenses(id: int) -> Array:
+	return unreported.get(id, [])
+
+
+## Uplatní nenahlášený čin `idx` (zjištěn): zapíše přestupky přes `commit_offense` a čin odstraní.
+func commit_pending(id: int, idx: int) -> void:
+	var list: Array = unreported.get(id, [])
+	if idx < 0 or idx >= list.size():
+		return
+	var e: Dictionary = list[idx]
+	list.remove_at(idx)
+	unreported[id] = list
+	for oid in e.get("offenses", []):
+		commit_offense(id, String(oid), {"severity": float(e.get("severity", 0.0))})
+
+
 ## Svědek, kdo dronu uvidí/uslyší (vesničané, obsluhy míst, hlídka, jiní hráči) do ~150 m vodorovně.
 ## Využívá `Drone._offense` – přestupek se píše jen když dron někoho upoutal. `ignore_pid` = vlastní pilot
 ## (letí sám u sebe – sám sebe za svědka nepočítá, jinak by přestupek padl vždy).
 func drone_witnessed(pos: Vector3, ignore_pid := -1) -> bool:
 	var p2 := Vector2(pos.x, pos.z)
-	if bots_root:
-		for v in bots_root.get_children():
-			if v is Villager and Vector2(v.global_position.x, v.global_position.z).distance_to(p2) < 150.0:
-				return true
-	for k in places:
-		var pl: Place = places[k]
-		if pl.keeper != null and is_instance_valid(pl.keeper) \
-				and Vector2(pl.keeper.global_position.x, pl.keeper.global_position.z).distance_to(p2) < 120.0:
-			return true
+	if witness_seen(ignore_pid, pos, "dron", 150.0):     # vesničané a obsluhy míst (M4.4 witness_check)
+		return true
 	if police and police.patrol != null and is_instance_valid(police.patrol) \
 			and Vector2(police.patrol.global_position.x, police.patrol.global_position.z).distance_to(p2) < 400.0:
 		return true

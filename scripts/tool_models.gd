@@ -27,6 +27,7 @@ const GRIPS := {
 	"kladivo": {"rot": Vector3(55, 0, 0), "grip": Vector3(0, 0.03, 0)},          # jako sekera, hlava nahoru-dopředu
 	"konev": {"rot": Vector3(0, 0, 0), "grip": Vector3(0, 0.2, 0)},              # horní držadlo podél Z
 	"konev_plna": {"rot": Vector3(0, 0, 0), "grip": Vector3(0, 0.2, 0)},
+	"hnuj": {"rot": Vector3(0, 0, 0), "grip": Vector3(0, 0.28, 0)},              # držadlo kbelíku nad náplní
 	"udice": {"rot": Vector3(12, 0, 0), "grip": Vector3(0, 0.06, 0.03)},         # pažba prutu, špička ~45° nahoru
 	"udice_lepsi": {"rot": Vector3(12, 0, 0), "grip": Vector3(0, 0.06, 0.03)},
 	"luk": {"rot": Vector3(60, 0, 0), "grip": Vector3(0, 0, 0)},                 # svislé držadlo luku, tětiva k tělu
@@ -75,6 +76,8 @@ static func _model(id: String) -> Node3D:
 			return hammer()
 		"konev", "konev_plna":
 			return watering_can()
+		"hnuj":
+			return manure_bucket()
 		"udice", "udice_lepsi":
 			return rod()
 		"luk":
@@ -182,6 +185,18 @@ static func watering_can() -> Node3D:
 	k.box(Vector3(0, 0.15, -0.09), Vector3(0.02, 0.08, 0.02), Color(0.22, 0.4, 0.5))
 	k.box(Vector3(0, 0.15, 0.09), Vector3(0.02, 0.1, 0.02), Color(0.22, 0.4, 0.5))
 	return _finish(k, 0.5, 0.3)
+
+
+## Fáze 8: kbelík hnoje z kompostu – pozinkované vedro, hnědá náplň, drátěné držadlo.
+static func manure_bucket() -> Node3D:
+	var k := MeshKit.new()
+	var zinek := Color(0.6, 0.62, 0.65)
+	k.cylinder(Vector3(0, 0.12, 0), 0.11, 0.085, 0.24, zinek, Vector3.ZERO, 12)
+	k.cylinder(Vector3(0, 0.235, 0), 0.095, 0.095, 0.02, Color(0.28, 0.18, 0.1), Vector3.ZERO, 12)   # náplň
+	for sx in [-0.1, 0.1]:
+		k.box(Vector3(sx, 0.24, 0), Vector3(0.015, 0.02, 0.015), zinek.darkened(0.2))
+	k.box(Vector3(0, 0.32, 0), Vector3(0.015, 0.015, 0.24), zinek.darkened(0.2))                    # držadlo přes okraj
+	return _finish(k, 0.5, 0.4)
 
 
 ## Udice: bambusový prut 2 m dopředu-vzhůru s očky.

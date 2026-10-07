@@ -1,7 +1,7 @@
 """Data budov pro fasády (okna, dveře, komíny) → data/buildings.json.
 
 Zdroj: podklady, ze kterých vznikají `walls.bin` a `roofs.bin` (proto sedí na stěny ve hře):
-  data/buildings_3d.json, data/buildings_3d_full.json   (kořen repozitáře; OSM půdorys + výšky DMP 1G)
+  pipeline/data/buildings_3d.json, pipeline/data/buildings_3d_full.json   (mezidata pipeline; OSM půdorys + výšky DMP 1G)
   tools/out/domov_hrace.json                  (dům hráče – usedlost, `home: true`)
   data/pois.json                           (osm_id míst → `poi: klíč`)
   data/map.json                            (silnice → strana, kde jsou dveře)
@@ -35,7 +35,10 @@ from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.dirname(HERE)
-ROOT = os.path.dirname(GAME)
+PIPE = os.path.join(GAME, "pipeline")
+PDATA = os.path.join(PIPE, "data")
+GEO = os.path.join(GAME, "geodata")
+PSCRIPTS = os.path.join(PIPE, "scripts")
 DATA = os.path.join(GAME, "data")
 
 DRIVABLE = {"secondary", "tertiary", "unclassified", "residential", "service", "living_street"}
@@ -103,8 +106,8 @@ def ridge_of(b, poly):
 
 
 def main():
-    src = json.load(open(os.path.join(ROOT, "data", "buildings_3d.json"))) + \
-        json.load(open(os.path.join(ROOT, "data", "buildings_3d_full.json")))
+    src = json.load(open(os.path.join(PDATA, "buildings_3d.json"))) + \
+        json.load(open(os.path.join(PDATA, "buildings_3d_full.json")))
     home_path = os.path.join(HERE, "out", "domov_hrace.json")
     home_id = None
     if os.path.exists(home_path):

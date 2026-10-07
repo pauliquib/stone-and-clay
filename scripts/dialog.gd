@@ -94,7 +94,7 @@ const PLACE_WORDS := {
 ## Témata z profilu postavy (Characters.PROFILES[*].topics) → klíčová slova a nadšené odpovědi.
 const TOPICS := {
 	"pole": [["pole", "obil", "psenic", "kukuric", "sklizen", "zne"], ["Letos to na poli vypadá slušně, jen kdyby víc zapršelo.", "Pole, to je moje. Každá hrouda má svou historii."]],
-	"traktor": [["traktor", "zetor", "kombajn"], ["Zetor je Zetor. Ty nové traktory mají víc elektroniky než rozumu.", "Traktor ti jednou řekne víc než člověk."]],
+	"traktor": [["traktor", "kombajn"], ["Starý traktor je starý traktor. Ty nové traktory mají víc elektroniky než rozumu.", "Traktor ti jednou řekne víc než člověk."]],
 	"zahrada": [["zahrad", "kvetin", "zelenin", "rajcat", "jirin", "zalev", "zahon"], ["Na zahradě mám rajčata jak pěsti!", "Zahrada je lék na všechno. Hlavně na manžela."]],
 	"kostel": [["kostel", "kaplick", "mse", "farar", "bozi"], ["V neděli v deset je mše, přijď.", "Kaplička u cesty pamatuje ještě moji babičku."]],
 	"fotbal": [["fotbal", "zapas", "hrist", "gol", "mic "], ["V neděli je zápas, přijď fandit na hřiště!", "Náš útok je slabý, ale srdce máme velký."]],
@@ -195,7 +195,10 @@ static func _fill(t: String, ctx: Dictionary) -> String:
 		t = _fill_ext(t, ctx)
 	t = t.replace("{voc}", v).replace(", !", "!").replace(", .", ".").replace(" ,", ",")
 	t = t.replace("{name}", String(pr.get("name", ""))).replace("{first}", String(pr.get("name", "")).split(" ")[0])
-	t = t.replace("{job}", String(pr.get("job", ""))).replace("{hobby}", String(pr.get("hobby", "")))
+	var hobby := String(pr.get("hobby", ""))
+	if ItemsDB.adult_on and pr.has("hobby_adult"):           # M4.8: jedna věta jen při zapnuté volbě pro dospělé
+		hobby += " " + String(pr["hobby_adult"])
+	t = t.replace("{job}", String(pr.get("job", ""))).replace("{hobby}", hobby)
 	# prázdné oslovení: „Ahoj, !“ → „Ahoj!“
 	t = t.replace(", !", "!").replace(", ?", "?").replace(", .", ".").replace(",  ", ", ")
 	return t.strip_edges()

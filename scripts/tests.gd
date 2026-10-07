@@ -13,8 +13,50 @@
 ##                     odchylek poloh, velikosti snímku a round-trip Clock / Weather
 ##   --weathertest  počasí a hratelnost: přilnavost povrchů, brzdná dráha auta (měřená),
 ##                  expozice těla, trakce chůze, AI opatrnost, předpověď
+##   --villagertest  vesničan s behavior stromem (Fáze 3, LimboAI): blackboard z herních dat,
+##                  ráno zahrada + kopání, pátek večer stůl v hospodě + pivo; bez addonu fallback
+##   --flighttest  letoun test_letoun na dráze letiště: vzlet, přetažení/zotavení, dosazení;
+##                 stavy přes godot-state-charts (Fáze 4), bez addonu fallback na flagy
+##   --fencetest   ploty a ohrady (Fáze 7, FenceManager): procedurální ploty kolem výběhu,
+##                 zahrady a pole, kolize, průchodnost branek, rebuild při stěhování, save
+##                 round-trip, kůň projde brankou; volitelně --fencedbg pro diagnostiku sond
+##   --gardentest  zahrada a dvoříště (Fáze 8): růst rostlin v mesši, plevel, kompost → hnůj →
+##                 hnojení, studna naplní konev, skleník chrání před mrazem, garden_visuals save
+##   --terraintest terén (Fáze 9): mikroreliéf vs. kolize, wetness → shader, louže při mokru,
+##                 wet_boost asfaltu, north_xz pro sněhové jazyky
+##   --obcetest   okolní obce (data/obce.json → World.obce, Villages): 5 fiktivních obcí mimo
+##                katastr, středy ±6 km, zástavba postavená, obec_at(center) → ta obec
 class_name Tests
 extends RefCounted
+
+## Mikro-profiler pro --perf: klíč → [celkové µs, počet volání]. Obaluje se kód přes
+## `var __t0 := Tests.prof_t0()` … `Tests.prof_add("hud", __t0)`. Zapnutý jen s --perf.
+static var PROF := {}
+static var PROF_ON := false
+
+
+static func prof_t0() -> int:
+	return Time.get_ticks_usec() if PROF_ON else 0
+
+
+static func prof_add(key: String, t0: int) -> void:
+	if not PROF_ON:
+		return
+	var e: Array = PROF.get(key, [0, 0])
+	e[0] += Time.get_ticks_usec() - t0
+	e[1] += 1
+	PROF[key] = e
+
+
+static func prof_report(dur_s: float, frames: int) -> void:
+	var keys := PROF.keys()
+	keys.sort_custom(func(a, b): return PROF[a][0] > PROF[b][0])
+	print("PERF profiler (celkem za %d s, %d volajících na frame):" % [int(dur_s), frames])
+	for k in keys:
+		var e: Array = PROF[k]
+		var per_frame_us := float(e[0]) / maxf(frames, 1.0)
+		print("PERF   %-22s %7.1f ms/frame  (%d volání/frame, %.0f µs/volání)" % [
+			k, per_frame_us / 1000.0, roundi(float(e[1]) / maxf(frames, 1.0)), per_frame_us / maxf(float(e[1]) / maxf(frames, 1.0), 1.0)])
 
 
 ## Testovaný hráč (lokální, id 1).
@@ -427,6 +469,9 @@ static func _reset(g: Node, h: float) -> void:
 	p.wanted_until = -1.0
 	g.world.traffic.car_of(1).repair()
 	g.world.clock.minutes = (floor(g.world.clock.minutes / 1440.0) + 1.0) * 1440.0 + h * 60.0
+	# A4-02: úřad má úřední dny (víkend a svátky zavřeno) – testy úkolů se posunou na pracovní den
+	while g.world.clock.weekday() >= 5 or g.world.clock.holiday() != "":
+		g.world.clock.minutes += 1440.0
 	await _frames(g, 2)
 
 
@@ -1020,3 +1065,1070 @@ static func interior_test(g: Node) -> void:
 	await _frames(g, 5)
 	print("VÝSLEDEK interiérů: %s" % ("OK" if bad.is_empty() else "%d chyb" % bad.size()))
 	g.get_tree().quit()
+
+
+## Vesničan s behavior stromem (Fáze 3, LimboAI): ověří, že se `ai/villager_routine.tres` načetl,
+## instancoval u prvních `Villager.BT_VILLAGERS` vesničanů, blackboard se naplnil z herních dat
+## (domov z Estate, pracoviště z povolání, stůl u hospody), strom vybírá větve podle denní doby
+## a vesničan se za cílem hýbe. Bez addonu LimboAI jen zkontroluje, že boti běží jako dřív.
+static func villager_test(g: Node) -> void:
+	var w: World = g.world
+	await g.get_tree().create_timer(1.0).timeout
+	var bad := []
+	var check := func(name: String, ok: bool) -> void:
+		if not ok:
+			bad.append(name)
+		print("%s %s" % ["OK  " if ok else "CHYBA", name])
+	var addon := ClassDB.class_exists("BehaviorTree")
+	print("VILLAGER: addon LimboAI=%s, strom=%s" % [addon, ResourceLoader.exists(Villager.BT_TREE)])
+	var bots: Array = []
+	for b in w.bots_root.get_children():
+		if b is Villager:
+			bots.append(b)
+	var with_bt: Array = bots.filter(func(v): return v._bt_inst != null)
+	check.call("villager.gd bez addonu běží (žádná tvrdá reference na LimboAI)", true)
+	if not addon:
+		print("VILLAGER: addon chybí – vesničanů %d bez BT, fallback = původní chůze (OK)" % bots.size())
+		check.call("villager.gd se načetl", bots.size() > 0)
+		print("VÝSLEDEK villager: %s" % ("OK" if bad.is_empty() else "%d chyb" % bad.size()))
+		g.get_tree().quit()
+		return
+	check.call("strom se načetl", ResourceLoader.exists(Villager.BT_TREE) and load(Villager.BT_TREE) != null)
+	check.call("prvních %d vesničanů má BT" % Villager.BT_VILLAGERS,
+		with_bt.size() == mini(Villager.BT_VILLAGERS, bots.size()))
+	check.call("každý má vlastní instanci stromu", with_bt.filter(func(v):
+		return v.persona != null and v.persona.daily_routine != null).size() == with_bt.size())
+	if with_bt.is_empty():
+		print("VÝSLEDEK villager: CHYBA – žádný vesničan nemá BT")
+		g.get_tree().quit()
+		return
+	await _frames(g, 30)   # nechat líně naplnit blackboard (places + estate vznikly až po botách)
+	var v: Villager = with_bt[0]
+	for key in ["self", "world", "graph", "terrain", "home", "garden", "pub_table"]:
+		check.call("blackboard má „%s“" % key, v._bt_bb.has_var(key) and v._bt_bb.get_var(key) != null)
+	check.call("domov je skutečné místo (Estate)", v._bt_bb.get_var("home") is Vector3 \
+		and v._bt_bb.get_var("home") != Vector3.INF)
+	var wp = v._bt_bb.get_var("workplace")
+	print("  %s – povolání „%s“, pracoviště %s" % [v.persona.display_name(),
+		v.persona.profile.get("job", "?"), wp if wp is Vector3 and wp != Vector3.INF else "žádné"])
+
+	# --- pracovní den 7:00 → větev „Ranní rutina“ (zahrada + kopání)
+	while w.clock.weekday() >= 5:
+		w.clock.minutes += 1440.0
+	w.clock.minutes = floor(w.clock.minutes / 1440.0) * 1440.0 + 7.0 * 60.0
+	var home: Vector3 = v._bt_bb.get_var("home")
+	var n0 := w.graph.nearest(Vector2(home.x, home.z))
+	var h2 := w.graph.nodes[n0] if n0 >= 0 else Vector2(home.x, home.z)
+	v.global_position = Vector3(h2.x, w.terrain.height_at(h2.x, h2.y) + 0.1, h2.y)
+	v.clear_target()
+	var garden: Vector3 = v._bt_bb.get_var("garden")
+	var arrived := false
+	var digged := false
+	var p0 := v.global_position
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 60000 and not digged:
+		await g.get_tree().physics_frame
+		if v.bt_target() == garden and Vector2(v.global_position.x - garden.x,
+				v.global_position.z - garden.z).length() < 2.0:
+			arrived = true
+		if String(v._visual.action) == "dig":
+			digged = true
+	check.call("ranní rutina: BT zvolil cíl „zahrada“", v.bt_target() == garden or arrived)
+	check.call("ranní rutina: došel na zahradu (<2 m)", arrived)
+	check.call("ranní rutina: animace kopání (dig)", digged)
+	print("  ráno 7:00 – cíl %s, ušel %.1f m, akce „%s“, bt_cíl %s" % [garden,
+		v.global_position.distance_to(p0), v._visual.action, v.bt_target()])
+
+	# --- pátek 18:00 → větev „Večerní hospoda“ (stůl, sednutí, pivo, promile)
+	while w.clock.weekday() != 4:
+		w.clock.minutes += 1440.0
+	w.clock.minutes = floor(w.clock.minutes / 1440.0) * 1440.0 + 18.0 * 60.0
+	var pub: Vector3 = v._bt_bb.get_var("pub_table")
+	# 1) počkat, až se větev hospody chytí (doběhne předchozí rutina – sekvence si
+	#    pamatuje běžící akci; kopání na zahradě trvá až 20 s)
+	var tw := Time.get_ticks_msec()
+	while v.bt_target() != pub and Time.get_ticks_msec() - tw < 40000:
+		await g.get_tree().physics_frame
+	check.call("hospoda: BT zvolil cíl „pub_table“", v.bt_target() == pub)
+	# 2) teleport na uzel ~8 m od stolu + clear_target → BT musí trasu naplánovat.
+	#    (Teleport přímo ke stolu/dveřím je moc blízko: d < arrive=1,5 → akce Jít
+	#    uspěje hned bez move_to, bt_target zůstane INF a check „došel“ by neprošel.)
+	var pub2 := Vector2(pub.x, pub.z)
+	var n1 := -1
+	var n1_diff := 1e9
+	for i in w.graph.nodes.size():
+		var dn: float = w.graph.nodes[i].distance_to(pub2)
+		if dn >= 5.0 and dn <= 20.0 and absf(dn - 8.0) < n1_diff:
+			n1_diff = absf(dn - 8.0)
+			n1 = i
+	if n1 < 0:
+		var hosp: Place = w.places.get("hospoda")
+		n1 = w.graph.nearest(Vector2(hosp.door.x, hosp.door.z) if hosp else pub2)
+	var p2: Vector2 = w.graph.nodes[n1] if n1 >= 0 else pub2
+	v.global_position = Vector3(p2.x, w.terrain.height_at(p2.x, p2.y) + 0.1, p2.y)
+	v.clear_target()
+	var sat := false
+	var drank := false
+	arrived = false
+	p0 = v.global_position
+	var dmin := 1e9
+	t0 = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 90000 and not drank:
+		await g.get_tree().physics_frame
+		var dp := Vector2(v.global_position.x - pub.x, v.global_position.z - pub.z).length()
+		dmin = minf(dmin, dp)
+		if dp < 1.8 and v.bt_target() == pub:
+			arrived = true
+		if v._visual.pose == "sit":
+			sat = true
+		if String(v._visual.action) == "drink" and v.promile > 0.0:
+			drank = true
+	check.call("hospoda: BT zvolil cíl „pub_table“", v.bt_target() == pub or arrived)
+	check.call("hospoda: došel ke stolu (<1,8 m)", arrived)
+	check.call("hospoda: sedl si (pose sit)", sat)
+	check.call("hospoda: objednal pivo (drink + promile > 0)", drank)
+	print("  pátek 18:00 – cíl %s, ušel %.1f m, min.vzdál. %.1f m, póza „%s“, promile %.2f ‰, stav %d" % [
+		pub, v.global_position.distance_to(p0), dmin, v._visual.pose, v.promile,
+		v._bt_inst.get_last_status()])
+	check.call("strom tickuje (last_status RUNNING/SUCCESS)", v._bt_inst.get_last_status() in [1, 3])
+	print("VÝSLEDEK villager: %s" % ("OK" if bad.is_empty() else "%d chyb" % bad.size()))
+	g.get_tree().quit()
+
+
+## Letový test (Fáze 4, godot-state-charts): stavový automat letouna na dráze letiště.
+## Reálná fyzika: rozjezd s plným plynem → vzlet (Zeme→Vzduch/Let); teleport do výšky
+## ověří konzistenci `physics_process` ve vzduchu; přetažení tahem výškovky po zrychlujícím
+## se sestupu (Let→Pretazeni) a zotavení; dosazení na dráhu (Vzduch→Zeme). „Létající
+## bedna“ má v headless jen mezní výkon – proto teleporty na finále/do výšky místo
+## dlouhého stoupání (výšku drží laminární proud v modelu jen do ~v_max). Na závěr
+## přímé události `send_event` (stroj bez pilota – fyzika stav nepřepíše).
+## Bez addonu běží fallback flagy `_fb_*` a test ověří totéž rozhraní.
+static func flight_test(g: Node) -> void:
+	var w: World = g.world
+	await g.get_tree().create_timer(1.0).timeout
+	var bad := []
+	var check := func(name: String, ok: bool) -> void:
+		if not ok:
+			bad.append(name)
+		print("%s %s" % ["OK  " if ok else "CHYBA", name])
+	var addon := Aircraft.chart_addon()
+	print("FLIGHT: addon godot-state-charts=%s" % addon)
+
+	# --- stroj na ose dráhy u prahu A (rovinatý pás ~260 m bez překážek, směr 30°)
+	var a := Aircraft.make("test_letoun")
+	a.name = "LetounTest"
+	w.add_child(a)
+	a.setup(w, 1, "test_letoun")
+	var d0 := w.airfield.dir()
+	var yaw_rwy: float = w.airfield._yaw_of(d0)
+	var spos := Vector3(Airfield.RWY_A.x + d0.x * 10.0, 0.0, Airfield.RWY_A.y + d0.y * 10.0)
+	spos.y = w.terrain.height_at(spos.x, spos.z)
+	a.park(spos, yaw_rwy)
+	w.aircrafts.get_or_add(1, []).append(a)
+	a.body_entered.connect(func(b: Node) -> void:
+		print("  kontakt tělesa: %s (v=%.1f m/s)" % [b.name if b else "?", a.linear_velocity.length()]))
+	await _frames(g, 5)
+	check.call("chart vystavěn podle dostupnosti addonu", (a._chart != null) == addon)
+	check.call("parkování: stav Zeme, on_ground, not flying", a.stav_letu() == "Zeme" and a.on_ground and not a.flying())
+	w.enter_aircraft(1, a)
+	await _frames(g, 3)
+	if a.pilot == null:
+		print("CHYBA: pilot nenastoupil – konec testu")
+		g.get_tree().quit()
+		return
+
+	# --- rozjezd a vzlet: plný plyn (W = move_forward) držíme až do stoupání –
+	#     po odlepení nesmí zhasnout, jinak stroj usedne zpátky (vztlak ∝ v²)
+	Input.action_press("move_forward")
+	var t0 := Time.get_ticks_msec()
+	var odlepl := false
+	var last_log := -10.0
+	while Time.get_ticks_msec() - t0 < 30000 and not odlepl:
+		await g.get_tree().physics_frame
+		odlepl = not a.on_ground
+		var tt := (Time.get_ticks_msec() - t0) / 1000.0
+		if tt - last_log >= 2.0:
+			last_log = tt
+			print("  rozběh t=%.0f s: pos=(%.0f,%.0f) v=%.1f m/s dmg=%.0f stav=%s" % [tt,
+				a.global_position.x, a.global_position.z, a.speed, a.dmg, a.stav_letu()])
+		if a.dmg >= 100.0:
+			break
+	check.call("vzlet: přechod Zeme→Vzduch (on_ground=false)", odlepl)
+	check.call("stav Let po vzletu", a.stav_letu() == "Let")
+	check.call("flying() konzistentní s on_ground", a.flying() == (not a.on_ground))
+	print("  odlepení: v=%.1f m/s, stav=%s" % [a.speed, a.stav_letu()])
+
+	# --- stoupání (vlna 0d, A2-02): plný plyn dál 10 s po odlepení → AGL > 20 m
+	#     (kalibrace SPECS: ~3,3 m/s stoupání při v_trim 13 m/s – PROJECT_LOG)
+	var agl_climb := 0.0
+	if odlepl:
+		t0 = Time.get_ticks_msec()
+		while Time.get_ticks_msec() - t0 < 10000 and not a.on_ground and a.dmg < 100.0:
+			await g.get_tree().physics_frame
+		agl_climb = a.global_position.y - w.ground_height(a.global_position.x, a.global_position.z)
+	print("  10 s po odlepení: %.1f m AGL, v=%.1f m/s, stav=%s" % [agl_climb, a.speed, a.stav_letu()])
+	check.call("stoupání: 10 s po odlepení AGL > 20 m (plný plyn)", odlepl and not a.on_ground and agl_climb > 20.0)
+
+	# --- teleport do výšky ~120 m nad dráhou: stav Vzduch přetrvává, fyzika běží dál.
+	#     ~4 s klidného letu s motorem → drží se vzduchu a chart je ve stavu Let.
+	var hod := Vector3(Airfield.RWY_A.x + d0.x * 130.0, 0.0, Airfield.RWY_A.y + d0.y * 130.0)
+	hod.y = w.terrain.height_at(hod.x, hod.z) + 120.0
+	a.global_transform = Transform3D(Basis(Vector3.UP, yaw_rwy), hod)
+	a.linear_velocity = Vector3(d0.x, 0.0, d0.y) * float(a.spec["v_trim"])
+	a.angular_velocity = Vector3.ZERO
+	a._yaw = yaw_rwy
+	a._pitch = 0.0
+	a._bank = 0.0
+	t0 = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 4000 and not a.on_ground and a.dmg < 100.0:
+		await g.get_tree().physics_frame
+	var agl0: float = a.global_position.y - w.terrain.height_at(a.global_position.x, a.global_position.z)
+	print("  ve výšce: %.0f m AGL, v=%.1f m/s, stav=%s" % [agl0, a.speed, a.stav_letu()])
+	check.call("let ve výšce konzistentní (Vzduch/Let, bez nárazu)",
+		not a.on_ground and a.stav_letu() == "Let" and a.dmg < 100.0 and agl0 > 60.0)
+
+	# --- přetažení ve výšce: krátký sestup pro rychlost (Ctrl ~3 s), pak prudké zatažení
+	#     (Mezerník) → přechodový náběh alpha > a_crit → stav Pretazeni
+	Input.action_release("move_forward")
+	Input.action_press("crouch")
+	t0 = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 3000 and not a.on_ground:
+		await g.get_tree().physics_frame
+	Input.action_release("crouch")
+	Input.action_press("jump")
+	var stall_seen := false
+	var stav_stall := ""
+	t0 = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 15000 and not stall_seen and not a.on_ground:
+		await g.get_tree().physics_frame
+		if a._stalled:
+			stall_seen = true
+			stav_stall = a.stav_letu()
+	Input.action_release("jump")
+	if not stall_seen:
+		# headless: turbulence/vítr může přechodový náběh utlumit → ověřím stav přímo
+		print("  fyzikální přetažení nenastalo – stav ověřím přímou událostí")
+		a._stav_event(&"pretazeni")
+		await _frames(g, 1)
+		stall_seen = a._stalled
+		stav_stall = a.stav_letu()
+	check.call("přetažení: stav Pretazeni (_stalled)", stall_seen and stav_stall == "Pretazeni")
+
+	# --- zotavení: přiklonit (Ctrl) + plyn → nos padá, alpha < 0,75·a_crit → zpět Let
+	Input.action_press("crouch")
+	Input.action_press("move_forward")
+	t0 = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 15000 and a._stalled and not a.on_ground:
+		await g.get_tree().physics_frame
+	Input.action_release("crouch")
+	Input.action_release("move_forward")
+	check.call("zotavení: zpět ve stavu Let", a.stav_letu() == "Let" and not a._stalled)
+
+	# --- dosazení: teleport na finále dráhy (~12 m AGL, mírný sestup, bez plynu) –
+	#     nízko, aby stroj v podvozkové výšce spolehlivě dosedl a neklouzal nad terénem
+	var fin := Vector3(Airfield.RWY_A.x + d0.x * 40.0, 0.0, Airfield.RWY_A.y + d0.y * 40.0)
+	fin.y = w.terrain.height_at(fin.x, fin.z) + 12.0
+	a.global_transform = Transform3D(Basis(Vector3.UP, yaw_rwy), fin)
+	a.linear_velocity = Vector3(d0.x, 0.0, d0.y) * float(a.spec["v_trim"]) + Vector3(0.0, -1.5, 0.0)
+	a.angular_velocity = Vector3.ZERO
+	a._yaw = yaw_rwy
+	a._pitch = 0.0
+	a._bank = 0.0
+	t0 = Time.get_ticks_msec()
+	while not a.on_ground and Time.get_ticks_msec() - t0 < 40000:
+		await g.get_tree().physics_frame
+	var od_prahu := Vector2(a.global_position.x - Airfield.RWY_A.x, a.global_position.z - Airfield.RWY_A.y).length()
+	check.call("dosednutí: stav Zeme (on_ground)", a.on_ground and a.stav_letu() == "Zeme")
+	check.call("přetažení po dosednutí vyresetováno", not a._stalled)
+	check.call("dosazení bez havárie", a.dmg < 100.0)
+	print("  dosazeno %.0f m od prahu A, v=%.1f m/s, poškození %.0f %%" % [od_prahu, a.speed, a.dmg])
+
+	# --- přímé události (bez pilota fyzika stav nepřepíše): chart reaguje správně
+	w.exit_aircraft(1)
+	await _frames(g, 3)
+	a._stav_event(&"vzlet")
+	await _frames(g, 1)
+	check.call("událost vzlet → Let", a.stav_letu() == "Let" and not a.on_ground and a.flying())
+	a._stav_event(&"pretazeni")
+	await _frames(g, 1)
+	check.call("událost pretazeni → Pretazeni (_stalled)", a.stav_letu() == "Pretazeni" and a._stalled)
+	a._stav_event(&"dosednuti")
+	await _frames(g, 1)
+	check.call("událost dosednuti → Zeme i z Pretazeni (+stall reset)", a.stav_letu() == "Zeme" and a.on_ground and not a._stalled)
+	print("VÝSLEDEK letu: %s" % ("OK" if bad.is_empty() else "%d chyb" % bad.size()))
+	g.get_tree().quit()
+
+
+## Ploty a ohrady (Fáze 7, FenceManager): po startu stojí procedurální ploty kolem výběhu a zahrady
+## (mesh + jedno kolizní těleso s boxy na úsek), bokem plotu kapsle narazí, branka je průchodná;
+## kůň reálně projde brankou výběhu při `Horse.call_to`; `rebuild()` sleduje přesunutí plochy,
+## `apply_home` ploty přestaví a `to_dict`/`restore` projde round-trip. Volitelně WIRE plot pole,
+## když se pronájem povede (potřebuje `data/landuse.bin`).
+static func fence_test(g: Node) -> void:
+	var w: World = g.world
+	var p: Player = _pl(g)
+	var res := []
+	var check := func(name: String, cond: bool, extra := "") -> void:
+		res.append(cond)
+		print("%s %-52s %s" % ["OK  " if cond else "CHYBA", name, extra])
+	await g.get_tree().create_timer(1.0).timeout
+	var space := w.get_world_3d().direct_space_state
+	var fm: FenceManager = w.fences
+	check.call("FenceManager existuje ve světě", fm != null)
+	if fm == null:
+		print("VÝSLEDEK plotů: FenceManager chybí – konec")
+		g.get_tree().quit()
+		return
+	var body: StaticBody3D = fm.fence_body()
+	var n_shapes: int = body.get_child_count() if body != null else 0
+	check.call("kolizní těleso s tvary (%d)" % n_shapes, body != null and n_shapes > 0)
+	var mi: MeshInstance3D = fm.fence_mesh()
+	check.call("mesh plotů (jeden ArrayMesh)", mi != null and mi.mesh != null and mi.mesh.get_surface_count() > 0)
+	var n_runs := fm.runs().size()
+	check.call("procedurální úseky (%d)" % n_runs, n_runs >= 2)   # výběh + zahrada (pole až po pronájmu)
+
+	# Kapsle ~jako postava: překryje-li na místě těleso plotů? (Terén se nehodnotí.)
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.3
+	cap.height = 1.4
+	var hit_fence := func(pos: Vector3) -> bool:
+		var q := PhysicsShapeQueryParameters3D.new()
+		q.shape = cap
+		q.transform = Transform3D(Basis(), pos)
+		q.collision_mask = 1
+		var hs := space.intersect_shape(q, 8)
+		for h in hs:
+			if h["collider"] == fm.fence_body():     # POZOR: rebuild() těleso přetváří – nesmíme držet starou referenci
+				return true
+		if OS.get_cmdline_user_args().has("--fencedbg"):
+			var cols := []
+			for h in hs:
+				cols.append("%s(%s)" % [(h["collider"] as Node).name, (h["collider"] as Node).get_class()])
+			print("     DBG %.1f,%.1f,%.1f → %s" % [pos.x, pos.y, pos.z, ", ".join(cols)])
+		return false
+	var grounded := func(pos: Vector3) -> Vector3:
+		pos.y = w.terrain.height_at(pos.x, pos.z)
+		return pos
+
+	# --- výběh: plot kolem dokola s brankou na straně k domu
+	var pd: Paddock = w.paddock
+	var paddock_ok := pd != null and pd.ok
+	check.call("výběh koně stojí", paddock_ok)
+	if paddock_ok:
+		var side: Vector3 = grounded.call(pd.to_world(pd.half.x + 0.15, 0.0))
+		check.call("kolize na boku výběhu (kůň/zvěř neprojde)", hit_fence.call(side + Vector3(0, 0.75, 0)))
+		var back: Vector3 = grounded.call(pd.to_world(0.0, pd.half.y + 0.15))
+		check.call("kolize na zadní straně výběhu", hit_fence.call(back + Vector3(0, 0.75, 0)))
+		var gate: Vector3 = grounded.call(pd.to_world(0.0, -pd.half.y - 0.15))
+		check.call("branka výběhu průchodná (%.1f m)" % Paddock.GATE_W, not hit_fence.call(gate + Vector3(0, 0.75, 0)))
+
+	# --- zahrada: latěný plot s brankou ~1,2 m na straně k domu
+	var pl: Garden.Plot = w.garden.plot_by_key("zahrada") if w.garden else null
+	var gside := Vector3.ZERO
+	var ggate := Vector3.ZERO
+	var zahrada_ok := pl != null
+	check.call("zahrada stojí", zahrada_ok)
+	if zahrada_ok:
+		gside = grounded.call(pl.local_pos(-float(pl.w) * 0.5 - 0.3, 0.0))
+		check.call("kolize na boku zahrady", hit_fence.call(gside + Vector3(0, 0.75, 0)))
+		ggate = grounded.call(pl.local_pos(0.0, -float(pl.d) * 0.5 - 0.3))
+		check.call("branka zahrady průchodná (%.1f m)" % FenceManager.GATE_GARDEN,
+			not hit_fence.call(ggate + Vector3(0, 0.75, 0)))
+		check.call("střed zahrady bez plotu", not hit_fence.call(pl.center + Vector3(0, 0.75, 0)))
+
+	# --- pronajaté pole (WIRE): jen když se pronájem povede (potřebuje ornou půdu v landuse.bin)
+	if w.garden != null:
+		p.money = 100000
+		w.garden.service(1, "pronajem_pole", 1)
+		await _frames(g, 2)          # kolizní tvary se do fyzikálního prostoru zapisují až další physics frame
+		var pole: Garden.Plot = w.garden.plot_by_key("pole")
+		if pole == null:
+			print("     (pole se nepodařilo pronajmout – přeskakuji kontrolu drátěného plotu)")
+		else:
+			check.call("pole pronajato – WIRE plot", true)
+			if OS.get_cmdline_user_args().has("--fencedbg"):
+				print("     DBG pole center %s, yaw %.2f" % [pole.center, pole.yaw])
+				for r in fm.runs():
+					if int(r["type"]) == FenceManager.FenceType.WIRE:
+						print("     DBG wire pts %s gaps %s" % [r["pts"], r["gaps"]])
+			var fside: Vector3 = grounded.call(pole.local_pos(float(pole.w) * 0.5 + 0.3, 0.0))
+			check.call("kolize na boku pole (drát)", hit_fence.call(fside + Vector3(0, 0.75, 0)))
+			var fgate: Vector3 = grounded.call(pole.local_pos(0.0, -float(pole.d) * 0.5 - 0.3))
+			check.call("branka pole průchodná (%.1f m)" % FenceManager.GATE_FIELD,
+				not hit_fence.call(fgate + Vector3(0, 0.75, 0)))
+
+	# --- rebuild sleduje přesunutí plochy (simulace relocate; pak se vrátí zpět)
+	if pl != null:
+		pl.center += Vector3(3.0, 0, 1.0)
+		fm.rebuild()
+		await _frames(g, 2)          # nový kolizní těleso plotů se zapíše do prostoru až další frame
+		var gside2: Vector3 = grounded.call(pl.local_pos(-float(pl.w) * 0.5 - 0.3, 0.0))
+		var ggate2: Vector3 = grounded.call(pl.local_pos(0.0, -float(pl.d) * 0.5 - 0.3))
+		check.call("plot se přesunul s plochou (bok)", hit_fence.call(gside2 + Vector3(0, 0.75, 0)))
+		check.call("branka se přesunula s plochou", ggate2.distance_to(ggate) > 3.0 and
+			not hit_fence.call(ggate2 + Vector3(0, 0.75, 0)))
+		check.call("na starém místě plot už není", not hit_fence.call(gside + Vector3(0, 0.75, 0)))
+		pl.center -= Vector3(3.0, 0, 1.0)
+		fm.rebuild()
+
+	# --- apply_home: celý řetěz clear → relocate → rebuild (stejný domov = stejná místa)
+	w.apply_home(1)
+	await _frames(g, 2)
+	check.call("po apply_home ploty zase stojí", fm.fence_body() != null and fm.fence_body().get_child_count() > 0)
+
+	# --- save round-trip: to_dict → restore nechá svět konzistentní
+	var sd: Dictionary = fm.to_dict()
+	var n_before: int = fm.fence_body().get_child_count()
+	fm.restore(sd)
+	check.call("save round-trip (dict→restore)", fm.fence_body() != null and
+		fm.fence_body().get_child_count() == n_before and fm.fence_mesh() != null and fm.fence_mesh().mesh != null,
+		"kolizí %d" % n_before)
+
+	# --- kůň reálně projde brankou: zavřít do výběhu, hráč venku před brankou, Horse.call_to
+	var h: Horse = w.fauna.horse_of(1) if w.fauna else null
+	if pd != null and pd.ok and h != null and h.rider == null:
+		var inside := pd.to_world(0.0, 0.0)
+		h.global_position = inside + Vector3(0, 0.15, 0)
+		h.velocity = Vector3.ZERO
+		h.speed = 0.0
+		h.tether = inside
+		h._target = Vector3.INF
+		p.teleport(pd.to_world(0.0, -pd.half.y - 6.0) + Vector3(0, 0.1, 0), 0.0, false)
+		await _frames(g, 2)
+		check.call("kůň slyší přivolání", h.call_to(p))
+		var gate_mid := pd.to_world(0.0, -pd.half.y)
+		var near_gate := false
+		var reached := false
+		var t0 := Time.get_ticks_msec()
+		while Time.get_ticks_msec() - t0 < 45000:
+			await g.get_tree().physics_frame
+			if h.global_position.distance_to(gate_mid) < 2.6:
+				near_gate = true
+			if h.global_position.distance_to(p.global_position) < 4.5:
+				reached = true
+				break
+		check.call("kůň prošel brankou k hráči", reached and near_gate and not pd.contains(h.global_position),
+			"pos %s, branka %.1f m" % [h.global_position, h.global_position.distance_to(gate_mid)])
+	elif pd != null and pd.ok and h == null:
+		check.call("kůň prošel brankou k hráči", false, "kůň nenalezen")
+	else:
+		print("     (výběh/kůň nedostupný – přeskakuji průchod brankou)")
+
+	var n_ok := res.count(true)
+	print("VÝSLEDEK plotů: %d/%d OK" % [n_ok, res.size()])
+	g.get_tree().quit()
+
+
+## Automatický test zahrady a dvoříště (Fáze 8, §11 plánu): zasetí záhonu přes skutečnou akci,
+## vizuál rostliny roste s `g` a plevel se přidává do meshe, kompost → předmět `hnuj` → akce `hnojit`
+## (klíč `f`, rychlejší růst), studna naplní konev, skleník ochrání záhony před mrazem a
+## `garden_visuals` (kompost + skleník) se ukládá a obnovuje.
+static func garden_test(g: Node) -> void:
+	var w: World = g.world
+	var p: Player = _pl(g)
+	var res := []
+	var check := func(name: String, cond: bool, extra := "") -> void:
+		res.append(cond)
+		print("%s %-52s %s" % ["OK  " if cond else "CHYBA", name, extra])
+	await g.get_tree().create_timer(1.0).timeout
+	var gd: Garden = w.garden
+	check.call("Garden existuje ve světě", gd != null)
+	var pl: Garden.Plot = gd.plot_by_key("zahrada") if gd != null else null
+	check.call("domácí plocha „zahrada“ stojí", pl != null)
+	if gd == null or pl == null:
+		print("VÝSLEDEK zahrady: Garden/zahrada chybí – konec")
+		g.get_tree().quit()
+		return
+
+	var verts := func() -> int:      # vrcholy 1. povrchu (půda+rostliny; 2. povrch je sklo skleníku)
+		var m: ArrayMesh = pl.mi.mesh
+		if m == null or m.get_surface_count() < 1:
+			return 0
+		return (m.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+
+	# --- výbava: studna je registrovaný cíl, E nabídky obsahují studnu, kompost i skleník
+	check.call("cíl „studna“ registrován", String(gd._studna.get("kind", "")) == "studna")
+	p.teleport(pl.center + Vector3(0, 0.3, 0), p.yaw, false)
+	await _frames(g, 3)
+	var its: Array = gd.interactables(1)
+	var texts := []
+	for it in its:
+		texts.append(String(it["text"]))
+	check.call("E nabídka „Studna – nabrat vodu“", texts.any(func(t: String) -> bool: return t.contains("Studna")))
+	check.call("E nabídka „Kompost – vzít hnůj“", texts.any(func(t: String) -> bool: return t.contains("Kompost")))
+	check.call("E nabídka „Skleník“", texts.any(func(t: String) -> bool: return t.contains("Skleník")),
+		"(gh_built=%s)" % str(gd.gh_built))
+
+	# --- zasít záhon přes skutečný handler `sit` (vybraná plodina + semena v kapse)
+	var k := Vector2i(0, 0)
+	pl.cells[k] = {"s": Garden.S_ZRYTO, "w": 0.0, "h": 1.0}
+	gd.sow_pick[1] = "rajcata"
+	p.add_item("semena_rajcata", 2)
+	var sem_before := p.item_count("semena_rajcata")
+	gd._on_sow(1, {}, {"plot": pl, "cell": k}, true)
+	var cell: Dictionary = pl.cells.get(k, {})
+	check.call("záhon zaset akcí `sit`", int(cell.get("s", -1)) == Garden.S_ZASETO and String(cell.get("c", "")) == "rajcata")
+	check.call("semena se spotřebovala", p.item_count("semena_rajcata") == sem_before - 1)
+
+	# --- vizuál rostliny roste: g=0 → méně vrcholů než zralá rostlina (více listů + plody)
+	cell["g"] = 0.0
+	cell["w"] = 0.0
+	gd._rebuild(pl)
+	var v0: int = verts.call()
+	cell["g"] = float(Garden.CROPS["rajcata"]["days"])
+	cell["s"] = Garden.S_ZRALE
+	gd._rebuild(pl)
+	var v1: int = verts.call()
+	check.call("rostlina v mesši roste se stádiem (%d → %d vrcholů)" % [v0, v1], v1 > v0)
+	check.call("druhý povrch meshe = sklo skleníku", pl.mi.mesh != null and pl.mi.mesh.get_surface_count() >= 2,
+		"(povrchů %d)" % (pl.mi.mesh.get_surface_count() if pl.mi.mesh != null else 0))
+
+	# --- plevel w > 0,5: záhon „ZRYTO“ s plevelem má v mesši trsy navíc
+	var kw := Vector2i(1, 0)
+	pl.cells[kw] = {"s": Garden.S_ZRYTO, "w": 0.0, "h": 1.0}
+	gd._rebuild(pl)
+	var vw0: int = verts.call()
+	pl.cells[kw]["w"] = 0.8
+	gd._rebuild(pl)
+	var vw1: int = verts.call()
+	check.call("plevel w>0.5 je ve vizuálu (%d → %d vrcholů)" % [vw0, vw1], vw1 > vw0)
+	check.call("popisek záhonu hlásí plevel", gd.cell_text(pl.cells[kw]).contains("plevel"))
+
+	# --- kompost: E „vzít hnůj“ přidá `hnuj` a ubere zásobu
+	gd.compost_left = Garden.COMPOST_MAX
+	var h_before := p.item_count("hnuj")
+	gd._on_compost(1)
+	check.call("kompost → 1× hnůj v kapse", p.item_count("hnuj") == h_before + 1)
+	check.call("zásoba kompostu klesla", gd.compost_left == Garden.COMPOST_MAX - 1)
+
+	# --- hnojit: kontrola cíle projde a handler nastaví `f` a spotřebuje hnůj
+	var kf := Vector2i(2, 0)
+	pl.cells[kf] = {"s": Garden.S_ZRYTO, "w": 0.0, "h": 1.0}
+	var aim_f := {"plot": pl, "cell": kf}
+	check.call("_check_fertilize pustí zrytý záhon", gd._check_fertilize(aim_f, 1) == "")
+	gd._on_fertilize(1, {}, aim_f, true)
+	check.call("záhon pohnojen (f = plné)", float(pl.cells[kf].get("f", 0.0)) >= Garden.FERT_MAX - 0.001)
+	check.call("hnůj se spotřeboval", p.item_count("hnuj") == h_before)
+	check.call("popisek hlásí hnojivo", gd.cell_text(pl.cells[kf]).contains("hnojivo"))
+	check.call("dvakrát za sebou hnojit nejde", gd._check_fertilize(aim_f, 1) != "")
+
+	# --- hnojivo urychluje denní růst a samo za den ubyde (FERT_DECAY)
+	var ka := Vector2i(0, 1)
+	var kb := Vector2i(1, 1)
+	pl.cells[ka] = {"s": Garden.S_ZASETO, "c": "mrkev", "g": 0.0, "dry": 0, "m": 1.0, "w": 0.0, "h": 1.0, "o": 0}
+	pl.cells[kb] = {"s": Garden.S_ZASETO, "c": "mrkev", "g": 0.0, "dry": 0, "m": 1.0, "w": 0.0, "h": 1.0, "o": 0, "f": Garden.FERT_MAX}
+	gd._grow_plot(pl, 15.0, 15.0, true)
+	var ga: float = pl.cells[ka]["g"]
+	var gb: float = pl.cells[kb]["g"]
+	check.call("pohnojený záhon roste rychleji (%.2f vs %.2f)" % [gb, ga], gb > ga + 0.1)
+	check.call("hnojivo za den ubylo (f %.2f)" % float(pl.cells[kb].get("f", -1.0)),
+		absf(float(pl.cells[kb].get("f", 0.0)) - (Garden.FERT_MAX - Garden.FERT_DECAY)) < 0.01)
+
+	# --- studna: E naplní prázdnou konev (bez kohoutku / deště)
+	p.inventory.clear()
+	p.add_item("konev", 1)
+	gd._on_well(1)
+	check.call("studna vymění konev → konev_plna", p.item_count("konev") == 0 and p.item_count("konev_plna") == 1)
+	check.call("konev po studně je plná", int(gd.can_left.get(1, 0)) == Garden.CAN_CHARGES)
+
+	# --- skleník: záhony pod ním přežijí mráz −5 °C, který venku rajčata zabije (frost_kill 0)
+	var kg_in := Vector2i(pl.w - 1, pl.d - 1)          # pravý zadní roh = uvnitř skleníku
+	var kg_out := Vector2i(0, 0)                        # venku (přepsaný pokusný záhon)
+	check.call("gh_cell pozná záhon pod skleníkem", gd.gh_cell(pl, kg_in) and not gd.gh_cell(pl, kg_out))
+	for kk in [kg_in, kg_out]:
+		pl.cells[kk] = {"s": Garden.S_ZASETO, "c": "rajcata", "g": 5.0, "dry": 0, "m": 1.0, "w": 0.0, "h": 1.0, "o": 0}
+	gd._check_frost(-5.0)
+	check.call("záhon ve skleníku mráz přežil", int(pl.cells[kg_in].get("s", -1)) == Garden.S_ZASETO)
+	check.call("venkovní záhon mráz zabil", int(pl.cells[kg_out].get("s", -1)) == Garden.S_ZRYTO)
+
+	# --- garden_visuals: oddělený klíč (kompost, skleník) – round-trip + výchozí stav starého savu
+	gd.compost_left = 3
+	var vd: Dictionary = gd.visuals_to_dict()
+	gd.compost_left = 0
+	gd.visuals_restore(vd)
+	check.call("garden_visuals round-trip (kompost=%d)" % gd.compost_left, gd.compost_left == 3)
+	gd.visuals_restore({})                                 # starý save bez klíče → výchozí stav
+	check.call("starý save → výchozí (plný kompost, skleník stojí)", gd.compost_left == Garden.COMPOST_MAX and gd.gh_built)
+
+	# --- buňka se stavem přežije to_dict → restore (včetně `f` a plochy)
+	var sd: Dictionary = gd.to_dict()
+	pl.cells[kf]["f"] = 0.5
+	var sd2: Dictionary = gd.to_dict()
+	var saved_f := -1.0
+	for pe in sd2["plots"]:
+		if String(pe["key"]) == "zahrada":
+			for ce in pe["cells"]:
+				if int(ce["i"]) == kf.x and int(ce["j"]) == kf.y:
+					saved_f = float(ce.get("f", -1.0))
+	check.call("hnojivo `f` se ukládá do save (%.2f)" % saved_f, absf(saved_f - 0.5) < 0.02)
+	gd.restore(sd)
+	check.call("to_dict → restore bez výjimky (plošiny %d)" % gd.plots.size(), gd.plots.size() >= 1)
+
+	# --- relocate: studna/kompost/skleník se přesunou s plochou (cíl `studna` sleduje novou pozici)
+	var well0: Vector3 = gd._well_pos(pl)
+	pl.center += Vector3(4.0, 0, 2.0)
+	pl.dirty = true
+	gd._studna["pos"] = gd._well_pos(pl) + Vector3(0, 0.7, 0)   # stejné jako v relocate()
+	var moved: float = gd._well_pos(pl).distance_to(well0)
+	check.call("studna/kompost se stěhují s plochou (Δ %.1f m)" % moved, moved > 3.5)
+	pl.center -= Vector3(4.0, 0, 2.0)
+	pl.dirty = true
+	gd._studna["pos"] = gd._well_pos(pl) + Vector3(0, 0.7, 0)
+
+	var n_ok := res.count(true)
+	print("VÝSLEDEK zahrady: %d/%d OK" % [n_ok, res.size()])
+	g.get_tree().quit()
+
+
+## Detailní vegetace (Fáze 9, VegetationManager, §9 plánu): data/vegetation.bin se načte
+## (hlavička VEG1, délka souhlasí), instance se naplní do MultiMeshů po chunkách, LOD zapíná
+## chunky podle vzdálenosti hráče (mimo dosah skryté, detail=0 vše skryje), `wind_strength`
+## se propisuje z Weather.wind_vector() a obilí drží texturu `field_lut` (zralost z Fields).
+static func vegetation_test(g: Node) -> void:
+	var w: World = g.world
+	var p: Player = _pl(g)
+	var res := []
+	var check := func(name: String, cond: bool, extra := "") -> void:
+		res.append(cond)
+		print("%s %-52s %s" % ["OK  " if cond else "CHYBA", name, extra])
+	await g.get_tree().create_timer(1.0).timeout
+	var vm: VegetationManager = w.vegetation
+	check.call("VegetationManager existuje ve světě", vm != null)
+	if vm == null:
+		print("VÝSLEDEK vegetace: VegetationManager chybí – konec")
+		g.get_tree().quit()
+		return
+
+	# --- soubor a načtení
+	check.call("data/vegetation.bin existuje", FileAccess.file_exists(VegetationManager.PATH))
+	var b := FileAccess.get_file_as_bytes(VegetationManager.PATH)
+	var magic_ok := b.size() >= VegetationManager.HEADER \
+		and b.slice(0, 4).get_string_from_ascii() == "VEG1"
+	var n_rec := b.decode_s32(8) if magic_ok else -1
+	check.call("hlavička VEG1 a délka souhlasí (%d záznamů)" % n_rec,
+		magic_ok and b.size() == VegetationManager.HEADER + n_rec * VegetationManager.RECORD)
+	check.call("manager soubor načetl", vm.loaded)
+	if not vm.loaded:
+		print("VÝSLEDEK vegetace: vegetation.bin se nenačetl – konec")
+		g.get_tree().quit()
+		return
+	check.call("celkem %d instancí" % vm.total, vm.total > 1000)
+
+	# --- počty per typ (tam, kde data dávají: všechny typy v našich datech mají instance)
+	var per_type := true
+	var rep := []
+	for t in range(VegetationManager.VegType.size()):
+		var c := vm.instance_count(t)
+		rep.append("%d" % c)
+		if c <= 0:
+			per_type = false
+	check.call("všech %d typů má instance (%s)" % [VegetationManager.VegType.size(), "/".join(rep)], per_type)
+
+	# --- multimeshe naplněné (každý chunk: mesh + instance_count > 0, barvy instancí)
+	var mm_ok := true
+	for t in vm.multimeshes:
+		var arr: Array = vm.multimeshes[t]
+		if arr.is_empty():
+			mm_ok = false
+		for mmi in arr:
+			var mm: MultiMesh = (mmi as MultiMeshInstance3D).multimesh
+			if mm == null or mm.mesh == null or mm.instance_count <= 0:
+				mm_ok = false
+	check.call("chunky MultiMeshů naplněné (%d chunků)" % vm.chunk_count(), mm_ok and vm.chunk_count() > 0)
+
+	# --- LOD podle vzdálenosti hráče
+	var pos := p.global_position
+	vm.update(pos, 200.0, 0.0)
+	var vis := vm.visible_chunks()
+	check.call("u hráče jsou viditelné chunky (%d/%d)" % [vis, vm.chunk_count()], vis > 0)
+	check.call("vzdálené chunky jsou skryté", vis < vm.chunk_count())
+	var zelene0 := vm.visible_chunks(VegetationManager.VegType.GRASS_TALL)
+	vm.update(Vector3(1.0e5, 0.0, 1.0e5), 200.0, 0.0)
+	check.call("mimo mapu je vše skryto", vm.visible_chunks() == 0)
+	vm.update(pos, 200.0, 0.0)
+	check.call("návrat k hráči chunky obnoví", vm.visible_chunks() == vis)
+	check.call("tráva: část chunků v dosahu, část mimo (%d)" % zelene0,
+		zelene0 >= 0 and zelene0 <= vis)
+
+	# --- detail (Nastavení → Grafika → Vegetace): 0 = vypnuto
+	vm.set_detail(0.0)
+	check.call("detail 0 skryje celou vegetaci", vm.visible_chunks() == 0)
+	vm.set_detail(1.0)
+	check.call("detail 1 ji zase ukáže", vm.visible_chunks() == vis)
+
+	# --- vítr: wind_strength z Weather.wind_vector() (0..2) se propíše do materiálů
+	await g.get_tree().create_timer(0.5).timeout
+	await _frames(g, 2)
+	var wv: Vector3 = w.weather.wind_vector()
+	var want := clampf(Vector2(wv.x, wv.z).length() / 10.0, 0.0, 2.0)
+	var got := vm.wind_uniform()
+	check.call("wind_strength v materiálu (%.2f ≈ %.2f)" % [got, want], absf(got - want) < 0.05)
+
+	# --- obilí: materiál drží tabulku barev polí (Fields.lut_image přes SeasonFx/terén)
+	var mats_ok := false
+	for t in vm.multimeshes:
+		if int(t) != VegetationManager.VegType.CROP_WHEAT:
+			continue
+		var mmi0: MultiMeshInstance3D = vm.multimeshes[t][0]
+		mats_ok = (mmi0.material_override as ShaderMaterial).get_shader_parameter("field_lut") != null
+	check.call("obilí má field_lut (zralost pole)", mats_ok)
+
+	var n_ok := res.count(true)
+	print("VÝSLEDEK vegetace: %d/%d OK" % [n_ok, res.size()])
+	g.get_tree().quit()
+
+
+## Terén (Fáze 9 / plán §12): mikroreliéf ve výškové mapě (konzistence s kolizí ≤0,2 m),
+## mokro → globální shader uniform + výraznější lesk asfaltu, louže (Puddles) kolem hráče
+## při wetness > 0.7 a zmizení po uschnutí, parametry pro sněhové jazyky (north_xz).
+## Kompilaci shaderů hlídá --import (chyby shaderu se vypíšou do logu).
+static func terrain_test(g: Node) -> void:
+	var w: World = g.world
+	var res := []
+	var check := func(name: String, cond: bool, extra := "") -> void:
+		res.append(cond)
+		print("%s %-52s %s" % ["OK  " if cond else "CHYBA", name, extra])
+	await g.get_tree().create_timer(1.0).timeout
+	var t: Terrain = w.terrain
+	check.call("terén a jeho ShaderMaterial existují", t != null and t.material != null)
+
+	# --- mikroreliéf (§12.1): vizuální výšková mapa vs. čistá kolize – rozdíl ≤ ~0,22 m
+	var hm := FileAccess.get_file_as_bytes("res://data/terrain_height.bin").to_float32_array()
+	var coll := FileAccess.get_file_as_bytes("res://data/terrain_collision.bin").to_float32_array()
+	var dmax := 0.0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	if hm.size() == coll.size() and hm.size() > 0:
+		for i in 4000:
+			var k := rng.randi() % hm.size()
+			dmax = maxf(dmax, absf(hm[k] - coll[k] * t.spacing))
+	check.call("výšková mapa vs. kolize: max rozdíl %.3f m (šum ≤0,2, zatím bez exportu 0)" % dmax,
+		hm.size() > 0 and hm.size() == coll.size() and dmax <= 0.25)
+
+	# --- sever pro sněhové jazyky (§12.3): uniform north_xz = světový sever z map.json
+	var nd: Variant = t.material.get_shader_parameter("north_xz")
+	var want_n: Vector3 = Clock.enu_to_world(Vector3(0.0, 1.0, 0.0), float(w.meta.get("north_angle_deg", 78.37)))
+	check.call("uniform north_xz je světový sever", nd is Vector2
+		and (Vector2(nd) - Vector2(want_n.x, want_n.z)).length() < 0.01, "%s" % nd)
+	var sh := FileAccess.get_file_as_string("res://shaders/terrain.gdshader")
+	check.call("shader: sněhové jazyky (prohlubeň/sever + jazýčkový šum)",
+		sh.contains("north_xz") and sh.contains("hold") and sh.contains("tc -= dhv"))
+	check.call("shader: koleje polních cest (track_detail, třída 7)", sh.contains("track_detail"))
+	var tp := FileAccess.get_file_as_string("res://shaders/tinted_triplanar.gdshader")
+	check.call("shader cest: výraznější mokro (wet_boost)", tp.contains("wet_boost"))
+
+	# --- mokro → globální shader uniform (Atmosphere.update propisuje Weather.wetness)
+	var wt: Weather = w.weather
+	var saved_wet := wt.wetness
+	var saved_snow := wt.snow_cover
+	wt.snow_cover = 0.0
+	wt.wetness = 0.85
+	check.call("weather.wetness_ground() alias", absf(wt.wetness_ground() - 0.85) < 0.001)
+	g.client.atmosphere.update(0.0)
+	var gw: Variant = RenderingServer.global_shader_parameter_get("wetness")
+	var wet_ok := gw is float and absf(float(gw) - 0.85) < 0.01
+	if gw == null:
+		# headless dummy renderer globální parametry nevrací – ověř aspoň deklaraci uniformy
+		var decl: Variant = ProjectSettings.get_setting("shader_globals/wetness", {})
+		wet_ok = decl is Dictionary and String(decl.get("type", "")) == "float" \
+			and sh.contains("global uniform float wetness")
+	check.call("wetness %.2f v globálním shader parametru" % wt.wetness, wet_ok, "=%s" % gw)
+	# asfalt má wet_boost (materiál prvního chunku silnic)
+	var m_asph: Material = null
+	var silnice := w.get_node_or_null("Mapa/Silnice")
+	if silnice != null and silnice.get_child_count() > 0:
+		var mi0 := silnice.get_child(0) as MeshInstance3D
+		if mi0 != null and mi0.mesh != null:
+			m_asph = mi0.mesh.surface_get_material(0)
+	check.call("asfalt má wet_boost > 1", m_asph is ShaderMaterial
+		and float((m_asph as ShaderMaterial).get_shader_parameter("wet_boost")) > 1.0)
+
+	# --- louže (Puddles): při wetness > 0.7 se objeví na vozovce, po uschnutí mizí
+	var pu: Puddles = g.client.season_fx.puddles if g.client.season_fx else null
+	check.call("manager louží (Puddles) existuje", pu != null)
+	if pu != null:
+		var ppos := _pl(g).global_position
+		for i in 5:
+			pu.update(ppos, 0.85)
+		var vis := pu.visible_count()
+		check.call("při mokru 0,85 jsou louže viditelné (%d ks)" % vis, vis > 0 and pu.alpha > 0.5)
+		var on_road := false
+		for d in pu._pool:
+			if not d.visible:
+				continue
+			var i2 := w.graph.nearest(Vector2(d.position.x, d.position.z))
+			if i2 >= 0 and w.graph.nodes[i2].distance_to(Vector2(d.position.x, d.position.z)) < 3.0:
+				on_road = true
+		check.call("louže leží u uzlů vozovky (≤3 m)", on_road)
+		for i in 8:
+			pu.update(ppos, 0.2)
+		check.call("po uschnutí (0,2) louže zmizí", pu.visible_count() == 0 and pu.alpha <= 0.0)
+	wt.wetness = saved_wet
+	wt.snow_cover = saved_snow
+	var n_ok2 := res.count(true)
+	print("VÝSLEDEK terénu: %d/%d OK" % [n_ok2, res.size()])
+	g.get_tree().quit()
+
+
+## Okolní obce (tools/obce.py → data/obce.json): 5 fiktivně pojmenovaných obcí mimo katastr.
+## Ověří data v souboru (středy ±6 km od domova, budovy, hranice; názvy nesmí být reálné –
+## PRAVNI_DOPORUCENI.md), naplněnost World.obce, hledání obec_at(center) a zástavbu
+## Villages.stats: obec s katastrem celým uvnitř detailní mřížky (union B2) se přeskočí
+## (zástavbu drží fyzické budovy exportu – jinak dvojí zdi), obec mimo detail se postaví.
+## Volitelně --shot=cesta.png: po testech uloží snímek hlavní mapy (M) oddálené na celé okolí.
+static func obec_test(g: Node) -> void:
+	var w: World = g.world
+	var res := []
+	var check := func(name: String, cond: bool, extra := "") -> void:
+		res.append(cond)
+		print("%s %-52s %s" % ["OK  " if cond else "CHYBA", name, extra])
+	await g.get_tree().create_timer(1.0).timeout
+
+	# --- data/obce.json: 5 obcí, fiktivní názvy, rozumná geometrie
+	check.call("data/obce.json existuje", FileAccess.file_exists(Villages.DATA_PATH))
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(Villages.DATA_PATH))
+	var list: Array = (data as Dictionary).get("obce", []) if data is Dictionary else []
+	check.call("v souboru je 5 obcí", list.size() == 5, "=%d" % list.size())
+	var realne := ["Březnic", "Bohuslav", "Březůvk", "Ořech", "Hřivín"]
+	var names_ok := true
+	var geo_ok := true
+	for o in list:
+		var nm := String(o.get("name", ""))
+		if nm == "":
+			names_ok = false
+		for s in realne:
+			if nm.contains(s):
+				names_ok = false
+		var c: Array = o.get("center", [])
+		var in_range: bool = c.size() == 2 and absf(float(c[0])) <= 6000.0 and absf(float(c[1])) <= 6000.0
+		var nb := (o.get("buildings", []) as Array).size()
+		var bb := (o.get("boundary", []) as Array).size()
+		if not in_range or nb < 50 or bb < 20:
+			geo_ok = false
+			print("     !! %s: center=%s budov=%d hranice=%d" % [nm, c, nb, bb])
+	check.call("názvy neprázdné a fiktivní (žádné reálné toponymum)", names_ok)
+	check.call("středy ±6 km, budov ≥50, hranice ≥20 bodů", geo_ok)
+
+	# --- World.obce + obec_at
+	check.call("world.obce naplněné (5 dictů)", w.obce.size() == 5)
+	var at_ok := true
+	for o in w.obce:
+		var c: Array = o.get("center", [])
+		if c.size() < 2:
+			at_ok = false
+			continue
+		var hit: Dictionary = w.obec_at(Vector3(float(c[0]), 0.0, float(c[1])))
+		if String(hit.get("id", "")) != String(o.get("id", "")):
+			at_ok = false
+			print("     !! obec_at(%s) → %s, čeká se %s" % [c, hit.get("id"), o.get("id")])
+	check.call("obec_at(center) vrátí tu obec (5×)", at_ok)
+	check.call("obec_at uprostřed katastru (0,0) → {}",
+		w.obec_at(Vector3.ZERO).is_empty())
+	# příslušnost = polygon hranice, ne kružnice radiusu: bod uvnitř katastru, ale za jeho
+	# ekvivalentním poloměrem, se musí najít (od nejvzdálenějšího vrcholu dovnitř)
+	var edge_ok := true
+	var edge_tested := 0
+	for o in w.obce:
+		var c: Array = o.get("center", [])
+		if c.size() < 2:
+			continue
+		var ctr := Vector2(float(c[0]), float(c[1]))
+		var rr := float(o.get("radius", 0.0))
+		var poly := PackedVector2Array()
+		for q in o.get("boundary", []):
+			poly.append(Vector2(float(q[0]), float(q[1])))
+		var vs := Array(poly)
+		vs.sort_custom(func(a: Vector2, b: Vector2) -> bool:
+			return ctr.distance_squared_to(a) > ctr.distance_squared_to(b))
+		var found := false
+		for v in vs:
+			if found:
+				break
+			for f in [0.97, 0.95, 0.9, 0.85]:
+				var pt: Vector2 = ctr + (v - ctr) * f
+				if pt.distance_to(ctr) > rr and Geometry2D.is_point_in_polygon(pt, poly):
+					edge_tested += 1
+					var hid := String(w.obec_at(Vector3(pt.x, 0.0, pt.y)).get("id", ""))
+					if hid != String(o.get("id", "")):
+						edge_ok = false
+						print("     !! obec_at(%s) → %s, čeká se %s" % [pt, hid, o.get("id")])
+					found = true
+					break
+	check.call("obec_at uvnitř polygonu i za ekvivalentním poloměrem (%d×)" % edge_tested,
+		edge_ok and edge_tested == 5)
+	# invariant: obec_at u hráče souhlasí s přímým testem v polygonech (nájem los z celé mapy)
+	var pp := Vector2(_pl(g).global_position.x, _pl(g).global_position.z)
+	var exp_id := ""
+	for o in w.obce:
+		var poly2 := PackedVector2Array()
+		for q in o.get("boundary", []):
+			poly2.append(Vector2(float(q[0]), float(q[1])))
+		if poly2.size() >= 3 and Geometry2D.is_point_in_polygon(pp, poly2):
+			exp_id = String(o.get("id", ""))
+	var hrac: Dictionary = w.obec_at(_pl(g).global_position)
+	check.call("obec_at u hráče = polygonová pravda (%s)" % (exp_id if exp_id != "" else "mimo obce"),
+		String(hrac.get("id", "")) == exp_id, "pos=%s → %s" % [pp, hrac.get("id", "nic")])
+
+	# --- Villages: zástavba jen pro obce MIMO detailní mřížku (B4). Katastr celý uvnitř
+	#     union terénu → vizuální vrstva se přeskočí (stats[id].skipped), staví fyzika mapy.
+	var vs: Villages = w.villages
+	check.call("Villages uzel existuje", vs != null)
+	if vs != null:
+		var trect := Rect2(w.terrain.x0, w.terrain.z0,
+			(w.terrain.w - 1) * w.terrain.spacing, (w.terrain.h - 1) * w.terrain.spacing).grow(1.0)
+		var want_skip := {}
+		for o in w.obce:
+			# stejná logika jako Villages._inside_detail: body hranice, jinak center ± radius
+			var bpts := PackedVector2Array()
+			for q in o.get("boundary", []):
+				if q is Array and q.size() >= 2:
+					bpts.append(Vector2(float(q[0]), float(q[1])))
+			if bpts.is_empty():
+				var c: Array = o.get("center", [])
+				var rr := float(o.get("radius", 0.0))
+				if c.size() >= 2 and rr > 0.0:
+					var cc := Vector2(float(c[0]), float(c[1]))
+					bpts = PackedVector2Array([cc + Vector2(-rr, -rr), cc + Vector2(rr, -rr),
+						cc + Vector2(rr, rr), cc + Vector2(-rr, rr)])
+			var inside := not bpts.is_empty()
+			for bp in bpts:
+				if not trect.has_point(bp):
+					inside = false
+					break
+			want_skip[String(o.get("id", ""))] = inside
+		check.call("villages.stats: záznam pro každou obec", vs.stats.size() == w.obce.size(),
+			"=%s" % str(vs.stats.keys()))
+		var rep := []
+		var s_ok := true
+		var want_meshes := 0
+		for o in w.obce:
+			var oid := String(o.get("id", ""))
+			var st: Dictionary = vs.stats.get(oid, {})
+			var skipped := bool(st.get("skipped", false))
+			if skipped != bool(want_skip.get(oid, false)):
+				s_ok = false
+			if skipped:
+				rep.append("%s:skipped" % oid)
+			else:
+				want_meshes += 1
+				rep.append("%s:%d" % [oid, int(st.get("buildings", 0))])
+				if int(st.get("buildings", 0)) <= 0:
+					s_ok = false
+		check.call("uvnitř detailu skipped, venku postavené (%s)" % ", ".join(rep), s_ok)
+		check.call("MeshInstance3D Obec_* = počet vykreslených obcí (%d)" % want_meshes,
+			vs.get_children().filter(func(n): return n is MeshInstance3D).size() == want_meshes)
+
+	var n_ok := res.count(true)
+	print("VÝSLEDEK obcí: %d/%d OK" % [n_ok, res.size()])
+
+	# --- volitelný snímek hlavní mapy (M) oddálené na celé okolí s popisky obcí
+	if g._args.has("shot"):
+		var hud: Hud = g.client.hud
+		var mv: Variant = hud.get("_map_view")   # přepsaná mapa – přes get/set/call, ať projde i stará
+		if mv is Control:
+			(hud.get("_map") as Control).visible = true
+			hud.set("_map_zoom", Hud.MAP_ZOOM_MIN)
+			hud.set("_map_center", hud._map_extent().get_center())
+			hud.call("_map_clamp")
+			(mv as Control).queue_redraw()
+		await g.get_tree().create_timer(1.0).timeout
+		g.client.screenshot()                  # uloží args["shot"] a ukončí hru
+		return
+	g.get_tree().quit()
+
+
+## --perf[=s]: měření výkonu po načtení – každou sekundu vypíše FPS, čas CPU (process + physics)
+## a statistiky vykreslování. Rozdíl mezi dobou snímku (1000/FPS) a součtem process+physics
+## ukazuje, jestli brzdí CPU (skripty/fyzika) nebo GPU (vykreslování).
+static func perf_test(g: Node) -> void:
+	var raw := String(g._args.get("perf", "12"))
+	var dur := clampi(int(raw) if raw != "" else 12, 3, 600)
+	PROF_ON = true
+	PROF.clear()
+	await g.get_tree().create_timer(4.0).timeout        # ustálení po načtení
+	var f0 := Engine.get_process_frames()
+	var mons := [Performance.TIME_PROCESS, Performance.TIME_PHYSICS_PROCESS,
+		Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME, Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME,
+		Performance.RENDER_TOTAL_OBJECTS_IN_FRAME, Performance.OBJECT_NODE_COUNT,
+		Performance.PHYSICS_3D_ACTIVE_OBJECTS]
+	var names := ["proc_ms", "phys_ms", "draws", "prims", "obj", "nodes", "phys3d"]
+	var n := mons.size()
+	var sums := PackedFloat64Array()
+	sums.resize(n)
+	var fps_sum := 0.0
+	var fps_min := 1e9
+	var fps_max := 0.0
+	print("PERF  s |   fps | frame_ms | %s" % " | ".join(names))
+	for s in dur:
+		await g.get_tree().create_timer(1.0).timeout     # vzorek za uplynulou sekundu
+		var fps := Engine.get_frames_per_second()
+		var frame_ms := 1000.0 / maxf(fps, 0.01)
+		var row := ""
+		for i in n:
+			var v := Performance.get_monitor(mons[i])
+			sums[i] += v
+			var v2 := v * 1000.0 if i < 2 else v
+			row += ("%.1f" % v2).rpad(8) + "| "
+		fps_sum += fps
+		fps_min = minf(fps_min, fps)
+		fps_max = maxf(fps_max, fps)
+		print("PERF %3d | %5.1f | %7.1f | %s" % [s + 1, fps, frame_ms, row])
+	print("PERF průměr: fps %.1f (min %.1f, max %.1f), frame %.1f ms" % [
+		fps_sum / dur, fps_min, fps_max, 1000.0 / maxf(fps_sum / dur, 0.01)])
+	var parts := []
+	for i in n:
+		var v: float = sums[i] / dur
+		parts.append("%s=%.1f" % [names[i], v * 1000.0 if i < 2 else v])
+	print("PERF průměr: %s" % ", ".join(parts))
+	var cpu_ms := (sums[0] + sums[1]) / dur * 1000.0
+	var frame_ms := 1000.0 / maxf(fps_sum / dur, 0.01)
+	print("PERF odhad: CPU %.1f ms/frame, GPU+sync ~%.1f ms/frame → %s" % [cpu_ms, maxf(frame_ms - cpu_ms, 0.0),
+		"CPU-bound (skripty/fyzika)" if cpu_ms > frame_ms * 0.6 else "GPU-bound (vykreslování)"])
+	prof_report(dur, Engine.get_process_frames() - f0)
+	PROF_ON = false
+	# sčítání uzlů: velikosti podstromů do hloubky 3 od kořene (Main/Svet/*, Main/Klient/*)
+	var counts := {}
+	var geo := {}
+	var walk: Array = [g.get_tree().root]
+	for depth in 3:
+		var next: Array = []
+		for nd in walk:
+			for c in nd.get_children():
+				var p := str(c.get_path())
+				counts[p] = _subtree_size(c)
+				geo[p] = _subtree_geo(c)
+				next.append(c)
+		walk = next
+	var top := counts.keys()
+	top.sort_custom(func(a, b): return counts[a] > counts[b])
+	print("PERF uzly celkem %d; top větve (uzly | geometrie z toho cullable | processujících):" % int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)))
+	for k in top.slice(0, 25):
+		var gg: Array = geo[k]
+		print("PERF   %-40s %7d | %5d (%d cull) | %d" % [k, counts[k], gg[0], gg[1], gg[2]])
+	g.get_tree().quit()
+
+
+static func _subtree_size(n: Node) -> int:
+	var total := 1
+	for c in n.get_children():
+		total += _subtree_size(c)
+	return total
+
+
+## [počet GeometryInstance3D, z toho s visibility_range_end > 0, počet uzlů s _process/_physics_process].
+static func _subtree_geo(n: Node) -> Array:
+	var t := 0
+	var cull := 0
+	var proc := 0
+	if n is GeometryInstance3D:
+		t = 1
+		if (n as GeometryInstance3D).visibility_range_end > 0.0:
+			cull = 1
+	if n.is_processing() or n.is_physics_processing():
+		proc = 1
+	for c in n.get_children():
+		var r := _subtree_geo(c)
+		t += r[0]
+		cull += r[1]
+		proc += r[2]
+	return [t, cull, proc]

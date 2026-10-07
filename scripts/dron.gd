@@ -10,7 +10,7 @@
 ## Ovládání (jako chůze): WASD let vpřed/strany, myš = otáčení dronu + naklápění kamery, Mezerník stoupat,
 ## Ctrl klesat, Shift sportovní režim, V kamera z dronu / za dronem, F přistát / návrat, O nebo LMB fotka.
 ##
-## Práva (ÚCL / EU 2019/947 – zjednodušená herní simulace): registrace provozovatele `dron_provozovatel`,
+## Práva (ÚVL / EU 2019/947 – zjednodušená herní simulace): registrace provozovatele `dron_provozovatel`,
 ## A1/A3 `dron_a1a3` pro >250 g, max 120 m AGL, ne nad lidmi, VLOS 500 m, soukromí (30 m / 30 s nad cizím
 ## pozemkem). Přestupky jdou přes `World.commit_offense`, jen když drona někdo uvidí (`World.drone_witnessed`).
 class_name Drone
@@ -510,6 +510,12 @@ func _scare_wildlife() -> void:
 # ------------------------------------------------------------------ nárazy
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("dron_phys", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if mode == "strom":
 		_stuck_t -= delta
 		if _stuck_t <= 0.0:
@@ -681,6 +687,12 @@ func status() -> Dictionary:
 # ------------------------------------------------------------------ vizuál (interpolace + kamera + rotor)
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("dron", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	var f := Engine.get_physics_interpolation_fraction()
 	var pos := _prev_pos.lerp(_cur_pos, f)
 	var tb := Basis(Vector3.UP, lerp_angle(_prev_yaw, _cur_yaw, f))

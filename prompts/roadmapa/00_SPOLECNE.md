@@ -29,12 +29,13 @@
 3. **Testování dělá výhradně uživatel.** Hru, testy ani simulace (`godot …`, `run.sh`, `--questtest`,
    `--shot`, `--faunatest`, headless běhy, `--import`) **nikdy nespouštěj**, pokud tě k tomu uživatel
    výslovně nepověří. Ověřuj čtením kódu. Testovací parametry, které úkol chce, napiš, ale nespouštěj.
+   **Jediná povolená výjimka (od 6. 10. 2026): kontrola překladu** – viz kap. 6 (`--import` + `--check-only`).
 4. **Na konci úkolu** (v tomto pořadí):
    1. statická kontrola (viz kap. 6),
    2. aktualizuj `README.md` (Systémy / Ovládání / Ladicí parametry) a jiné dotčené návody,
    3. odškrtni krok v `docs/VIZE_A_ROADMAPA.md` (`[ ]` → `[x]`) a v `prompts/roadmapa/README.md`,
    4. záznam do `PROJECT_LOG.md` (v kořeni repozitáře, formát kap. 7),
-   5. záznam do deníku efektivity AI podle `CLAUDE.md` v kořeni repozitáře,
+   5. (deník efektivity AI se nevede – `CLAUDE.md` v repozitáři není; krok vynech),
    6. commit (jen tvoje změny – viz bod 8),
    7. vypiš uživateli **checklist ručních testů (max. 10 bodů)**: co spustit, kam ve hře jít
       (F2 → Teleport / Datum / Počasí / Hráč), co udělat, co má být vidět. Pak **skonči a čekej**.
@@ -45,7 +46,7 @@
 8. **Commity:** v repozitáři může pracovat i jiná session. Commituj jen své soubory; u sdílených souborů
    jen své hunky (`git add -p` neumíš → `git diff soubor > /tmp/p.patch`, uprav patch, `git apply --cached`).
    Zprávu commitu piš česky ve stylu historie („M0.2 Jednotný katalog předmětů: …“).
-9. **Kontext šetři:** velké soubory (`world.gd` 1640 ř., `car.gd` 1270, `hud.gd` 980, `player.gd` 910)
+9. **Kontext šetři:** velké soubory (`world.gd` ~3750 ř., `hud.gd` ~2150, `jobs.gd` ~1740, `car.gd` ~1600, `player.gd` ~1230)
    nečti celé – najdi místo přes `grep -n` a čti výřez (`Read` s `offset/limit`).
 
 ## 3. Právní zásady obsahu (platí pro všechno nové)
@@ -104,6 +105,8 @@ Podrobně `PRAVNI_DOPORUCENI.md` a README → „Právní zásady obsahu“.
 | `radio.gd`, `radio_music.gd` | rádio doma, stanice z `data/radia.json` | |
 | `sleep_spot.gd`, `save_game.gd` | noclehy; ukládání `user://saves/*.json` | `SaveGame.VERSION`, `save()`, `load()` |
 | `estate.gd` `Estate` (M1.7) | registr nemovitostí: smyšlená čísla popisná, cedulky, domov = vlastnictví / nájem bytu, nájem | `World.estate`, `home_of(pid)`, `home_label(pid)`, `owns_house(pid)`, `is_flat(pid)`, `lot_door()`, `set_home()`, `World.apply_home(pid)`, `rent_debt(pid)`, `pay_rent_debt(pid)` (M3.1) |
+| `debts.gd` `Debts` (M4.2) | společná evidence dluhů (pokuty, upomínka +1 000 Kč, exekuce z účtu po 30 dnech, příkazy poštou), stav per hráč | `World.debts`: `add(pid, kind, kc, due_jd, text, ref)`, `queue_order`, `pay(pid, id, kc, "cash"/"bank")`, `list`, `total(pid, kinds)`, `advance_to(jd)` (denní krok), `to_dict/from_dict` (klíč `debts`); `World.pay_debts_office(id)` |
+| `law.gd` `Law` (M0.5), `permits.gd` `Permits` (M6.1), `police.gd` | zákon jako data (`data/zakon.json` – řádky s `drb`, `karma`, `misto`), rejstřík a body per hráč, doklady, policie | `World.commit_offense(id, oid, data)`, `World.law[id]` (`LawRecord`: `records`, `points`, `unpaid_fines`), `World.permits` (jedna instance: `has(pid, kind, sub := "")`, `grant(pid, kind, no, sub)`, `revoke / restore / list / subs`, `KINDS` – nový druh vždy do `KINDS`; řidičák `ridicsky` má skupiny), `World.license_check(id, car)` (skupina vozidla, M4.1), `World.auto_enroll / auto_school` (autoškola), `World.has_permit(id, kind, pos)` (les.work_permit + Permits + cheat), svědci dnes `Forestry.witness_near(pos, r)` (M4.4 → `World.witness_check`), nenahlášené činy `Forestry.unreported` (M4.4 sjednotí), `Police.license_ok(p)` = jen zákaz řízení |
 | `jobs.gd` `Jobs` (M3.1) + `data/prace.json` | zaměstnání per hráč: katalog prací a pracovních úkolů, pohovor, směny a docházka, napomenutí → výpověď, výplata, deník J → Práce | `World.jobs[id]`, `current`, `can_apply(job)`, `apply(job)`, `quit()`, `fire(reason)`, `place_options(place)` (přes `Quests.place_options`), `Jobs.set_provider(jméno, Callable(world, pid, job) -> Array[Vector3])`, `Jobs.job/task_def/jobs_at/shifts_on`, `target()`, `hud_text()`, `journal_bbcode()`; události `job_*`, `shift_started/done`; typy úkolů `akce` / `dojdi` |
 | `prace/statek.gd` `Statek`, `prace/udrzba.gd` `ObecniUdrzba`, `prace/vycep.gd` `Vycep` (M3.2) | pracoviště prvních tří prací: statek (dědí `Farm`, místo „statek“, výběh, stodola), obecní údržba (zóny trávy / listí / sněhu, lavička, odpadky), čepování | `World.statek / udrzba / vycep`, poskytovatelé `statek_*`, `udrzba_*`, `vycep_kompas`; `Estate.set_estate_owner / owner_of / pick_farmstead`; `Pen.setup_at`; `FarmAnimal.hold`; Jobs: `on_shift`, `task_id`, `lend` / `unlend`, `adjust_rating`, `own_target`, `task_ok`, klíče úkolů `mesice`, `snih_min/max`, `zapujcit`, `r_cile`, `kompas` |
 | `prace/les.gd` `LesniPrace`, `prace/obchod.gd` `ProdavacPrace`, `prace/zahradnik.gd` `ZahradnikPrace`, `prace/palenice.gd` `PalenicePrace` (M3.3) | lesní dělník (paseka u chaty, vyznačené stromy, hromada), prodavač/ka (pokladna – minihra s mincemi, bedny do regálu, pečivo), zahradník u sousedů (zakázky od dědy, dočasná zóna u domu zákazníka), pálenice (kvas, topení – minihra teploty, lahve) | `World.les / obchod / zahradnik / palenice`; Jobs: typ úkolu `modul` + `progress(task, n)`, `hodiny`, varianty směn `smeny[].nazev` + `smeny_volba` (`shift_pick`), zakázky `druh: "zakazka"` + `set_contract_maker` / `take_contract` / `contract()`, `set_event_hook(job, Callable)`, práce `mesice`, `naturalie`; `Actions.chain_target_check`; `Cargo.shoulder_new / carried_kind / consume_carried` (náklad `bedna`, `sud`); `Estate.pick_customer_house`; události `job_contract`, `job_contract_done`, `job_contract_failed`, `log_lopped`, `log_cut` |
@@ -136,13 +139,24 @@ zákon, respekt…) se na `emit_game_event` napojí stejně. **Nevolej HUD pří
 
 | Obsazeno | Rezervováno pro roadmapu |
 |---|---|
-| WASD, myš, Shift, Mezerník, Ctrl/C, V, kolečko, E, T/Enter, F, L, B, N, R, H, X (dalekohled), Tab, J, M, F1, F2, F5, F9, Esc, Backspace (deník), hvízdnutí na koně (viz `project.godot`; **G je sdílené s nákladem**, M2.10) | **Q** = nástroj / zbraň do ruky (cyklus), **1–5** = rychlé sloty opasku, **levé tlačítko myši** = použít nástroj / vystřelit (pěšky), **pravé tlačítko** = mířit, **G** = zvednout / položit / naložit náklad (**sdílená klávesa**: `Cargo.on_g` nejdřív zkusí náklad v dosahu nebo nesený, jinak hvízdnutí na koně – `World.player_action("whistle")`), **K** = dovednosti (záložka deníku), **I** = oblečení / šatník (mimo domov jen prohlížení), **P** = doklady a oprávnění, **O** = volné, **Z / Y** = volné (pozor na QWERTZ – `physical_keycode`) |
+| WASD, myš, Shift, Mezerník, Ctrl/C, V, kolečko, E, T/Enter, F, L, B, N, R, H, U (vyproštění), X (dalekohled), O (fotka dronem – jen za letu), **Z** (fyzicky Y – panel úkolu), Tab, J, M, F1, F2, F5, F9, Esc, Backspace (deník), **P** (panel dokladů, M4.1), hvízdnutí na koně (viz `project.godot`; **G je sdílené s nákladem**, M2.10) | **Q** = nástroj / zbraň do ruky (cyklus), **1–5** = rychlé sloty opasku, **levé tlačítko myši** = použít nástroj / vystřelit (pěšky), **pravé tlačítko** = mířit, **G** = zvednout / položit / naložit náklad (**sdílená klávesa**: `Cargo.on_g` nejdřív zkusí náklad v dosahu nebo nesený, jinak hvízdnutí na koně – `World.player_action("whistle")`), **K** = dovednosti (záložka deníku), **I** = oblečení / šatník (mimo domov jen prohlížení), **F3, F4, F6–F8, 6–0** = volné (pozor na QWERTZ – `physical_keycode`) |
 
 8. **Nápověda:** každá nová klávesa do F1 (`hud.gd`, text nápovědy) a do README → Ovládání.
 9. **Deník J:** nové přehledy (dovednosti, doklady, respekt, práce…) jako oddíly v `Hud._journal_bbcode()`.
 
 ## 6. Statická kontrola před commitem (místo spuštění hry)
 
+- **Povinná kontrola překladu (uživatel povolil):** po dokončení změn spusť
+  ```bash
+  timeout 300 godot --headless --path . --import >/dev/null 2>&1
+  for f in $(git diff --name-only HEAD -- '*.gd') <nové .gd soubory>; do
+    timeout 60 godot --headless --path . --check-only --script res://$f 2>&1 | grep -E "SCRIPT ERROR|ERROR:"
+  done
+  ```
+  Výstup musí být prázdný. Hlášky „Could not resolve…“ / „Cannot infer the type…“ jsou často jen následek
+  chyby v jiném skriptu – oprav první skutečnou příčinu a zkontroluj znovu. Hru samotnou ani testy (`--…test`)
+  nespouštěj. (Ve vlně 0 tahle kontrola odhalila 3 chyby, kvůli kterým hra nešla spustit: duplicitní
+  proměnná ve funkci, nespárovaná závorka, `:=` s hodnotou bez typu z proměnné typu `Node`.)
 - `grep -n` na každou nově volanou funkci / proměnnou – existuje a má správné parametry?
 - Nový `class_name` nekoliduje s existujícím (`grep -rn "class_name X" scripts`).
 - **Názvy metod a proměnných nesmí kolidovat s nativními členy** `Node` / `Node3D` / `Object` (`set_owner`, `owner`, `name`,

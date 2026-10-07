@@ -101,11 +101,43 @@ const ITEMS := {
 	# ------------------------------------------------------------ tabák
 	"cigarety": {"name": "Cigarety (krabička 20 ks)", "short": "Cigarety", "type": "smoke", "kg": 0.03, "count": 20, "price": 165,
 		"color": Color(0.9, 0.9, 0.88)},
+	# ---- M4.8 obsah pro dospělé (`adult: true`): vidí se jen při zapnuté volbě (`ItemsDB.adult_on`), jinak nejsou ve hře.
+	# Oficiální text: zjednodušená herní simulace, nejde o návod. Úroveň THC / psilocybinu v `BodyState`.
+	"tabak_semena": {"name": "Semena tabáku (sáček)", "short": "Semena tabáku", "type": "seed", "kg": 0.01, "stack": 99,
+		"price": 45, "adult": true, "color": Color(0.7, 0.75, 0.5)},
+	"tabak_susene": {"name": "Ruční cigareta z papírku (tabák)", "short": "Cigareta", "type": "smoke", "kg": 0.05,
+		"count": 1, "stack": 99, "price": 0, "adult": true, "color": Color(0.5, 0.36, 0.18)},
+	"papirky": {"name": "Papírky na cigarety (balení 60 ks)", "short": "Papírky", "type": "material", "kg": 0.02,
+		"stack": 99, "price": 25, "adult": true, "color": Color(0.95, 0.93, 0.85)},
+	"konopi_semena": {"name": "Semena konopí (průmyslová odrůda, nízké THC)", "short": "Semena konopí", "type": "seed",
+		"kg": 0.01, "stack": 99, "price": 60, "adult": true, "color": Color(0.55, 0.6, 0.35)},
+	"konopi_kvety": {"name": "Joint z konopí (1 dávka)", "short": "Joint", "type": "smoke", "kg": 0.05, "count": 1,
+		"stack": 99, "price": 0, "adult": true, "thc": 1.0, "color": Color(0.42, 0.52, 0.22)},
+	# M4.8 sušák: čerstvá sklizeň schne ~2 týdny (Garden → Vyhlasky.add_batch), pak je z ní suchý materiál (na ubalení / pečení)
+	"tabak_list": {"name": "Sušený tabák (na ubalení)", "short": "Sušený tabák", "type": "material", "kg": 0.05,
+		"stack": 99, "price": 0, "adult": true, "color": Color(0.5, 0.36, 0.18)},
+	"konopi_susene": {"name": "Sušené květy konopí (na ubalení a pečení)", "short": "Suché konopí", "type": "material", "kg": 0.05,
+		"stack": 99, "price": 0, "adult": true, "color": Color(0.42, 0.52, 0.22)},
+	"tabak_cerstvy": {"name": "Čerstvé listy tabáku (sušák)", "short": "Čerstvý tabák", "type": "material", "kg": 0.1,
+		"stack": 99, "price": 0, "adult": true, "color": Color(0.4, 0.55, 0.25)},
+	"konopi_cerstve": {"name": "Čerstvé květy konopí (sušák)", "short": "Čerstvé konopí", "type": "material", "kg": 0.1,
+		"stack": 99, "price": 0, "adult": true, "color": Color(0.35, 0.5, 0.2)},
+	"lysohlavky": {"points": 8, "name": "Lysohlávky (čerstvé)", "short": "Lysohlávky", "type": "food",
+		"kg": 0.05, "kcal": 20, "price": 0, "adult": true, "psilo": 1.0, "color": Color(0.8, 0.75, 0.6)},
+	# záměna při sběru (`World._houba_druh`): muchomůrka = otrava (`toxic`, `BodyState.eat`)
+	"muchomurka": {"name": "Muchomůrka (záměna za lysohlávku)", "short": "Muchomůrka", "type": "food",
+		"kg": 0.05, "kcal": 20, "price": 0, "adult": true, "toxic": 1.0, "color": Color(0.8, 0.15, 0.1)},
+	# jedlá varianta: rohlík + sušené konopí; THC nastoupí se zpožděním (`thc_eat`, `BodyState.eat`)
+	"konopne_pecivo": {"name": "Konopné pečivo (rohlík s THC)", "short": "Konopné pečivo", "type": "food",
+		"kg": 0.1, "kcal": 300, "price": 0, "adult": true, "thc_eat": 0.8, "color": Color(0.7, 0.55, 0.3)},
 	# ------------------------------------------------------------ vybavení
 	"spacak": {"name": "Spacák a karimatka (vyspíš se kdekoli venku)", "short": "Spacák", "type": "gear", "kg": 1.5, "price": 890,
 		"color": Color(0.8, 0.3, 0.1)},
+	# M5.7 skateboard: F = stoupnout / seskočit (Player.board_mount / board_dismount); jízda W/S/A/D, ollie Mezerník
+	"skateboard": {"name": "Skateboard (F = stoupnout na prkno)", "short": "Skateboard", "type": "gear", "kg": 2.5, "price": 1890,
+		"color": Color(0.9, 0.6, 0.2)},
 	# ---- M6.1 drony (stavy baterie a poškození drží `World.drone_states`, modely `DroneModel.MODELS`;
-	# start z inventáře → `World.drone_launch`; opravy a nabíjení na počítači doma, stránka Letectví – ÚCL)
+	# start z inventáře → `World.drone_launch`; opravy a nabíjení na počítači doma, stránka Letectví – ÚVL)
 	"dron": {"name": "Dron Ptáček Mini (249 g, kamera, ~12 min letu)", "short": "Dron Mini", "type": "gear", "kg": 0.45,
 		"price": 7990, "color": Color(0.82, 0.83, 0.88)},
 	"dron_velky": {"name": "Dron Ptáček Pro XL (2,5 kg, 4K kamera, ~15 min letu, vyžaduje A1/A3)", "short": "Dron XL",
@@ -113,7 +145,7 @@ const ITEMS := {
 	"dron_baterie": {"name": "Náhradní baterie dronu (při startu se sama vymění za vybitou)", "short": "Baterie dronu",
 		"type": "gear", "kg": 0.3, "price": 1490, "color": Color(0.35, 0.55, 0.75)},
 	# ---- M6.4 paramotor (sbalený stroj v batohu, 25 kg = hranice nosnosti; start přes detail →
-	# „Připravit k letu" → `World.pg_prepare`; registrace / škola / pojištění na PC → Letectví – ÚCL)
+	# „Připravit k letu" → `World.pg_prepare`; registrace / škola / pojištění na PC → Letectví – ÚVL)
 	"paramotor": {"name": "Paramotor Vlaštovka 24 (nový: křídlo 24 m² + motor s vrtulí)", "short": "Paramotor",
 		"type": "gear", "kg": 25.0, "price": 180000, "color": Color(0.85, 0.3, 0.2)},
 	"paramotor_ojety": {"name": "Paramotor Sokolík (ojetý, po prohlídce)", "short": "Paramotor (ojetý)",
@@ -130,18 +162,25 @@ const ITEMS := {
 	"trava": {"name": "Tráva (svazek)", "short": "Tráva", "type": "material", "kg": 0.1, "price": 0, "stack": 50, "color": Color(0.35, 0.6, 0.2)},
 	"polena": {"name": "Polena", "short": "Polena", "type": "material", "kg": 1.5, "price": 30, "stack": 50, "color": Color(0.55, 0.38, 0.2)},
 	"vetve": {"name": "Větve (klestí)", "short": "Větve", "type": "material", "kg": 0.8, "price": 0, "stack": 50, "color": Color(0.4, 0.3, 0.18)},
+	"vetve_cerstve": {"name": "Čerstvé větve (klestí)", "short": "Čerstvé větve", "type": "material", "kg": 0.8, "price": 0, "stack": 50, "color": Color(0.45, 0.4, 0.22)},
 	"klesti": {"name": "Kleště", "short": "Kleště", "type": "tool", "kg": 0.5, "price": 180, "durability": 300, "color": Color(0.5, 0.5, 0.55)},
 	"spalek": {"name": "Špalek na štípání", "short": "Špalek", "type": "tool", "hold": false, "kg": 12.0, "price": 0, "color": Color(0.5, 0.35, 0.2)},
 	"lopata": {"name": "Lopata", "short": "Lopata", "type": "tool", "kg": 2.0, "price": 320, "durability": 250, "color": Color(0.5, 0.5, 0.5)},
 	"motyka": {"name": "Motyka", "short": "Motyka", "type": "tool", "kg": 1.5, "price": 280, "durability": 250, "color": Color(0.5, 0.45, 0.4)},
 	"konev": {"name": "Konev", "short": "Konev", "type": "tool", "kg": 0.8, "price": 150, "durability": 400, "color": Color(0.3, 0.55, 0.7)},
 	"konev_plna": {"name": "Konev (plná vody)", "short": "Konev (plná)", "type": "tool", "kg": 4.0, "price": 0, "durability": 400, "color": Color(0.3, 0.55, 0.7)},
+	# ---- Fáze 8 Zahrádky (`Garden`, §11): hnůj z kompostu u zahrady – nosí se v kbelíku, akce `hnojit` na záhonu
+	"hnuj": {"name": "Hnůj (kbelík)", "short": "Hnůj", "type": "tool", "kg": 2.0, "price": 15, "stack": 10, "color": Color(0.28, 0.18, 0.1)},
 	# ---- M3.2 nářadí prací (zapůjčí ho zaměstnavatel na směnu – `Jobs` `zapujcit`; v obchodě zatím není, DOPLNIT: stavebniny M5.1)
 	"vidle": {"name": "Vidle", "short": "Vidle", "type": "tool", "kg": 1.6, "price": 290, "durability": 300, "color": Color(0.55, 0.55, 0.58)},
 	"kosa": {"name": "Kosa", "short": "Kosa", "type": "tool", "kg": 1.8, "price": 590, "durability": 300, "color": Color(0.6, 0.62, 0.66)},
 	"hrabe": {"name": "Hrábě", "short": "Hrábě", "type": "tool", "kg": 1.0, "price": 190, "durability": 300, "color": Color(0.55, 0.4, 0.22)},
 	"kladivo": {"name": "Kladivo a hřebíky", "short": "Kladivo", "type": "tool", "kg": 0.8, "price": 250, "durability": 300, "color": Color(0.4, 0.4, 0.42)},
 	"pisek": {"name": "Posypový písek (kbelík)", "short": "Písek", "type": "material", "kg": 3.0, "price": 10, "stack": 20, "color": Color(0.78, 0.68, 0.48)},
+	# M5.1 pokračování: dřevo a řezivo z pily (DOPLNIT: ceny odhad)
+	"prkno": {"name": "Prkno 2 m (smrk)", "short": "Prkno", "type": "material", "kg": 9.0, "price": 180, "stack": 10, "color": Color(0.88, 0.74, 0.5)},
+	"rezivo": {"name": "Hranol 6 × 10 cm, 4 m", "short": "Hranol", "type": "material", "kg": 14.0, "price": 260, "stack": 6, "color": Color(0.8, 0.66, 0.42)},
+	"poleno": {"name": "Palivové dříví (štípané, pytel)", "short": "Dříví", "type": "material", "kg": 6.0, "price": 90, "stack": 10, "color": Color(0.5, 0.36, 0.22)},
 	# ---- M3.3 zahradník u sousedů (zapůjčí je zákazník / děda na zakázku; DOPLNIT: prodej ve stavebninách M5.1)
 	"nuzky_zahradni": {"name": "Zahradní nůžky na živý plot", "short": "Zahradní nůžky", "type": "tool", "kg": 1.2, "price": 390, "durability": 300, "color": Color(0.35, 0.55, 0.3)},
 	"sazenice_kvetin": {"name": "Sazenice květin (plato)", "short": "Květiny (sazenice)", "type": "seed", "kg": 0.4, "price": 35, "stack": 20, "color": Color(0.9, 0.4, 0.6)},
@@ -319,8 +358,27 @@ const ITEMS := {
 }
 
 
+## M4.8: „Obsah pro dospělé“ (Esc → Nastavení). Nastavuje `GameSettings` / `PauseMenu`; výchozí vypnuto.
+static var adult_on := false
+
+
+## M4.8: ruční úpravy v inventáři (ubalení, pečení). `need` = kromě předmětu, na který se akce volá (ten se spotřebuje
+## vždy), se spotřebuje ještě tohle; `out` vznikne. Jen při zapnuté volbě (položky jsou `adult`).
+const RECIPES := {
+	"tabak_list": [{"name": "Ubalit cigaretu", "need": {"papirky": 1}, "out": "tabak_susene"}],
+	"konopi_susene": [
+		{"name": "Ubalit joint", "need": {"papirky": 1}, "out": "konopi_kvety"},
+		{"name": "Upéct konopné pečivo (s rohlíkem)", "need": {"rohlik": 1}, "out": "konopne_pecivo"}],
+}
+
+
+## Předmět s klíčem `adult` je ve hře jen při zapnuté volbě (vypnuto = neexistuje, ani v nabídkách).
+static func hidden(id: String) -> bool:
+	return ITEMS.has(id) and bool(ITEMS[id].get("adult", false)) and not adult_on
+
+
 static func exists(id: String) -> bool:
-	return ITEMS.has(id)
+	return ITEMS.has(id) and not hidden(id)
 
 
 static func info(id: String) -> Dictionary:
@@ -357,7 +415,7 @@ static func burnt_to(id: String) -> String:
 static func by_type(t: String) -> Array[String]:
 	var out: Array[String] = []
 	for id in ITEMS:
-		if ITEMS[id]["type"] == t:
+		if ITEMS[id]["type"] == t and not hidden(id):
 			out.append(id)
 	return out
 

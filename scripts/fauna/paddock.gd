@@ -1,5 +1,5 @@
-## Výběh pro koně u domova (M1.7: nájemník bytu má louku pronajatou blízko bydliště; stěhuje se s domovem přes `World.apply_home` → `relocate`): dřevěná ohrada s pevnou kolizí (kůň ani zvěř přes plot neprojdou),
-## branka = 3,4 m široká mezera na straně k domu, žlab se senem a napáječka uvnitř.
+## Výběh pro koně u domova (M1.7: nájemník bytu má louku pronajatou blízko bydliště; stěhuje se s domovem přes `World.apply_home` → `relocate`): dřevěná ohrada s pevnou kolizí (kůň ani zvěř přes plot neprojdou)
+## – obvodový plot a branku (3,4 m mezera uprostřed strany k domu, `GATE_W`) staví `FenceManager` (Fáze 7, typ WOODEN_POST; `gate_in`/`gate_out`/`contains` tu zůstávají jako čistá matematika nad `half`), žlab se senem a napáječka uvnitř.
 ##
 ## Místo hledá `World._ground_spot` (volná rovná plocha bez silnice, domu a auta) postupně pro velikosti
 ## z `SIZES` (největší 20×15 m). Když se nenajde nic, výběh se nepostaví (`ok = false`) a kůň stojí
@@ -12,9 +12,7 @@ class_name Paddock
 extends Node3D
 
 const SIZES := [Vector2(20.0, 15.0), Vector2(16.0, 12.0), Vector2(13.0, 10.0)]   # šířka × hloubka (m)
-const GATE_W := 3.4                  # šířka branky (m)
-const POST_STEP := 2.5               # rozestup sloupků (m)
-const FENCE_H := 1.3                 # výška plotu (m)
+const GATE_W := 3.4                  # šířka branky (m) – mezera v plotu od FenceManageru, uprostřed strany k domu
 const CARE_R := 12.0                 # kůň musí být takhle blízko žlabu / napáječky (m)
 const GROOM_S := 3.0                 # délka čištění (s)
 const SPOT_R0 := 14.0                # hledání místa: nejblíž k domu (m)
@@ -156,54 +154,19 @@ func horse_spot(id: int) -> Array:
 
 # ------------------------------------------------------------------ stavba
 
+## Staví jen výbavu uvnitř výběhu (žlab, napáječka + jejich kolize). Obvodový plot s brankou
+## staví `FenceManager` (Fáze 7, `World.fences.rebuild()` po `relocate`) – dřív tu byla jeho
+## vlastní řada sloupků + kolizních boxů, nově je to úsek FenceType.WOODEN_POST.
 func _build() -> void:
 	var body := StaticBody3D.new()
-	body.name = "Plot"
+	body.name = "Vybava"
 	body.collision_layer = 1
 	body.collision_mask = 0
 	add_child(body)
 	var wood := Color(0.48, 0.34, 0.2)
-	var dark := wood.darkened(0.3)
 	var k := MeshKit.new()
 	var hx := half.x
 	var hz := half.y
-	var g := GATE_W * 0.5
-	# strany jako řady bodů [zleva doprava, zezadu dopředu…]; na straně k domu (−Z) je uprostřed branka
-	var runs: Array = [
-		_run(Vector2(-hx, -hz), Vector2(-g, -hz)),
-		_run(Vector2(g, -hz), Vector2(hx, -hz)),
-		_run(Vector2(hx, -hz), Vector2(hx, hz)),
-		_run(Vector2(hx, hz), Vector2(-hx, hz)),
-		_run(Vector2(-hx, hz), Vector2(-hx, -hz)),
-	]
-	var post_done := {}
-	for run in runs:
-		var pts: Array = run
-		for i in pts.size():
-			var pw: Vector3 = pts[i]
-			var key := Vector2i(roundi(pw.x * 10.0), roundi(pw.z * 10.0))
-			if not post_done.has(key):
-				post_done[key] = true
-				k.box(pw + Vector3(0, (FENCE_H - 0.4) * 0.5, 0), Vector3(0.14, FENCE_H + 0.4, 0.14), dark)
-			if i == 0:
-				continue
-			var a: Vector3 = pts[i - 1]
-			var d := pw - a
-			var len_ := d.length()
-			var rot := Vector3(-asin(clampf(d.y / len_, -1.0, 1.0)), atan2(d.x, d.z), 0.0)
-			var mid := (pw + a) * 0.5
-			for hh: float in [0.55, 1.05]:
-				k.box(mid + Vector3(0, hh, 0), Vector3(0.05, 0.12, len_), wood, rot)
-			var cs := CollisionShape3D.new()
-			var bs := BoxShape3D.new()
-			bs.size = Vector3(0.18, FENCE_H + 0.2, len_)
-			cs.shape = bs
-			cs.transform = Transform3D(Basis.from_euler(rot), mid + Vector3(0, (FENCE_H + 0.2) * 0.5 - 0.1, 0))
-			body.add_child(cs)
-	# branka: dva vyšší sloupky
-	for sx: float in [-g, g]:
-		var gp := to_world(sx, -hz)
-		k.box(gp + Vector3(0, 0.75, 0), Vector3(0.2, 2.1, 0.2), dark)
 	# žlab se senem a napáječka na protější straně
 	trough = to_world(-hx * 0.45, hz - 1.4)
 	water = to_world(hx * 0.45, hz - 1.4)
@@ -225,18 +188,7 @@ func _build() -> void:
 		cs2.transform = Transform3D(Basis(Vector3.UP, yaw), tpv + Vector3(0, 0.3, 0))
 		body.add_child(cs2)
 	var mi := MeshKit.mesh_instance(self, k.commit(MeshKit.vc_material(0.85)), 400.0)
-	mi.name = "Ohrada"
-
-
-## Body podél strany a→b (místní souřadnice), rozestup ≤ POST_STEP, ve světě s výškou terénu.
-func _run(a: Vector2, b: Vector2) -> Array:
-	var n := maxi(ceili(a.distance_to(b) / POST_STEP), 1)
-	var out := []
-	for i in n + 1:
-		var t := float(i) / n
-		var l := a.lerp(b, t)
-		out.append(to_world(l.x, l.y))
-	return out
+	mi.name = "VybavaMesh"
 
 
 # ------------------------------------------------------------------ péče o koně (E)

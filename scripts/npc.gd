@@ -17,6 +17,7 @@ var _label: Label3D
 var _name_label: Label3D
 var _say_t := 0.0
 var _yaw := 0.0
+var _far := false                 # za simulační bublinou – vizuál schovaný (NPC „jen u hráče“)
 
 
 static func make(name_: String, outfit: String, shirt: Color, seed_: int, pos: Vector3, yaw: float,
@@ -94,16 +95,33 @@ func say(text: String, dur := 4.0) -> void:
 
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("npc", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if _say_t > 0.0:
 		_say_t -= delta
 		if _say_t <= 0.0:
 			_label.visible = false
-	var player: Node3D = world.nearest_player(global_position) if world else null
+	var player: Player = world.nearest_player(global_position) if world else null
 	if player == null:
 		return
-	var to := player.global_position - global_position
+	var to: Vector3 = world.player_world_pos(player) - global_position
+	# za simulační bublinou se NPC schová (jen u hráče) – otáčení za ním nemá smysl počítat
+	var simr: float = world.sim_radius if world != null else 320.0
+	var d := to.length()
+	if d > simr:
+		if not _far:
+			_far = true
+			visual.visible = false
+		return
+	elif _far:
+		_far = false
+		visual.visible = true
 	var want := base_yaw
-	if face_player and to.length() < 7.0 and not sitting:
+	if face_player and d < 7.0 and not sitting:
 		want = atan2(to.x, to.z)
 	_yaw = lerp_angle(_yaw, want, 1.0 - exp(-4.0 * delta))
 	visual.rotation.y = _yaw

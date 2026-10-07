@@ -1,6 +1,6 @@
 # M5.8 – U-rampa na zahradě za domem hráče
 
-> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 8/9
+> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 8/12
 > Předpoklady: M5.7 (skateboard), M5.1 (rámec staveb `BuildingKit`) nepovinně · Navazují: –
 
 ## 0. Než začneš – přečti
@@ -52,5 +52,5 @@ Uživatel: „přidat na zahradu u domu U-rampu hned vedle domu, tedy za domem�
 7. 23:00 jízda → stížnost sousedů.
 
 ## 6. Závěr
-README (Systémy → U-rampa), VIZE odškrtnout (a vyřešenou otázku v kap. 7), roadmapa README, PROJECT_LOG, deník AI,
+README (Systémy → U-rampa), VIZE odškrtnout (a vyřešenou otázku v kap. 7), roadmapa README, PROJECT_LOG,
 commit „M5.8 U-rampa za domem: …“, checklist a čekat.

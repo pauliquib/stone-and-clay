@@ -24,7 +24,10 @@ body popularity (M7.1), budovat vztahy a nabízet **morální volby**, které m�
   za peníze / předražit), hádka o mez mezi sousedy (rozsoudit / podplatit jednoho / nechat eskalovat),
   fotbalisté bez brankáře, zatoulaná kráva na silnici, sbírka na kapličku (přispět / zpronevěřit), vinařův
   ukradený sud, kluci s pyrotechnikou, výlov rybníka, požár trávy (M5.3), pomoc s porodem telete, nedělní
-  oběd u babičky, stará motorka ve stodole (opravit a vrátit / prodat).
+  oběd u babičky, stará motorka ve stodole (opravit a vrátit / prodat), **hromada větví k spálení** (doplněk uživatele:
+  soused potřebuje spálit velkou hromadu klestí v době vyhlášky o zákazu pálení – spálit ji „maskovanou“ jako opékání
+  špekáčků s rizikem, že svědek pozná pálení a přijde pokuta, nebo ji poctivě odvézt / ohlásit; využije mechaniku pálení,
+  vyhlášek a svědků z M4.4).
 - **Větvení podle pověsti / karmy:** kdo je „postrach vsi“, tomu lidé nabídnou jiné (horší) úkoly; vysoká
   karma odemyká úkoly „od srdce“ (bez odměny, s velkým respektem). Úkoly se nabízejí rozhovorem (téma „help_me“,
   otázka zpět) a u míst (E).
@@ -48,5 +51,5 @@ body popularity (M7.1), budovat vztahy a nabízet **morální volby**, které m�
 7. Uložit / načíst uprostřed úkolu → pokračuje správný krok.
 
 ## 6. Závěr
-README, VIZE a roadmapa README odškrtnout, PROJECT_LOG, deník AI, commit „M7.3 Vedlejší úkoly: …“,
+README, VIZE a roadmapa README odškrtnout, PROJECT_LOG, commit „M7.3 Vedlejší úkoly: …“,
 checklist a čekat.

@@ -8,7 +8,7 @@
 class_name Fire
 extends Node3D
 
-const WOOD_MIN := {"polena": 25.0, "vetve": 8.0}     # herní minuty hoření na 1 kus
+const WOOD_MIN := {"polena": 25.0, "vetve": 8.0, "vetve_cerstve": 3.0}     # herní minuty hoření na 1 kus (čerstvé hoří krátce a kouří)
 const MAX_FUEL := 300.0                              # herní minuty (strop přikládání)
 const EMBER_MIN := 20.0                              # doba žhavých uhlíků po dohoření
 const RAIN_K := 2.0                                  # déšť (0..1) zrychlí hoření až na 3×

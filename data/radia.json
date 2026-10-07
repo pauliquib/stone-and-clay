@@ -3,5 +3,8 @@
  {"name": "ČRo Dvojka", "url": "https://rozhlas.stream/dvojka_mp3_128.mp3", "genre": "oldies a zábava", "noise": 0.4},
  {"name": "ČRo Vltava", "url": "https://rozhlas.stream/vltava_mp3_128.mp3", "genre": "vážná hudba", "noise": 0.25},
  {"name": "ČRo Radio Wave", "url": "https://rozhlas.stream/wave_mp3_128.mp3", "genre": "alternativa a elektronika", "noise": 0.7},
- {"name": "ČRo Plus", "url": "https://rozhlas.stream/plus_mp3_128.mp3", "genre": "mluvené slovo", "noise": 0.3}
+ {"name": "ČRo Plus", "url": "https://rozhlas.stream/plus_mp3_128.mp3", "genre": "mluvené slovo", "noise": 0.3},
+ {"name": "Rock Pod Kopcem", "genre": "rock", "noise": 0.75, "poznamka": "smyšlená stanice, stream doplní uživatel"},
+ {"name": "Kytara Na Návsi", "genre": "klasický rock", "noise": 0.7, "poznamka": "smyšlená stanice, stream doplní uživatel"},
+ {"name": "Rock Ve Žlebu", "genre": "tvrdý rock", "noise": 0.8, "poznamka": "smyšlená stanice, stream doplní uživatel"}
 ]

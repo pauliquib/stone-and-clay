@@ -45,6 +45,9 @@ const RACK_MAX_KG := 35.0            # nosič motorky / mopedu
 const BICYCLE_MAX_KG := 15.0         # nosič kola: jen malé věci
 const SHOULDER := Vector3(0.0, 1.3, 0.0)
 const STAMINA_K := 0.03              # úbytek výdrže za s při chůzi × (kg / 20)
+## zdroje modifikátorů rychlosti hráče (`Player.set_speed_mod`)
+const MOD_OWN := "rameno"
+const MOD_CART := "vozik"
 const JUMP_CARRIED := 2.0            # skok s nákladem (malý hop; bez nákladu `Player.jump_velocity`)
 const GRIP_LOST_R := 3.6             # vzdálenost od madla, kdy oj vyklouzne z ruky
 const CART_STAMINA_K := 0.03         # úbytek výdrže za s při tažení × (kg / 60) × (1 + 6 × stoupání)
@@ -64,8 +67,8 @@ var carts: Array = []                # Array[HandCart]
 var sacks: Array = []                # pytle ležící na zemi (StaticBody3D)
 var two_person_partner := {}         # V2 háček: id hráče → id druhého hráče / NPC, se kterým nese náklad ve dvou (zatím nepoužito)
 var _store: Dictionary = {}          # Car → Array záznamů nákladu (kufr / ložná plocha / nosič)
-var _own: Dictionary = {}            # id hráče → {e, walk0, sprint0, jump0}: špalek / pytel na rameni
-var _grip: Dictionary = {}           # id hráče → {cart, walk0, sprint0, jump0}: drží oj vozíku
+var _own: Dictionary = {}            # id hráče → {e}: špalek / pytel na rameni
+var _grip: Dictionary = {}           # id hráče → {cart}: drží oj vozíku
 var _seen_cd := {}                   # id hráče → čas (s), do kdy se `cargo_seen` neopakuje
 var _tick_t := 0.0
 var _rng := RandomNumberGenerator.new()
@@ -360,11 +363,9 @@ func _lift_ground(id: int, p: Player, g: Dictionary) -> void:
 
 func _own_lift(id: int, p: Player, e: Dictionary) -> void:
 	var kg := float(e["kg"])
-	_own[id] = {"e": e, "walk0": p.walk_speed, "sprint0": p.sprint_speed, "jump0": p.jump_velocity}
+	_own[id] = {"e": e}
 	var k := clampf(1.0 - kg / 60.0, 0.35, 0.9)
-	p.walk_speed *= k
-	p.sprint_speed = p.walk_speed          # s břemenem na rameni se neběhá
-	p.jump_velocity = JUMP_CARRIED
+	p.set_speed_mod(MOD_OWN, {"walk_k": k, "no_sprint": true, "jump": JUMP_CARRIED})   # s břemenem na rameni se neběhá
 	var vis := e["node"] as Node3D
 	if vis.get_parent() != self:
 		if vis.get_parent() != null:
@@ -374,11 +375,10 @@ func _own_lift(id: int, p: Player, e: Dictionary) -> void:
 	world.emit_game_event(id, "cargo_lift", {"kind": e["kind"], "kg": kg, "tag": e["tag"]})
 
 
-func _restore_speeds(p: Player, o: Dictionary) -> void:
+## Sundá modifikátor rychlosti daného zdroje (`MOD_OWN` rameno / `MOD_CART` vozík).
+func _restore_speeds(p: Player, source: String) -> void:
 	if p != null:
-		p.walk_speed = float(o["walk0"])
-		p.sprint_speed = float(o["sprint0"])
-		p.jump_velocity = float(o["jump0"])
+		p.clear_speed_mod(source)
 
 
 ## Sundá vlastní břemeno z ramene a vrátí jeho záznam (model zůstane, volající ho umístí).
@@ -386,7 +386,7 @@ func _own_release(id: int) -> Dictionary:
 	if not _own.has(id):
 		return {}
 	var o: Dictionary = _own[id]
-	_restore_speeds(_player(id), o)
+	_restore_speeds(_player(id), MOD_OWN)
 	_own.erase(id)
 	return o["e"]
 
@@ -559,6 +559,11 @@ func _g_with_cart(id: int, p: Player) -> void:
 # ------------------------------------------------------------------ vozidla: kufr, ložná plocha, nosič
 
 ## Způsob uložení: "trunk" (kufr, nevidět), "bed" (ložná plocha pickupu, vidět), "rack" (nosič motorky / kola, vidět), "" = nejde.
+## Náklad uložený v kufru / na ložné ploše vozidla (M4.6: policejní kontrola kufru). Jen čtení, kopie seznamu.
+func vehicle_items(car: Car) -> Array:
+	return (_store.get(car, []) as Array).duplicate()
+
+
 func _veh_mode(car: Car) -> String:
 	if car.two_wheeler:
 		return "rack" if car.has_rack() else ""
@@ -860,8 +865,8 @@ func _grip_start(id: int, cart: HandCart) -> void:
 	cart.chocked = false
 	cart.sleeping = false
 	cart.add_collision_exception_with(p)
-	_grip[id] = {"cart": cart, "walk0": p.walk_speed, "sprint0": p.sprint_speed, "jump0": p.jump_velocity}
-	p.jump_velocity = JUMP_CARRIED
+	_grip[id] = {"cart": cart}
+	p.set_speed_mod(MOD_CART, {"walk_k": 1.0, "no_sprint": true, "jump": JUMP_CARRIED})
 	_msg(id, "Držíš oj vozíku (%d kg). G = naložit věc ze země, E = pustit / zabrzdit." % roundi(cart.total_kg()), 3.5)
 
 
@@ -872,7 +877,7 @@ func grip_release(id: int, chock := false) -> void:
 	var o: Dictionary = _grip[id]
 	var cart: HandCart = o["cart"]
 	var p := _player(id)
-	_restore_speeds(p, o)
+	_restore_speeds(p, MOD_CART)
 	_grip.erase(id)
 	if is_instance_valid(cart):
 		if p != null:
@@ -914,6 +919,12 @@ func _grip_release_msg(id: int, chock: bool) -> void:
 # ------------------------------------------------------------------ smyčka
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("cargo", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if world == null or not world.ready_done:
 		return
 	for id in _own.keys():
@@ -945,7 +956,7 @@ func _own_follow(id: int, delta: float) -> void:
 	v.global_transform = Transform3D(Basis(Vector3.UP, p.yaw) * Basis(Vector3.BACK, PI * 0.5), v.global_position)     # leží na rameni napříč
 	var hv := Vector2(p.velocity.x, p.velocity.z).length()
 	if hv > 0.5:
-		p.stamina = maxf(p.stamina - delta * STAMINA_K * float(e["kg"]) / 20.0, 0.0)
+		p.drain_stamina(delta * STAMINA_K * float(e["kg"]) / 20.0)
 	if p.stamina <= 0.01:
 		_msg(id, "Došly ti síly – náklad ti sklouzl z ramene.", 3.0)
 		_drop_carried(id, p)
@@ -956,7 +967,7 @@ func _grip_update(id: int, delta: float) -> void:
 	var cart: HandCart = o["cart"]
 	var p := _player(id)
 	if p == null or not is_instance_valid(cart):
-		_restore_speeds(p, o)
+		_restore_speeds(p, MOD_CART)
 		_grip.erase(id)
 		return
 	if p.car != null or p.horse != null or p.inside != "" or p.fallen > 0.0:
@@ -973,11 +984,10 @@ func _grip_update(id: int, delta: float) -> void:
 	var k := clampf(1.0 - total / 320.0, 0.45, 0.9)
 	if grade > 0.0:
 		k *= clampf(1.0 - grade * (2.0 + total / 120.0), 0.3, 1.0)          # do kopce pomalu (DOPLNIT: ladění podle pocitu)
-	p.walk_speed = float(o["walk0"]) * k
-	p.sprint_speed = p.walk_speed
+	p.set_speed_mod(MOD_CART, {"walk_k": k, "no_sprint": true, "jump": JUMP_CARRIED})
 	var hv := Vector2(p.velocity.x, p.velocity.z).length()
 	if hv > 0.5:
-		p.stamina = maxf(p.stamina - delta * CART_STAMINA_K * (total / 60.0) * (1.0 + maxf(grade, 0.0) * 6.0), 0.0)
+		p.drain_stamina(delta * CART_STAMINA_K * (total / 60.0) * (1.0 + maxf(grade, 0.0) * 6.0))
 	if p.stamina <= 0.01:
 		_msg(id, "Došly ti síly – pustil jsi vozík.", 3.0)
 		grip_release(id, false)
@@ -1028,7 +1038,7 @@ func _seen_tick() -> void:
 		if tag == "" or t < float(_seen_cd.get(id, 0.0)):
 			continue
 		var p := _player(id)
-		if p == null or not world.forestry.witness_near(p.global_position, SEEN_R):
+		if p == null or not world.witness_seen(id, p.global_position, "naklad", SEEN_R):
 			continue
 		_seen_cd[id] = t + SEEN_COOLDOWN_S
 		world.emit_game_event(id, "cargo_seen", {"tag": tag, "kg": carried_kg(id), "pos": p.global_position})

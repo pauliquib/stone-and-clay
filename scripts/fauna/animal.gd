@@ -188,6 +188,12 @@ func _ready() -> void:
 # ------------------------------------------------------------------ smyčka
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_impl(delta)
+	Tests.prof_add("animal", __t0)
+
+
+func _physics_impl(delta) -> void:
 	if fauna == null:
 		return
 	_lod_t -= delta

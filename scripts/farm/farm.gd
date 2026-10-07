@@ -360,6 +360,8 @@ func _slaughter_go(id: int, a: FarmAnimal, free_helper: bool) -> void:
 	await world.blackout(id, 2.0)
 	if is_instance_valid(p):
 		p.controls_locked = false
+	if not is_instance_valid(p) or not is_instance_valid(a):     # za dobu zatemnění mohl hráč odejít nebo zvíře zmizet (A3-09)
+		return
 	var kg_r: Array = spec["meat_kg"]
 	var kg := roundi(lerpf(float(kg_r[0]), float(kg_r[1]), 0.4 + 0.6 * a.health))
 	p.add_item(String(spec["meat_item"]), maxi(1, kg))

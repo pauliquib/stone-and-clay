@@ -38,6 +38,7 @@ uniform float tex_scale = 4.0;     // velikost dlaždice textury v metrech
 global uniform float snow_cover;   // sníh na zemi 0..1
 global uniform float wetness;      // mokrý povrch 0..1
 global uniform float grass_green;  // svěžest trávy 0..1 (zima / sucho → hnědá)
+uniform vec2 north_xz = vec2(-0.98, -0.20);   // světový směr severu (z map.json north_angle; pro sněhové jazyky)
 
 varying vec3 wpos;
 
@@ -94,6 +95,36 @@ float blocks_field(int c) {
 	return (c == 3 || c == 4 || c == 5 || c == 7) ? 1.0 : 0.0;
 }
 
+// --- polní cesta (třída 7): směr a postranní poloha se odhadnou z masky třídy (rastr 4 m).
+// Míra "cestovitosti" bodu – 1 pro texel třídy 7, 0 pro ostatní (nearest sampling).
+float trackness(vec2 p) {
+	if (surface_rect.z <= 0.0) return 0.0;
+	vec2 uv = (p - surface_rect.xy) / surface_rect.zw;
+	if (uv.x <= 0.0 || uv.y <= 0.0 || uv.x >= 1.0 || uv.y >= 1.0) return 0.0;
+	float v = texture(surface_tex, uv).r * 255.0;
+	return clamp(1.0 - abs(v - 7.0), 0.0, 1.0);
+}
+
+// Koleje cesty ~0,9 m rozchod. Gradient trackness míří ke středu cesty (napříč), takže
+// symetrie vzorků vlevo/vpravo podél něj dává příčnou polohu phi ≈ vzdálenost od osy
+// (0 uprostřed, ±1 u kraje). Vrací (kolej, mezikolejní pás) × jistota odhadu.
+vec2 track_detail(vec2 p, float jit) {
+	float gx = trackness(p + vec2(3.0, 0.0)) - trackness(p - vec2(3.0, 0.0));
+	float gz = trackness(p + vec2(0.0, 3.0)) - trackness(p - vec2(0.0, 3.0));
+	float gl = length(vec2(gx, gz));
+	if (gl < 0.03) return vec2(0.0);                 // uprostřed širokého úseku nebo mimo → bez kolejí
+	vec2 side = vec2(gx, gz) / gl;
+	float sp = trackness(p + side * 1.3);
+	float sm = trackness(p - side * 1.3);
+	float den = sp + sm;
+	if (den < 0.05) return vec2(0.0);
+	float phi = clamp((sp - sm) / den * 1.15 + jit, -1.0, 1.0);   // příčná poloha, ~0,3 ≈ ±0,45 m od osy
+	float rut = smoothstep(0.16, 0.05, abs(abs(phi) - 0.30));     // dvě vyjeté koleje
+	float mid = smoothstep(0.18, 0.05, abs(phi));                 // mezikolejní pás (zarůstá trávou)
+	float conf = clamp(gl * 2.5, 0.0, 1.0) * clamp(den, 0.0, 1.0) * trackness(p);
+	return vec2(rut, mid) * conf;
+}
+
 void vertex() {
 	vec3 w = (MODEL_MATRIX * vec4(VERTEX.x, 0.0, VERTEX.z, 1.0)).xyz;
 	vec2 cell = clamp(round((w.xz - grid_origin) / spacing), vec2(0.0), grid_size - 1.0);
@@ -130,6 +161,7 @@ void fragment() {
 	vec3 col;
 	float greenish;      // podíl zelené plochy (sezónní hnědnutí, květy na loukách)
 	float field_keep = 1.0;   // kolik z pole se smí projevit (les, dvůr, břeh a cesta ho zakrývají)
+	float rut = 0.0;         // vyjetá kolej polní cesty 0..1 (v mokru v ní drží voda)
 	if (use_ortho) {
 		vec2 fuv = (wpos.xz - full_rect.xy) / full_rect.zw;
 		col = texture(ortho_full, fuv).rgb;
@@ -243,6 +275,16 @@ void fragment() {
 			greenish *= 1.0 - rockw;
 			field_keep *= 1.0 - rockw;
 		}
+		// --- polní cesta (třída 7): písek s dvěma vyjetými kolejemi ~0,9 m rozchod (§12.2);
+		// směr a příčná poloha se odhadnou z gradientu masky třídy, detail jen zblízka
+		float trackw = (ca == 7 ? 1.0 - tb : 0.0) + (cb == 7 ? tb : 0.0);
+		float rutf = (1.0 - smoothstep(25.0, 90.0, dist));
+		if (trackw > 0.02 && rutf > 0.01) {
+			vec2 td = track_detail(wpos.xz, (d1 - 0.5) * 0.14);
+			rut = td.x * trackw * rutf;
+			col = mix(col, col * vec3(0.64, 0.58, 0.50), rut * 0.85);                 // uježděná hlína tmavší
+			col = mix(col, col * vec3(0.80, 1.05, 0.70), td.y * trackw * rutf * 0.5 * grass_green);  // mezikolejní pás
+		}
 	}
 	// pole podle plodiny a data (před sněhem a mokrem)
 	if (lcls == 1) {
@@ -260,10 +302,30 @@ void fragment() {
 		fc = mix(fc, vec3(0.5, 0.25, 0.6), step(0.75, d2));
 		col = mix(col, fc, spots * 0.7);
 	}
-	// sníh: na rovině víc, na strmých svazích méně, okraje rozbité šumem
-	float snow = clamp((snow_cover * 1.35 - (1.0 - d2) * 0.35 - (1.0 - d1) * 0.12) * 1.6, 0.0, 1.0) * smoothstep(0.55, 0.85, n.y);
-	// mokro: tmavší a lesklejší povrch
-	float wet = wetness * (1.0 - snow);
+	// sníh: na rovině víc, na strmých svazích méně, okraje rozbité šumem.
+	// Sněhové jazyky (§12.3): při couvající pokrývce sníh déle drží v prohlubních
+	// (vlastní výška pod okolím ±6 m) a na severních svazích (normála odvrácená od
+	// poledního slunce); okraj se trhá do jazýčků – šum protáhnutý po směru spádu.
+	float hold = 0.0;
+	float snow = 0.0;
+	if (snow_cover > 0.005) {
+		ivec2 hc = ivec2(clamp((wpos.xz - grid_origin) / spacing, vec2(0.0), grid_size - 1.0));
+		ivec2 hlo = max(hc - 3, ivec2(0));
+		ivec2 hhi = min(hc + 3, ivec2(grid_size) - 1);
+		float hav = (texelFetch(height_tex, ivec2(hlo.x, hc.y), 0).r + texelFetch(height_tex, ivec2(hhi.x, hc.y), 0).r
+			+ texelFetch(height_tex, ivec2(hc.x, hlo.y), 0).r + texelFetch(height_tex, ivec2(hc.x, hhi.y), 0).r) * 0.25;
+		float dep = clamp((hav - wpos.y) * 0.8, 0.0, 1.0);              // prohlubeň
+		vec2 dhv = n.xz / max(length(n.xz), 0.02);                       // směr spádu (protažení jazyků)
+		vec2 tc = wpos.xz * 0.045;
+		tc -= dhv * dot(tc, dhv) * 0.6;
+		float dt = texture(detail_noise, tc + 13.7).r;                   // jazýčkový šum po svahu
+		float north_face = smoothstep(0.0, 0.7, dot(dhv, north_xz)) * (1.0 - n.y);   // severní svah
+		hold = 0.30 * dep + 0.14 * north_face;
+		snow = clamp((snow_cover * 1.35 + hold - (1.0 - dt) * 0.40 - (1.0 - d2) * 0.20
+			- (1.0 - d1) * 0.10) * 1.8, 0.0, 1.0) * smoothstep(0.55, 0.85, n.y);
+	}
+	// mokro: tmavší a lesklejší povrch; v kolejích polních cest drží voda déle
+	float wet = min(wetness * (1.0 + rut * 0.6), 1.0) * (1.0 - snow);
 	col *= 1.0 - 0.32 * wet;
 	col = mix(col, vec3(0.9, 0.92, 0.96) * (0.92 + 0.08 * d1), snow);
 	ALBEDO = col * 1.05;

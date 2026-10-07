@@ -632,7 +632,7 @@ func _hit_creature(pr: Dictionary, hit: Dictionary, target: Node) -> void:
 	elif target is Horse:
 		kind = "horse"
 	world.emit_game_event(id, "shot_hit", _info(pr, hit, kind, target))
-	if _witness(hit["position"], 60.0):
+	if _witness(id, hit["position"], 60.0):
 		world.commit_offense(id, "poskozeni_veci", {"severity": clampf(_energy(pr) / 1500.0, 0.1, 1.0)})
 		_msg(id, "Někdo tě viděl, jak střílíš do zvířete!", 3.5)
 
@@ -640,7 +640,7 @@ func _hit_creature(pr: Dictionary, hit: Dictionary, target: Node) -> void:
 func _hit_car(pr: Dictionary, hit: Dictionary, car: Car) -> void:
 	var id := int(pr["id"])
 	world.emit_game_event(id, "shot_hit", _info(pr, hit, "car", car))
-	if _witness(hit["position"], 80.0):
+	if _witness(id, hit["position"], 80.0):
 		world.commit_offense(id, "poskozeni_veci", {"severity": clampf(_energy(pr) / 1500.0, 0.2, 1.0)})
 		_msg(id, "Postřelil jsi cizí auto – někdo tě viděl!", 3.0)
 
@@ -730,9 +730,9 @@ func _pickup(id: int, a: Dictionary) -> void:
 
 # ------------------------------------------------------------------ zákon
 
-## Je poblíž `pos` svědek (vesničan, obsluha, hlídka) do `r` m?
-func _witness(pos: Vector3, r: float) -> bool:
-	return world.forestry != null and world.forestry.witness_near(pos, r)
+## Nahlásí čin někdo poblíž `pos` (`World.witness_check`: vesničan, obsluha, hlídka) do `r` m?
+func _witness(id: int, pos: Vector3, r: float) -> bool:
+	return world.witness_reported(id, pos, "zbran", r, r)
 
 
 func _cooldown_ok(id: int, offense: String) -> bool:
@@ -763,7 +763,7 @@ func _law_on_shot(id: int, p: Player, spec: Dictionary, pos: Vector3, dir: Vecto
 	var firearm := bool(spec["firearm"])
 	var noise := float(spec["noise"])
 	var hear := minf(noise, 350.0) if firearm else noise          # kdo výstřel uslyší a pozná, co to bylo
-	var witness := _witness(pos, hear)
+	var witness := _witness(id, pos, hear)
 	var in_range := range_ != null and range_.is_shooting_lane(p.global_position, dir)
 	# 1) zbraň bez oprávnění (puška): na střelnici ji hlídá myslivec, jinde stačí svědek
 	var need := String(spec["permit"])
@@ -856,7 +856,7 @@ func _village_check(id: int, p: Player) -> void:
 		return
 	_scare_villagers(p.global_position, VILLAGE_R, id, true, null)
 	# zbraň pod vlivem i bez výstřelu (svědek nablízku)
-	if p.body.promile() > 0.0 and _witness(p.global_position, 30.0) and _cooldown_ok(id, "zbran_pod_vlivem"):
+	if p.body.promile() > 0.0 and _witness(id, p.global_position, 30.0) and _cooldown_ok(id, "zbran_pod_vlivem"):
 		world.commit_offense(id, "zbran_pod_vlivem", {"severity": clampf(p.body.promile() / 2.0, 0.0, 1.0)})
 		_msg(id, "Někdo tě viděl se zbraní pod vlivem alkoholu!", 3.5)
 

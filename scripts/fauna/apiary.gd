@@ -137,6 +137,12 @@ func _bee_mesh() -> ArrayMesh:
 # ------------------------------------------------------------------ simulace
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("apiary", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	_t += delta
 	var w = fauna.world
 	var d: float = w.nearest_player_dist(global_position)

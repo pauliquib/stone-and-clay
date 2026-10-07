@@ -14,6 +14,7 @@ uniform vec3 base_tint : source_color = vec3(1.0);
 uniform float normal_strength = 0.7;
 uniform float blend_sharpness = 4.0;
 uniform float snow_amount = 1.0;   // kolik sněhu na vodorovných plochách drží (silnice jsou protažené)
+uniform float wet_boost = 1.0;     // násobek mokrého efektu (asfalt leskne výrazněji, §12.3)
 global uniform float snow_cover;
 global uniform float wetness;
 
@@ -42,10 +43,11 @@ void fragment() {
 	float r = texture(rough_tex, p.zy).g * bw.x + texture(rough_tex, p.xz).g * bw.y + texture(rough_tex, p.xy).g * bw.z;
 	// sníh na střechách a cestách (plochy natočené vzhůru), mokro – tmavší a lesklejší
 	float snow = clamp((snow_cover * snow_amount * 1.4 - (1.0 - lum) * 0.25) * 1.8, 0.0, 1.0) * smoothstep(0.35, 0.7, n.y);
-	float wet = wetness * (1.0 - snow) * (0.4 + 0.6 * clamp(n.y, 0.0, 1.0));
+	float wet = clamp(wetness * wet_boost, 0.0, 1.0) * (1.0 - snow) * (0.4 + 0.6 * clamp(n.y, 0.0, 1.0));
 	alb *= 1.0 - 0.3 * wet;
 	ALBEDO = mix(alb, vec3(0.9, 0.92, 0.96), snow);
 	ROUGHNESS = mix(mix(clamp(r, 0.3, 1.0), 0.18, wet), 0.7, snow);
+	SPECULAR = mix(0.5, 0.7, wet);   // mokrý povrch leskne víc (za sucha původní 0,5; asfalt díky wet_boost)
 	vec2 tx = texture(normal_tex, p.zy).xy * 2.0 - 1.0;
 	vec2 ty = texture(normal_tex, p.xz).xy * 2.0 - 1.0;
 	vec2 tz = texture(normal_tex, p.xy).xy * 2.0 - 1.0;

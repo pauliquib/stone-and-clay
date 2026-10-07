@@ -34,7 +34,8 @@ var _d := PackedFloat32Array()          # trees.bin (11 floatů na strom)
 var _meta := {}                         # i → [nkey, p, near_idx, fkey, group, far_idx, shape_idx]
 var _near_mm := {}                      # [nkey, p] → MultiMesh
 var _far_mm := {}                       # [fkey, group] → MultiMesh
-var _shapes: Array = []                 # CollisionShape3D kmenů (podle pořadí ve `trunks`)
+var _shapes: Array = []                 # [RID kolizního těla, index tvaru] kmenů (podle pořadí ve `trunks`)
+var _shape_rids: Array[RID] = []        # RIDy tvarů kmenů (vlastník = tady; uvolní se v _exit_tree)
 var _cells := {}                        # Vector2i(64 m) → PackedInt32Array stojících i pokácených stromů
 var _stumps := {}                       # i → StaticBody3D pařezu
 var _orig := {}                         # i → původní Transform3D skrytého stromu
@@ -50,13 +51,26 @@ func setup(w: World, t: Terrain) -> void:
 	planted.setup(w, self)
 
 
+## Svět zaniká (nová hra / konec): uvolnit RIDy tvarů kmenů na fyzikálním serveru (nejsou vázané
+## na žádný uzel, takže by jinak zůstaly leaknout přes reload scény).
+func _exit_tree() -> void:
+	for r in _shape_rids:
+		if r.is_valid():
+			PhysicsServer3D.free_rid(r)
+	_shape_rids.clear()
+
+
 ## Zavolá `MapLoader.build_trees`: syrová data a mapy instancí. Postaví mřížku pro dotazy.
-func set_index(d: PackedFloat32Array, meta: Dictionary, near_mm: Dictionary, far_mm: Dictionary, shapes: Array) -> void:
+## `shapes` = [RID těla, index tvaru] na kmen (tvary žijí jen na fyzikálním serveru, bez uzlů);
+## `shape_rids` převezme TreeManager k uvolnění při zániku světa.
+func set_index(d: PackedFloat32Array, meta: Dictionary, near_mm: Dictionary, far_mm: Dictionary,
+		shapes: Array, shape_rids: Array[RID] = []) -> void:
 	_d = d
 	_meta = meta
 	_near_mm = near_mm
 	_far_mm = far_mm
 	_shapes = shapes
+	_shape_rids = shape_rids
 	count = meta.size()
 	_cells.clear()
 	for i in meta:
@@ -250,8 +264,9 @@ func _set_visible(i: int, on: bool) -> void:
 		if near and int(m[2]) >= 0 and int(m[2]) < near.instance_count:
 			near.set_instance_transform(int(m[2]), xf)
 	var si := int(m[6])
-	if si >= 0 and si < _shapes.size() and is_instance_valid(_shapes[si]):
-		(_shapes[si] as CollisionShape3D).set_deferred("disabled", not on)
+	if si >= 0 and si < _shapes.size():
+		var rec: Array = _shapes[si]
+		PhysicsServer3D.body_set_shape_disabled.call_deferred(rec[0], rec[1], not on)
 
 
 func _make_stump(i: int) -> void:

@@ -11,14 +11,14 @@ extends Node3D
 
 const TILE_M := 2048.0          # hrana dlaždice okolí (m) – 64×64 quadů na dlaždici
 const TILE_QUADS := 64
-const HOLE_SINK := 3.0          # zapuštění pod detailní terén uvnitř katastru (m)
-const HOLE_BLEND := 30.0        # náběh zapuštění od hranice katastru (m)
+const HOLE_SINK := 3.0          # zapuštění pod detailní terén uvnitř jeho obdélníku (m)
+const HOLE_BLEND := 30.0        # náběh zapuštění od okraje detailního terénu (m)
 const SKIRT_DEPTH := 60.0       # sukně okrajů dlaždic (m)
-const FALLBACK_EXTENT := 4500.0 # bez dat: jak daleko za katastr sahá krajina (m)
+const FALLBACK_EXTENT := 4500.0 # bez dat: jak daleko za detailní terén sahá krajina (m)
 const FALLBACK_STEP := 64.0     # krok fallback mřížky (m)
 const FALLBACK_NOISE := 16.0    # zvlnění fallback krajiny (m)
-const FALLBACK_EDGE := 300.0    # fallback: do této vzdálenosti od katastru přesná výška okraje (m)
-const CONE_RANGE := 4000.0      # hrubé kužely lesa do této vzdálenosti od katastru (m)
+const FALLBACK_EDGE := 300.0    # fallback: do této vzdálenosti od detailu přesná výška okraje (m)
+const CONE_RANGE := 4000.0      # hrubé kužely lesa do této vzdálenosti od detailu (m)
 const CONE_STEP := 90.0         # rozestup kuželů (m)
 const CONE_H := 16.0            # výška kuželu lesa (m)
 const HEADER := 28              # hlavička .bin (magic 4 + verze 4 + x0,z0,krok 12 + nx,nz 8)
@@ -66,7 +66,7 @@ func height_at(x: float, z: float) -> float:
 	return lerpf(lerpf(heights[i], heights[i + 1], tx), lerpf(heights[i + nx], heights[i + nx + 1], tx), tz)
 
 
-## Vzdálenost bodu za obdélník katastru (0 = uvnitř).
+## Vzdálenost bodu za obdélník detailního terénu (0 = uvnitř).
 func _kat_dist(x: float, z: float) -> float:
 	var cx := clampf(x, _kat.position.x, _kat.position.x + _kat.size.x)
 	var cz := clampf(z, _kat.position.y, _kat.position.y + _kat.size.y)

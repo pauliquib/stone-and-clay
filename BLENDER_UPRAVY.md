@@ -18,7 +18,7 @@ geometrii a zapíše binární data do `data/`. Co se exportuje a odkud:
 | **Stěny budov** | objekty `OKOLI_Budovy_steny`, `OKOLI_FULL_Budovy_steny`, `OKOLI_DumDomov_steny` + kolekce **`HRA_Steny`** | Blender – kap. 4.1–4.3 |
 | **Střechy** | `OKOLI_Budovy_strechy`, `OKOLI_FULL_Budovy_strechy`, `OKOLI_DumDomov_strecha` + **`HRA_Strechy`** | Blender |
 | **Asfalt / štěrkové cesty** (povrch) | `OKOLI_Komunikace_asfalt`/`_strk` (+ `OKOLI_FULL_…`) + **`HRA_Asfalt`**, **`HRA_Strk`** | Blender – kap. 4.4 |
-| Trasy AI aut, vesničanů a psů | `data/okoli_full_local.geojson` (čáry OSM) | GIS / textový editor – kap. 4.4 |
+| Trasy AI aut, vesničanů a psů | `pipeline/data/okoli_full_local.geojson` (čáry OSM) | GIS / textový editor – kap. 4.4 |
 | **Stromy** | instance v `OKOLI_Vegetace`, `OKOLI_FULL_Vegetace` + **`HRA_Stromy`** | Blender – kap. 4.5 |
 | Odstranění budov / stromů | kolekce **`HRA_Smazat`** (kvádry) | Blender – kap. 4.3 |
 | Dům hráče | `tools/domov_hrace.py` (půdorys + střecha fitem na DMP) | Python, nebo přes `HRA_*` |
@@ -38,9 +38,9 @@ Nemusíš tak zasahovat do obřích spojených meshů `OKOLI_*` (desítky tisíc
 
 1. **Zálohuj zdrojovou scénu.** Soubory `.blend` nejsou v gitu.
    ```bash
-   cp mapa_okoli.blend mapa_okoli_zaloha_$(date +%F).blend
+   cp blend/mapa_okoli.blend blend/mapa_okoli_zaloha_$(date +%F).blend
    ```
-2. **Upravuj vždy `mapa_okoli.blend`** v kořeni repozitáře.
+2. **Upravuj vždy `blend/mapa_okoli.blend`** (složka `blend/` v kořeni repozitáře).
    `blend/mapa.blend` je jen výstup exportu – při každém exportu se přepíše
    a úpravy v něm by zmizely.
 3. Scéna je velká (celý katastr, ~21 800 stromů). Pro plynulou práci:
@@ -126,7 +126,7 @@ Budovy z mapy jsou spojené v několika velkých objektech (`OKOLI_Budovy_steny`
 - Výška pásu **nemusí přesně sedět** – hra silnice „přilepí“ na terén (10 cm nad něj).
   Exportér navíc pod silnicemi mírně sníží terénní mřížku, aby jím terén neprostrkoval.
 - Silnice je kolize s povrchem „asfalt“/„štěrk“ → auta na ní mají správnou přilnavost.
-- **AI auta, vesničané a psi** jezdí/chodí po grafu cest z `data/okoli_full_local.geojson`
+- **AI auta, vesničané a psi** jezdí/chodí po grafu cest z `pipeline/data/okoli_full_local.geojson`
   (čáry `highway` z OSM), ne po meshi. Aby po nové silnici jezdila i AI, přidej do souboru
   `Feature` s `"properties": {"kind": "highway", "highway": "residential", "name": "…"}` a
   `"geometry": {"type": "LineString", "coordinates": [[x, y], …]}` v **Blender souřadnicích** (x, y).
@@ -175,9 +175,9 @@ Když potřebuješ terén změnit (srovnat plochu pod novou stavbou, násep, ryb
 ```python
 # terrain_edit.py – srovná obdélník (Blender souřadnice) na zadanou výšku (vůči scéně)
 import json, numpy as np
-meta = json.load(open("data/geodata_meta_full.json"))
+meta = json.load(open("pipeline/data/geodata_meta_full.json"))
 X0, Y1, RES = meta["grid_x0"], meta["grid_y1"], meta["dem_res"]
-H_ref = json.load(open("data/terrain_ref.json"))["H_ref"]
+H_ref = json.load(open("pipeline/data/terrain_ref.json"))["H_ref"]
 hm = np.load("geodata/dtm_full_scene.npy")               # absolutní výšky (m n. m.)
 x_min, x_max, y_min, y_max = 100.0, 130.0, -260.0, -230.0  # obdélník v Blenderu
 target = 1.5                                              # výška ve scéně (Blender Z)

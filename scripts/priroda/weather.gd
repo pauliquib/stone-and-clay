@@ -77,6 +77,7 @@ var snow_cover := 0.0                  # sníh na zemi 0..1 (1 ≈ 10 cm a víc)
 var wetness := 0.0                     # mokrý povrch 0..1
 var storm := 0.0                       # síla bouřky 0..1 (blesky)
 var rain_recent := 0.0                 # vlhko z posledních dnů 0..1 (roste deštěm, klesá ~0,5 za den) – hřiby
+var drought := 0.0                     # sucho 0..1 (roste bez deště, za horka víc; klesá deštěm) – vyhláška sucha (M4.4 B)
 
 ## Autorita nad počasím: true = simuluje se tady (singleplayer, server). Klient v multiplayeru ji vypne
 ## (`authority = false`): počasí si nevyvíjí samo (ani náhodné blesky), jen plynule doháhá stav ze serveru
@@ -176,6 +177,12 @@ func reset() -> void:
 # ------------------------------------------------------------------ smyčka
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("weather", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if clock == null:
 		return
 	if not authority:
@@ -241,6 +248,7 @@ func _advance() -> void:
 	wind_bearing = fposmod(250.0 + _anom_noise.get_noise_1d(clock.minutes / 60.0 * 0.5 + 200.0) * 120.0, 360.0)
 	storm = move_toward(storm, 1.0 if t.get("storm", false) else 0.0, dt_h * 2.0)
 	rain_recent = clampf(rain_recent + rain * dt_h * 0.25 - dt_h / 24.0 * 0.5, 0.0, 1.0)
+	drought = clampf(drought + dt_h / 24.0 * (0.04 + maxf(temp - 20.0, 0.0) * 0.01) - rain * dt_h * 0.15, 0.0, 1.0)
 	temp = lerpf(temp, _temp_target(), 1.0 - exp(-dt_h / TAU_TEMP))
 	if forced and forced_frost:
 		temp = minf(temp, -2.0)
@@ -354,6 +362,12 @@ func is_snowing() -> bool:
 	return rain > 0.03 and temp < SNOW_BELOW
 
 
+## Mokro povrchu 0..1 (plán §12.3 „wetness_ground“) – alias ke `wetness`, terénní shader
+## jej čte přes globální uniform `wetness` (nastavuje Atmosphere), louže přes Puddles.
+func wetness_ground() -> float:
+	return wetness
+
+
 ## Srážky v mm/h.
 func precip_mm_h() -> float:
 	return rain * RAIN_MM_H
@@ -437,7 +451,7 @@ func grip_factor(surf: String) -> float:
 func state() -> Dictionary:
 	return {"kind": kind, "cloud": cloud, "rain": rain, "fog": fog, "wind": wind, "wind_bearing": wind_bearing,
 		"temp": temp, "snow_cover": snow_cover, "wetness": wetness, "storm": storm,
-		"forced": forced, "rain_recent": rain_recent}
+		"forced": forced, "rain_recent": rain_recent, "drought": drought}
 
 
 ## Klient převezme stav ze serveru: situace (`kind`) hned, spojité veličiny se k němu blíží plynule

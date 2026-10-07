@@ -27,7 +27,7 @@ a to, jestli jde o přestupek nebo trestný čin. Další kroky do něj jen při
                    "pokuta": [2500, 20000], "body": 7, "zakaz_rizeni_mes": [12, 24], "trestny_cin": false, "misto": "spravni_rizeni"},
   "alkohol_nad_1": {"nazev": "Ohrožení pod vlivem návykové látky", "zakon": "40/2009 Sb.", "par": "§ 274",
                     "pokuta": [0, 0], "body": 7, "zakaz_rizeni_mes": [12, 120], "trestny_cin": true, "misto": "soud"},
-  "rychlost_obec_20": {...}, "rizeni_pres_zakaz": {...}, "ujeti_policii": {...}, "ruseni_nocniho_klidu": {...},
+  "rychlost_obec": {...}, "rizeni_pres_zakaz": {...}, "ujeti_policii": {...}, "ruseni_nocniho_klidu": {...},
   "urazka_uredni_osoby": {...}, "nehoda_skoda": {...}, "srazeni_chodce": {...}
  }
 }

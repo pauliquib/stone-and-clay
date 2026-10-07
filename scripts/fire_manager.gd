@@ -255,7 +255,7 @@ func _check_law(id: int, f: Fire) -> void:
 	if not near_forest(f.global_position):
 		return
 	f.illegal = true
-	var seen: bool = world.forestry != null and world.forestry.witness_near(f.global_position, WITNESS_R)
+	var seen: bool = world.witness_reported(id, f.global_position, "ohen", WITNESS_R, WITNESS_R)
 	if seen:
 		world.notify(id, "popup", ["Někdo tě u ohně u lesa viděl!", 3.0])
 		_report(f, true)
@@ -425,7 +425,7 @@ func open_fire_menu(id: int, f: Fire) -> void:
 		_:
 			text = "Vyhaslé ohniště. Zapálíš ho sirkami / zapalovačem v ruce (Q) a levým tlačítkem (potřeba 2× větve a 2× polena, nebo 4× větve)."
 	var opts := []
-	for item in ["polena", "vetve"]:
+	for item in ["polena", "vetve", "vetve_cerstve"]:
 		var n := p.item_count(item)
 		opts.append(["Přiložit: %s (máš %d)" % [ItemsDB.name_of(item), n], add_fuel.bind(id, f, item), n > 0 and f.fuel < Fire.MAX_FUEL - 1.0])
 	for item in cookables(p):
@@ -447,6 +447,8 @@ func add_fuel(id: int, f: Fire, item: String) -> void:
 	p.remove_item(item)
 	world.play_sfx(id, "pickup")
 	world.notify(id, "show_message", ["Přiloženo: %s (dříví na %s)." % [ItemsDB.name_of(item), _hm(f.fuel)], 2.2])
+	if world.vyhlasky:
+		world.vyhlasky.on_fuel(id, f, item)             # kouř z čerstvých větví, zákaz pálení (M4.4 část B)
 
 
 func start_cook(id: int, f: Fire, item: String) -> void:
@@ -540,6 +542,12 @@ func home_chimney_id() -> int:
 # ------------------------------------------------------------------ čas, teplo a šíření
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("fire", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	if world == null or world.clock == null:
 		return
 	var now := world.clock.minutes
@@ -624,6 +632,8 @@ func _end_grass(g: GrassFire) -> void:
 		world.emit_game_event(rid, "fire_out", {"pos": g.global_position, "peak": g.peak_r})
 	if world.players.has(id) and g.peak_r >= OFFENSE_MIN_R:
 		world.commit_offense(id, "zpusobeni_pozaru", {"severity": clampf(g.peak_r / GrassFire.MAX_R, 0.0, 1.0)})
+		if world.hasici:
+			world.hasici.on_caused_fire(id)      # M5.3: respekt hasičů −5 za požár, který způsobil hráč
 		var rep: Reputation = world.reputations.get(id)
 		if rep:
 			rep.change_karma(KARMA_FIRE, "způsobil požár")

@@ -52,5 +52,5 @@ podpisy petice rozhovorem, protikandidát.
 7. Uložit / načíst → hodnoty zůstanou.
 
 ## 6. Závěr
-README, VIZE a roadmapa README odškrtnout, PROJECT_LOG, deník AI, commit „M7.1 Popularita a kritéria: …“,
+README, VIZE a roadmapa README odškrtnout, PROJECT_LOG, commit „M7.1 Popularita a kritéria: …“,
 checklist a čekat.

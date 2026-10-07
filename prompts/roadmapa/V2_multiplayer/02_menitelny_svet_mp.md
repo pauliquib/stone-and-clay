@@ -42,4 +42,4 @@ ohně a stavby se synchronizují a ukládají se se světem hosta.
 8. Host uloží, oba odejdou, host načte, B se připojí → vše na místě.
 
 ## 5. Závěr
-GDD kap. 6 (autorita, vlastnictví domů), README, PROJECT_LOG, deník AI, commit „V2.02 Měnitelný svět v MP: …“, checklist a čekat.
+GDD kap. 6 (autorita, vlastnictví domů), README, PROJECT_LOG, commit „V2.02 Měnitelný svět v MP: …“, checklist a čekat.

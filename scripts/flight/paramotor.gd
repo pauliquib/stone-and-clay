@@ -3,7 +3,7 @@
 ##  - START: křídlo se na louce rozloží za pilota (World.pg_prepare), F = navléct nosiče;
 ##    W = rozběh po nohou, křídlo se naplní jen čelem proti větru (HUD šipka větru);
 ##    boční vítr / slabý rozběh → křídlo spadne na stranu; vítr > 8 m/s → vytržení a pád;
-##    plyn (Shift) před nahozeným křídlem → pád na záda / vrtule do trávy.
+##    plyn (Shift) před nahozeným křídlem jen varuje (tah se nepřičte).
 ##  - ŘÍZENÍ: A/D = levá / pravá brzda (zatáčení), S = obě brzdy (zpomalení; hluboký tah →
 ##    propad / stall), W nebo Shift = plyn, Mezerník (držet) = povolené trimry (rychlejší let),
 ##    Ctrl = „uši“ (větší odpor → rychlejší klesání). Turbulence křídlo částečně zavře
@@ -12,7 +12,7 @@
 ##    jinak tvrdé přistání (zranění). Po dosednutí křídlo padne za pilota; E = „Složit křídlo“.
 ##  - PRAVIDLA: pilotní průkaz `pilot_pg_motor` (škola 35 000 Kč – teorie eTest „paramotor“
 ##    + 5 výcvikových vzletů s instruktorem „rádiem“), registrace stroje a pojištění na
-##    počítači (Letectví – ÚCL). Přestupky: bez průkazu / registrace, nízko nad obcí
+##    počítači (Letectví – ÚVL). Přestupky: bez průkazu / registrace, nízko nad obcí
 ##    (<150 m AGL, svědek slyší motor ~800 m), nad lidmi, v noci, za ztížené viditelnosti.
 ## Stroj stojí `World` (`aircrafts`), uložení sdílí `Aircraft.save_dict` + `pg_item`.
 class_name Paramotor
@@ -24,7 +24,8 @@ const RUN_MAX_V := 7.5             # m/s – strop rychlosti rozběhu nohama
 const INFLATE_T := 1.6             # s – doba zvedání křídla nad hlavu
 const CROSS_MAX := 3.5             # m/s – max. boční složka větru pro čisté nahození
 const WIND_SAFE := 8.0             # m/s – silnější vítr křídlo vytrhne (pád)
-const FUMBLE_LOCK := 1.6           # s blokáda po pádu / vytržení
+const FUMBLE_LOCK := 1.6           # s blokáda po vytržení křídla větrem
+const SHIFT_WARN_CD := 3.0         # s mezi varováními „plyn až s křídlem nad hlavou“
 const BRAKE_CD := 0.5              # přídavný odpor obou brzd naplno (S)
 const SIDE_BRAKE_CD := 0.18        # přídavný odpor jednostranné brzdy (A/D)
 const EARS_CD := 0.25              # „uši“ (Ctrl) – přídavný odpor → rychlejší klesání
@@ -40,7 +41,13 @@ const RECOVER_K := 2.5             # násobitel zotavení opačnou brzdou
 const SINK_STALL_T := 0.7          # s hlubokého tahu obou brzd → propad (stall křídla)
 const FLARE_AGL := 1.6             # m – okno pro vyrovnání přistání oběma brzdami
 const FLARE_BRAKE := 0.7           # potřebný tah obou brzd pro flare
-const WING_H := 6.6                # m – výška křídla nad závěsem (vizuální kyvadlo)
+const WING_H := 7.4                # m – vrchol oblouku křídla nad zemí (vis) při visu / letu
+const RISER := Vector3(0.3, 2.0, 0.05)   # karabiny riserů (vis) = čep kyvadla křídla
+const WING_R := 6.0                # m – poloměr oblouku křídla (čelní pohled)
+const WING_ARC := 0.9              # rad – půlúhel oblouku (rozpětí ~9,4 m v průmětu)
+const WING_CHORD := 2.6            # m – hloubka uprostřed
+const WING_TIP_CHORD := 1.3        # m – hloubka na konci
+const WING_CELLS := 14             # barevných komor
 const PG_LAW_TICK := 4.0           # s – perioda kontroly přestupků
 const PG_LOW_ALT := 150.0          # m AGL – minimum nad obcí / „šumový“ limit
 const PG_PERSON_R := 35.0          # m – osoba pod paramotorem (nad shromážděním)
@@ -63,8 +70,11 @@ var _sink_t := 0.0                 # s hlubokého tahu obou brzd (→ propad)
 var _law_pg_t := 0.0
 var _was_flying := false
 var _infl_warned := false          # hláška „křídlo spadlo na stranu“ jen jednou za pokus
+var _shift_warn_t := -10.0         # _life_t posledního varování Shift před křídlem
 
-var _wing_root: Node3D             # vizuál křídla (pohybuje se podle fáze / kyvadla)
+var _wing_root: Node3D             # čep křídla v karabinách (fáze nahazování / kyvadlo)
+var _wing_mi: MeshInstance3D       # mesh křídla (na zemi naplocho – scale y)
+var _wing_vis := 0.0               # vizuální fáze křídla 0 = leží, 1 = nahoře (plynule padá)
 var _lines: MeshInstance3D         # šňůry (jen když křídlo stoupá / je nahoře)
 
 
@@ -120,6 +130,7 @@ func _pg_tick(dt: float) -> void:
 	if on_ground:
 		if _was_flying and pg_state == "wing_up":
 			pg_state = "carried"                                 # po dosednutí křídlo padá za záda
+			_inflate = 0.0
 		_was_flying = false
 		_collapse_t = 0.0
 		_sink_t = 0.0
@@ -159,6 +170,9 @@ func _start_collapse(msg: String) -> void:
 
 func set_pilot(p: Player) -> void:
 	super.set_pilot(p)
+	if p.visual and on_ground:
+		p.visual.position = Vector3.ZERO                         # na zemi stojí nohama na trávě
+		p.visual.pose = "stand"
 	if pg_state == "laid":
 		pg_state = "carried"
 		_notify("Nosiče navlečené. Otoč se ČELEM PROTI VĚTRU (šipka na přístrojích), " +
@@ -175,55 +189,45 @@ func clear_pilot() -> void:
 # ------------------------------------------------------------------ země: rozběh a nahození
 
 ## Pojíždění = běh pilota s motorem na zádech. W = nohy; tah vrtule se započítá až s křídlem
-## nad hlavou (plyn předtím = fumble). Vzlet při v_min a dostatečném vztlaku padáku.
+## nad hlavou (Shift předtím jen varuje – A2-13). Vzlet, když vztlak padáku převáží tíhu.
+## Rychlost na zemi je vodorovná a náběh = pitch (A2-03, společné `Aircraft._ground_aero`).
 func _on_ground(xf: Transform3D, gy: float,
 		steer_in: float, elev_in: float, dt: float) -> void:
 	var pos := xf.origin
 	var fwd := Vector3(-sin(_yaw), 0.0, -cos(_yaw))
-	var h_a := world.terrain.height_at(pos.x + fwd.x * 2.0, pos.z + fwd.z * 2.0)
-	var h_b := world.terrain.height_at(pos.x - fwd.x * 2.0, pos.z - fwd.z * 2.0)
-	var slope := (h_a - h_b) / 4.0
+	var slope := _slope_at(pos, fwd)
 	var v_ground := maxf(speed, 0.0)
 	var wind := wind_at(pos)
 	var m := total_kg()
-	if pg_state == "carried" or pg_state == "wing_up":
-		var run_in := clampf(pilot_input.throttle, 0.0, 1.0) if pilot_input else 0.0   # W = nohy
-		var a := run_in * RUN_ACC * (1.0 - v_ground / RUN_MAX_V) - MU_GRASS * G - G * slope * 0.5
-		if elev_in > 0.0:                                        # Mezerník na zemi = zabrždění
-			a -= BRAKE_DECEL * 0.5
-		if pg_state == "wing_up":
-			a += float(spec["thrust"]) * throttle / m            # tah vrtule pomáhá doběhnout
-		elif _sprint_in() and _life_t > _lock_t:
-			_fumble()
-			return
-		v_ground = maxf(v_ground + a * dt, 0.0)
-		if _life_t < _lock_t:
-			v_ground = 0.0                                       # po pádu se sbalíš a stojíš
-		_yaw -= steer_in * GROUND_STEER * clampf(v_ground / 6.0, 0.0, 1.0) * dt
-		_bank = lerpf(_bank, -steer_in * 0.05, minf(dt * 3.0, 1.0))
-		var pitch_tgt := atan(clampf(slope, -0.4, 0.4))
-		if v_ground >= float(spec["v_min"]) * 0.9:
-			pitch_tgt = 0.12
-		_pitch = lerpf(_pitch, pitch_tgt, minf(dt * 4.0, 1.0))
-		pos.y = gy + float(spec["gear_h"])
-		var new_basis := Basis.from_euler(Vector3(_pitch, _yaw, _bank))
-		global_transform = Transform3D(new_basis, pos)
-		linear_velocity = new_basis * Vector3(0, 0, -v_ground)
-		speed = v_ground
-		_burn_fuel(dt)
-		_update_inflate(dt, wind, v_ground)
-		# vzlet: křídlo nahoře a vztlak převáží
-		if pg_state == "wing_up" and v_ground >= float(spec["v_min"]) * 0.95:
-			var rw := wind_at(pos) - linear_velocity
-			var lrw := new_basis.inverse() * rw
-			var va := maxf(lrw.length(), 0.01)
-			var cl := float(spec["CL0"]) + float(spec["CL_A"]) * atan2(lrw.y, maxf(lrw.z, 0.01))
-			if 0.5 * RHO * va * va * float(spec["S"]) * cl * _lift_scale() > m * G:
-				on_ground = false
-				_pitch = 0.14
-				world.pg_training_takeoff(owner_id)
-				_notify("Odlepení! Usaď se v sedačce – A/D brzdy do stran, S obě (pozor na propad), " +
-					"W/Shift plyn, Mezerník trimry, Ctrl uši.", 6.0)
+	var wing_up := pg_state == "wing_up"
+	var ae := _ground_aero(pos, fwd, v_ground, slope, 1.0 if wing_up else 0.0)
+	var run_in := clampf(pilot_input.throttle, 0.0, 1.0) if pilot_input else 0.0   # W = nohy
+	var a := run_in * RUN_ACC * maxf(1.0 - v_ground / RUN_MAX_V, 0.0) - MU_GRASS * G - G * slope * 0.5
+	if elev_in > 0.0:                                            # Mezerník na zemi = zabrždění
+		a -= BRAKE_DECEL * 0.5
+	if wing_up:
+		a += (_thrust(float(ae["va"])) - float(ae["drag"])) / m   # tah vrtule pomáhá doběhnout
+	elif _sprint_in():
+		_shift_warn()
+	v_ground = maxf(v_ground + a * dt, 0.0)
+	if _life_t < _lock_t:
+		v_ground = 0.0                                           # po vytržení se sbíráš a stojíš
+	_ground_move(pos, gy, slope, v_ground, float(ae["va"]), steer_in, dt, wing_up)
+	_burn_fuel(dt)
+	_update_inflate(dt, wind, v_ground)
+	# vzlet: křídlo nahoře a vztlak převáží
+	if wing_up and _try_liftoff(float(ae["lift"]), float(ae["va"]), v_ground):
+		world.pg_training_takeoff(owner_id)
+		_notify("Odlepení! Usaď se v sedačce – A/D brzdy do stran, S obě (pozor na propad), " +
+			"W/Shift plyn, Mezerník trimry, Ctrl uši.", 6.0)
+
+
+## Shift před nahozeným křídlem: jen varování (dřív pád na záda – A2-13), tah se nepřičte.
+func _shift_warn() -> void:
+	if _life_t - _shift_warn_t < SHIFT_WARN_CD:
+		return
+	_shift_warn_t = _life_t
+	_notify("Plyn až s křídlem nad hlavou! Nejdřív čelem proti větru rozběh (W), Shift potom.", 3.0)
 
 
 ## Nahazování křídla: potřebný čelní proud (rozběh + protivítr), málo boční složky.
@@ -249,20 +253,6 @@ func _update_inflate(dt: float, wind: Vector3, v_ground: float) -> void:
 			_infl_warned = true
 			_notify("Křídlo spadlo na stranu – nedostatečný rozběh nebo boční vítr. Znovu a čelem proti větru!", 3.5)
 		_inflate = maxf(_inflate - dt * 1.2 / INFLATE_T, 0.0)
-
-
-## Plyn (Shift) dřív, než je křídlo nad hlavou → pád na záda, vrtule do trávy.
-func _fumble() -> void:
-	dmg = minf(dmg + 8.0, 99.0)
-	if body_state:
-		body_state.hurt(6.0, "pád při rozběhu paramotoru")
-	world.play_sfx(owner_id, "thud", 0.8, -2.0)
-	_notify("Plyn před křídlem! Motor tě převrátil na záda a vrtule jede do trávy. Nejdřív křídlo nahlas, pak plyn.", 4.5)
-	_lock_t = _life_t + FUMBLE_LOCK
-	_inflate = 0.0
-	throttle = 0.0
-	speed = 0.0
-	linear_velocity = Vector3.ZERO
 
 
 ## Vytržení křídla silným větrem (vléčení, pád).
@@ -303,14 +293,14 @@ func _bank_target(steer_in: float) -> float:
 
 
 func _flare_ok() -> bool:
-	if world == null or world.terrain == null:
+	if world == null:
 		return false
-	var gy := world.terrain.height_at(global_position.x, global_position.z)
-	return global_position.y - gy <= FLARE_AGL and _brake_both >= FLARE_BRAKE
+	return _xf.origin.y - _gh(_xf.origin.x, _xf.origin.z) <= FLARE_AGL and _brake_both >= FLARE_BRAKE
 
 
 func _flare_land(impact: float) -> void:
 	pg_state = "carried"                                     # křídlo po doskočení padá za záda
+	_inflate = 0.0
 	if impact > 2.2:
 		if body_state:
 			body_state.hurt((impact - 2.2) * 9.0, "špatné doskočení parametru")
@@ -319,6 +309,11 @@ func _flare_land(impact: float) -> void:
 	else:
 		_notify("Pěkné dosednutí na nohy – doběhni! (E = složit křídlo)", 3.5)
 		world.play_sfx(owner_id, "land", 1.0, -6.0)
+
+
+## Hláška při vstupu do přetažení (Fáze 4, stav „Pretazeni“) – u padáku se pouštějí brzdy.
+func _stall_hint() -> String:
+	return "PŘETAŽENÍ křídla! Povol brzdy a přidej plyn – nos padne a křídlo se zase chytí."
 
 
 # ------------------------------------------------------------------ přestupky (svědek = hluk ~800 m)
@@ -333,8 +328,7 @@ func _law_pg(dt: float) -> void:
 	var pos := global_position
 	if not world.pg_noise_witnessed(pos):
 		return
-	var gy := world.terrain.height_at(pos.x, pos.z) if world.terrain else pos.y
-	var agl := pos.y - gy
+	var agl := pos.y - _gh(pos.x, pos.z)
 	_offense("pg_bez_prukazu", not world.has_permit(owner_id, "pilot_pg_motor", pos), {})
 	_offense("pg_bez_registrace", not world.has_permit(owner_id, "pg_registrace", pos), {})
 	_offense("pg_nizko_nad_obci", agl < PG_LOW_ALT and world.pg_over_village(pos), {"agl": agl})
@@ -354,104 +348,148 @@ func _offense(oid: String, cond: bool, data: Dictionary) -> void:
 
 # ------------------------------------------------------------------ model (MeshKit)
 
-## Vizuál: motor s klecí a vrtulí na zádech sedačky, závěsy se šňůrami a padákové křídlo
-## (barevný loft oblouk ~10 m rozpětí) – samostatný uzel `_wing_root` (kyvadlo / fáze).
+## Vizuál (`vis`: y = 0 zem pod nohama, −Z vpřed): sedačka s opěrou, motor s nádrží a klecí
+## vrtule na zádech pilota, závěsy (risery) a padákové křídlo – profilovaný oblouk s barevnými
+## komorami a šňůrami. Křídlo visí na uzlu `_wing_root` s čepem v karabinách (kyvadlo, fáze
+## nahazování); na zemi leží naplocho za pilotem (A2-09).
 func _build_mesh() -> void:
-	seat_pos = Vector3(0, -0.4, 0.1)   # postava „visí“ v postroji: nohy ~0,5 m nad zemí (gear_h 0,9)
 	var mk := MeshKit.new()
-	var frame := Color(0.32, 0.33, 0.36)
+	var frame := Color(0.62, 0.63, 0.66)
 	var dark := Color(0.16, 0.16, 0.18)
-	mk.box(Vector3(0, 0.55, 0.1), Vector3(0.55, 0.45, 0.4), Color(0.2, 0.2, 0.22))       # sedačka / sedák
-	mk.box(Vector3(0, 0.85, 0.42), Vector3(0.5, 0.7, 0.28), dark)                        # motor na zádech
-	mk.box(Vector3(0, 1.25, 0.42), Vector3(0.3, 0.12, 0.2), Color(0.5, 0.3, 0.1))        # nádrž
-	# klec vrtule: prsten + 4 paprsky (za pilotem, rovina XZ svisle = rotace o X)
-	mk.cylinder(Vector3(0, 1.05, 0.62), 0.52, 0.52, 0.04, dark, Vector3(PI * 0.5, 0, 0), 20)
-	for ang in [0.0, PI * 0.5]:
-		mk.box(Vector3(0, 1.05, 0.6), Vector3(0.05, 1.0, 0.04), frame, Vector3(0, 0, ang))
-	mk.box(Vector3(-0.34, 1.35, 0.05), Vector3(0.05, 1.4, 0.05), frame)                  # závěsy (risery)
-	mk.box(Vector3(0.34, 1.35, 0.05), Vector3(0.05, 1.4, 0.05), frame)
+	var harness := Color(0.18, 0.22, 0.3)
+	mk.box(Vector3(0, 0.76, 0.25), Vector3(0.46, 0.06, 0.36), harness)                  # sedák (vršek 0,79)
+	mk.box(Vector3(0, 1.08, 0.24), Vector3(0.44, 0.6, 0.08), harness)                   # opěra / zádový chránič
+	mk.box(Vector3(0, 1.0, 0.4), Vector3(0.34, 0.4, 0.24), dark)                        # motor
+	mk.cylinder(Vector3(0, 1.0, 0.54), 0.07, 0.07, 0.1, dark, Vector3(PI * 0.5, 0, 0), 10)  # náboj reduktoru
+	mk.box(Vector3(0, 0.66, 0.38), Vector3(0.32, 0.2, 0.22), Color(0.85, 0.5, 0.12))    # nádrž
+	# klec vrtule: obruč z 20 trubek + 4 paprsky
+	var cage_c := Vector3(0, 1.02, 0.62)
+	for i in range(20):
+		var a0 := TAU * i / 20.0
+		var a1 := TAU * (i + 1) / 20.0
+		rod(mk, cage_c + Vector3(cos(a0), sin(a0), 0) * 0.62, cage_c + Vector3(cos(a1), sin(a1), 0) * 0.62, 0.012, frame, 4)
+	for i in range(4):
+		var a2 := TAU * i / 4.0 + PI * 0.25
+		rod(mk, cage_c + Vector3(0, 0, -0.06), cage_c + Vector3(cos(a2), sin(a2), 0) * 0.62, 0.01, frame, 4)
+	# ramena k karabinám a risery vzhůru
+	for sx in [-1.0, 1.0]:
+		rod(mk, Vector3(sx * 0.18, 1.2, 0.34), Vector3(sx * 0.26, 1.42, 0.06), 0.015, frame, 5)
+		rod(mk, Vector3(sx * 0.26, 1.42, 0.06), Vector3(sx * RISER.x, RISER.y, RISER.z), 0.012, dark, 4)
 	var mi := MeshInstance3D.new()
 	mi.mesh = mk.commit(MeshKit.vc_material(0.75))
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	vis.add_child(mi)
 	_prop = MeshInstance3D.new()                                   # vrtule v kleci (točí se kolem Z)
 	var pmk := MeshKit.new()
-	pmk.box(Vector3.ZERO, Vector3(0.06, 0.95, 0.03), Color(0.1, 0.1, 0.1))
-	pmk.box(Vector3.ZERO, Vector3(0.95, 0.06, 0.03), Color(0.1, 0.1, 0.1))
+	pmk.box(Vector3.ZERO, Vector3(0.07, 1.1, 0.03), Color(0.1, 0.1, 0.1))
 	_prop.mesh = pmk.commit(MeshKit.vc_material(0.6))
-	_prop.position = Vector3(0, 1.05, 0.6)
+	_prop.position = cage_c + Vector3(0, 0, -0.02)
 	vis.add_child(_prop)
-	# křídlo: loft oblouk přes rozpětí (buňky = barevné pruhy přes rozpětí)
+	# křídlo: čep `_wing_root` v karabinách, mesh křídla posunutý nahoru (vrchol oblouku = WING_H)
 	_wing_root = Node3D.new()
+	_wing_root.position = Vector3(0, RISER.y, RISER.z)
 	vis.add_child(_wing_root)
+	_wing_mi = MeshInstance3D.new()
+	_wing_mi.mesh = _wing_mesh()
+	_wing_mi.position = Vector3(0, WING_H - RISER.y, 0)
+	_wing_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	_wing_root.add_child(_wing_mi)
+	_lines = MeshInstance3D.new()
+	_lines.mesh = _lines_mesh()
+	_wing_root.add_child(_lines)
+	# pilot: ve vzduchu sedí v sedačce (pánev ~6 cm nad sedákem), nohy volně vpředu dole,
+	# ruce u riserů (řidičky brzd); na zemi stojí (seat (0,0,0), póza stand – viz _process)
+	seat_pos = Vector3(0, 0.79 + 0.06 - 0.5, 0.06)
+	rider = rider_pose(seat_pos, 0.5, -0.1, Vector3(0, 1.55, 0.02), Vector3(0, 0.1, -0.35))
+	eye_pos = seat_pos + Vector3(0, 1.17, -0.06)
+
+
+## Bod profilu křídla ve stanici `th` (rad podél oblouku) – `u` 0..1 podél hloubky od náběžné
+## hrany, `side` +1 horní / −1 spodní plocha. Souřadnice vůči vrcholu oblouku (mesh křídla).
+func _wing_pt(th: float, u: float, side: float) -> Vector3:
+	var c := WING_CHORD - (WING_CHORD - WING_TIP_CHORD) * pow(th / WING_ARC, 2.0)
+	var nrm := Vector3(sin(th), cos(th), 0.0)
+	var ctr := Vector3(WING_R * sin(th), WING_R * cos(th) - WING_R, 0.0)
+	var thick := 0.14 * c * sin(PI * pow(u, 0.6))
+	var off := thick * (0.7 if side > 0.0 else -0.3)
+	return ctr + nrm * off + Vector3(0, 0, -0.3 * c + u * c)
+
+
+## Padákové křídlo: oblouk WING_CELLS komor (každá komora vlastní barva – zdvojené stanice),
+## uzavřený profil (horní / spodní plocha), víčka na koncích.
+func _wing_mesh() -> ArrayMesh:
 	var wmk := MeshKit.new()
-	var palette := [Color(0.85, 0.25, 0.2), Color(0.95, 0.85, 0.25), Color(0.2, 0.45, 0.8)]
+	var palette := [Color(0.85, 0.22, 0.18), Color(0.97, 0.85, 0.25), Color(0.2, 0.45, 0.82)]
+	const US := [0.0, 0.08, 0.3, 0.6, 1.0]
 	var rings := []
 	var cols := []
-	for i in range(9):
-		var x := -5.0 + i * (10.0 / 8.0)
-		var arc := 0.9 * (1.0 - (x / 5.0) * (x / 5.0))
-		rings.append(PackedVector3Array([Vector3(x, arc, -1.05), Vector3(x, arc * 0.85, 1.05)]))
-		cols.append([palette[i % 3], palette[i % 3].darkened(0.15)])
-	wmk.loft(rings, cols, false)
-	var wmi := MeshInstance3D.new()
-	wmi.mesh = wmk.commit(MeshKit.vc_material(0.85, 0.0, 0.0, false))
-	wmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	_wing_root.add_child(wmi)
-	# šňůry: ~16 tenkých válečků ze závěsů k okraji křídla (vizuální, jen když stoupá/je nahoře)
+	for i in range(WING_CELLS):
+		var col: Color = palette[i % palette.size()]
+		for e in [0, 1]:
+			var th := -WING_ARC + 2.0 * WING_ARC * float(i + e) / WING_CELLS
+			var ring := PackedVector3Array()
+			var rc := []
+			for u in US:                                          # horní plocha náběžná → odtoková
+				ring.append(_wing_pt(th, float(u), 1.0))
+				rc.append(col)
+			for k in range(US.size() - 2, 0, -1):                # spodní plocha zpět
+				ring.append(_wing_pt(th, float(US[k]), -1.0))
+				rc.append(col.darkened(0.3))
+			rings.append(ring)
+			cols.append(rc)
+	wmk.loft(rings, cols, true)
+	cap_ring(wmk, rings[0], true, palette[0].darkened(0.3))
+	cap_ring(wmk, rings[rings.size() - 1], false, palette[(WING_CELLS - 1) % palette.size()].darkened(0.3))
+	return wmk.commit(MeshKit.vc_material(0.85))
+
+
+## Šňůry: z karabin (čep `_wing_root`) k přední (A) a zadní (C) řadě na spodní ploše křídla.
+func _lines_mesh() -> ArrayMesh:
 	var lmk := MeshKit.new()
-	for side in [-1.0, 1.0]:
-		for i in range(8):
-			var tx: float = side * (0.6 + i * 0.62)
-			var ty: float = WING_H + 0.9 * (1.0 - (tx / 5.0) * (tx / 5.0))
-			_rope(lmk, Vector3(side * 0.34, 2.0, 0.05), Vector3(tx, ty, 0.05), Color(0.75, 0.75, 0.75))
-	_lines = MeshInstance3D.new()
-	_lines.mesh = lmk.commit(MeshKit.vc_material(0.5))
-	vis.add_child(_lines)
-
-
-## Tenký váleček šňůry mezi body a→b (MeshKit.add_prim s bází podle směru).
-func _rope(mk: MeshKit, a: Vector3, b: Vector3, color: Color) -> void:
-	var d := b - a
-	var len := d.length()
-	if len < 0.01:
-		return
-	var y_ax := d / len
-	var x_ax := y_ax.cross(Vector3.FORWARD)
-	x_ax = y_ax.cross(Vector3.RIGHT).normalized() if x_ax.length() < 0.01 else x_ax.normalized()
-	var z_ax := x_ax.cross(y_ax)
-	var cm := CylinderMesh.new()
-	cm.top_radius = 0.012
-	cm.bottom_radius = 0.012
-	cm.height = len
-	cm.radial_segments = 5
-	mk.add_prim(cm, Transform3D(Basis(x_ax, y_ax, z_ax), (a + b) * 0.5), color)
+	var up := Vector3(0, WING_H - RISER.y, 0)
+	for sx in [-1.0, 1.0]:
+		var root := Vector3(sx * RISER.x, 0.0, 0.0)
+		for k in range(6):
+			var th: float = sx * WING_ARC * (k + 0.5) / 6.0
+			for u in [0.12, 0.62]:
+				rod(lmk, root, up + _wing_pt(th, u, -1.0), 0.008, Color(0.82, 0.82, 0.8), 3)
+	return lmk.commit(MeshKit.vc_material(0.5))
 
 
 # ------------------------------------------------------------------ vizuál / HUD / save
 
+## Pilot paramotoru na zemi běží (Humanoid.speed), ve vzduchu sedí.
+func rider_speed() -> float:
+	return speed if on_ground and pilot != null else 0.0
+
+
 func _process(delta: float) -> void:
 	super._process(delta)
-	# postava pilota: ve vzduchu sedí v sedačce, na zemi stojí/běží
-	if pilot != null and pilot.visual:
-		pilot.visual.pose = "ride" if not on_ground else "stand"
-	# poloha křídla podle fáze (na zemi za zády → nahození → nad hlavou) + kyvadlo
+	# postava pilota: ve vzduchu sedí v sedačce, na zemi stojí nohama na trávě a běží
+	if pilot != null and pilot.visual and pilot.visual.get_parent() == vis:
+		var air := not on_ground
+		pilot.visual.pose = "ride" if air else "stand"
+		pilot.visual.on_floor = true
+		pilot.visual.position = pilot.visual.position.lerp(seat_pos if air else Vector3.ZERO, minf(delta * 4.0, 1.0))
+	# křídlo: položené naplocho za pilotem → nahazování obloukem → nad hlavou + kyvadlo
 	if _wing_root:
 		var t := clampf(_inflate, 0.0, 1.0)
 		if not on_ground or pg_state == "wing_up":
-			t = maxf(t, 0.999)
-		# položené křídlo leží za pilotem, nahozené visí ~WING_H nad závěsem
-		var lay := Vector3(0, 0.45, 3.4)
-		_wing_root.position = lay.lerp(Vector3(0, WING_H, 0.1), ease(t, 0.5))
-		var rot_x := lerpf(-1.25, 0.0, ease(t, 0.5))                # vztyčení při nahození
-		var sway := -_bank * 0.4                                     # kyvadlo: v zatáčce pilot vylétává ven
-		var pump := _brake_both * 0.12                               # brzdy houpu vpřed/vzad
+			t = 1.0
+		_wing_vis = move_toward(_wing_vis, t, delta * (4.0 if t > _wing_vis else 0.7))
+		var k := ease(_wing_vis, 0.6)
+		var lay := (1.0 - k) * PI * 0.5                            # 90° = křídlo leží vzadu
+		_wing_root.position = Vector3(0, lerpf(0.25, RISER.y, k), RISER.z)
+		var sway := -_bank * 0.4 * k                               # kyvadlo: v zatáčce pilot vylétává ven
+		var pump := _brake_both * 0.12 * k                         # brzdy houpou vpřed/vzad
 		if _collapse_t > 0.0:
 			sway += _collapse_side * 0.55
 			pump += 0.15
-		_wing_root.rotation = Vector3(rot_x + pump, 0.0, sway)
+		_wing_root.rotation = Vector3(lay + pump, 0.0, sway)
+		_wing_mi.rotation = Vector3(-lay, 0.0, 0.0)                # hloubka zůstává vodorovně
+		_wing_mi.scale = Vector3(1.0, lerpf(0.06, 1.0, k), 1.0)    # na zemi oblouk naplocho
 	if _lines:
-		_lines.visible = _inflate > 0.25 or not on_ground
+		_lines.visible = _wing_vis > 0.85
 
 
 ## Telemetrie navíc: fáze přípravy, zavření křídla, výstrahy pro `FlightHud`.

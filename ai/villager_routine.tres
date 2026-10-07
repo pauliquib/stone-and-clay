@@ -1,0 +1,210 @@
+[gd_resource type="BehaviorTree" load_steps=50 format=3]
+
+[ext_resource type="Script" path="res://scripts/ai/conditions/is_time_of_day.gd" id="1_8wkxd"]
+[ext_resource type="Script" path="res://scripts/ai/actions/go_to_place.gd" id="2_8in0b"]
+[ext_resource type="Script" path="res://scripts/ai/actions/animate.gd" id="3_ir1jn"]
+[ext_resource type="Script" path="res://scripts/ai/conditions/is_work_day.gd" id="4_ne86n"]
+[ext_resource type="Script" path="res://scripts/ai/conditions/has_job.gd" id="5_5kohf"]
+[ext_resource type="Script" path="res://scripts/ai/actions/wait.gd" id="6_tr6ou"]
+[ext_resource type="Script" path="res://scripts/ai/conditions/is_pub_evening.gd" id="7_gmsph"]
+[ext_resource type="Script" path="res://scripts/ai/conditions/below_promile.gd" id="8_42ppu"]
+[ext_resource type="Script" path="res://scripts/ai/actions/random_walk.gd" id="9_44c68"]
+[ext_resource type="Script" path="res://scripts/ai/conditions/garden_weather.gd" id="10_gw4ea"]
+[ext_resource type="Script" path="res://scripts/ai/conditions/place_open.gd" id="11_po7xk"]
+[ext_resource type="Script" path="res://scripts/ai/conditions/is_free_day.gd" id="12_fd3qu"]
+[ext_resource type="Script" path="res://scripts/ai/conditions/not_done_today.gd" id="13_nd5ys"]
+[ext_resource type="Script" path="res://scripts/ai/actions/mark_day.gd" id="14_md9bz"]
+
+[sub_resource type="BTCondition" id="BTCondition_ujzde"]
+custom_name = "Je 6–8 h?"
+script = ExtResource("1_8wkxd")
+hour_from = 6.0
+hour_to = 8.0
+
+[sub_resource type="BTCondition" id="BTCondition_8gxd6"]
+custom_name = "Počasí na zahradu?"
+script = ExtResource("10_gw4ea")
+
+[sub_resource type="BTAction" id="BTAction_ncf10"]
+custom_name = "Jdi na zahradu"
+script = ExtResource("2_8in0b")
+place_var = "garden"
+arrive = 1.8
+
+[sub_resource type="BTAction" id="BTAction_epf91"]
+custom_name = "Kope na zahradě"
+script = ExtResource("3_ir1jn")
+anim = "dig"
+pose = ""
+duration = 20.0
+promile_gain = 0.0
+
+[sub_resource type="BTSequence" id="BTSequence_dhodz"]
+custom_name = "Ranní rutina"
+children = [SubResource("BTCondition_ujzde"), SubResource("BTCondition_8gxd6"), SubResource("BTAction_ncf10"), SubResource("BTAction_epf91")]
+
+[sub_resource type="BTCondition" id="BTCondition_doc9i"]
+custom_name = "Je pracovní den?"
+script = ExtResource("4_ne86n")
+
+[sub_resource type="BTCondition" id="BTCondition_s0j8h"]
+custom_name = "Má zaměstnání?"
+script = ExtResource("5_5kohf")
+place_var = "workplace"
+
+[sub_resource type="BTCondition" id="BTCondition_t9lgm"]
+custom_name = "Je 6:30–16:00?"
+script = ExtResource("1_8wkxd")
+hour_from = 6.5
+hour_to = 16.0
+
+[sub_resource type="BTCondition" id="BTCondition_xg9ed"]
+custom_name = "Pracoviště otevřeno?"
+script = ExtResource("11_po7xk")
+key_var = "workplace_key"
+
+[sub_resource type="BTAction" id="BTAction_n581u"]
+custom_name = "Jdi do práce"
+script = ExtResource("2_8in0b")
+place_var = "workplace"
+arrive = 2.5
+
+[sub_resource type="BTAction" id="BTAction_33xtp"]
+custom_name = "Pracuje na místě"
+script = ExtResource("6_tr6ou")
+duration = 30.0
+jitter = 10.0
+
+[sub_resource type="BTSequence" id="BTSequence_lpft7"]
+custom_name = "Práce"
+children = [SubResource("BTCondition_doc9i"), SubResource("BTCondition_s0j8h"), SubResource("BTCondition_t9lgm"), SubResource("BTCondition_xg9ed"), SubResource("BTAction_n581u"), SubResource("BTAction_33xtp")]
+
+[sub_resource type="BTCondition" id="BTCondition_5v2se"]
+custom_name = "Je víkend / svátek?"
+script = ExtResource("12_fd3qu")
+
+[sub_resource type="BTCondition" id="BTCondition_h60kv"]
+custom_name = "Je 9–18 h?"
+script = ExtResource("1_8wkxd")
+hour_from = 9.0
+hour_to = 18.0
+
+[sub_resource type="BTCondition" id="BTCondition_j50ce"]
+custom_name = "Dnes ještě „shop_day“ ne?"
+script = ExtResource("13_nd5ys")
+day_var = "shop_day"
+
+[sub_resource type="BTCondition" id="BTCondition_9uvw5"]
+custom_name = "Místo „obchod“ otevřeno?"
+script = ExtResource("11_po7xk")
+place_key = "obchod"
+
+[sub_resource type="BTAction" id="BTAction_3efr4"]
+custom_name = "Jdi do obchodu"
+script = ExtResource("2_8in0b")
+place_var = "shop"
+arrive = 2.5
+
+[sub_resource type="BTAction" id="BTAction_edt2s"]
+custom_name = "Nakupuje"
+script = ExtResource("6_tr6ou")
+duration = 15.0
+jitter = 10.0
+
+[sub_resource type="BTAction" id="BTAction_ywb3w"]
+custom_name = "Označ dnešek „shop_day“"
+script = ExtResource("14_md9bz")
+day_var = "shop_day"
+
+[sub_resource type="BTSequence" id="BTSequence_kh5dn"]
+custom_name = "Víkendový nákup"
+children = [SubResource("BTCondition_5v2se"), SubResource("BTCondition_h60kv"), SubResource("BTCondition_j50ce"), SubResource("BTCondition_9uvw5"), SubResource("BTAction_3efr4"), SubResource("BTAction_edt2s"), SubResource("BTAction_ywb3w")]
+
+[sub_resource type="BTCondition" id="BTCondition_sipzz"]
+custom_name = "Je pá/so večer?"
+script = ExtResource("7_gmsph")
+days = Array[int]([4, 5])
+hour_from = 17.0
+hour_to = 24.0
+
+[sub_resource type="BTCondition" id="BTCondition_5fk2z"]
+custom_name = "Promile < 0,5 ‰?"
+script = ExtResource("8_42ppu")
+limit = 0.5
+
+[sub_resource type="BTCondition" id="BTCondition_9ri19"]
+custom_name = "Místo „hospoda“ otevřeno?"
+script = ExtResource("11_po7xk")
+place_key = "hospoda"
+
+[sub_resource type="BTAction" id="BTAction_r0wyo"]
+custom_name = "Jdi ke stolu u hospody"
+script = ExtResource("2_8in0b")
+place_var = "pub_table"
+arrive = 1.5
+
+[sub_resource type="BTAction" id="BTAction_jfljo"]
+custom_name = "Sedni ke stolu"
+script = ExtResource("3_ir1jn")
+anim = ""
+pose = "sit"
+duration = 3.0
+promile_gain = 0.0
+
+[sub_resource type="BTAction" id="BTAction_oa5lq"]
+custom_name = "Objednej pivo"
+script = ExtResource("3_ir1jn")
+anim = "drink"
+pose = "sit"
+duration = 10.0
+promile_gain = 0.4
+
+[sub_resource type="BTSequence" id="BTSequence_saj08"]
+custom_name = "Večerní hospoda"
+children = [SubResource("BTCondition_sipzz"), SubResource("BTCondition_5fk2z"), SubResource("BTCondition_9ri19"), SubResource("BTAction_r0wyo"), SubResource("BTAction_jfljo"), SubResource("BTAction_oa5lq")]
+
+[sub_resource type="BTCondition" id="BTCondition_xui6d"]
+custom_name = "Je pá/so večer?"
+script = ExtResource("7_gmsph")
+days = Array[int]([4, 5])
+hour_from = 17.0
+hour_to = 24.0
+
+[sub_resource type="BTCondition" id="BTCondition_39zzz"]
+custom_name = "Místo „hospoda“ otevřeno?"
+script = ExtResource("11_po7xk")
+place_key = "hospoda"
+
+[sub_resource type="BTAction" id="BTAction_zg4zd"]
+custom_name = "Jdi ke stolu u hospody"
+script = ExtResource("2_8in0b")
+place_var = "pub_table"
+arrive = 1.5
+
+[sub_resource type="BTAction" id="BTAction_men2k"]
+custom_name = "Sedí a povídá"
+script = ExtResource("3_ir1jn")
+anim = ""
+pose = "sit"
+duration = 20.0
+promile_gain = 0.0
+
+[sub_resource type="BTSequence" id="BTSequence_hvdga"]
+custom_name = "Posezení u stolu"
+children = [SubResource("BTCondition_xui6d"), SubResource("BTCondition_39zzz"), SubResource("BTAction_zg4zd"), SubResource("BTAction_men2k")]
+
+[sub_resource type="BTAction" id="BTAction_j8gxb"]
+custom_name = "Náhodná procházka"
+script = ExtResource("9_44c68")
+
+[sub_resource type="BTSequence" id="BTSequence_enyjq"]
+custom_name = "Procházka"
+children = [SubResource("BTAction_j8gxb")]
+
+[sub_resource type="BTSelector" id="BTSelector_wx4hh"]
+custom_name = "Denní rutina"
+children = [SubResource("BTSequence_dhodz"), SubResource("BTSequence_lpft7"), SubResource("BTSequence_kh5dn"), SubResource("BTSequence_saj08"), SubResource("BTSequence_hvdga"), SubResource("BTSequence_enyjq")]
+
+[resource]
+description = "Denní rutina vesničana (Fáze 3): ráno zahrada (za vhodného počasí), přes den práce (je-li místo otevřeno), o víkendu nákup, v pá/so večer hospoda, jinak procházka po cestách. Cíle plní Villager do blackboardu."
+root_task = SubResource("BTSelector_wx4hh")

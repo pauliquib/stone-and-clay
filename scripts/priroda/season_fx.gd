@@ -1,7 +1,8 @@
 ## Roční období u klienta – pole, květy a sezónní výzdoba stromů (vedle Atmosphere, která řídí trávu a listí):
 ## - denně (a hned po skoku v datu, F2 → Datum) přepočítá tabulku barev polí `Fields.lut_image` pro terénní shader
 ##   a nastaví `meadow_bloom` (květy na loukách v shaderu),
-## - vede MeadowFlowers (květy kolem hráče) a TreeDecor (ovoce v korunách, padané listí).
+## - vede MeadowFlowers (květy kolem hráče), TreeDecor (ovoce v korunách, padané listí)
+##   a Puddles (louže na vozovkách po dešti, §12.3).
 ## Vše je jen vzhled – simulaci (sezónní předměty, události) drží World.
 class_name SeasonFx
 extends Node
@@ -12,6 +13,7 @@ var world: World
 var player: Player
 var flowers: MeadowFlowers
 var decor: TreeDecor
+var puddles: Puddles
 var _lut: ImageTexture
 var _jd := -1
 var _t := 0.0
@@ -28,10 +30,20 @@ func setup(w: World, p: Player) -> void:
 	decor.name = "OvoceListi"
 	add_child(decor)
 	decor.setup(w)
+	puddles = Puddles.new()
+	puddles.name = "Louze"
+	add_child(puddles)
+	puddles.setup(w)
 	_t = 0.0
 
 
 func _process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_process_impl(delta)
+	Tests.prof_add("seasonfx", __t0)
+
+
+func _process_impl(delta: float) -> void:
 	_t -= delta
 	if _t > 0.0 or world == null or world.clock == null or world.terrain == null:
 		return
@@ -47,6 +59,9 @@ func _process(delta: float) -> void:
 	var pos := player.car.global_position if player.car else player.global_position
 	flowers.update(pos, doy, snow, jd)
 	decor.update(pos, doy, snow, jd)
+	puddles.update(pos, world.weather.wetness if world.weather else 0.0)   # louže po dešti (§12.3)
+	if world.vegetation:                 # Fáze 9: LOD chunků vegetace podle vzdálenosti
+		world.vegetation.update(pos, doy, snow)
 
 
 func _update_lut(doy: float, year: int) -> void:
@@ -57,5 +72,7 @@ func _update_lut(doy: float, year: int) -> void:
 	if _lut == null:
 		_lut = ImageTexture.create_from_image(img)
 		world.terrain.set_field_lut(_lut)
+		if world.vegetation:
+			world.vegetation.set_field_lut(_lut)   # obilí zraje podle kalendáře pole
 	else:
 		_lut.update(img)

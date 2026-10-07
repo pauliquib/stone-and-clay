@@ -1,6 +1,6 @@
 # M5.5 – Kalendář událostí a zábava s kapelou
 
-> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 5/9
+> Roadmapa „Život na vsi“ · **M5 Obec a volný čas** · krok 5/12
 > Předpoklady: M1.5 (sál v hospodě), M3.4 (web obce, pošta), M0.6 (respekt) · Navazují: M5.4 (soutěž), M5.6 (zápas), M2.6 (zabijačka) – všechny se zapíšou do kalendáře
 
 ## 0. Než začneš – přečti
@@ -44,12 +44,29 @@ zábavy, hody, zápasy, hasičská soutěž, zabijačky… a který uvidí hrá�
   Opilý kamarád → doprovod domů (M4.5).
 - Respekt: návštěva `mladez` +1, `stamgasti` +1; tancování `mladez` +1.
 
-### 2.3 Hasičský bál (varianta)
+### 2.3 Nedělní mše (doplněk uživatele 6. 10. 2026)
+- **Kaplička v obci:** ověř grepem, jestli je kaplička v datech (`data/pois.json`, `data/buildings.json` – druh
+  `chapel` / `wayside_shrine` / název; ve hře se o ní mluví v `dialog.gd`). Když je, pravidelná akce v kalendáři
+  „Nedělní mše v kapličce“ (např. 1× za měsíc nebo každou neděli v 10:00 – vyber a dej do `EVENTS`) na **skutečné poloze
+  z dat** (ne vymyšlená). Když v datech není, zapiš otevřený bod a požádej uživatele o souřadnice (mapa M ukazuje polohu).
+- **Kostel ve fiktivní obci „Velký Oříškov“** (z `data/obce.json`, budova s `"kind": "church"` – ověř, která patří Velkému
+  Oříškovu): každou neděli mše. Okolní obce nemají terén ani kolize (jen data), proto: odjezd autobusem / autem k hranici
+  katastru → `blackout` → interiér kostela (nový veřejný interiér přes `public_interiors.gd`, mimo mapu jako ostatní
+  interiéry – lavice, oltář, varhany, okna; vymyšlený, bez reálné výzdoby konkrétního kostela) → po mši návrat.
+  Rozhodni a zapiš, jestli se jezdí „mimo mapu“ (vzor soudu M4.3), nebo jen k okraji.
+- **Farář** (NPC, smyšlené jméno, `Persona` s povahou `moudry`): mše = krátký text kázání (tematicky podle kalendáře –
+  advent, Velikonoce, dožínky), hráč může sedět (akce „sednout do lavice“), po mši rozhovor (T) – témata víra, obec,
+  pomoc potřebným (navazuje na M4.5 prosby). Účast: starší vesničané (pár postav z `Characters`), respekt komunity
+  (ověř id komunit v `reputation.gd`) +1 za návštěvu, max. 1× týdně.
+- **Nikdy reálné názvy obcí** – jen „Velký Oříškov“ a další fiktivní jména z `data/obce.json`.
+
+### 2.4 Hasičský bál (varianta)
 Únor, pořádá SDH (M5.3): vstupné, **tombola** (hráč si koupí lístky, o půlnoci losování – ceny: sele (M2.6!), dort,
 slivovice, poukaz do stavebnin), předtančení hasičů. Respekt `hasici`.
 
 ## 3. Minimum
-Kalendář + plakáty + taneční zábava v sále s kapelou, hudbou, návštěvníky a tancem. Rvačky a bál do otevřených bodů.
+Kalendář + plakáty + taneční zábava v sále s kapelou, hudbou, návštěvníky a tancem. Rvačky, bál a mše do otevřených bodů
+(mše může být samostatná session – „pokračuj podle otevřených bodů“).
 
 ## 4. Hotovo, když
 - Na plakátech a webu obce jsou nadcházející akce; zábava se v daný den postaví, kapela hraje, lidé přicházejí,
@@ -63,6 +80,7 @@ Kalendář + plakáty + taneční zábava v sále s kapelou, hudbou, návštěvn
 5. 02:00 → opilejší hosté, odcházejí; rvačka → urovnej.
 6. Ráno odpadky → uklid → karma.
 7. Hasičský bál v únoru (pokud hotovo) → tombola o půlnoci.
+8. Neděle 10:00 → mše v kapličce (pokud je v datech) / odjezd na mši do kostela ve Velkém Oříškově → farář, lavice, kázání.
 
 ## 6. Závěr
-README (Systémy → Události), VIZE odškrtnout, roadmapa README, PROJECT_LOG, deník AI, commit „M5.5 Kalendář událostí a zábava: …“, checklist a čekat.
+README (Systémy → Události), VIZE odškrtnout, roadmapa README, PROJECT_LOG, commit „M5.5 Kalendář událostí a zábava: …“, checklist a čekat.

@@ -33,6 +33,9 @@ var last_test_promile := -1.0
 
 var _route_t := 0.0
 var _suspicion := {}                # id hráče → podezření 0..1
+var _crash_t := {}                  # id hráče → herní minuta poslední nehody zapsané svědkem (M4.4)
+const CRASH_CD_MIN := 60.0          # herních minut mezi nehodami ze svědectví (série nárazů = jedna nehoda)
+const CRASH_NO_OFFENSE := ["silnice", "cesta", "terén"]   # pád / náraz do povrchu – bez cizí škody, bez přestupku
 var _lost_t := 0.0
 var _stop_t := 0.0
 var _cp_state := 0                  # 0 nic, 1 hráč se blíží, 2 minul blízko
@@ -54,6 +57,10 @@ var _returning: Array = []           # [npc, dočasný?, vůz | null, stanovišt
 var _cp_post := Vector3.INF
 var _cp_yaw := 0.0
 const COP_WALK := 1.7                # m/s
+const TRUNK_CHECK_P := 0.35          # M4.6: šance, že policista u okénka prohlédne kufr auta (ověřit / ladit)
+const DRUG_TEST_P := 0.6             # M4.8: šance, že dechová kontrola (plán „test“) doplní test na drogy (ověřit / ladit)
+const DRUG_THC_MIN := 0.5            # M4.8: THC v krvi nad touto hodnotou = pozitivní test (zástupná hodnota, jako v zakon.json)
+const DRUG_PSILO_MIN := 0.3          # M4.8: psilocybin v krvi nad touto hodnotou = pozitivní test (ladit)
 
 
 func setup(t: Traffic, g: RoadGraph, ter: Terrain, w: Node, c: Clock) -> void:
@@ -95,6 +102,7 @@ func spawn_patrol() -> void:
 
 func _new_patrol_route(first := false) -> void:
 	var a := graph.astar(RoadGraph.CAR_KINDS)
+	var ends := graph.astar(RoadGraph.END_KINDS)     # start / cíl ne na účelové cestě (vjezd do dvora)
 	var near: Node3D = null if first else world.nearest_player(patrol.global_position)
 	var anchor: Vector3 = world.player_world_pos(near as Player) if near else world.player_anchor(0)
 	var pp := Vector2(anchor.x, anchor.z)
@@ -103,10 +111,14 @@ func _new_patrol_route(first := false) -> void:
 		var ang := _rng.randf() * TAU
 		var s: int
 		if far:
-			s = a.get_closest_point(pp + Vector2(cos(ang), sin(ang)) * _rng.randf_range(250.0, 600.0))
+			s = ends.get_closest_point(pp + Vector2(cos(ang), sin(ang)) * _rng.randf_range(250.0, 600.0))
+			if s < 0 or not a.has_point(s):
+				continue
 		else:
 			s = a.get_closest_point(Vector2(patrol.global_position.x, patrol.global_position.z))
-		var e := a.get_closest_point(graph.nodes[s] + Vector2(cos(ang + 1.0), sin(ang + 1.0)) * _rng.randf_range(600.0, 1500.0))
+		var e := ends.get_closest_point(graph.nodes[s] + Vector2(cos(ang + 1.0), sin(ang + 1.0)) * _rng.randf_range(600.0, 1500.0))
+		if e < 0 or not a.has_point(e):
+			continue
 		var ids := a.get_id_path(s, e)
 		if ids.size() < 6:
 			continue
@@ -115,6 +127,8 @@ func _new_patrol_route(first := false) -> void:
 			var d := Vector2(pts[1].x - pts[0].x, pts[1].z - pts[0].z)
 			traffic.place_car(patrol, Vector2(pts[0].x, pts[0].z), atan2(d.x, d.y))
 		patrol.set_ai_route(pts, 15.0)
+		if not far:
+			patrol.reroute(pts)       # jede odtud, kde stojí – body za autem přeskočit
 		return
 
 
@@ -206,6 +220,12 @@ func release(pl: Player) -> void:
 # ------------------------------------------------------------------ hlavní smyčka
 
 func _physics_process(delta: float) -> void:
+	var __t0 := Tests.prof_t0()
+	_physics_process_impl(delta)
+	Tests.prof_add("police", __t0)
+
+
+func _physics_process_impl(delta: float) -> void:
 	if patrol == null or world.players.is_empty():
 		return
 	_checked_recently = maxf(_checked_recently - delta, 0.0)
@@ -246,7 +266,7 @@ func _watch(delta: float, cop: Car, pl: Player) -> void:
 	var spd_v: float = pcar.speed if pcar != null else pl.horse.speed
 	var wobble: float = absf(pcar.steer_in) if pcar != null else absf(pl.horse._yaw_rate) * 0.6
 	var kmh := absf(spd_v) * 3.6
-	var in_village := Vector2(pnode.global_position.x, pnode.global_position.z).distance_to(Traffic.VILLAGE_CENTER) < Traffic.VILLAGE_R
+	var in_village := traffic.in_village(Vector2(pnode.global_position.x, pnode.global_position.z))
 	var limit := 50.0 if in_village else 90.0
 	var reason := ""
 	if kmh > limit + 12.0:
@@ -284,8 +304,22 @@ func report_crash(pos: Vector3, what: String, pl: Player) -> void:
 	for cop in [patrol, checkpoint_car]:
 		if cop and is_instance_valid(cop) and cop.global_position.distance_to(pos) < 90.0 and pl.car:
 			if _los(cop.global_position + Vector3(0, 1.3, 0), pos + Vector3(0, 1.0, 0)):
+				if not (what in CRASH_NO_OFFENSE):
+					world.commit_offense(pl.id, "nehoda_skoda", {"severity": 0.5})     # M4.4: oživený přestupek
 				start_chase(cop, "nehoda (%s)" % what, pl)
 				return
+	# nikdo z policie: svědek z vesnice nehodu nahlásí, jinak zůstane nenahlášená (M4.4)
+	if what in CRASH_NO_OFFENSE:
+		return
+	if world.clock.minutes - float(_crash_t.get(pl.id, -1.0e9)) < CRASH_CD_MIN:
+		return
+	if pl.car:
+		_crash_t[pl.id] = world.clock.minutes
+		if world.witness_reported(pl.id, pos, "nehoda", 60.0, 60.0):
+			world.commit_offense(pl.id, "nehoda_skoda", {"severity": 0.5})
+		else:
+			world.add_unreported(pl.id, {"kind": "nehoda", "offenses": ["nehoda_skoda"], "pos": [pos.x, pos.y, pos.z],
+				"t": world.clock.minutes, "value": 0, "severity": 0.5, "tool": what, "discover_p": 0.3})
 
 
 func report_hit_person(pos: Vector3, pl: Player) -> void:
@@ -296,6 +330,7 @@ func report_hit_person(pos: Vector3, pl: Player) -> void:
 			var s := a.get_closest_point(Vector2(pos.x, pos.z) + Vector2(250, 0).rotated(_rng.randf() * TAU))
 			var sp := graph.nodes[s]
 			traffic.place_car(patrol, sp, 0.0)
+		world.commit_offense(pl.id, "srazeni_chodce", {"severity": 1.0})     # M4.4: policie přijede vždy
 		start_chase(patrol, "sražení chodce", pl)
 
 
@@ -320,7 +355,7 @@ func _recent(pid: int) -> Dictionary:
 func _speed_offense(in_village: bool, over: float) -> String:
 	if over >= 40.0:
 		return "rychlost_vyrazna"
-	return "rychlost_obec_20" if in_village else "rychlost_mimo_obec"
+	return "rychlost_obec" if in_village else "rychlost_mimo_obec"
 
 
 ## Co policista u okénka udělá: "test" dechová zkouška (podezření na alkohol, bez zákazu, nebo náhodně),
@@ -329,6 +364,8 @@ func _plan(pl: Player) -> String:
 	var v := _recent(pl.id)
 	if pl.body.promile() >= 0.2 or not license_ok(pl) or (not v.is_empty() and String(v["id"]).is_empty()):
 		return "test"
+	if pl.car and not world.license_check(pl.id, pl.car)["ok"]:      # M4.1: řídí bez skupiny řidičáku
+		return "ticket"
 	if not v.is_empty():
 		return "ticket"
 	return "test" if _rng.randf() < 0.3 else "ok"
@@ -336,10 +373,17 @@ func _plan(pl: Player) -> String:
 
 ## Vystaví pokutu a body za zjištěný přestupek (přes zákon). Vrací výsledek `World.commit_offense`, nebo {}.
 func _ticket(pl: Player) -> Dictionary:
-	var v := _recent(pl.id)
-	if v.is_empty() or String(v["id"]).is_empty():
-		return {}
-	var res: Dictionary = world.commit_offense(pl.id, String(v["id"]), {"severity": float(v["sev"]), "quiet": true})
+	var oid := ""
+	var sev := 1.0
+	if pl.car and not world.license_check(pl.id, pl.car)["ok"]:
+		oid = "rizeni_bez_opravneni"          # M4.1: jízda bez skupiny řidičáku
+	else:
+		var v := _recent(pl.id)
+		if v.is_empty() or String(v["id"]).is_empty():
+			return {}
+		oid = String(v["id"])
+		sev = float(v["sev"])
+	var res: Dictionary = world.commit_offense(pl.id, oid, {"severity": sev, "quiet": true})
 	_viol.erase(pl.id)
 	if not res.get("ok", false):
 		return {}
@@ -395,8 +439,8 @@ func _chase(delta: float) -> void:
 			var ids := graph.route(Vector2(chaser.global_position.x, chaser.global_position.z), Vector2(tpos.x, tpos.z),
 				RoadGraph.CAR_KINDS + ["track"])
 			if ids.size() >= 2:
-				chaser.ai_path = graph.lane_points(ids, terrain)
-				chaser.ai_i = 0
+				# trasa začíná v nejbližším uzlu (často za autem) – body za autem se rovnou odbaví
+				chaser.reroute(graph.lane_points(ids, terrain))
 		chaser.ai_speed_limit = 33.0
 	# zastavil? / vystoupil z auta poblíž?
 	var stopped := (pcar != null and absf(pcar.speed) < 1.5 and d < 16.0) or (pcar == null and d < 25.0)
@@ -417,8 +461,8 @@ func _chase(delta: float) -> void:
 			escaped.emit(who.id)
 	else:
 		_lost_t = 0.0
-	# policie se převrátila / zničila
-	if chaser.damage >= 100.0:
+	# policie se převrátila / zničila (chaser může být null po _end_chase výše)
+	if chaser != null and chaser.damage >= 100.0:
 		_end_chase()
 
 
@@ -545,6 +589,9 @@ func _stopping(delta: float) -> void:
 			if _stop_t > 3.2:
 				if cop:
 					cop.visual.stop_action()
+				var trunk := _trunk_search(sp)
+				if trunk != "":
+					_banner(sp, "Policista: v kufru: %s." % trunk, 4.0)
 				var said := ""
 				match _stop_plan:
 					"test":
@@ -570,6 +617,32 @@ func _stopping(delta: float) -> void:
 				_stop_cop = null
 				_stop_player = null
 				_end_chase()
+
+
+## M4.6: prohlídka kufru řidiče u zastavení (jen někdy – `TRUNK_CHECK_P`). Zbraň, která není v ruce, a bez zbrojního
+## oprávnění, se zabaví (`Weapons.police_check`, zbraň je v kufru). Nelegální úlovek v kufru = přestupek `pytlactvi`.
+## Vrací text nálezu (prázdné = nic nenalezeno nebo kufr se neprohledává).
+func _trunk_search(pl: Player) -> String:
+	if pl.car == null or _rng.randf() > TRUNK_CHECK_P:
+		return ""
+	var found := ""
+	var wpn = world.get("weapons")
+	if pl.item_count("puska") > 0 and pl.equipped != "puska" and not world.has_permit(pl.id, "zbrojni", pl.global_position):
+		if wpn != null and wpn.police_check(pl.id, "kufr"):
+			found = "zbraň bez zbrojního oprávnění"
+	# M4.8: držení látek (konopí, tabák, lysohlávky) – zjednodušeně jako u zbraně: co hráč veze v autě
+	if ItemsDB.adult_on and _drugs_carried(pl) > 0:
+		world.commit_offense(pl.id, "prechovavani_navykove_latky", {})
+		found += ("; " if found != "" else "") + "látky"
+	var cargo = world.get("cargo")
+	if cargo != null:
+		for e in cargo.vehicle_items(pl.car):
+			var c = e.get("c", null)
+			if c is Carcass and not (c as Carcass).legal:
+				world.commit_offense(pl.id, "pytlactvi", {"severity": 0.5})
+				found += ("; " if found != "" else "") + "nelegální úlovek"
+				break
+	return found
 
 
 ## Policisté po kontrole: ten z hlídky dojde zpátky k vozu a nastoupí (vůz pak odjede),
@@ -609,6 +682,25 @@ func _walk_back(delta: float) -> void:
 				cop.collision_layer = 4
 
 
+## M4.8: počet kusů návykových látek u hráče (klíče z ItemsDB, jen při zapnuté volbě pro dospělé).
+func _drugs_carried(pl: Player) -> int:
+	var n := 0
+	for k in ["konopi_kvety", "tabak_susene", "lysohlavky", "konopi_susene", "tabak_list", "konopne_pecivo"]:
+		n += pl.item_count(k)
+	return n
+
+
+## M4.8: test na drogy při dechové kontrole – pozitivní při THC / psilocybinu nad prahem (`DRUG_*`).
+## Jen při zapnuté volbě pro dospělé a jen někdy (`DRUG_TEST_P`). Vrací true, pokud test proběhl pozitivně.
+func _drug_test(pl: Player) -> bool:
+	if not ItemsDB.adult_on or pl.body == null or _rng.randf() > DRUG_TEST_P:
+		return false
+	var positive: bool = pl.body.thc >= DRUG_THC_MIN or pl.body.psilo >= DRUG_PSILO_MIN
+	if positive:
+		world.commit_offense(pl.id, "rizeni_pod_vlivem_navykove_latky", {})
+	return positive
+
+
 func breath_test(pl: Player, context: String) -> void:
 	pl.controls_locked = false
 	if pl.car:
@@ -638,6 +730,8 @@ func breath_test(pl: Player, context: String) -> void:
 		msg += " Děkujeme, šťastnou cestu."
 		_banner(pl, msg, 4.0)
 		test_passed.emit(pl.id, p)
+	if _drug_test(pl):
+		_banner(pl, "Test na drogy: pozitivní. Vystupte si, prosím.", 4.0)
 	world.emit_game_event(pl.id, "breath_test", {"promile": p, "context": context})
 
 
