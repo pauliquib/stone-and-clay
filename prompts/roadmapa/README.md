@@ -122,7 +122,7 @@ Doplněk od uživatele (30. 9. 2026). Doporučeno po M4 a M5.5; M6 létání je 
 | | Krok | Soubor | Předpoklady |
 |---|---|---|---|
 | [x] | M7.1 Popularita a kritéria kandidatury | [`M7_starosta/01_popularita_a_kriteria.md`](M7_starosta/01_popularita_a_kriteria.md) | M0.6, M4.5, M5.5 |
-| [ ] | M7.2 Kampaň a volby (poctivě i nečestně) | [`M7_starosta/02_kampan_a_volby.md`](M7_starosta/02_kampan_a_volby.md) | M7.1, (M4.3, M4.4) |
+| [x] | M7.2 Kampaň a volby (poctivě i nečestně) | [`M7_starosta/02_kampan_a_volby.md`](M7_starosta/02_kampan_a_volby.md) | M7.1, (M4.3, M4.4) |
 | [ ] | M7.3 Vedlejší úkoly s větvením | [`M7_starosta/03_vedlejsi_ukoly_a_vetveni.md`](M7_starosta/03_vedlejsi_ukoly_a_vetveni.md) | M7.1 |
 | [ ] | M7.4 Starostování a konce příběhu | [`M7_starosta/04_starostovani.md`](M7_starosta/04_starostovani.md) | M7.2 |
 

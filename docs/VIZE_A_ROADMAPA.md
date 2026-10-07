@@ -531,7 +531,12 @@ kroky přehazovat, mezi milníky platí závislosti.
   protikandidát, záložka „Obec“ v deníku. *Hotovo: `Politics` (`World.politics`), `data/volby.json` (zákon č. 491/2001 Sb.,
   zjednodušeně, funkční období 1 461 herních dní / 4 roky, volby ve stejném intervalu), petice rozhovorem (téma
   „petition“), protikandidát Starosta Novák + 1–2 smyšlení kandidáti.*
-- [ ] **M7.2 Kampaň a volby** – poctivé nástroje i úplatky, pomluvy a podvody s rizikem odhalení, volební den.
+- [x] **M7.2 Kampaň a volby** – poctivé nástroje i úplatky, pomluvy a podvody s rizikem odhalení, volební den.
+  *Hotovo: `Campaign` (`World.campaign`) – mítink v hospodě (poctivý slib / slib bez krytí), letáky do schránek
+  (`World.street_mailboxes`), úplatek a pomluva protikandidáta (rozhovor T, `DialogThemes.THEMES["bribe"/"slander"]`),
+  zfalšovaný podpis petice (úřad), riziko odhalení (povaha postavy, svědci, karma) → skandál + `commit_offense`
+  (`podplaceni_volicu` / `volebni_podvod`, `data/zakon.json`) → soud (M4.3) vyřadí z kandidatury; volební den
+  (`resolve_election`, hlasování postav se šumem), prohra = nová kandidatura za 120 dní (`data/volby.json`).*
 - [ ] **M7.3 Vedlejší úkoly s větvením** – úkoly jako data, 15+ úkolů se 2–3 konci, řetězy postav, dopad na hlasy.
 - [ ] **M7.4 Starostování** – rozpočet, projekty s viditelnou změnou, zastupitelstvo, sliby a klam, konce příběhu.
 

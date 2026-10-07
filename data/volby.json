@@ -5,6 +5,9 @@
   "obdobi_dni": 1461,
   "obdobi_poznamka": "4 herní roky (1461 dní = 3×365 + 366). Odpovídá reálnému funkčnímu období obecního zastupitelstva (§ 64 zákona č. 491/2001 Sb., ověřit aktuální znění). Volby se opakují ve stejném intervalu.",
 
+  "doplnovaci_volby_dni": 120,
+  "doplnovaci_volby_poznamka": "M7.2 herní zjednodušení: když hráč volby prohraje, může znovu kandidovat už za 120 dní (ne za celé funkční období) – ve hře jde o novou kampaň, ne o reálné doplňovací volby podle zákona (ty se vypisují jen za konkrétních podmínek, ověřit aktuální znění). Řeší `Campaign.resolve_election`.",
+
   "peticia_procento": 7,
   "peticia_paragraf": "§ 21 odst. 4 zákona č. 491/2001 Sb. – u obce do 500 obyvatel potřebuje nezávislý kandidát podpisovou petici min. 7 % oprávněných voličů obce (ověřit aktuální znění; u větších obcí procento klesá).",
   "potreba_podpisu": 15,

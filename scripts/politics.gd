@@ -2,13 +2,14 @@
 ## Zjednodušená herní simulace komunálních voleb (satira) – čísla u paragrafů: viz `data/volby.json`
 ## (`VOLBY`, zákon č. 491/2001 Sb., ověřit aktuální znění). Jedna instance `World.politics`:
 ## - termín voleb (`election_jd`), protikandidát a ostatní kandidáti, 3 „přání obce“ jsou společné všem hráčům;
-## - popularita, podpisy petice a skrytý klam (`deceit`, háček pro M7.2 – podvody a podplácení) jsou per hráč.
+## - popularita, podpisy petice, skrytý klam (`deceit`) a vítězství (`mayor`) jsou per hráč.
 ##
 ## Popularita (0..100 %, `popularity`) = podíl voličů, kteří by hráče volili: váží pověst (`Reputation.score`),
 ## respekt komunit váhovaný počtem jejích členů (`Characters.PROFILES` → `Reputation.community_of`),
 ## přátelství s postavami (`Persona.friendship`) a skrytý klam. Karma popularitu neovlivňuje (jen štěstí / konec příběhu).
 ## Petice: `sign_petition` volá `World._apply_reply` při záměru rozhovoru „petition“ (`DialogThemes.THEMES["petition"]`).
-## Navazují: M7.2 (kampaň, registrace kandidatury, volby, klam), M7.3 (vedlejší úkoly), M7.4 (starostování).
+## M7.2 (`scripts/campaign.gd`, `World.campaign`): mítinky, letáky, úplatky, pomluvy, podvody (plní `deceit`),
+## volební den (`resolve_election`, voláno z `tick()`). Navazují: M7.3 (vedlejší úkoly), M7.4 (starostování).
 ## Ukládání: `to_dict(pid)` / `from_dict(pid, d)` – klíč `politics` v `SaveGame` (starý save bez klíče = žádná kandidatura).
 class_name Politics
 extends RefCounted
@@ -43,6 +44,7 @@ var wishes: Array = []              # [{"id","text"}] 3 aktuální přání obce
 var signatures := {}                # pid → int (počet podpisů petice)
 var signers := {}                   # pid → Array[String] (jméno postavy, aby nešlo podepsat 2×)
 var deceit := {}                    # pid → float, skrytá (M7.2 háček)
+var mayor := {}                      # pid → bool, vítěz posledních voleb (M7.2 `Campaign.resolve_election`, čte M7.4)
 var _last_jd := -1
 
 
@@ -103,6 +105,17 @@ func _roll_candidates() -> void:
 	opponent_pop = OPPONENT_POP_START + randf_range(-10.0, 10.0)
 
 
+## Nová kandidatura po prohraných volbách (M7.2 `Campaign.resolve_election`): nová přání obce a soupeři,
+## petice se nepřenáší (začíná se znovu sbírat podpisy – skrytý klam `deceit` zůstává, je to vlastnost hráče).
+func reroll_for_new_term() -> void:
+	wishes.clear()
+	candidates.clear()
+	signatures.clear()
+	signers.clear()
+	_roll_wishes()
+	_roll_candidates()
+
+
 ## Denní krok (volat z World._process_impl): náhodná procházka popularity protikandidáta
 ## a oznámení blížících se voleb. Přesná vazba na konkrétní události (skandály, opravy) je M7.3.
 func tick(jd: int) -> void:
@@ -113,7 +126,10 @@ func tick(jd: int) -> void:
 	for c in candidates:
 		c["pop"] = clampf(float(c["pop"]) + randf_range(-OPPONENT_DRIFT_DAY, OPPONENT_DRIFT_DAY), 0.0, 60.0)
 	if jd > election_jd:
-		election_jd += term_days      # volby proběhly (vyhodnocení výsledku: M7.2); termín se posune o další období
+		if world.campaign:             # M7.2: hlasování, vyhlášení výsledku a nový termín (výhra / doplňovací volby)
+			world.campaign.resolve_election()
+		else:
+			election_jd += term_days
 		return
 	var zbyva := election_jd - jd
 	if zbyva in [60, 30, 14, 7, 1]:
@@ -254,9 +270,14 @@ func sign_petition(pid: int, per: Persona, attitude: float) -> Dictionary:
 	return {"text": "Jasně, kamaráde, podpis máš (%d/%d)." % [signatures_of(pid), signatures_needed()]}
 
 
-## Skrytý klam (M7.2 – podvod, podplácení): připraveno jako háček, hodnota se zatím nikde nenastavuje.
+## Skrytý klam (M7.2 – podvod, podplácení, nastavuje `Campaign`).
 func add_deceit(pid: int, delta: float) -> void:
 	deceit[pid] = clampf(float(deceit.get(pid, 0.0)) + delta, -100.0, 100.0)
+
+
+## Je hráč starostou po posledních vyhodnocených volbách (M7.2 `Campaign.resolve_election`, čte M7.4)?
+func is_mayor(pid: int) -> bool:
+	return bool(mayor.get(pid, false))
 
 
 # ------------------------------------------------------------------ deník (J → „Obec“)
@@ -281,6 +302,10 @@ func journal_bbcode(pid: int) -> String:
 	s += "\n[b]Přání obce[/b]\n"
 	for w in wishes:
 		s += "  • %s\n" % String(w.get("text", ""))
+	if is_mayor(pid):
+		s += "\n[color=#9f9][b]Jsi starostou/starostkou obce.[/b][/color]\n"
+	if world.campaign:         # M7.2: mítinky, letáky, úplatky, pomluvy – „Příběh kampaně“
+		s += world.campaign.journal_section(pid)
 	return s
 
 
@@ -288,7 +313,8 @@ func journal_bbcode(pid: int) -> String:
 
 func to_dict(pid: int) -> Dictionary:
 	return {"election_jd": election_jd, "wishes": wishes, "candidates": candidates, "opponent_pop": opponent_pop,
-		"signatures": signatures_of(pid), "signers": signers.get(pid, []), "deceit": float(deceit.get(pid, 0.0))}
+		"signatures": signatures_of(pid), "signers": signers.get(pid, []), "deceit": float(deceit.get(pid, 0.0)),
+		"mayor": is_mayor(pid)}
 
 
 func from_dict(pid: int, d: Dictionary) -> void:
@@ -305,3 +331,4 @@ func from_dict(pid: int, d: Dictionary) -> void:
 	signatures[pid] = int(d.get("signatures", 0))
 	signers[pid] = d.get("signers", [])
 	deceit[pid] = float(d.get("deceit", 0.0))
+	mayor[pid] = bool(d.get("mayor", false))      # M7.2: starý save bez klíče = ne starosta

@@ -92,6 +92,8 @@ var favors: Favors               # prosby vesničanů a dobré skutky (M4.5), st
 var debts: Debts                 # dluhy a pokuty (M4.2): bloková složenka, příkaz poštou, upomínka, exekuce; stav per hráč
 var court: Court                 # soud a vězení (M4.3): obvinění, předvolání, jednání, rozsudek; stav per hráč
 var politics: Politics           # cesta na starostu (M7.1): popularita, kritéria kandidatury, petice, protikandidát
+var campaign: Campaign           # M7.2: kampaň a volby (mítinky, letáky, úplatky, pomluvy, podvody), stav per hráč
+var street_mailboxes: Array[Vector3] = []   # M7.2: pozice `Prop` poštovních schránek podél silnic (`_spawn_props`), roznos letáků
 var action_runner: ActionRunner  # výběr cíle a průběh kontextových akcí (M0.4)
 var sleep_spots: Array[SleepSpot] = []
 var clients := {}                # id → LocalClient (jen hráči na tomto počítači)
@@ -537,6 +539,9 @@ func add_player(id: int, pos: Vector3, yaw: float) -> Player:
 	if politics == null:          # M7.1: cesta na starostu (jedna instance; termín voleb a protikandidát společné, popularita per hráč)
 		politics = Politics.new()
 		politics.setup(self)
+	if campaign == null:          # M7.2: kampaň a volby (jedna instance, stav per hráč)
+		campaign = Campaign.new()
+		campaign.setup(self)
 	if gamekeeper == null:        # M4.6: hajný a rybářská stráž (jedna instance každá; svědci přes add_witness_source)
 		gamekeeper = Gamekeeper.new()
 		add_child(gamekeeper)
@@ -1011,6 +1016,8 @@ func _spawn_props() -> void:
 		var pr := Prop.make(k, Vector3(p.x, y + 0.02, p.y), atan2(dir.x, dir.y) + (PI / 2 if side > 0 else -PI / 2))
 		pr.damaged.connect(_on_prop_damaged)
 		root.add_child(pr)
+		if k == "schranka":    # M7.2: roznos letáků kampaně (Campaign.interactables)
+			street_mailboxes.append(Vector3(p.x, y + 0.02, p.y))
 
 
 ## Vzdálenost bodu od nejbližší osy silnice (pro auta) v okolí 40 m.
@@ -1600,6 +1607,8 @@ func emit_game_event(id: int, kind: String, data: Dictionary) -> void:
 	var jb: Jobs = jobs.get(id)
 	if jb:
 		jb.on_event(kind, data)      # M3.1: úkoly směny (action_done), pití v práci, zadržení → výpověď
+	if campaign:
+		campaign.on_event(id, kind, data)   # M7.2: splněný úkol obecní údržby během kampaně = plnění přání obce
 	if computer:
 		computer.on_event(id, kind, data)   # M3.4: drby na webu obce, výzvy k zaplacení pokuty, upomínky e-mailem
 	# politics (M7.1) nemá on_event – popularita se čte na požádání z Reputation / Persona, viz Politics.popularity
@@ -2731,6 +2740,8 @@ func interactables(id: int) -> Array:
 		out.append_array(cargo.interactables(id))       # ruční vozík, vyložení z auta (M2.10)
 	if computer:
 		out.append_array(computer.interactables(id))    # bankomaty, balíky z e-shopu u dveří (M3.4)
+	if campaign:
+		out.append_array(campaign.interactables(id))    # M7.2: mítink, letáky do schránek, zfalšovaný podpis
 	out.append_array(drone_interactables(id))          # M6.1: sebrání zaparkovaného / rozbitého dronu
 	out.append_array(paramotor_interactables(id))      # M6.4: složení křídla paramotoru
 	if airfield:
@@ -3019,6 +3030,14 @@ func _apply_reply(id: int, target: Node3D, r: Dictionary, ctx: Dictionary) -> vo
 	var txt: String = r["text"]
 	if String(r["intent"]) == "petition" and politics:    # M7.1: podpis petice za kandidaturu
 		var pr := politics.sign_petition(id, per, float(ctx.get("attitude", 0.0)))
+		if String(pr.get("text", "")) != "":
+			txt += " " + String(pr["text"])
+	elif String(r["intent"]) == "bribe" and campaign:     # M7.2: úplatek voliči (nečestná kampaň, riziko odhalení)
+		var pr := campaign.try_bribe(id, per, float(ctx.get("attitude", 0.0)))
+		if String(pr.get("text", "")) != "":
+			txt += " " + String(pr["text"])
+	elif String(r["intent"]) == "slander" and campaign:   # M7.2: pomluva protikandidáta (nečestná kampaň, riziko odhalení)
+		var pr := campaign.try_slander(id, per, float(ctx.get("attitude", 0.0)))
 		if String(pr.get("text", "")) != "":
 			txt += " " + String(pr["text"])
 	target.say(txt, clampf(2.0 + txt.length() / 14.0, 3.5, 9.0))
