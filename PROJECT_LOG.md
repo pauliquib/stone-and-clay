@@ -1376,3 +1376,53 @@ dřeva a vývraty po bouři, vazba na houby a zvěř.
 - Tento worktree byl při startu výrazně za `main` (jiná, stará historie) – první krok byl neformátovatelný `merge --ff-only`,
   proveden běžný `git merge main` s jedním konfliktem v `README.md` (vyřešen ve prospěch verze z `main`); zmínka pro orchestrátora,
   ne chyba tohoto kroku.
+
+## 2026-10-07 – M7.3 Vedlejší úkoly s větvením
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Nová datová struktura úkolů**: engine `scripts/quest_data.gd` (`class_name QuestData` + vnořená
+  `DataQuest extends Quests.Quest`) čte definice z `data/ukoly/*.json` a `Quests.setup()` je přidá do
+  `list` vedle starých ručně psaných úkolů (`CigaretyQuest`…) – shodné rozhraní `Quest`, shodné ukládání
+  (`save_game.gd` ukládá/načítá generiky přes `id`/`state`, beze změny tohoto souboru). Formát JSON
+  (klíče `giver`, `requires`, `steps` s typy kroku `near`/`item`/`event`/`talk`, `branches` s `reward`/
+  `risk`) je podrobně popsán v hlavičce `quest_data.gd` a stručně i v hlavičce `quests.gd`. Starý quest
+  kód se **nepřevedl** – čas na krok to nedovolil, prompt to dovoluje (dva systémy žijí vedle sebe).
+- **10 nových úkolů** (`data/ukoly/*.json`), každý se 2 konci a dopadem na respekt komunity / skrytou
+  karmu / přátelství / pověst (→ `Politics.popularity` automaticky, počítá se z nich): `pes_ztraceny`
+  (děda – vrátit / nechat si psa), `pytlak_v_lese` (chata – udat / krýt pytláka), `klesti_hromada`
+  (chata – doplněk uživatele: poctivě odvézt klestí / spálit „maskovaně“ jako špekáčky s rizikem
+  odhalení), `strikacka` (úřad – koupit díl hasičům / „vypůjčit“ ho ze sousední obce), `mez_sousede`
+  (úřad – rozsoudit / vzít úplatek), `kaplicka_sbirka` (úřad – odevzdat sbírku / zpronevěřit část),
+  `drevo_babicka` (pila – dříví zadarmo / předražit babičce; nabídne se jen s trochou kladné karmy –
+  „úkol od srdce“), `sud_vinar` (sklep – vrátit / prodat ukradený sud), `motorka_stodola` (Stavebniny –
+  vrátit dědicům / tajně prodat; nabídne se jen bez vysoké karmy – „horší“ nabídka pro míň svatého
+  hráče), `krava_na_silnici` (Potraviny – zahnat krávu / nechat ji na silnici). Nečestné větve mají
+  `risk.chance` na odhalení (styl M4) s dodatečným postihem respektu/pověsti a textem o drbech/stížnosti.
+- **Nabídka rozhovorem i u místa**: beze zásahu do `dialog.gd` – existující téma „quest“ (`ctx.quest_offers`
+  z `World.dialog_context`) i generický `Quests.available_at(place)`/`place_options(place)` fungují pro
+  libovolný `giver`, data úkoly jen přibyly do `list`.
+- **Karma gating** (item 4 promptu): `requires.karma_min`/`karma_max` v `can_start()` – `drevo_babicka`
+  vidí jen hráč s karmou ≥ 10 (odemčený „úkol od srdce“ po pár dobrých skutcích), `motorka_stodola` jen
+  hráč s karmou ≤ 30 (pokušení se nenabízí už hodně „svatému“ hráči) – obojí ověřeno čtením `can_start()`.
+- Dokumentace: `docs/testy_M7.md` (nový oddíl „M7.3“), `docs/SYSTEMS.md` (bod „Úkoly“ doplněn o datové
+  vedlejší úkoly), `docs/VIZE_A_ROADMAPA.md` a `prompts/roadmapa/README.md` (M7.3 odškrtnuto – splněno
+  „Hotovo, když“ z promptu kroku: hráč najde ≥ 5 úkolů v prvních dnech, volby mají viditelné následky).
+- Kontrola překladu: `godot --headless --path . --import` (čisté, jen nesouvisející varování k ikonám
+  addonu LimboAI) + `--check-only` na `scripts/quests.gd`, `scripts/quest_data.gd`, `scripts/world.gd` –
+  bez chyb.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M7.md`, po celém M7, ne jen po tomto kroku).
+- Nedotaženo oproti `VIZE_A_ROADMAPA.md` (aspoň 15 úkolů, 2–3 konce, řetězy 3 postav se 3 úkoly
+  s dopadem na jejich hlas ve volbách) – stihlo se jen 10 úkolů se 2 konci bez řetězů; klidně doplnit
+  dalšími `.json` soubory v `data/ukoly/` (žádný kód se měnit nemusí) v dalším kroku/M7.4.
+- Staré ručně psané úkoly (cigarety, pivo, slivovice…) se nepřevedly na data – zůstávají jako GDScript
+  třídy v `quests.gd`; převod je možný později stejným enginem, beze změny ukládání.
+- Risk odhalení u nečestných větví je zjednodušený okamžitý hod kostkou (`randf() < chance`), ne plná
+  svědecká mechanika M4.4 (`Forestry.witness_near`/`World.witness_check`) – u `klesti_hromada` (doplněk
+  uživatele o pálení za vyhlášky) by šlo napojit přesněji, ale nehrozí žádná formální pokuta/zápis do
+  `Law`, jen sociální dopad (respekt, pověst), takže to nevyžaduje citaci zákona.
+- M7.2 (souběžný krok) může do `quests.gd`/`dialog*.gd` zasáhnout stejnými řádky – podle zadání orchestrátor
+  slučuje ve prospěch této datové struktury; nový kód tohoto kroku je soustředěný v `quest_data.gd` a
+  v `data/ukoly/`, v `quests.gd` jen 2 malé přídavky (hlavičkový komentář + jeden řádek v `setup()`), aby
+  byl merge co nejmenší.

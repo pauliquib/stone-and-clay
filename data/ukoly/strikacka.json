@@ -1,0 +1,23 @@
+{
+	"id": "strikacka",
+	"title": "Hasiči shánějí díl",
+	"giver": "urad",
+	"giver_name": "Starosta Novák",
+	"intro": "Hasičům dosluhuje stará stříkačka a sbírka na novou se táhne. Sehnal bys jim náhradní díl, než jim chytne hadice při zásahu?",
+	"requires": {"day_min": 0},
+	"steps": [
+		{"text": "Promluv se starostou o chybějícím dílu pro hasiče", "need": {"type": "talk"}}
+	],
+	"choice_text": "Jak náhradní díl sženeš?",
+	"branches": [
+		{"id": "koupit", "label": "Koupit nový díl ve Stavebninách (1200 Kč)", "honest": true,
+			"requires": {"money_min": 1200},
+			"result_text": "Zaplatil jsi díl – hasiči ti děkují.",
+			"reward": {"money": -1200, "respect": {"hasici": 12}, "karma": 3, "reputation": 4}},
+		{"id": "vypujcit", "label": "„Vypůjčit“ díl ze sousední obce bez dovolení", "honest": false,
+			"result_text": "Díl sis jen tak vzal.",
+			"reward": {"karma": -5},
+			"risk": {"chance": 0.45, "text": "Sousední obec si díl poznala a vyžádala ho zpět – ostuda na celou ves.",
+				"reward": {"respect": {"hasici": -10}, "reputation": -6}}}
+	]
+}

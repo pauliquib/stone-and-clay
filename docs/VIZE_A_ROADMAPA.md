@@ -532,7 +532,10 @@ kroky přehazovat, mezi milníky platí závislosti.
   zjednodušeně, funkční období 1 461 herních dní / 4 roky, volby ve stejném intervalu), petice rozhovorem (téma
   „petition“), protikandidát Starosta Novák + 1–2 smyšlení kandidáti.*
 - [ ] **M7.2 Kampaň a volby** – poctivé nástroje i úplatky, pomluvy a podvody s rizikem odhalení, volební den.
-- [ ] **M7.3 Vedlejší úkoly s větvením** – úkoly jako data, 15+ úkolů se 2–3 konci, řetězy postav, dopad na hlasy.
+- [x] **M7.3 Vedlejší úkoly s větvením** – úkoly jako data (`data/ukoly/*.json`, engine `scripts/quest_data.gd`).
+  *Hotovo (minimum): 10 nových úkolů se 2 konci (vrátit/nechat si, udat/krýt, poctivě/nečestně…), nabídka
+  rozhovorem i u místa, dopad na respekt komunit, karmu a pověst (→ popularita). Otevřeno: 15+ úkolů,
+  3. konce, řetězy postav – viz `PROJECT_LOG.md`.*
 - [ ] **M7.4 Starostování** – rozpočet, projekty s viditelnou změnou, zastupitelstvo, sliby a klam, konce příběhu.
 
 ### M8 – Realistický svět (transformační upgrade, E14, po M7)

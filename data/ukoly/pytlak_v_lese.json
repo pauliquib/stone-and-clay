@@ -1,0 +1,22 @@
+{
+	"id": "pytlak_v_lese",
+	"title": "Pytlák v lese",
+	"giver": "chata",
+	"giver_name": "Myslivec Franta",
+	"intro": "Všiml jsem si čerstvých stop pytláka u mokřadu – kdo to dělá, netuším jistě. Nechceš se tam mrknout a řekneš mi, co jsi zjistil?",
+	"requires": {"day_min": 0},
+	"steps": [
+		{"text": "Promluv s myslivcem Frantou o podezření na pytláka", "need": {"type": "talk"}}
+	],
+	"choice_text": "Franta čeká, co s tím, co jsi zjistil, uděláš.",
+	"branches": [
+		{"id": "udat", "label": "Řekni Frantovi vše, co víš", "honest": true,
+			"result_text": "Franta sdružení informoval, hajní si na pytláka dají pozor.",
+			"reward": {"respect": {"zemedelci": 10}, "karma": 4, "reputation": 3}},
+		{"id": "kryt", "label": "Mlč – pytláka znáš, je to tvůj kamarád", "honest": false,
+			"result_text": "Nic jsi Frantovi neřekl.",
+			"reward": {"karma": -4},
+			"risk": {"chance": 0.4, "text": "Franta se to dozvěděl od někoho jiného a ví, že jsi mlčel.",
+				"reward": {"respect": {"zemedelci": -12}}}}
+	]
+}

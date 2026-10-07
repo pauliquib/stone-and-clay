@@ -1,0 +1,22 @@
+{
+	"id": "kaplicka_sbirka",
+	"title": "Sbírka na kapličku",
+	"giver": "urad",
+	"giver_name": "Starosta Novák",
+	"intro": "Na opravu staré kapličky se vybírá sbírka. Vezmeš truhlici a obejdeš pár sousedů?",
+	"requires": {"day_min": 0},
+	"steps": [
+		{"text": "Obejdi sousedy s truhlicí na kapličku", "need": {"type": "talk"}}
+	],
+	"choice_text": "Vybral jsi 2 000 Kč na kapličku. Co s penězi uděláš?",
+	"branches": [
+		{"id": "odevzdat", "label": "Odevzdat celou sbírku na úřadě", "honest": true,
+			"result_text": "Peníze šly na opravu kapličky, lidé si toho všimli.",
+			"reward": {"respect": {"sousede": 10}, "reputation": 5, "karma": 3}},
+		{"id": "zpronevery", "label": "Nechat si část vybraných peněz", "honest": false,
+			"result_text": "Část sbírky sis nechal pro sebe.",
+			"reward": {"money": 800, "karma": -10},
+			"risk": {"chance": 0.55, "text": "Účetnictví sbírky nevyšlo a lidé mají podezření, kam peníze zmizely.",
+				"reward": {"respect": {"sousede": -18}, "reputation": -10}}}
+	]
+}

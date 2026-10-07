@@ -1,0 +1,23 @@
+{
+	"id": "motorka_stodola",
+	"title": "Motorka ve stodole",
+	"giver": "stavebniny",
+	"giver_name": "Prodavač Miroslav",
+	"intro": "V opuštěné stodole za vsí jsi našel starou motorku. Majitel je už po smrti, dědicové o ní zřejmě netuší.",
+	"requires": {"day_min": 0, "karma_max": 30},
+	"steps": [
+		{"text": "Zjisti ve Stavebninách, komu stodola a motorka vlastně patřily", "need": {"type": "talk"}}
+	],
+	"choice_text": "Co s nalezenou motorkou uděláš?",
+	"branches": [
+		{"id": "vratit_opravit", "label": "Najít dědice a motorku jim vrátit (opravu zaplatíš sám)", "honest": true,
+			"requires": {"money_min": 300},
+			"result_text": "Dědici byli překvapení a vděční – aspoň na opravu ti přispěli.",
+			"reward": {"money": -300, "respect": {"sousede": 7}, "karma": 3, "reputation": 3}},
+		{"id": "prodat", "label": "Motorku si nechat a tiše prodat", "honest": false,
+			"result_text": "Motorku jsi prodal, jako by byla tvoje.",
+			"reward": {"money": 1500, "karma": -7},
+			"risk": {"chance": 0.4, "text": "Dědicové se o motorce dozvěděli a stěžovali si na úřadě.",
+				"reward": {"respect": {"sousede": -10}, "reputation": -6}}}
+	]
+}

@@ -1,0 +1,22 @@
+{
+	"id": "krava_na_silnici",
+	"title": "Zatoulaná kráva",
+	"giver": "obchod",
+	"giver_name": "Prodavačka Jarka",
+	"intro": "Ze statku se utrhla kráva a courá se u Potravin po silnici. Než přijede policie a někoho to napadne řešit, stihneš ji zahnat zpátky?",
+	"requires": {"day_min": 0},
+	"steps": [
+		{"text": "Doběhni ke kravě u silnice poblíž Potravin a zkus ji zahnat", "need": {"type": "near", "place": "obchod", "offset": [15, -10], "radius": 20}}
+	],
+	"choice_text": "Kráva stojí před tebou. Co uděláš?",
+	"branches": [
+		{"id": "zahnat", "label": "Pomalu ji zahnat zpátky na statek", "honest": true,
+			"result_text": "Kráva je zpátky na statku, hospodář ti poděkoval.",
+			"reward": {"respect": {"zemedelci": 8}, "karma": 3, "reputation": 3}},
+		{"id": "nechat", "label": "Nechat ji tam stát a jít dál", "honest": false,
+			"result_text": "Krávu jsi tam nechal stát a šel dál.",
+			"reward": {"karma": -4},
+			"risk": {"chance": 0.5, "text": "Kráva na silnici skoro způsobila nehodu – lidé mluví o tom, že jsi mohl pomoct a nepomohl.",
+				"reward": {"respect": {"zemedelci": -8}, "reputation": -4}}}
+	]
+}
