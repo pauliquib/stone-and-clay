@@ -1316,3 +1316,18 @@ dřeva a vývraty po bouři, vazba na houby a zvěř.
 - Před M8: rozhodnutí uživatele z `00_START_M8.md` (offline generátory, testování po vlnách, měření výkonu, BPEJ).
 - M8 pravidlo „agent smí spustit offline generátor“ je **návrh** – platí jen po souhlasu uživatele na startu M8.
 - Kroky M5 jsou v `prompts/roadmapa/README.md` stále `[ ]` (čekají na ruční test M5 – beze změny).
+
+## 2026-10-07 – Start M7 – rozhodnutí uživatele
+
+### Rozhodnutí (platí pro celé M7, subagenti se neptají znovu)
+- **Termín voleb (M7.1):** funkční období starosty = **1461 herních dní (4 roky)**, plně realistické dle ČR, volby se
+  opakují ve stejném intervalu. Harmonogram kandidatury a kampaně je realistický (sběr podpisů, registrace kandidátky,
+  kampaň týdny před volebním dnem) – nahrazuje dřívější návrh 60/120 dní z README/VIZE. Doladění herních časových
+  skoků během kampaně (aby hráč nemusel čekat roky) **není nyní řešeno** – uživatel to případně doladí později.
+- **Testování:** až po celé M7 (beze změny oproti obecnému pravidlu).
+- **Kaplička (otevřený bod M5.5):** zůstává 225 m od úřadu (`Krize.chapel_pos()`), beze změny kódu.
+- **Nečestné cesty (M7.2):** úplatky, pomluvy, podvody podle promptu, s rizikem odhalení a důsledky (styl M4).
+- **Plán vln:** schválen jak navrženo – 1: M7.1 · 2: M7.2 ∥ M7.3 (slučovat M7.3 první) · 3: M7.4.
+
+### Otevřené body
+- README `M7.1 termín voleb (60/120 dní)` je zastaralý – opraví se na 1461 dní při odškrtnutí M7.1.

@@ -176,7 +176,7 @@ pak síťový základ a nové kroky V2.01–V2.05 (dovednosti a akce, měniteln�
 | M0.5 / M4 | úroveň realismu zákona (daně, povinné ručení, STK – ano/ne) |
 | M1.5 | ~~interiéry ostatních domů – zamčené, nebo generované?~~ → generované se streamováním (M1.8) – **hotovo** (M1.8: cizí domy zamčené, zaklepat) |
 | M1.7 | který dům bude bytový (start hráče) – návrh: největší obytná budova s více podlažími |
-| M7.1 | termín prvních voleb (návrh 60 herních dní, další po 120) |
+| M7.1 | ~~termín prvních voleb (návrh 60 herních dní, další po 120)~~ → rozhodnuto 7. 10. 2026: funkční období 1461 herních dní (4 roky, realisticky) |
 | M5.1, M5.2 | souřadnice stavebnin a bývalé hasičské nádrže (mapa M ve hře ukazuje souřadnice hráče) |
 | M5.8 | U-rampa hotová od začátku (návrh), nebo stavba ze stavebnin? |
 | M6.2 | ~~strop a dosah letu~~ → rozhodnuto: strop 1 500 m nad terénem, hranice 2 km za katastrem (`World.FLY_*`) |
