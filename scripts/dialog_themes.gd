@@ -573,6 +573,16 @@ const THEMES := {
 		"season": {"podzim": ["Na podzim jsou jablka, hrušky a houby. Jez a nadechuj se.", "Podzim je sklizeň jídla, takže se nají každý."], "léto": ["V létě jsou rajčata, okurky a ovoce, to je zdravé.", "V létě se jí lehce."], "zima": ["V zimě se jí těžší jídlo: guláš, svíčková.", "V zimě se topí, a proto se i víc jí."], "jaro": ["Na jaře je málo zásob, ale zelenina začíná růst.", "Na jaře se jí první zelenina."]},
 		"ask": ["q_food"],
 	},
+	"petition": {       # M7.1: petice za kandidaturu na starostu – skutečný podpis řeší Politics.sign_petition (World._apply_reply)
+		"words": ["petici", "petice", "podepsat", "podepises", "podepisete", "podpis pod", "kandiduj", "kandidatur", "na starostu"],
+		"lines": ["Petice za tvou kandidaturu? To je zajímavé.", "Takže se chceš stát starostou? To bych ráda viděla.", "Podpis pod petici je vážná věc, ne jen škrábanec na papíře."],
+		"trait": {"prisny": ["Nejdřív ukaž, že to myslíš vážně, a pak uvidíme.", "Podpis dám jen tomu, komu věřím."],
+			"veselak": ["Starostou? Hehe, to by byla sranda! Ukaž tu petici!", "Proč ne, aspoň se něco ve vsi změní!"],
+			"drbna": ["To bude řeč po celé vsi! Dej mi to podepsat.", "Všichni budou mluvit o tom, kdo ti podepsal a kdo ne."],
+			"moudry": ["Za mých let se o starostovi rozhodovalo v hospodě. Teď aspoň máš petici.", "Kandidatura je odpovědnost, ne hra."]},
+		"cond": {"friend": ["Tobě podpis dám rád{g:|a}, jsme přece kámoši.", "Tebe podpořím, jasně."], "disliked": ["Po tom, co jsi předváděl{g:|a}? To ne.", "Tobě bych nedal{g:|a} ani podpis na nákupní seznam."]},
+		"why": ["Protože i ves potřebuje někoho nového, {voc}."],
+	},
 }
 
 ## Navazující reakce, když téma nemá vlastní pole (klíč = `why` / `more` / `how` / `where` / `andyou`), dle povahy.

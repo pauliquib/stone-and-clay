@@ -1,0 +1,40 @@
+{
+  "_poznamka": "M7.1 – zjednodušená herní simulace komunálních voleb (satira; žádný reálný starosta, strana ani symbol obce). Čísla u paragrafů ověřit aktuální znění zákona.",
+  "zakon": "zákon č. 491/2001 Sb., o volbách do zastupitelstev obcí (ověřit aktuální znění)",
+
+  "obdobi_dni": 1461,
+  "obdobi_poznamka": "4 herní roky (1461 dní = 3×365 + 366). Odpovídá reálnému funkčnímu období obecního zastupitelstva (§ 64 zákona č. 491/2001 Sb., ověřit aktuální znění). Volby se opakují ve stejném intervalu.",
+
+  "peticia_procento": 7,
+  "peticia_paragraf": "§ 21 odst. 4 zákona č. 491/2001 Sb. – u obce do 500 obyvatel potřebuje nezávislý kandidát podpisovou petici min. 7 % oprávněných voličů obce (ověřit aktuální znění; u větších obcí procento klesá).",
+  "potreba_podpisu": 15,
+  "potreba_podpisu_poznamka": "Herní zjednodušení: ve hře žije jen cca 28 postav se jménem (Characters.PROFILES) místo stovek reálných voličů. Počet podpisů je zvolen tak, aby poměr k počtu postav ve hře odpovídal duchu 7 % z paragrafu, ne přesnému počtu obyvatel.",
+
+  "registrace_dni_pred_volbami": 66,
+  "registrace_paragraf": "§ 21 odst. 3 zákona č. 491/2001 Sb. – kandidátní listina (a petice) se podává registračnímu úřadu nejpozději 66 dní před prvním dnem voleb (ověřit aktuální znění).",
+
+  "kauce_kc": 0,
+  "kauce_poznamka": "Reálný zákon o volbách do zastupitelstev obcí žádnou kauci ani poplatek nevyžaduje (na rozdíl např. od prezidentských voleb) – hra proto žádnou nevybírá; v promptu zmíněná 'kauce' je tím zjednodušena na 0 Kč.",
+
+  "moratorium_dni": 3,
+  "moratorium_paragraf": "Obecná zásada volebního moratoria (agitace, průzkumy a zveřejňování odhadů se v posledních dnech před volbami omezují) – pro volby do zastupitelstev obcí není v zákoně č. 491/2001 Sb. explicitní lhůta stanovena stejně jako u jiných voleb, ověřit aktuální znění. Ve hře: poslední 3 dny se nepočítají nové podpisy petice.",
+
+  "bez_odsouzeni_roky": 3,
+  "bez_odsouzeni_poznamka": "Herní zjednodušení (ne přesná citace trestního zákona) podle zadání: 'bez odsouzení za úmyslný trestný čin v posledních letech'. Ve hře kontroluje World.law[pid].criminal_record() (zápis se 'rozsudek' z Court, M4.3) v posledních N herních letech.",
+
+  "trvaly_pobyt_pozadovan": true,
+  "trvaly_pobyt_paragraf": "§ 4 zákona č. 491/2001 Sb. – právo volit i být zvoleno má občan s trvalým pobytem v obci (ověřit aktuální znění). Ve hře stačí jakékoliv přidělené bydlení v obci (byt i dům, Estate.home_of, M1.7) – hráč je má od začátku hry.",
+
+  "prani_obce": [
+    {"id": "hriste", "text": "oprava hřiště a houpaček na návsi"},
+    {"id": "lavicky", "text": "nové lavičky a koše kolem cest"},
+    {"id": "rozhlas", "text": "lepší obecní rozhlas, ať se dovíme, co se děje"},
+    {"id": "koupaliste", "text": "déle otevřené koupaliště v létě"},
+    {"id": "silnice", "text": "zalátat díry v silnici k hospodě"},
+    {"id": "osvetleni", "text": "víc veřejného osvětlení za vsí"},
+    {"id": "auta", "text": "méně rychlých aut projíždějících návsí"},
+    {"id": "zabava", "text": "víc tanečních zábav a akcí pro mládež"},
+    {"id": "odpadky", "text": "víc popelnic a méně černých skládek v lese"},
+    {"id": "hasici", "text": "novou techniku pro dobrovolné hasiče"}
+  ]
+}

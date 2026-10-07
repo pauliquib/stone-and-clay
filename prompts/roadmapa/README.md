@@ -121,7 +121,7 @@ Doplněk od uživatele (30. 9. 2026). Doporučeno po M4 a M5.5; M6 létání je 
 **Start celé M7 jednou session (orchestrátor se subagenty, Sonnet 5):** [`M7_starosta/00_START_M7.md`](M7_starosta/00_START_M7.md).
 | | Krok | Soubor | Předpoklady |
 |---|---|---|---|
-| [ ] | M7.1 Popularita a kritéria kandidatury | [`M7_starosta/01_popularita_a_kriteria.md`](M7_starosta/01_popularita_a_kriteria.md) | M0.6, M4.5, M5.5 |
+| [x] | M7.1 Popularita a kritéria kandidatury | [`M7_starosta/01_popularita_a_kriteria.md`](M7_starosta/01_popularita_a_kriteria.md) | M0.6, M4.5, M5.5 |
 | [ ] | M7.2 Kampaň a volby (poctivě i nečestně) | [`M7_starosta/02_kampan_a_volby.md`](M7_starosta/02_kampan_a_volby.md) | M7.1, (M4.3, M4.4) |
 | [ ] | M7.3 Vedlejší úkoly s větvením | [`M7_starosta/03_vedlejsi_ukoly_a_vetveni.md`](M7_starosta/03_vedlejsi_ukoly_a_vetveni.md) | M7.1 |
 | [ ] | M7.4 Starostování a konce příběhu | [`M7_starosta/04_starostovani.md`](M7_starosta/04_starostovani.md) | M7.2 |
@@ -176,7 +176,7 @@ pak síťový základ a nové kroky V2.01–V2.05 (dovednosti a akce, měniteln�
 | M0.5 / M4 | úroveň realismu zákona (daně, povinné ručení, STK – ano/ne) |
 | M1.5 | ~~interiéry ostatních domů – zamčené, nebo generované?~~ → generované se streamováním (M1.8) – **hotovo** (M1.8: cizí domy zamčené, zaklepat) |
 | M1.7 | který dům bude bytový (start hráče) – návrh: největší obytná budova s více podlažími |
-| M7.1 | ~~termín prvních voleb (návrh 60 herních dní, další po 120)~~ → rozhodnuto 7. 10. 2026: funkční období 1461 herních dní (4 roky, realisticky) |
+| M7.1 | ~~termín prvních voleb (návrh 60 herních dní, další po 120)~~ → rozhodnuto 7. 10. 2026: funkční období 1 461 herních dní (4 roky), volby se opakují ve stejném intervalu, realistický harmonogram kandidatury (`data/volby.json`) |
 | M5.1, M5.2 | souřadnice stavebnin a bývalé hasičské nádrže (mapa M ve hře ukazuje souřadnice hráče) |
 | M5.8 | U-rampa hotová od začátku (návrh), nebo stavba ze stavebnin? |
 | M6.2 | ~~strop a dosah letu~~ → rozhodnuto: strop 1 500 m nad terénem, hranice 2 km za katastrem (`World.FLY_*`) |

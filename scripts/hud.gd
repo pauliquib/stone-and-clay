@@ -828,6 +828,8 @@ func _journal_bbcode() -> String:
 			s += "  [color=#%s]%+d[/color] %s\n" % ["8f8" if float(e["delta"]) > 0.0 else "f88", roundi(float(e["delta"])), e["text"]]
 		s += _relations_bbcode(rep)
 	s += _law_bbcode()
+	if game.politics:
+		s += _politics_bbcode()          # M7.1: oddíl „Obec“ – cesta na starostu
 	if _quests().active:
 		s += "\n\n[color=#aaa]Rozdělaný úkol lze vzdát klávesou Backspace.[/color]"
 	return s
@@ -2328,3 +2330,8 @@ static func _dash_segments(pts: PackedVector2Array, dash := OBEC_DASH, gap := OB
 				on = not on
 				left = dash if on else gap
 	return out
+
+
+## Deník, oddíl „Obec“ (M7.1): popularita, protikandidát, termín voleb, kritéria kandidatury, přání obce.
+func _politics_bbcode() -> String:
+	return game.politics.journal_bbcode(player.id)
