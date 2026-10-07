@@ -1426,3 +1426,63 @@ dřeva a vývraty po bouři, vazba na houby a zvěř.
   slučuje ve prospěch této datové struktury; nový kód tohoto kroku je soustředěný v `quest_data.gd` a
   v `data/ukoly/`, v `quests.gd` jen 2 malé přídavky (hlavičkový komentář + jeden řádek v `setup()`), aby
   byl merge co nejmenší.
+
+## 2026-10-07 – M7.2 Kampaň a volby: poctivě i nečestně
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Nová třída `campaign.gd` `Campaign` = `World.campaign`** (jedna instance, stav per hráč), navazuje na
+  `World.politics` z M7.1 beze zásahu do jeho popularity funkce: poctivé nástroje kampaně zvedají doopravdy
+  pověst / respekt (přes existující `Reputation.change_respect`, žádná změna `reputation.gd`), ze kterých
+  `Politics.popularity()` počítá skutečnou podporu; nečestné nástroje plní skrytý `Politics.deceit` (háček
+  z M7.1, poprvé naplňovaný – `Politics.add_deceit`).
+- **Poctivě**: mítink v sále hospody (E u dveří hospody v otevírací době, `Place.is_open`) – nabídne jedno ze
+  3 aktuálních přání obce (`Politics.wishes`), volba „poctivě slíbit“ (respekt sousedů +, `Reputation.change_respect`)
+  nebo „slíbit bez krytí“ (skrytý klam + rychle, ale `promises[pid]` = „dluh slibů“ pro M7.4). Letáky: roznos do
+  10 různých poštovních schránek denně (nový `World.street_mailboxes`, pozice `Prop` kind „schranka“ zapsané v
+  `_spawn_props`; interakce E u schránky, `Campaign.deliver_leaflet`, malý respekt za každou). Plnění přání obce:
+  hák `Campaign.on_event` na existující událost `job_task_done` (job `udrzba`, M3.2) přidá respekt a zápis do
+  deníku, bez zásahu do `quests.gd` nebo `jobs.gd`.
+- **Nečestně**: nová témata rozhovoru (T) `"bribe"` a `"slander"` v `DialogThemes.THEMES` (`dialog_themes.gd`,
+  stejný vzor jako „petition“ z M7.1 – auto-registrace přes `Dialog._words/_order`, žádný zásah do `dialog.gd`).
+  Úplatek („dám ti stovku, když mě budeš volit“) → `World._apply_reply` → `Campaign.try_bribe` (150 Kč, přijetí
+  podle povahy a nálady postavy, `Politics.add_deceit`). Pomluva protikandidáta („nevol nováka“ ap.) →
+  `Campaign.try_slander` (1× denně, u věřící postavy klesne `Politics.opponent_pop`). Zfalšovaný podpis petice:
+  nová interakce u úřadu (1× denně, `Campaign.forge_signature`, obchází `Politics.sign_petition`).
+- **Riziko odhalení**: `Campaign._reveal_chance` – povahová ochota mluvit dál (`TELL_CHANCE`, drbna/přísný skoro
+  jistě), štěstí z karmy (`Reputation.luck`), navíc svědek nablízko (`World.witness_reported`, kind „kampan“).
+  Odhalení = `Campaign._scandal`: pád pověsti (`Reputation.change`, −15), klam se obrátí (`add_deceit`, −20),
+  přestupek `World.commit_offense` – dva nové záznamy v `data/zakon.json` (`podplaceni_volicu`, `volebni_podvod`,
+  oba trestné činy → `misto: "soud"` → M4.3; odsouzení pak samo vyřadí z kandidatury přes stávající
+  `Politics.clean_record()`, žádný nový kód pro „zákaz kandidatury“ nebyl potřeba).
+- **Volební den**: `Politics.tick()` při `jd > election_jd` nově volá `Campaign.resolve_election()` (místo
+  prostého posunu termínu). Simulace hlasů (`Campaign._simulate_votes`): každá ze ~28 postav (`Characters.count`)
+  hlasuje s pravděpodobností podle `Politics.popularity(pid)` vs. protikandidát + 1–2 smyšlení kandidáti (šum na
+  hlas), výsledek se vyhlásí oknem (`World.notify …"open_menu"`, text „Výsledky hlasování na úřadě“). Výhra →
+  `Politics.mayor[pid] = true` (nové pole, čte M7.4, `Politics.is_mayor`), stejné funkční období (1 461 dní,
+  M7.1 rozhodnutí nedotčeno). Prohra → `Politics.reroll_for_new_term()` (nová přání, soupeři), nový termín za
+  120 dní (nové pole `doplnovaci_volby_dni` v `data/volby.json` s poznámkou „herní zjednodušení“).
+- **Deník J → „Obec“**: rozšířen přímo v `Politics.journal_bbcode()` (ne v `hud.gd` – vyhnuto se zásahu do
+  `_journal_bbcode()`, se kterým souběžně pracuje M7.3) – nápis „Jsi starostou/starostkou obce“ a nový oddíl
+  „Příběh kampaně“ (`Campaign.journal_section`, posledních 12 záznamů + dluh slibů).
+- **Ukládání**: nový klíč `d["campaign"]` přidaný na konec sekce v `save_game.gd` (save i load), `politics`
+  rozšířeno o `mayor` (starý save bez klíčů = čistý start kampaně / není starosta).
+- **Žádný zásah do `quests.gd`** (M7.3 na něm souběžně pracuje) – plnění přání obce napojeno přes existující
+  `World.emit_game_event` hák, ne přes úkoly. `reputation.gd` beze změny (jen volání existujícího veřejného API).
+- Dokumentace: `docs/SYSTEMS.md` (nový bod „Kampaň a volby“ + doplněk u „Ukládání“), `docs/VIZE_A_ROADMAPA.md`
+  a `prompts/roadmapa/README.md` (M7.2 odškrtnuto).
+- Kontrola překladu: plné `godot --headless --import` bez chyby (po opravě jedné: `Cannot infer the type of
+  "picked"` v `campaign.gd` – chybělo typování u `a if c else b` s `Dictionary.keys()[0]`, opraveno `String(...)`
+  + explicitní typ). `--check-only` na `campaign.gd`, `politics.gd`, `world.gd`, `dialog_themes.gd`,
+  `save_game.gd` bez chyby.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M7.md`, oddíl M7.2, po celém M7).
+- **Kompromat** (vyfotit protikandidáta při přestupku dronem / telefonem) a **podpora spolků** (sponzorský dar
+  hasičům / fotbalu) z „Co udělat“ nejsou implementované – chybí scriptovaný přestupek protikandidáta a hák na
+  dárky spolkům; necháno jako nápad pro M7.3/M7.4.
+- **Debata s protikandidátem** (výběr argumentů, Výřečnost) z „Co udělat“ není implementovaná – mítink a letáky
+  pokrývají „Minimum“ z promptu, debata je nad rámec tohoto kroku.
+- Unikátnost kampaně (vichřice, vyhořelá stodola, televize) nebyla přidána – jen `_simulate_votes` má šum na
+  hlas a `Politics.tick()` náhodnou procházku soupeřů z M7.1; návrh nových náhodných událostí kampaně patří M7.3.
+- `Politics.reroll_for_new_term()` čistí podpisy petice pro všechny hráče (`signatures.clear()`), ne jen pro
+  toho, kdo prohrál – v singleplayeru bez dopadu, při budoucím multiplayeru (V2) by to potřebovalo per-hráče klíč.

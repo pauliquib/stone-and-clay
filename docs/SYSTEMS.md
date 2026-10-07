@@ -440,7 +440,8 @@
   a nálady postav, zaměstnání (M3.1; M3.3 i varianta směn a rozdělaná zakázka), obecní údržba – posekaná tráva, odklizený sníh, lavička, odpadky (M3.2),
   vyznačené stromy a hromada dřeva lesního dělníka (M3.3, klíč `les`), počítač (M3.4, klíč `pc`: účet, pohyby, trvalý příkaz, pošta,
   objednávky a balíky u dveří, drby, výsledky eTestů; v `jobs` i výplata na účet a pozvánky na pohovor; v `politics` termín voleb,
-  protikandidát a podpisy petice, M7.1). Rozdělaný úkol se po načtení vrátí do nabídky. `--load=slot` načte pozici po startu.
+  protikandidát a podpisy petice (M7.1), v `campaign` mítinky, sliby bez krytí, úplatky a příběh kampaně (M7.2).
+  Rozdělaný úkol se po načtení vrátí do nabídky. `--load=slot` načte pozici po startu.
 - **Cesta na starostu** (M7.1, `politics.gd` `Politics` = `World.politics`, zjednodušený volební zákon `data/volby.json`):
   hlavní cíl hry – **popularita** 0–100 % (`popularity(pid)`) z pověsti (45 %), respektu komunit váhovaného počtem jejich
   členů (35 %) a přátelství s postavami (20 %); skrytý **klam** (háček pro M7.2 – podplácení, podvody) popularitu uměle
@@ -451,6 +452,21 @@
   cyklu komunálních voleb v ČR (první pátek října, roky ≡ 2 mod 4). Protikandidát **Starosta Novák** + 1–2 smyšlení
   kandidáti (losují se podle hry), popularita soupeřů pomalu kolísá. Deník J → oddíl „Obec“: popularita, bloky voličů,
   kritéria, termín voleb, 3 „přání obce“. Registrace kandidatury, kampaň, úplatky a volební den: M7.2.
+- **Kampaň a volby** (M7.2, `campaign.gd` `Campaign` = `World.campaign`): poctivé nástroje opravdu zvedají
+  pověst / respekt (ze kterých počítá popularitu `Politics`) – **mítink** v sále hospody (E u dveří, otevřeno
+  dle hodin) probere jedno ze 3 přání obce („poctivě slíbit“ = respekt +, nebo „slib bez krytí“ = rychlý
+  skrytý klam, ale „dluh slibů“ do M7.4), **letáky** do poštovních schránek podél cest (E, 10 různých schránek
+  denně = malý respekt + zápis do deníku), splněný úkol obecní údržby (M3.2) během kampaně přidá taky.
+  Nečestné nástroje (rozhovor T): **úplatek** („dám ti stovku, když mě budeš volit“ → 150 Kč, přijetí podle
+  povahy a nálady) a **pomluva** protikandidáta (šíří fámu, klesá mu vidina popularita) plní skrytý **klam**;
+  u úřadu lze 1× denně i **zfalšovat podpis** petice. Riziko odhalení: povaha postavy (drbna / přísný skoro
+  jistě řeknou dál), svědci (`World.witness_reported`) a náhoda z karmy (`Reputation.luck`) – odhalení =
+  skandál (pověst −15, klam −20) a přestupek `podplaceni_volicu` / `volebni_podvod` (`data/zakon.json`,
+  trestné činy → soud M4.3 → odsouzení vyřadí z kandidatury). **Volební den**: po vypršení termínu
+  `Politics.tick()` zavolá `resolve_election()` – simuluje hlas každé ze ~28 postav podle popularity hráče
+  a soupeřů (s šumem), vyhlásí výsledek na úřadě (`open_menu`). Výhra = `Politics.mayor[pid]` (čte M7.4),
+  prohra = nová kandidatura (nová přání, soupeři) za 120 herních dní (`data/volby.json`). Deník J → „Obec“:
+  oddíl „Příběh kampaně“ (poslední záznamy, dluh slibů). Ukládání: klíč `campaign` v `SaveGame`.
 
 ## Co ve hře je
 

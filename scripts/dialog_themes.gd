@@ -583,6 +583,25 @@ const THEMES := {
 		"cond": {"friend": ["Tobě podpis dám rád{g:|a}, jsme přece kámoši.", "Tebe podpořím, jasně."], "disliked": ["Po tom, co jsi předváděl{g:|a}? To ne.", "Tobě bych nedal{g:|a} ani podpis na nákupní seznam."]},
 		"why": ["Protože i ves potřebuje někoho nového, {voc}."],
 	},
+	"bribe": {       # M7.2: úplatek voliči za hlas – skutečné přijetí / odmítnutí řeší Campaign.try_bribe (World._apply_reply)
+		"words": ["dam ti stovku", "das stovku", "uplatek", "podplatit", "koupim hlas", "koupit hlas", "zaplatim ti za hlas", "penize za hlas"],
+		"lines": ["Úplatek? To je vážná nabídka, nebo si děláš legraci?", "Chceš si koupit hlas? To se dělá takhle nahlas?", "Peníze za hlas… to by nemělo být normální."],
+		"trait": {"prisny": ["Urážíš mě. Úplatky neberu a nahlásím to.", "Tohle je trestné, víš to?"],
+			"veselak": ["Hehe, a kolik nabízíš? No dělám si srandu, to nejde.", "Úplatek za pivo, to by šlo. Ale za hlas? Hmm."],
+			"drbna": ["To bude řeč, jestli to někomu řeknu!", "Zajímavá nabídka. Ale víš, že já umím mlčet jen těžko."],
+			"moudry": ["Hlas se má vydobýt, ne koupit, {voc}.", "Za mých let se takové věci taky dělaly. Špatně skončily."]},
+		"cond": {"friend": ["Pro tebe bych to i zvážil{g:|a}, ale riskuju víc než ty.", "No… jako kamarádovi bych to snad…"], "disliked": ["Po tom všem? Rovnou tě nahlásím.", "Ty bys mě ještě podplácel? To je vrchol."]},
+		"why": ["Protože hlasy se nedají, ale berou, ne?"],
+	},
+	"slander": {       # M7.2: pomluva protikandidáta – skutečný dopad na popularitu řeší Campaign.try_slander (World._apply_reply)
+		"words": ["novak je spatny", "novak bere uplatky", "nevol novaka", "novak je podvodnik", "spatna fama o novakovi", "pomluva o novakovi", "novak krade"],
+		"lines": ["To o Novákovi povídáš poprvé. Je to pravda?", "Fáma o starostovi? To je silné sousto.", "Na to bych si dal pozor, co o něm říkáš nahlas."],
+		"trait": {"drbna": ["To mi povídej víc! Tohle se musí roznést!", "Já už jsem něco podobného slyšela, teda možná."],
+			"moudry": ["Nevěřím pomluvám bez důkazu, {voc}.", "Kdo pomlouvá, sám něco skrývá."],
+			"prisny": ["Pomluva je trestná, pokud to není pravda.", "Máš na to důkaz, nebo jen tak žvaníš?"]},
+		"cond": {"friend": ["Tobě věřím, tak to budu povídat dál.", "No, když to říkáš ty…"], "disliked": ["Tobě bych nevěřil{g:|a} ani slovo.", "Po tom, co o tobě vím, tomu nevěřím."]},
+		"why": ["Protože lidi by měli vědět, koho volí."],
+	},
 }
 
 ## Navazující reakce, když téma nemá vlastní pole (klíč = `why` / `more` / `how` / `where` / `andyou`), dle povahy.

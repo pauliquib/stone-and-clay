@@ -200,6 +200,12 @@
    "poznamka": "NEOVĚŘENO – UL stroje létají vizuálně za denního světla; ve hře `Clock.is_night`. Orientační pokuta, ověřit. Ověřit aktuální znění."},
   "ul_mraky": {"nazev": "Let ultralehkým letadlem v oblacích / za ztížené viditelnosti", "drb": "vlítl s rogalem do mraků", "karma": -1, "zakon": "49/1997 Sb. + provozní řád ULL", "par": "ověřit",
    "pokuta": [5000, 40000], "body": 0, "trestny_cin": false, "misto": "spravni_rizeni",
-   "poznamka": "NEOVĚŘENO – Létání mimo mraky a za viditelnosti; ve hře zjednodušeně oblačnost > 0,75 nebo mlha. Orientační pokuta, ověřit. Ověřit aktuální znění."}
+   "poznamka": "NEOVĚŘENO – Létání mimo mraky a za viditelnosti; ve hře zjednodušeně oblačnost > 0,75 nebo mlha. Orientační pokuta, ověřit. Ověřit aktuální znění."},
+  "podplaceni_volicu": {"nazev": "Podplácení voličů", "drb": "nabízel peníze za hlas ve volbách", "karma": -5, "zakon": "40/2009 Sb.", "par": "§ 351 (ověřit)",
+   "pokuta": [20000, 100000], "body": 0, "trestny_cin": true, "misto": "soud",
+   "poznamka": "NEOVĚŘENO – M7.2 herní satira (žádná reálná volba, strana ani osoba); ověřit aktuální znění trestního zákoníku. Odsouzení (Court, M4.3) vyřadí z kandidatury přes `Politics.clean_record`."},
+  "volebni_podvod": {"nazev": "Volební podvod (lživá pomluva, zfalšované podpisy)", "drb": "šířil lži o protikandidátovi nebo falšoval podpisy petice", "karma": -4, "zakon": "40/2009 Sb.", "par": "§ 351 (ověřit)",
+   "pokuta": [15000, 80000], "body": 0, "trestny_cin": true, "misto": "soud",
+   "poznamka": "NEOVĚŘENO – M7.2 herní satira; ověřit aktuální znění trestního zákoníku. Odsouzení (Court, M4.3) vyřadí z kandidatury přes `Politics.clean_record`."}
  }
 }
