@@ -2126,6 +2126,8 @@ const PERF_SCENES := {
 		"weather": "jasno", "popis": "pole v létě, poledne – plodiny a fenologie"},
 	"dron_200m": {"pos": Vector3(60.0, 0.0, 110.0), "yaw": 0.0, "date": [2026, 7, 15], "hour": 12.0,
 		"weather": "jasno", "agl": 200.0, "popis": "volná kamera 200 m nad návsí – dohlednost, impostory, obloha"},
+	"zapad_slunce": {"pos": Vector3(900.0, 0.0, -500.0), "yaw": 0.0, "date": [2026, 6, 21], "hour": 20.5,
+		"weather": "jasno", "popis": "M8.5: otevřená louka při západu slunce v červnu – fyzikální obloha, pás Venuše, modrá hodina"},
 }
 
 

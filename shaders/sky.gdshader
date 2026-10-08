@@ -21,6 +21,7 @@ uniform float haze = 0.0;                // opar, mlha 0..1
 uniform float flash = 0.0;               // blesk 0..1
 uniform float brightness = 1.0;
 uniform float light_pollution = 0.0;     // M5.12: světelný smog 0..1 (obec svítí) – řídí Atmosphere podle kamery
+uniform bool sky_on = true;              // M8.5: fyzikální přídavky (pás Venuše) – vypínač "Realismus → Obloha"
 
 float hash3(vec3 p) {
 	p = fract(p * vec3(443.897, 441.423, 437.195));
@@ -50,6 +51,15 @@ void sky() {
 	float low_sun = (1.0 - smoothstep(0.02, 0.32, sun_h)) * smoothstep(-0.16, -0.01, sun_h);
 	col += sunset_col * low_sun * pow(1.0 - h, 5.0) * (0.25 + 0.75 * pow(cs, 4.0)) * 1.3;
 	col += vec3(1.0, 0.86, 0.62) * (pow(cs, 10.0) * 0.35 + pow(cs, 90.0) * 0.8) * day;
+
+	// --- M8.5: pás Venuše (Belt of Venus) – růžový pás naproti slunci v občanském soumraku (zjednodušeně,
+	// 00_PRINCIPY kap. 8); jen při zapnutém přepínači "Obloha", stará obloha bez něj
+	if (sky_on) {
+		float anticos = max(dot(d, -sd), 0.0);
+		float twi = smoothstep(-0.12, -0.02, sun_h) * (1.0 - smoothstep(-0.02, 0.05, sun_h));
+		float band = pow(anticos, 9.0) * smoothstep(0.0, 0.2, h) * smoothstep(0.4, 0.05, h);
+		col += vec3(0.85, 0.55, 0.55) * band * twi * 1.5;
+	}
 
 	// --- noc: hvězdy a měsíc (jen v obraze, ne v odrazech)
 	float night = 1.0 - smoothstep(-0.2, 0.02, sun_h);

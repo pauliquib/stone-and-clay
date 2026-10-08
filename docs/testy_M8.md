@@ -52,5 +52,39 @@ kartě/ovladači; `SSAO` hlásí varování, že vyžaduje Forward+. **Baseline 
 a jakéhokoli M8 obsahu) běží ~27 fps / ~36 ms, ne 60 fps / 16,6 ms** z rozpočtu kap. 6 – rozpočet
 „0,5 ms CPU / 1,0 ms GPU navíc za krok M8“ je tedy nad už přetíženým základem, ne nad ideálním 60 fps
 základem. M8.19 musí tohle zohlednit (buď vyšetřit Forward Mobile/renderer, nebo počítat rozpočet
-relativně k naměřenému základu, ne k teoretickým 16,6 ms). Drobná varování v logu (zóny obecní
+relativně k naměřenému základu, ne k teoretickým 16,6 ms).
+
+## M8.5 – Fyzikální obloha, světlo a expozice
+
+Co změřit: `tools/launcher.sh --perfscene=ves_poledne` a nová `--perfscene=zapad_slunce` (louka,
+21. 6. 2026, 20:30, jasno – otevřený pohled k obzoru). Cíl kap. 6: nejvýš +0,8 ms GPU navíc vůči
+naměřenému základu (`ves_poledne` ~37,3 ms z 8. 10. 2026) na předvolbě Střední.
+
+1. F2 → Teleport/Datum/Čas: 21. 6. 2026, 20:30, počasí jasno, kamera na otevřeném místě (nebo
+   `--perfscene=zapad_slunce`) → oranžové sluneční kotouč u obzoru, naproti němu (na východě)
+   narůžovělý pás (pás Venuše), po západu modrá hodina (obloha zmodrá a ztmavne postupně, ne naráz).
+2. Poledne v létě vs. v prosinci (stejné místo) → v prosinci je slunce níž, slabší a teplejší
+   barvou (`Atmosphere.SkyModel.sun_tint`), obloha u obzoru v poledne světlejší než v zenitu.
+3. Noc za úplňku (F2 → Datum na den s úplňkem) na louce → krajina tmavě modrošedá, ale cesta a
+   obrysy budov/stromů čitelné (Purkyňův posun = potlačené barvy, ne černo).
+4. Noc v novu v lese → velmi tma, baterka/lampy znovu důležité (ne jako za úplňku).
+5. Ze sklepa / interiéru ven v jasném poledni → krátké oslnění (obraz na okamžik jasnější), do ~2 s
+   se srovná na normální jas; naopak při vstupu dovnitř přizpůsobení netrvá tak dlouho jako při
+   vstupu do tmy v noci (to je v pořádku, rychlá/pomalá adaptace jsou různé).
+6. Lampy v obci (M5.12) a světla aut svítí stejně jako dřív (ne přepálené ani zhasnuté) – fyzikální
+   jednotky se netýkají interiérů ani umělých světel, jen slunce/měsíce/oblohy.
+7. Esc → Nastavení → Realismus → „Fyzikální obloha a expozice“ vypnout → obloha i noční jas se
+   vrátí ke starému vzhledu (bez pásu Venuše, bez adaptace, statická expozice jako dřív); zpátky
+   zapnout → vrátí se nové chování.
+8. `--perfscene=ves_poledne` a nová `--perfscene=zapad_slunce` → poslat FPS/ms (porovnání s
+   naměřeným základem výš).
+
+Co nahlásit: screenshot/popis západu slunce a nočních scén (úplněk vs. nov), zda lampy/auta
+vypadají při zapnutém i vypnutém přepínači stejně, čísla z obou `--perfscene`.
+
+**Otevřené body (M8.5):** místo předpočítané 64×256 LUT textury se transmitance počítá analytickými
+vzorci přímo ve skriptu (levnější, v rozpočtu kap. 6, ale méně přesné u extrémních úhlů – k ověření
+na skutečném běhu). Stíny mraků (předvolba Vysoká) a plná vzdušná perspektiva v `terrain.gdshader`
+nejsou zavedeny – zůstává jen existující mlha/fog z M6.2. Fyzikální jednotky světel
+(`use_physical_light_units`) se nezapínají globálně, jen lux→energy převod pro slunce/měsíc. Drobná varování v logu (zóny obecní
 údržby/paseka se nevešly) nesouvisí s M8, jsou staré a nesouvisí s tímto měřením.
