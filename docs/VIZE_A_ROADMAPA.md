@@ -555,7 +555,7 @@ Start: `prompts/roadmapa/M8_realismus/00_START_M8.md` (orchestrátor, 8 vln), sp
 - [ ] **M8.3 Dřeviny a porosty** – `dreviny.json`, druh / věk / vitalita pro každý strom z mapy, porosty, dřevo podle druhu.
 - [ ] **M8.4 Pole větru** – nárazy běžící krajinou, závětří, hierarchický ohyb, vlny přes obilí, vítr pro létání a kouř.
 - [x] **M8.5 Fyzikální obloha a světlo** – Rayleigh/Mie, soumraky, světlo v luxech, adaptace oka, vzdušná perspektiva, stíny mraků.
-- [ ] **M8.6 Pohyb člověka** – fázový cyklus chůze, chodidla bez klouzání, IK na svahu, rovnováha, postoj podle nákladu a stavu těla.
+- [x] **M8.6 Pohyb člověka** – fázový cyklus chůze, chodidla bez klouzání, IK na svahu, rovnováha, postoj podle nákladu a stavu těla.
 - [ ] **M8.7 Vodní bilance** – vlhkost půdy, odtok, průtok a hladina potoků, lokální bláto a louže, tání sněhu.
 - [ ] **M8.8 Generátor stromů** – space colonization / přesleny podle druhu, věku a vitality, atlasy listů a kůry, LOD a impostory.
 - [ ] **M8.9 Mikroklima** – inverze a mrazové kotliny, údolní mlha, rosa a jinovatka, teplota v místě hráče.
