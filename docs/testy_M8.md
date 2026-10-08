@@ -37,3 +37,20 @@ pak `les_rano_mlha` a `udoli_noc`. M8.1 sám nic těžkého nepočítá (eko-tak
 Co nahlásit: FPS / frame ms ze všech tří scén (ves_poledne, les_rano_mlha, udoli_noc) – ideálně obsah
 `logs/latest.log` po doběhnutí, nebo aspoň poslední řádek „PERFSCENE … hotovo: fps …“ z konzole pro
 každou scénu. Pokud se něco zaseklo nebo spadlo, popis + co bylo na obrazovce.
+
+### Naměřeno 8. 10. 2026 (kalibrace pro M8.19 – přečti před uzavřením milníku)
+
+| Scéna | FPS (min/max) | Frame |
+|---|---|---|
+| ves_poledne | 26,8 (10–31) | 37,3 ms |
+| les_rano_mlha | 26,1 (1–31) | 38,2 ms |
+| udoli_noc | 28,6 (19–30) | 34,9 ms |
+
+HW: NVIDIA Quadro M2200 (ne GTX 1050, ale podobná třída). Log hlásí `Vulkan ... Forward Mobile`,
+**ne Forward+** jak počítá `00_SPOLECNE.md` – Godot si zřejmě sám zvolil slabší renderer na této
+kartě/ovladači; `SSAO` hlásí varování, že vyžaduje Forward+. **Baseline už před M8.1 (bez eko-taktu
+a jakéhokoli M8 obsahu) běží ~27 fps / ~36 ms, ne 60 fps / 16,6 ms** z rozpočtu kap. 6 – rozpočet
+„0,5 ms CPU / 1,0 ms GPU navíc za krok M8“ je tedy nad už přetíženým základem, ne nad ideálním 60 fps
+základem. M8.19 musí tohle zohlednit (buď vyšetřit Forward Mobile/renderer, nebo počítat rozpočet
+relativně k naměřenému základu, ne k teoretickým 16,6 ms). Drobná varování v logu (zóny obecní
+údržby/paseka se nevešly) nesouvisí s M8, jsou staré a nesouvisí s tímto měřením.
