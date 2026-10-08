@@ -77,25 +77,32 @@ func animate(delta: float, speed: float, turn_rate: float, load_kg: float, tired
 	var load_frac := clampf(load_kg / LOAD_MAX_KG, 0.0, 1.0)
 	amp *= 1.0 - load_frac * LOAD_STEP_K
 	var lift := lerpf(LIFT_WALK, LIFT_RUN, run_frac) * move_w
-	var offs := [0.0, 0.5]
-	var legs := [0.0, 0.0]
-	var knees := [0.05, 0.05]
-	for i in 2:
-		var p := fposmod(phase + offs[i], 1.0)
-		var s := 0.0
-		var f := 0.0
-		if p < duty:
-			s = amp * (1.0 - 2.0 * p / duty)         # stojná fáze: lineární výkyv vzad = rychlost těla vpřed (bez klouzání)
-		else:
-			var t := (p - duty) / (1.0 - duty)
-			s = amp * (-1.0 + 2.0 * smoothstep(0.0, 1.0, t))
-			f = sin(PI * t) * lift                   # švihová fáze: oblouk nad terénem
-		legs[i] = s
-		knees[i] = 0.05 + f * (0.5 + run_frac * 0.85)
-	leg_l = legs[0]
-	leg_r = legs[1]
-	knee_l = knees[0]
-	knee_r = knees[1]
+	# Pozn. (oprava regrese po vlně 2 M8): dřív byl tenhle krok přes `for i in 2` nad třemi
+	# nově alokovanými Array literály (`offs`/`legs`/`knees`) – GDScript Array je heap objekt
+	# s refcountem, takže to bylo 3 alokace + GC navíc na *každé* zavolání `animate()`, tj. na
+	# každý frame každé postavy. Rozbaleno na dvě nohy přímo (beze změny výsledku).
+	var p_l := fposmod(phase, 1.0)
+	var p_r := fposmod(phase + 0.5, 1.0)
+	var s_l := 0.0
+	var f_l := 0.0
+	if p_l < duty:
+		s_l = amp * (1.0 - 2.0 * p_l / duty)         # stojná fáze: lineární výkyv vzad = rychlost těla vpřed (bez klouzání)
+	else:
+		var t_l := (p_l - duty) / (1.0 - duty)
+		s_l = amp * (-1.0 + 2.0 * smoothstep(0.0, 1.0, t_l))
+		f_l = sin(PI * t_l) * lift                   # švihová fáze: oblouk nad terénem
+	var s_r := 0.0
+	var f_r := 0.0
+	if p_r < duty:
+		s_r = amp * (1.0 - 2.0 * p_r / duty)
+	else:
+		var t_r := (p_r - duty) / (1.0 - duty)
+		s_r = amp * (-1.0 + 2.0 * smoothstep(0.0, 1.0, t_r))
+		f_r = sin(PI * t_r) * lift
+	leg_l = s_l
+	leg_r = s_r
+	knee_l = 0.05 + f_l * (0.5 + run_frac * 0.85)
+	knee_r = 0.05 + f_r * (0.5 + run_frac * 0.85)
 	# protipohyb paží vůči protilehlé noze (kontralaterální koordinace)
 	arm_l = -leg_r * ARM_SWING_K
 	arm_r = -leg_l * ARM_SWING_K

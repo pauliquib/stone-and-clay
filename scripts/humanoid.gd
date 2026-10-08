@@ -124,6 +124,9 @@ var tired := 0.0
 var cold := 0.0
 var _gait: Gait
 var _prev_yaw := 0.0
+var _slope_fwd := 0.0            # cache: sklon terénu pod chodidly (oprava regrese po vlně 2 M8 –
+var _slope_roll_raw := 0.0       # 4x Callable.call(height_at) bylo drahé každý frame, viz níž)
+var _slope_t := 0.0
 
 
 func _ready() -> void:
@@ -702,18 +705,27 @@ func _process_impl(delta: float) -> void:
 		lean = _gait.run_frac * 0.22 + _gait.move_w * 0.05
 		# terén pod chodidly: podélný sklon → náklon trupu (do kopce vpřed, z kopce vzad), boční
 		# sklon → náklon pánve (test „chůze napříč svahem“: chodidla rovnoběžně se svahem, pánev nakloněná)
+		# Oprava regrese po vlně 2 M8: 4x Callable.call() do Terrain.height_at KAŽDÝ frame (60 Hz)
+		# na postavu bylo drahé (Callable má větší overhead než přímé volání metody) a zbytečné –
+		# sklon terénu pod chodidly se chůzí mění pomalu. Vzorkuje se jen ~10x/s, mezitím se
+		# použije poslední známá hodnota (vizuálně nerozeznatelné, svah i náklon pánve funkční).
 		if ground_fn.is_valid():
 			const SLOPE_D := 0.22
-			var fwd := -global_transform.basis.z
-			var right := global_transform.basis.x
-			var p := global_position
-			var h_f: float = ground_fn.call(p.x + fwd.x * SLOPE_D, p.z + fwd.z * SLOPE_D)
-			var h_b: float = ground_fn.call(p.x - fwd.x * SLOPE_D, p.z - fwd.z * SLOPE_D)
-			var h_r: float = ground_fn.call(p.x + right.x * SLOPE_D, p.z + right.z * SLOPE_D)
-			var h_l: float = ground_fn.call(p.x - right.x * SLOPE_D, p.z - right.z * SLOPE_D)
-			var slope_fwd := atan2(h_f - h_b, 2.0 * SLOPE_D)
-			slope_roll = clampf(atan2(h_r - h_l, 2.0 * SLOPE_D), -0.4, 0.4) * _gait.move_w
-			lean += clampf(-slope_fwd, -0.45, 0.45) * _gait.move_w
+			const SLOPE_RESAMPLE_S := 0.1
+			_slope_t -= delta
+			if _slope_t <= 0.0:
+				_slope_t = SLOPE_RESAMPLE_S
+				var fwd := -global_transform.basis.z
+				var right := global_transform.basis.x
+				var p := global_position
+				var h_f: float = ground_fn.call(p.x + fwd.x * SLOPE_D, p.z + fwd.z * SLOPE_D)
+				var h_b: float = ground_fn.call(p.x - fwd.x * SLOPE_D, p.z - fwd.z * SLOPE_D)
+				var h_r: float = ground_fn.call(p.x + right.x * SLOPE_D, p.z + right.z * SLOPE_D)
+				var h_l: float = ground_fn.call(p.x - right.x * SLOPE_D, p.z - right.z * SLOPE_D)
+				_slope_fwd = atan2(h_f - h_b, 2.0 * SLOPE_D)
+				_slope_roll_raw = clampf(atan2(h_r - h_l, 2.0 * SLOPE_D), -0.4, 0.4)
+			slope_roll = _slope_roll_raw * _gait.move_w
+			lean += clampf(-_slope_fwd, -0.45, 0.45) * _gait.move_w
 		# náklad na rameni a vyčerpaná výdrž: shrbení (lean), chlad: ruce blíž k tělu (řeší se níž u `arm_out`)
 		lean += clampf(load_kg / Gait.LOAD_MAX_KG, 0.0, 1.0) * Gait.LOAD_LEAN_K * 10.0
 		lean += tired * Gait.TIRED_LEAN_K

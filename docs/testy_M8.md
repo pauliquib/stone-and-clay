@@ -150,3 +150,49 @@ Co změřit: `tools/launcher.sh --perfscene=ves_poledne` (víc vesničanů najed
 `Humanoid`/`Gait` současně). Zajímá nás, jestli se oproti baseline z 8. 10. 2026 (ves_poledne 26,8 fps /
 37,3 ms, viz výš) frame znatelně nezhoršil – `Gait.animate` je jen pár goniometrických funkcí a nejvýš
 4 volání `Terrain.height_at` na postavu, rozpočet je ≤ 0,05 ms/postavu (00_PRINCIPY kap. 6).
+
+### Oprava regrese po vlně 2 M8 (8. 10. 2026, po mergi `f17274d`)
+
+Uživatel naměřil po celé vlně 2 (M8.2 + M8.5 + M8.6) výrazně víc, než povoluje rozpočet
+(00_PRINCIPY kap. 6, ≤ 0,5 ms CPU / 1,0 ms GPU na krok):
+
+| | Před vlnou 2 | Po vlně 2 | Δ |
+|---|---|---|---|
+| FPS | 26,8 | 22,8 | −15 % |
+| Frame | 37,3 ms | 44,0 ms | +6,7 ms |
+| `villager` (PERF) | 4,5 ms / 72 vol. (63 µs/vol.) | 6,8 ms / 85 vol. (**80 µs/vol.**) | +27 % na instanci |
+| `humanoid` (PERF) | 1,0 ms / 50 vol. (19 µs/vol.) | 2,0 ms / 49 vol. (**40 µs/vol.**) | +110 % na instanci |
+| `car` (PERF) | 5,7 ms / 33 vol. (172 µs/vol.) | 7,9 ms / 39 vol. (203 µs/vol.) | +18 % na instanci |
+
+**Příčina (villager + humanoid):** `scripts/villager.gd` v M8.6 skutečně jen krmí `Gait` daty (4
+řádky, nic drahého), ale `villager` v PERF kategorii zahrnuje i čas jeho dětského uzlu `Humanoid`
+(`_visual`) – tam byl skutečný problém, ve dvou místech `scripts/humanoid.gd`/`scripts/gait.gd`
+zavedených v M8.6:
+1. `Gait.animate()` počítala obě nohy přes `for i in 2` nad třemi nově alokovanými `Array` literály
+   (`offs`/`legs`/`knees`) – 3 heap alokace + refcounting na *každé* zavolání, tj. na každý frame
+   každé postavy navíc k samotné matematice.
+2. `Humanoid._process_impl()` dělala 4× `ground_fn.call(...)` (Callable do `Terrain.height_at`) na
+   **každý** frame (60 Hz) u každé stojící/chodící postavy se zapojeným terénem (`ground_fn`) –
+   `Callable.call()` má větší overhead než přímé volání metody a sklon terénu pod chodidly se chůzí
+   mění pomalu, takže vzorkovat ho 60×/s bylo zbytečné.
+
+**Oprava:**
+- `scripts/gait.gd`: smyčka nad dvěma nohama rozbalena přímo (`p_l/p_r`, `s_l/s_r`, `f_l/f_r`) beze
+  změny výsledku – žádné `Array` literály v hot cestě.
+- `scripts/humanoid.gd`: sklon terénu pod chodidly (`_slope_fwd`/`_slope_roll_raw`) se teď vzorkuje
+  jen ~10×/s (`SLOPE_RESAMPLE_S = 0.1`, časovač `_slope_t`), mezitím se použije poslední známá
+  hodnota. Fázová chůze, sklon pánve/trupu na svahu, náklad/únava/chlad zůstávají beze změny
+  funkčně – jen se nepočítají/nevzorkují zbytečně často.
+
+**Příčina (car):** `git diff ee9b51c^ ee9b51c -- scripts/car.gd` je **prázdný** – M8.2/8.5/8.6
+soubor `car.gd` nezměnily. Nárůst volání 33 → 39 ukazuje, že šlo o jiný počet aut na mapě mezi
+dvěma běhy měření (hustota dopravy se v `ves_poledne` může lišit běh od běhu), ne o regresi v kódu
+auta. Nevylučuje to úplně nepřímý efekt (delší frame → jiné načasování spawnu/despawnu aut), ale
+nic v `car.gd` k opravě není – neopravováno.
+
+**Co znovu změřit:** `tools/launcher.sh --perfscene=ves_poledne` – FPS/frame by se měly vrátit
+blízko baseline 26,8 fps / 37,3 ms (M8.6 Gait IK přidá očekávaně ~0,05 ms/postavu, M8.2 Site nic za
+běhu nepočítá navíc), `villager`/`humanoid` v PERF kategorii by měly klesnout zpět blízko
++0,5 ms/+1,0 ms rozpočtu kroku M8 dohromady, ne +27 %/+110 % na instanci. `car` sledovat jen pro
+ověření, že 33 vs. 39 volání byla skutečně jen variace hustoty dopravy (zkusit běh se stejným počtem
+aut, pokud launcher umí fixovat seed/hustotu).

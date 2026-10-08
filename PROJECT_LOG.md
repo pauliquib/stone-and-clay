@@ -1836,3 +1836,50 @@ M8 Realistický svět (`prompts/roadmapa/M8_realismus/00_START_M8.md`).
 - Zvuk kroků (`cadence_hz` je v `Gait` připraveno, ale nepoužité) čeká na M8.16/8.17/zvukový krok.
 - `tools/launcher.sh --perfscene=ves_poledne` – uživatel pošle fps/ms, porovnat s baseline
   26,8 fps / 37,3 ms z 8. 10. 2026 (`docs/testy_M8.md`), ne s ideálními 60 fps.
+
+## 2026-10-08 – Oprava regrese výkonu po vlně 2 M8
+
+Uživatel po vlně 2 (M8.2 + M8.5 + M8.6) naměřil přes `tools/launcher.sh --perfscene=ves_poledne`
+regresi nad rámec rozpočtu `prompts/roadmapa/M8_realismus/00_PRINCIPY.md` kap. 6 (≤ 0,5 ms CPU /
+1,0 ms GPU na krok): FPS 26,8 → 22,8 (−15 %), frame 37,3 → 44,0 ms (+6,7 ms); PERF kategorie
+`villager` 63 → 80 µs/volání (+27 %), `humanoid` 19 → 40 µs/volání (+110 %, částečně čekané u
+Gait IK), `car` 172 → 203 µs/volání (+18 %, ale `car.gd` se ve vlně 2 nezměnil).
+
+**Příčina villager/humanoid:** `villager` v PERF kategorii zahrnuje i čas dětského uzlu `Humanoid`
+(`_visual`) – `scripts/villager.gd` sám přidal jen 4 levné řádky (M8.6), skutečná neefektivita byla
+v `scripts/gait.gd`/`scripts/humanoid.gd`:
+- `Gait.animate()` alokovala na každé volání (= každý frame každé postavy) tři `Array` literály
+  (`offs`/`legs`/`knees`) jen pro smyčku přes dvě nohy.
+- `Humanoid._process_impl()` dělala 4× `Callable.call()` do `Terrain.height_at` (sklon terénu pod
+  chodidly) na **každý** frame (60 Hz) u každé stojící/chodící postavy s terénem zapojeným
+  (`ground_fn`), ačkoli se sklon terénu chůzí mění pomalu.
+
+**Oprava:**
+- `scripts/gait.gd`: smyčka nad nohama rozbalena přímo (`p_l/p_r`, `s_l/s_r`, `f_l/f_r`) – žádné
+  `Array` alokace v hot cestě, výsledek nezměněn.
+- `scripts/humanoid.gd`: sklon terénu (`_slope_fwd`, `_slope_roll_raw`) se vzorkuje jen ~10×/s
+  (časovač `_slope_t`, `SLOPE_RESAMPLE_S = 0.1`) místo každý frame; mezi vzorky se použije poslední
+  známá hodnota. Fázová chůze, sklon pánve na svahu i postoj podle nákladu/únavy/chladu zůstávají
+  funkčně beze změny.
+
+**Příčina car:** `git diff ee9b51c^ ee9b51c -- scripts/car.gd` je prázdný – soubor se ve vlně 2
+nezměnil. Nárůst volání 33 → 39 ukazuje na jiný počet aut mezi dvěma běhy měření (hustota dopravy),
+ne na regresi v kódu auta – neopravováno (nic k opravě).
+
+**Kontrola překladu:** `godot --headless --check-only` na `scripts/gait.gd`, `scripts/humanoid.gd`,
+`scripts/villager.gd` po `--import` – prázdný výstup (žádný `SCRIPT ERROR`/`ERROR:`).
+
+**Bezpečnostní kontrola (merge main):** `git merge --ff-only main` (již `up to date`, main byl na
+`ee9b51c`), `git merge-base --is-ancestor ee9b51c HEAD` → `ANCESTOR_OK`.
+
+### Co znovu změřit
+`tools/launcher.sh --perfscene=ves_poledne` – FPS/frame by se měly vrátit blízko baseline
+26,8 fps / 37,3 ms, `villager`/`humanoid` v PERF kategorii blízko rozpočtu (~+0,5 ms CPU na krok
+M8.2+M8.6 dohromady), ne +27 %/+110 % na instanci. `car` sledovat jen pro ověření, že jde o hustotu
+dopravy, ne o regresi.
+
+### Otevřené body
+- Čeká na nové měření uživatele (`--perfscene=ves_poledne`) pro potvrzení, že se `villager`/`humanoid`
+  vrátily do rozpočtu.
+- `car` +18 %/instanci zůstává nevysvětlené s jistotou (nejpravděpodobněji šum v počtu aut), pokud se
+  při dalším měření zopakuje i se stejným počtem volání, je potřeba se na `car.gd` podívat znovu.
