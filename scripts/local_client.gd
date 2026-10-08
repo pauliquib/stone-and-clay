@@ -181,6 +181,7 @@ func build_environment() -> void:
 	# obloha (Sky), slunce, měsíc, počasí a roční období řídí Atmosphere
 	atmosphere = Atmosphere.new()
 	atmosphere.name = "Atmosfera"
+	atmosphere.realism = settings.realism     # M8.5: přepínač "sky" (Esc → Nastavení → Realismus)
 	add_child(atmosphere)
 	atmosphere.setup(world.clock, world.weather, env, sun, moon, 78.37, world.terrain)
 

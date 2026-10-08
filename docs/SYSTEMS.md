@@ -519,6 +519,25 @@
   Ladicí vrstvy mapy M: `site_twi`, `site_soil`, `site_insol`, `site_cold`, `site_wind`. Drobnost:
   rozhovor (T, téma „půda“) – postava podle `Site.soil` na místě hráče utrousí větu o zemi
   (`scripts/dialog_themes.gd` → `THEMES.puda`).
+- **Fyzikální obloha, světlo a expozice (M8.5)**: `Atmosphere.SkyModel` (vnořená třída v `scripts/priroda/atmosphere.gd`)
+  – zjednodušený Rayleigh + Mie + ozon model (à la Hillaire 2020 / Preetham, `00_PRINCIPY.md` kap. 8), čisté
+  statické funkce volatelné odkudkoli (`Atmosphere.SkyModel.sun_illuminance_lux(elev, cloud, haze)`), ne jen
+  z klientské oblohy: `air_mass`, `sun_tint`, `sun_illuminance_lux` (jasné poledne ~100 000 lx), `sky_illuminance_lux`
+  (difuzní nebe; zataženo ~10 000 lx, soumrak/noc log. interpolace k ~3,4 lx / ~0,0005 lx), `moon_illuminance_lux`
+  (úplněk ~0,25 lx), `ev100_from_lux`, `is_civil_twilight`, `global_horizontal_irradiance_wm2` (W/m², pro M8.12/8.16).
+  Instanční zkratky na `Atmosphere` (čtou aktuální `Clock`/`Weather`): `sun_illuminance_lux()`, `sky_illuminance_lux()`,
+  `global_horizontal_irradiance_wm2()`, `is_civil_twilight()` – vrací fyzikální hodnotu vždy (i při vypnutém
+  přepínači „sky“, ten řídí jen vzhled). `Atmosphere.exposure_ev` – vyhlazená EV100 scény (ISO 12232), adaptace
+  oka asymetrická (do světla ~2 s, do tmy ~20 s); `env.tonemap_exposure` a Purkyňův posun (desaturace pod ~1 lx,
+  `env.adjustment_saturation`) se z ní odvozují jen při zapnutém přepínači. Sluneční barva/síla podle vzdušné
+  hmoty (zčervená nízko nad obzorem, `SkyModel.sun_tint`), v `sky.gdshader` nový uniform `sky_on` + pás Venuše
+  (růžový pás naproti slunci v občanském soumraku). **Zjednodušení oproti zadání:** místo předpočítané LUT textury
+  (64×256) se transmitance počítá analytickými vzorci přímo ve skriptu (levné, v rozpočtu kap. 6); fyzikální
+  jednotky světel (`use_physical_light_units`) se nezapínají globálně (riziko přepálení/zhasnutí lamp M5.12 a
+  světel aut) – slunce/měsíc dostávají energii převodem `lux → energy` jen pro ně, interiéry a umělá světla jsou
+  beze změny. Stíny mraků a plná vzdušná perspektiva v terénu (předvolba Vysoká) nejsou v M8.5 zavedeny (open point).
+  Přepínač „sky“ (Esc → Nastavení → Realismus) vrátí starou ruční oblohu / statickou expozici. Měřicí scéna
+  `Tests.PERF_SCENES["zapad_slunce"]`.
 
 ## Co ve hře je
 

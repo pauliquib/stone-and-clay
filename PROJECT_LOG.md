@@ -1745,3 +1745,43 @@ M8 Realistický svět (`prompts/roadmapa/M8_realismus/00_START_M8.md`).
   agent zatím ověřil jen syntetickým self-testem nástroje a statickou kontrolou kódu.
 - Sdílený `scripts/world.gd`: hunky přidány minimálně (nová proměnná, 3 řádky v `build()`, nová
   skupina funkcí pro ladicí vrstvy, pár řádků v `_talk_context`) – ať se dobře slučují s M8.5/M8.6.
+
+## 2026-10-08 – M8.5 Fyzikální obloha, světlo a expozice
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou překladu – ruční test čeká)
+- **Co**: `scripts/priroda/atmosphere.gd` – nová vnořená třída `Atmosphere.SkyModel`: zjednodušený
+  Rayleigh + Mie + ozon model (00_PRINCIPY kap. 8, à la Hillaire 2020 / Preetham), čisté statické
+  funkce volatelné odkudkoli (`Atmosphere.SkyModel.xxx(...)`), bez nutnosti instance uzlu: `air_mass`
+  (Kasten & Young 1989), `sun_tint` (barva slunce podle vzdušné hmoty), `sun_illuminance_lux` (jasné
+  poledne ~100 000 lx), `sky_illuminance_lux` (difuzní nebe; zataženo ~10 000 lx, soumrak/noc log.
+  interpolace k ~3,4 lx / ~0,0005 lx), `moon_illuminance_lux` (úplněk ~0,25 lx), `total_illuminance_lux`,
+  `ev100_from_lux` (ISO 12232), `is_civil_twilight`, `global_horizontal_irradiance_wm2` (W/m²).
+  Instanční API na `Atmosphere` (vždy fyzikální, nezávisle na přepínači): `sun_illuminance_lux()`,
+  `sky_illuminance_lux()`, `global_horizontal_irradiance_wm2()`, `is_civil_twilight()`,
+  `exposure_ev` (vyhlazená EV100, asymetrická adaptace: do světla ~2 s / do tmy ~20 s).
+- **Přepínač `sky`** (`GameSettings.realism`, nový řádek v `REALISM_ROWS`) – zapnuto: fyzikální
+  barva/síla slunce a měsíce (lux → energy převod, ne globální `use_physical_light_units` – riziko
+  pro lampy M5.12 a auta), adaptivní `env.tonemap_exposure` + Purkyňův posun (`env.adjustment_saturation`
+  klesá pod ~1 lx), pás Venuše v `shaders/sky.gdshader` (nový uniform `sky_on`); vypnuto: beze změny
+  vůči stavu před M8.5 (stará obloha a statická expozice). `LocalClient` nastaví `atmosphere.realism
+  = settings.realism` po vytvoření uzlu.
+- **Měřicí scéna**: `Tests.PERF_SCENES["zapad_slunce"]` (louka, 21. 6. 2026 20:30, jasno).
+- Doplněno: `docs/SYSTEMS.md` (odstavec M8.5), `README.md` (tabulka přepínačů realismu,
+  `--perfscene` výčet), `docs/testy_M8.md` (oddíl „M8.5“), `docs/VIZE_A_ROADMAPA.md` a
+  `prompts/roadmapa/README.md` (odškrtnuto).
+- Kontrola překladu: `godot --headless --import` + `--check-only` na `game_settings.gd`,
+  `local_client.gd`, `priroda/atmosphere.gd`, `tests.gd` – prázdný výstup (jen nesouvisející
+  staré hlášky LimboAI addon ikon při `--import`).
+
+### Otevřené body
+- **Zjednodušení oproti zadání**: žádná předpočítaná 64×256 LUT textura – transmitance se počítá
+  analytickými vzorci přímo ve skriptu (levnější, v rozpočtu kap. 6, ale méně přesné u extrémních
+  úhlů / barevných přechodů než plná LUT – případné doladění v M8.19).
+- **Nezavedeno** (predvolba Vysoká): stíny mraků na terénu/vegetaci, plná vzdušná perspektiva v
+  `terrain.gdshader`/`surroundings.gdshader` (zůstává jen existující fog z M6.2, který se přepínačem
+  `sky` neřídí).
+- Fyzikální jednotky světel (`ProjectSettings rendering/lights_and_shadows/use_physical_light_units`)
+  se nezapínají – vědomé rozhodnutí kvůli riziku pro interiéry/lampy/auta (prompt to explicitně
+  dovoluje řešit převodem lux → energy jen pro venkovní slunce/měsíc).
+- Čeká na ruční test uživatele (checklist v odpovědi orchestrátorovi) – zejména vizuální dojem
+  západu slunce, nočních scén a přepínače zapnuto/vypnuto, a čísla z `--perfscene`.

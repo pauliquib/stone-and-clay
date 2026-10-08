@@ -92,11 +92,12 @@ krocích: Esc → Nastavení → „Realismus (M8)…“. M8.1 (základ) jen zak
 
 | klíč (`GameSettings.realism`) | krok M8 | co zapíná |
 |---|---|---|
-| `site`, `species`, `wind`, `sky`, `gait`, `soil_water`, `treegen`, `micro`, `animal_gait`, `phenology`, `crops`, `terramech`, `ground_veg`, `habitat`, `thermo`, `village_life`, `soundscape` | M8.2–M8.18 | výchozí zapnuto; konkrétní popisek a cena v menu přibude s krokem, který klíč zavádí |
+| `sky` | M8.5 | fyzikální obloha a expozice – Rayleigh/Mie, slunce a měsíc v luxech, adaptace oka, pás Venuše; vypnuto = stará ruční obloha |
+| `site`, `species`, `wind`, `gait`, `soil_water`, `treegen`, `micro`, `animal_gait`, `phenology`, `crops`, `terramech`, `ground_veg`, `habitat`, `thermo`, `village_life`, `soundscape` | M8.2–M8.18 | výchozí zapnuto; konkrétní popisek a cena v menu přibude s krokem, který klíč zavádí |
 
 Měření výkonu po krocích M8: `--perfscene=<jméno>[,sekund]` (`ves_poledne`, `les_rano_mlha`,
-`louka_vitr`, `udoli_noc`, `pole_leto`, `dron_200m`) teleportuje na pevnou scénu a změří FPS/CPU/GPU
-stejně jako `--perf` → `user://perf/<jméno>.csv`. Pro pohodlné posílání výsledků použij
+`louka_vitr`, `udoli_noc`, `pole_leto`, `dron_200m`, `zapad_slunce`) teleportuje na pevnou scénu a změří
+FPS/CPU/GPU stejně jako `--perf` → `user://perf/<jméno>.csv`. Pro pohodlné posílání výsledků použij
 `tools/launcher.sh --perfscene=ves_poledne` (viz tabulka nástrojů níž) – zapíše kompaktní log do
 `logs/` místo ručního přepisování čísel z konzole. F2 → „Příroda – ladění…“ nechá mapu (M) kreslit
 barevnou mřížku stavu modelu – M8.2 přidala `site_twi`, `site_soil`, `site_insol`, `site_cold`,

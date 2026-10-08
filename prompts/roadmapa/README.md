@@ -137,7 +137,7 @@ voda, vítr, světlo, mikroklima → stromy, rostliny, plodiny, zvěř → člov
 | [x] | M8.2 Mapa stanovišť (TWI, oslunění, půda, mrazové kotliny) | [`M8_realismus/02_mapa_stanovist.md`](M8_realismus/02_mapa_stanovist.md) | M8.1 · **dotaz: půdní data (BPEJ)?** – zodpovězeno: žádná geometrie k dispozici, fallback z terénu/landuse |
 | [ ] | M8.3 Druhy dřevin a porosty podle stanoviště | [`M8_realismus/03_dreviny_a_porosty.md`](M8_realismus/03_dreviny_a_porosty.md) | M8.2 |
 | [ ] | M8.4 Pole větru, nárazy, hierarchický ohyb vegetace | [`M8_realismus/04_pole_vetru.md`](M8_realismus/04_pole_vetru.md) | M8.1, (M8.2) |
-| [ ] | M8.5 Fyzikální obloha, světlo v luxech, expozice | [`M8_realismus/05_obloha_svetlo_expozice.md`](M8_realismus/05_obloha_svetlo_expozice.md) | M8.1 |
+| [x] | M8.5 Fyzikální obloha, světlo v luxech, expozice | [`M8_realismus/05_obloha_svetlo_expozice.md`](M8_realismus/05_obloha_svetlo_expozice.md) | M8.1 |
 | [ ] | M8.6 Pohyb člověka (biomechanika chůze, IK, postoj) | [`M8_realismus/06_pohyb_cloveka.md`](M8_realismus/06_pohyb_cloveka.md) | M8.1 |
 | [ ] | M8.7 Vodní bilance: vlhkost půdy, odtok, potoky, bláto | [`M8_realismus/07_vodni_bilance.md`](M8_realismus/07_vodni_bilance.md) | M8.2 |
 | [ ] | M8.8 Generátor stromů (space colonization, LOD, impostory) | [`M8_realismus/08_generator_stromu.md`](M8_realismus/08_generator_stromu.md) | M8.3, M8.4 |
