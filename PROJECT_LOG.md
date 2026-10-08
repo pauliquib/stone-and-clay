@@ -1687,3 +1687,4 @@ M8 Realistický svět (`prompts/roadmapa/M8_realismus/00_START_M8.md`).
   historií repozitáře – do `main` byly ručně přeneseny jen nové soubory tohoto kroku
   (`tools/fetch_bpej.py`, `data/bpej_meta.json`, `docs/BPEJ.md`, řádek v `.gitignore`), žádný
   merge branche jako celku.
+<!-- M8.5 práce zahájena -->
