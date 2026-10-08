@@ -134,7 +134,7 @@ voda, vítr, světlo, mikroklima → stromy, rostliny, plodiny, zvěř → člov
 | | Krok | Soubor | Předpoklady |
 |---|---|---|---|
 | [x] | M8.1 Základ: přepínače realismu, eko-takt, měřicí scény, ladicí vrstvy | [`M8_realismus/01_zaklad_prepinace_takt_mereni.md`](M8_realismus/01_zaklad_prepinace_takt_mereni.md) | M7 |
-| [ ] | M8.2 Mapa stanovišť (TWI, oslunění, půda, mrazové kotliny) | [`M8_realismus/02_mapa_stanovist.md`](M8_realismus/02_mapa_stanovist.md) | M8.1 · **dotaz: půdní data (BPEJ)?** |
+| [x] | M8.2 Mapa stanovišť (TWI, oslunění, půda, mrazové kotliny) | [`M8_realismus/02_mapa_stanovist.md`](M8_realismus/02_mapa_stanovist.md) | M8.1 · **dotaz: půdní data (BPEJ)?** – zodpovězeno: žádná geometrie k dispozici, fallback z terénu/landuse |
 | [ ] | M8.3 Druhy dřevin a porosty podle stanoviště | [`M8_realismus/03_dreviny_a_porosty.md`](M8_realismus/03_dreviny_a_porosty.md) | M8.2 |
 | [ ] | M8.4 Pole větru, nárazy, hierarchický ohyb vegetace | [`M8_realismus/04_pole_vetru.md`](M8_realismus/04_pole_vetru.md) | M8.1, (M8.2) |
 | [ ] | M8.5 Fyzikální obloha, světlo v luxech, expozice | [`M8_realismus/05_obloha_svetlo_expozice.md`](M8_realismus/05_obloha_svetlo_expozice.md) | M8.1 |

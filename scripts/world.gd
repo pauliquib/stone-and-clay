@@ -131,6 +131,7 @@ var _item_nodes := {}            # pořadí předmětu v map.json → Item (doku
 var _collected := {}             # pořadí předmětu → true: už sebraný (ukládá se)
 var _collected_jd := {}          # pořadí předmětu → juliánský den sběru (znovuvyrůstání sezónních předmětů)
 var surface: SurfaceMap          # maska povrchu terénu (data/surface.bin) – procedurální materiály, minimapa
+var site: Site                   # M8.2: mapa stanovišť (data/site.bin) – terén, voda, oslunění, půda (00_PRINCIPY §3)
 var surroundings: Surroundings   # M6.2: levná krajina za katastrem (bez kolizí, bez dat fallback prstenec)
 var villages: Villages           # vizuální zástavba 5 okolních vesnic (data/obce.json; jen pohled z dálky)
 var building_details: BuildingDetails   # okna, dveře, vrata a komíny budov (data/buildings.json; null bez dat)
@@ -211,6 +212,68 @@ func _debug_layer_none(_x: float, _z: float) -> Color:
 	return Color(0.0, 0.0, 0.0, 0.0)
 
 
+## M8.2: ladicí vrstvy mapy stanovišť (F2 → Příroda – ladění) – `site_twi`, `site_soil`, `site_insol`,
+## `site_cold`, `site_wind`. Bez `data/site.bin` vrátí prázdnou buňku (alfa 0), ať je na mapě vidět fallback.
+func _register_site_debug_layers() -> void:
+	debug_layers["site_twi"] = Callable(self, "_debug_layer_site_twi")
+	debug_layers["site_soil"] = Callable(self, "_debug_layer_site_soil")
+	debug_layers["site_insol"] = Callable(self, "_debug_layer_site_insol")
+	debug_layers["site_cold"] = Callable(self, "_debug_layer_site_cold")
+	debug_layers["site_wind"] = Callable(self, "_debug_layer_site_wind")
+
+
+## TWI: modrá sytější ve vlhkých údolnicích (síť by měla kopírovat potoky).
+func _debug_layer_site_twi(x: float, z: float) -> Color:
+	if site == null or not site.loaded:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var t := clampf((site.twi(x, z) - 3.0) / 8.0, 0.0, 1.0)
+	return Color(0.15, 0.25 + 0.2 * t, 0.35 + 0.55 * t, 0.15 + 0.55 * t)
+
+
+## Půda: barva podle třídy (`Site.SOIL_*`), stejná paleta jako legenda v nápovědě.
+const SITE_SOIL_COLORS := [
+	Color(0.55, 0.42, 0.22),   # hnědozem / kambizem
+	Color(0.62, 0.58, 0.50),   # ranker / litozem
+	Color(0.85, 0.78, 0.55),   # arenosol
+	Color(0.40, 0.45, 0.30),   # pseudoglej / glej
+	Color(0.30, 0.55, 0.35),   # fluvizem
+	Color(0.60, 0.60, 0.62),   # antropozem
+]
+func _debug_layer_site_soil(x: float, z: float) -> Color:
+	if site == null or not site.loaded:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var s := site.soil(x, z)
+	var c: Color = SITE_SOIL_COLORS[s] if s >= 0 and s < SITE_SOIL_COLORS.size() else Color.GRAY
+	c.a = 0.6
+	return c
+
+
+## Oslunění: žlutá sytější na osluněných (jižních) svazích, tmavší na severních.
+func _debug_layer_site_insol(x: float, z: float) -> Color:
+	if site == null or not site.loaded:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var t := clampf((site.insol(x, z) - 2500.0) / 3000.0, 0.0, 1.0)
+	return Color(0.9, 0.75 * t + 0.15, 0.15, 0.15 + 0.55 * t)
+
+
+## Mrazové kotliny: modrofialová v mrazových dnech (nízká dna údolí).
+func _debug_layer_site_cold(x: float, z: float) -> Color:
+	if site == null or not site.loaded:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var t := site.cold_pool(x, z)
+	if t < 0.05:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	return Color(0.45, 0.25, 0.65, 0.2 + 0.6 * t)
+
+
+## Expozice větru: červeno-oranžová na větrných hřbetech.
+func _debug_layer_site_wind(x: float, z: float) -> Color:
+	if site == null or not site.loaded:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var t := site.wind_exp(x, z)
+	return Color(0.8, 0.35, 0.15, 0.1 + 0.5 * t)
+
+
 ## Zapnuto, i když to krok, který klíč zavádí, ještě není hotový (fallback, 00_PRINCIPY kap. 3).
 func realism_on(key: String) -> bool:
 	return bool(realism.get(key, true))
@@ -241,6 +304,9 @@ func build() -> void:
 	if fields.load_data():
 		terrain.set_landuse(fields.make_texture(), fields.rect())
 		terrain.set_field_lut(ImageTexture.create_from_image(fields.lut_image(clock.day_of_year(), clock.year())))
+	site = Site.new()                        # M8.2: mapa stanovišť (tools/site.py); bez dat fallback z terrain
+	site.setup(terrain)
+	_register_site_debug_layers()
 	surroundings = Surroundings.new()        # M6.2: krajina za katastrem (jen vzhled, bez kolizí)
 	surroundings.name = "Okoli"
 	add_child(surroundings)
@@ -2958,6 +3024,11 @@ func _talk_context(ctx: Dictionary, id: int, p: Player) -> void:
 	ctx["cloud"] = weather.cloud
 	ctx["daylight"] = clock.daylight()
 	ctx["money"] = p.money
+	if site != null:   # M8.2: drobnost – vesničan/děda občas utrousí větu o půdě tam, kde hráč stojí
+		const SOIL_COND := ["soil_hnedozem", "soil_ranker", "soil_arenosol", "soil_glej", "soil_fluvizem", "soil_antropozem"]
+		var soil_i := site.soil(p.global_position.x, p.global_position.z)
+		if soil_i >= 0 and soil_i < SOIL_COND.size():
+			ctx["soil_cond"] = SOIL_COND[soil_i]
 	var d := clock.date()
 	var m: int = d["month"]
 	var dd: int = d["day"]

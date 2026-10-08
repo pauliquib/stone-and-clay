@@ -498,6 +498,28 @@
   ukázkovou prázdnou vrstvu `realism_off`. `tools/launcher.sh` + `tools/launcher_log.py` – spustí
   hru a zapíše kompaktní (deduplikovaný) log do `logs/` místo ručního přepisování čísel z konzole.
 
+- **Mapa stanovišť (M8.2)**: `World.site` (`Site`, `scripts/eko/site.gd`) – offline nástroj
+  `tools/site.py` → `data/site.bin` (mřížka 4 m, self-popisný formát s vlastním `scale`/`offset`
+  u každé vrstvy). Z `terrain_height.bin` (gradient → sklon, orientace = kompasní azimut spádnice
+  podle `north_deg`, stejná transformace jako `Clock.enu_to_world`), D8 akumulace odtoku → **TWI =
+  ln(a / tan β)** (Beven & Kirkby 1979), `scipy.ndimage.distance_transform_edt` k vodě z
+  `water.json` → vzdálenost k vodě a zjednodušené HAND (výška nad nejbližší vodou), TPI (okolí
+  100 m/500 m) → poloha v reliéfu, expozice větru (TPI + orientace vůči převládajícímu západnímu
+  proudění) a mrazová kotlina (záporné TPI, nízké HAND, málo větru). Oslunění: clear-sky model se
+  slunečním vektorem (stejné NOAA rovnice jako `Clock.sun_enu`) integrovaný po hodinách pro 12
+  reprezentativních dnů v roce, roční i zimní součet (MJ/m²); bez zastínění terénem (M8.2 „Minimum“).
+  **Půda** (třída `Site.SOIL_*`, hloubka, AWC, pH, živiny) je odvozená zjednodušeně z terénu a
+  landuse podle české taxonomie (hnědozem/kambizem, ranker/litozem, arenosol, pseudoglej/glej,
+  fluvizem, antropozem) se šumem pro přirozené hranice – **reálná BPEJ geometrie pro tento katastr
+  nebyla dohledatelná** (geoportál SPÚ nedostupný, viz `docs/BPEJ.md`); `--soils=soubor.geojson` je
+  jen připravený hák, bez geometrie bez účinku. Dotazy `elev/slope/aspect/twi/dist_water/hand/tpi/
+  wind_exp/insol/insol_winter/cold_pool/soil/soil_depth/awc/ph/nutr(x, z)` + `at(x, z)` pro ladění,
+  bilineární interpolace u spojitých vrstev. **Fallback** bez `data/site.bin`: sklon/orientace z
+  `Terrain.height_at` (konečné diference), zbytek střední hodnoty – svět běží dál, jen „plochý“.
+  Ladicí vrstvy mapy M: `site_twi`, `site_soil`, `site_insol`, `site_cold`, `site_wind`. Drobnost:
+  rozhovor (T, téma „půda“) – postava podle `Site.soil` na místě hráče utrousí větu o zemi
+  (`scripts/dialog_themes.gd` → `THEMES.puda`).
+
 ## Co ve hře je
 
 - **Celý katastr** (~5,2 × 4,6 km) bez načítacích obrazovek: terén 2 m mřížka (kolize =

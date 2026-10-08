@@ -1687,3 +1687,61 @@ M8 Realistický svět (`prompts/roadmapa/M8_realismus/00_START_M8.md`).
   historií repozitáře – do `main` byly ručně přeneseny jen nové soubory tohoto kroku
   (`tools/fetch_bpej.py`, `data/bpej_meta.json`, `docs/BPEJ.md`, řádek v `.gitignore`), žádný
   merge branche jako celku.
+
+## 2026-10-08 – M8.2 Mapa stanovišť: terén, voda, oslunění a půda
+
+### Hotovo (staticky ověřeno čtením kódu + syntetický self-test nástroje – ruční test v Godotu čeká)
+- **Co**: nový offline nástroj `tools/site.py` → `data/site.bin` (self-popisný formát: hlavička
+  nese `scale`/`offset` pro každou vrstvu, mřížka 4 m, 16 vrstev). Vstupy jen lokální
+  (`terrain_height.bin`, `water.json`, `surface.bin`, `landuse.bin`, `map.json`). Počítá: výšku,
+  sklon a orientaci (gradient terénu; aspect = kompasní azimut spádnice přes `north_deg`, stejná
+  transformace jako `Clock.enu_to_world`, jen obráceně), D8 akumulaci odtoku a **TWI = ln(a / tan β)**
+  (Beven & Kirkby 1979), vzdálenost k vodě a zjednodušené HAND (`scipy.ndimage.distance_transform_edt`
+  k rastru vody z `water.json`), TPI (okolí 100 m / 500 m) → expozici větru (TPI + orientace vůči
+  převládajícímu západnímu proudění) a mrazovou kotlinu, roční i zimní potenciální oslunění
+  (clear-sky model se slunečním vektorem podle stejných NOAA rovnic jako `Clock.sun_enu`,
+  integrace po hodinách pro 12 reprezentativních dnů – bez zastínění terénem, to je M8.2 „Minimum“).
+  Nový runtime `scripts/eko/site.gd` (`class_name Site`, `World.site`): typované dotazy
+  `elev/slope/aspect/twi/dist_water/hand/tpi/wind_exp/insol/insol_winter/cold_pool/soil/
+  soil_depth/awc/ph/nutr(x, z)` + `at(x, z)` pro ladění, bilineární interpolace u spojitých vrstev,
+  **fallback bez `data/site.bin`**: sklon/orientace z `Terrain.height_at` (konečné diference),
+  zbytek střední hodnoty. `scripts/world.gd`: `var site`, instance v `build()` hned po
+  `surface`/`fields`, 5 ladicích vrstev mapy M (`site_twi`, `site_soil`, `site_insol`, `site_cold`,
+  `site_wind`) + jejich barevné `Callable`. Drobnost: rozhovor (T) – nové téma `puda` v
+  `scripts/dialog_themes.gd` (`THEMES.puda`, 2–4 věty na půdní třídu), napojené přes nový
+  `ctx["soil_cond"]` v `World._talk_context` a zpracování v `Dialog._conds`.
+- **Půda bez BPEJ geometrie** (docs/BPEJ.md: geoportál SPÚ nedostupný, `katastr_codes` je `null`):
+  fallback podle české taxonomie, pravidla v tabulce na začátku `tools/site.py` (SOIL_RULES_DOC) –
+  niva (HAND < 2 m, blízko vody) → fluvizem; vlhká deprese (TWI > 80. percentil) → pseudoglej/glej;
+  prudký svah/hřbet (sklon > 20°, TPI500 > 0) → ranker/litozem; zástavba (`surface.bin` třída 4) →
+  antropozem; mírný/suchý terén s šancí podle Gaussem rozostřeného šumu (seed) → arenosol; jinak
+  hnědozem/kambizem. Orná půda (`landuse.bin`) prohlubuje ornici a zvyšuje živiny. `--soils=` zůstává
+  jako nevyužitý hák – bez reálné geometrie nemá co přepsat.
+- Self-test nástroje (agent hru nespouští, ale offline generátor smí – 00_PRINCIPY kap. 7): syntetická
+  mřížka 40×40 s údolím a tokem ověřila D8 akumulaci (monotónní nárůst, žádná nekonečná smyčka),
+  bezeztrátové kvantování (`quantize` round-trip chyba < 0,0002 m), 143 slunečních vektorů nad
+  horizontem pro 12 dnů, jižní/severní rozdíl v oslunění (5926 vs. 3963 MJ/m² na testovací mřížce) a
+  správnou klasifikaci fluvizemu u vody (25 % buněk v testu). Plný běh na reálných datech (katastr
+  ~2,8 k × 1,9 k buněk @ 4 m) agent spustit nemohl – `terrain_height.bin`/`water.json`/`surface.bin`
+  nejsou v tomto worktree (gitignored, generují se z Blenderu/geodat, které tu nejsou).
+- Kontrola překladu (00_SPOLECNE kap. 6): `godot --headless --import` doběhlo (exit 0, jen staré
+  nesouvisející chyby o ikonách LimboAI); `--check-only` na `scripts/world.gd`, `scripts/dialog.gd`,
+  `scripts/dialog_themes.gd`, `scripts/eko/site.gd` – výstup prázdný.
+- README (tabulka nástrojů + nový odstavec „M8.2 Mapa stanovišť“), `docs/SYSTEMS.md` (odstavec
+  Mapa stanovišť), `docs/testy_M8.md` (nový oddíl „M8.2“), `prompts/roadmapa/README.md` (M8.2 `[x]`).
+
+### Otevřené body
+- **Velikost dat**: `data/site.bin` na reálné mřížce vyjde odhadem ~100 MB (16 vrstev, z toho 5
+  `uint16`) – víc, než 00_PRINCIPY kap. 6 předpokládá pro *všechny* nové mřížky M8 dohromady
+  (≤ 64 MB celkem). Nerozbíjí nic (čte se jen při startu), ale je to kandidát na úpravu v M8.19
+  (zúžit `dist_water`/`hand` na `uint8`, nebo přestat ukládat a počítat na dotaz).
+- `flow_acc` (D8 akumulace) se nepersistuje do `site.bin` – není v API z 00_PRINCIPY kap. 3
+  (jen mezivýpočet pro TWI); kdyby ho budoucí krok potřeboval, musí se `tools/site.py` doplnit.
+- HAND je zjednodušený (elev buňky − elev nejbližší vodní buňky vzdušnou čarou), ne po skutečné
+  spádnici – model je jednodušší než realita, ale zdokumentovaný (hlavička nástroje).
+- Insolace je clear-sky bez zastínění terénem (M8.2 „Minimum“ to povoluje) – kdyby budoucí krok
+  potřeboval přesnější model u lesů/úzkých údolí, bude nutné doplnit horizont ve 16 směrech.
+- Čeká na ruční test uživatele v Godotu (checklist v `docs/testy_M8.md` → „M8.2“, max. 10 bodů) –
+  agent zatím ověřil jen syntetickým self-testem nástroje a statickou kontrolou kódu.
+- Sdílený `scripts/world.gd`: hunky přidány minimálně (nová proměnná, 3 řádky v `build()`, nová
+  skupina funkcí pro ladicí vrstvy, pár řádků v `_talk_context`) – ať se dobře slučují s M8.5/M8.6.

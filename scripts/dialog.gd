@@ -846,6 +846,8 @@ static func _conds(ctx: Dictionary) -> Dictionary:
 		c["respected"] = true
 	if ctx.get("in_car", false):
 		c["in_car"] = true
+	if String(ctx.get("soil_cond", "")) != "":    # M8.2: Site.soil tam, kde hráč stojí
+		c[String(ctx["soil_cond"])] = true
 	if (ctx.get("outfit_tags", []) as Array).has("slavnostni"):
 		c["outfit_slavnostni"] = true
 	for k in ctx.get("carry", []):

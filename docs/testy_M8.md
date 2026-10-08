@@ -54,3 +54,42 @@ a jakéhokoli M8 obsahu) běží ~27 fps / ~36 ms, ne 60 fps / 16,6 ms** z rozpo
 základem. M8.19 musí tohle zohlednit (buď vyšetřit Forward Mobile/renderer, nebo počítat rozpočet
 relativně k naměřenému základu, ne k teoretickým 16,6 ms). Drobná varování v logu (zóny obecní
 údržby/paseka se nevešly) nesouvisí s M8, jsou staré a nesouvisí s tímto měřením.
+
+## M8.2 – Mapa stanovišť: terén, voda, oslunění a půda
+
+Nejdřív spusť generátor (agent ho jen napsal a staticky ověřil na syntetických datech – offline
+generátor smí uživatel spustit sám, 00_PRINCIPY kap. 7):
+
+```
+python3 tools/site.py
+```
+
+Vypíše čas běhu, velikost `data/site.bin`, podíl půdních tříd, rozsah TWI a průměrné oslunění
+jižních vs. severních svahů (mělo by platit jižní > severní). **Pošli tento výpis** – řekne, jestli
+model dává smysl dřív, než se podíváš do hry.
+
+Checklist (max. 10 bodů):
+1. `python3 tools/site.py` doběhne bez chyby; zkontroluj vypsaný čas a velikost souboru.
+2. F2 → Příroda – ladění → **TWI** (`site_twi`): modré linie v údolích by měly kopírovat potoky.
+3. Vrstva **Půda** (`site_soil`): u řeky jiná barva (niva/fluvizem) než na kopcích; obec = antropozem
+   (jiná barva než okolní pole).
+4. Vrstva **Oslunění** (`site_insol`): jižní svahy světlejší (žlutší) než severní.
+5. Vrstva **Mrazové kotliny** (`site_cold`): fialový odstín na dnech údolí, ne na hřbetech.
+6. Vrstva **Vítr** (`site_wind`): červenější na hřbetech/kopcích než v zákrytu.
+7. Stůj na nivě (louka těsně u potoka) a promluv s dědou/vesničanem (T), téma „půda“ (klíčové slovo
+   „půda“ nebo „hlína“) → věta o vlhké/jílovité zemi; zkus to i na kopci → jiná věta (mělká/kamenitá).
+8. `--perfscene=ves_poledne` (launcher) – FPS/ms by se nemělo znatelně lišit od naměřeného základu
+   8. 10. 2026 (~27 fps / ~36 ms) – `Site` jen čte mřížku, nic nepočítá za běhu navíc.
+9. Přejmenuj/smaž `data/site.bin` → hra běží dál (fallback): vrstvy na mapě M jsou prázdné (alfa 0),
+   žádný pád ani varování navíc než jedno `push_warning`.
+10. Ulož hru (F5) a znovu načti (F9) – žádný pád (`Site` nemá vlastní uložený stav, nic nového
+    v save souboru).
+
+Co nahlásit: výstup `tools/site.py` (statistika), FPS/ms z bodu 8, a jestli vrstvy z bodů 2–6
+opticky odpovídají realitě (potoky, obec, jih/sever, dno údolí).
+
+**Pozn. k velikosti dat:** `data/site.bin` má 16 vrstev na mřížce 4 m přes celý katastr
+(~2,8 k × 1,9 k buněk) – odhadem ~100 MB (5 vrstev `uint16`, 11 `uint8`). To je víc, než
+00_PRINCIPY kap. 6 předpokládá pro *všechny* nové mřížky M8 dohromady (≤ 64 MB) – je to otevřený bod
+pro M8.19 (zúžit `dist_water`/`hand` na `uint8`, nebo tyto dvě vrstvy počítat jen „na dotaz“ místo
+uložení). Hru to nezpomalí (čte se jen při startu), jen to zabírá víc místa na disku, než je cíl.

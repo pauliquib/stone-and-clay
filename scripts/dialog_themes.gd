@@ -602,6 +602,20 @@ const THEMES := {
 		"cond": {"friend": ["Tobě věřím, tak to budu povídat dál.", "No, když to říkáš ty…"], "disliked": ["Tobě bych nevěřil{g:|a} ani slovo.", "Po tom, co o tobě vím, tomu nevěřím."]},
 		"why": ["Protože lidi by měli vědět, koho volí."],
 	},
+	"puda": {      # M8.2: podle Site.soil tam, kde hráč stojí (`World._talk_context` → ctx["soil_cond"])
+		"words": ["puda", "hlina", "jil", "pisek", "bahno", "jaka je tu zem", "jaka je tu puda"],
+		"lines": ["Půda je tu různá, kousek od kousku jiná. Člověk se to musí naučit.", "Kdo hospodaří, ten pozná půdu po barvě i po tom, jak se za ní lepí boty."],
+		"cond": {
+			"soil_fluvizem": ["Tady je niva, po řece naplavená hlína – úrodná, ale po dešti rychle zaplavená.", "Tady u vody je země tučná, nejlepší na zeleninu. Jen pozor na vodu po bouřce."],
+			"soil_glej": ["Tady je jíl, po dešti se tu zabořit nechceš.", "Tahle země je zamokřená, voda z ní dlouho neodejde. Brambory tu nedáš, leda vrbu.", "Tady to drží vodu jak houba. Odvodnit, nebo smířit se s mokřinou."],
+			"soil_ranker": ["Tady na svahu je půda mělká, kámen máš hned pod nohama.", "Tady se moc nezaseješ, kamenitá a mělká země. Tak leda ovce."],
+			"soil_arenosol": ["Tady je písčina, voda rychle propadne, hnojit se musí víc.", "Na písku rychle vyschne, ale brambory tu jdou dobře."],
+			"soil_hnedozem": ["Tady je obyčejná hlinitá hlína, poctivá. Na ní roste cokoliv.", "Dobrá středně těžká zem, nejlepší na obilí."],
+			"soil_antropozem": ["Tady je navezená zemina, zbytek po stavbě. Je to spíš dvůr než pole.", "Tady se kopalo a zase zasypalo, půda to moc není."],
+		},
+		"why": ["Protože každá strana údolí má jinou zem, {voc}. Záleží na vodě a na kameni pod ní."],
+		"ask": ["q_garden"],
+	},
 }
 
 ## Navazující reakce, když téma nemá vlastní pole (klíč = `why` / `more` / `how` / `where` / `andyou`), dle povahy.

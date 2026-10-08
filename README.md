@@ -99,9 +99,20 @@ Měření výkonu po krocích M8: `--perfscene=<jméno>[,sekund]` (`ves_poledne`
 stejně jako `--perf` → `user://perf/<jméno>.csv`. Pro pohodlné posílání výsledků použij
 `tools/launcher.sh --perfscene=ves_poledne` (viz tabulka nástrojů níž) – zapíše kompaktní log do
 `logs/` místo ručního přepisování čísel z konzole. F2 → „Příroda – ladění…“ nechá mapu (M) kreslit
-barevnou mřížku stavu modelu (zatím jen ukázková prázdná vrstva). Podrobnosti:
+barevnou mřížku stavu modelu – M8.2 přidala `site_twi`, `site_soil`, `site_insol`, `site_cold`,
+`site_wind` (mapa stanovišť, viz níž). Podrobnosti:
 [`docs/DEV.md`](docs/DEV.md) → „Ladicí parametry“, kontrakt API mezi kroky
 [`prompts/roadmapa/M8_realismus/00_PRINCIPY.md`](prompts/roadmapa/M8_realismus/00_PRINCIPY.md).
+
+**M8.2 Mapa stanovišť** (`World.site`, `Site` v `scripts/eko/site.gd`, data `tools/site.py` →
+`data/site.bin`, mřížka 4 m): terén (výška, sklon, orientace), vlhkost (TWI, vzdálenost k vodě,
+HAND – výška nad nejbližší vodou), poloha v reliéfu (TPI, expozice větru, mrazová kotlina) a
+oslunění (roční i zimní, clear-sky, bez zastínění terénem – doplní se, až bude potřeba). Půda
+(třída, hloubka, AWC, pH, živiny) je odvozená zjednodušeně z terénu a landuse (hnědozem/kambizem,
+ranker/litozem, arenosol, pseudoglej/glej, fluvizem, antropozem) – **reálná BPEJ geometrie pro
+katastr nebyla k dispozici** (geoportál SPÚ nedostupný, viz `docs/BPEJ.md`); `--soils=soubor.geojson`
+je připravený hák pro budoucí reálná data, teď je bez geometrie bez účinku. Bez `data/site.bin` hra
+běží dál (fallback: sklon/orientace z `Terrain`, zbytek střední hodnoty).
 
 ## Dokumentace
 
@@ -144,6 +155,7 @@ Generované soubory a jejich nástroje (výstupy se commitují, kromě `data/*.b
 | `python3 tools/gen_hospoda_map.py` | `data/maps/hospoda.map` | po změně mapy hospody (editovatelná i v TrenchBroomu) |
 | `python3 tools/gen_interior_textures.py` | `assets/textures/interiors/*.png` | po změně vzhledu interiérových textur (vyžaduje Pillow) |
 | `python3 tools/obce.py` | `data/obce.json` | po změně výběru/geometrie okolních obcí (5 fiktivních katastrů; vyžaduje `osmium`, `numpy`) |
+| `python3 tools/site.py` (M8.2) | `data/site.bin` (**není v gitu**) | po přegenerování `terrain_height.bin`/`water.json`/`surface.bin`/`landuse.bin` – mapa stanovišť (sklon, orientace, TWI, vzdálenost k vodě, HAND, TPI, expozice větru, oslunění, mrazové kotliny, půda); vyžaduje `numpy`, `scipy` |
 | `tools/launcher.sh [parametry hry…]` (M8.1) | `logs/m8_perf_<datum_čas>.log` + `logs/latest.log` (**mimo git**) | kdy chceš spustit hru / `--perfscene=…` a poslat výsledek dál bez ručního přepisování konzole – spustí `run.sh`, zachytí výstup, zapíše kompaktní deduplikovaný log (`tools/launcher_log.py`); `--help` jen vypíše nápovědu |
 
 Binární data mapy (`data/*.bin`) se regenerují exportem z Blenderu přes `tools/export_map.py`
