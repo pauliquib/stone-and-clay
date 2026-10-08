@@ -115,6 +115,8 @@ func _ready() -> void:
 	_visual = Humanoid.new()
 	Characters.apply_look(_visual, persona.profile)
 	_visual.vis_end = 220.0            # postava za ~220 m nikdo stejně nerozezná (šetří draw call)
+	if terrain != null:
+		_visual.ground_fn = Callable(terrain, "height_at")      # M8.6: Gait – sklon pod chodidly
 	add_child(_visual)
 	_name_label = Label3D.new()
 	_name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -316,6 +318,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _physics_impl(delta) -> void:
+	if world != null:
+		_visual.gait_on = world.realism_on("gait")   # M8.6: ať jde přepínač vypnout i za běhu (Esc → Nastavení)
 	var player: Player = world.nearest_player(global_position)
 	var to_player: Vector3 = world.player_world_pos(player) - global_position if player else Vector3(INF, 0, 0)
 	var dist := to_player.length()

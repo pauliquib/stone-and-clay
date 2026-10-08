@@ -1471,6 +1471,18 @@ func _process_impl(delta: float) -> void:
 	_say_label.visible = _say_t > 0.0 and not (camera != null and first_person and car == null)
 	visual.drunk = body.drunk_level()
 	visual.fat = body.fatness()
+	# M8.6: Gait (přepínač, terén pod chodidly, náklad na rameni, výdrž, chlad) – nastavuje se jednou
+	# za snímek, ať funguje i před mergem World.cargo / World.realism (kontrola `!= null`, 00_PRINCIPY kap. 3)
+	var w_g := get_parent() as World
+	if w_g != null:
+		visual.gait_on = w_g.realism_on("gait")
+		if w_g.terrain != null and not visual.ground_fn.is_valid():
+			visual.ground_fn = Callable(w_g.terrain, "height_at")
+		if w_g.cargo != null:
+			visual.load_kg = w_g.cargo.carried_kg(id)
+	var smax_g := body.stamina_max()
+	visual.tired = clampf(1.0 - stamina / maxf(smax_g, 0.01), 0.0, 1.0)
+	visual.cold = body.cold
 	if car != null:
 		visual.speed = 0.0
 		visual.pedal_angle = car.pedal_angle

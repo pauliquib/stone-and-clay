@@ -498,6 +498,23 @@
   ukázkovou prázdnou vrstvu `realism_off`. `tools/launcher.sh` + `tools/launcher_log.py` – spustí
   hru a zapíše kompaktní (deduplikovaný) log do `logs/` místo ručního přepisování čísel z konzole.
 
+- **Pohyb člověka (M8.6):** `scripts/gait.gd` (`class_name Gait`, RefCounted, jedna instance na
+  `Humanoid._gait`) – fázový cyklus chůze/běhu podle 00_PRINCIPY kap. 8 „Člověk – pohyb“: stojná fáze
+  ~60 % při chůzi / ~35 % při běhu (přechod kolem 2 m/s), kmitočet a délka kroku z rychlosti a délky
+  nohy (`Humanoid.scale_factor`, dynamická podobnost jako u `fauna/quadruped_rig.gd`), noha ve stojné
+  fázi vykonává lineární výkyv stejně rychlý jako pohyb těla (chodidlo neklouže), ve švihu opisuje
+  oblouk; protipohyb paží, boční posun a svislý pohup pánve (`Humanoid._hips.position.x/y`),
+  přešlapování při otočce na místě. `Humanoid` čte terén pod chodidly (`ground_fn`, nastavuje
+  `Player`/`Villager` na `Terrain.height_at`) → podélný sklon = náklon trupu do/z kopce, boční sklon =
+  náklon pánve (chodidla rovnoběžně se svahem); náklad na rameni (`load_kg`, z `World.cargo.carried_kg`)
+  zkracuje krok a shrbí, vyčerpaná výdrž (`tired`, z `Player.stamina`) shrbí a zpomalí kadenci, chlad
+  (`cold`, z `BodyState.cold`) přitáhne ruce k tělu a přidá deterministický třes (šum z `_sway_t`, ne
+  `randf()`). Opilost zůstala v `Humanoid` (potácení), jen běží nad `Gait` (`_gait.move_w` zesiluje
+  rozkmit při chůzi). Přepínač `World.realism_on("gait")` (Esc → Nastavení → Realismus) – vypnuto nebo
+  bez instance `Gait` = stará jednoduchá animace (fallback, beze změny). API používají M8.16 (únava,
+  chlad → postoj – `tired`/`cold` jsou už zapojené, jen bez vlastní simulace zdrojů) a M8.17 (vesničané
+  při práci). Měřicí scéna `ves_poledne` (víc vesničanů, M8.1).
+
 ## Co ve hře je
 
 - **Celý katastr** (~5,2 × 4,6 km) bez načítacích obrazovek: terén 2 m mřížka (kolize =

@@ -113,8 +113,21 @@ var _sway_t := 0.0
 var _last_action := ""
 var _tool: Node3D               # nástroj v ruce (viz set_tool)
 
+## M8.6 – Gait (fázový cyklus chůze, `scripts/gait.gd`): zapíná `gait_on` (volající čte
+## `World.realism_on("gait")`, výchozí zapnuto); bez instance / vypnuto = stará jednoduchá animace
+## níž v `_process_impl` (fallback, 00_PRINCIPY kap. 3). Volající (Player/Villager) může nastavit
+## `ground_fn` (terén pro sklon pod chodidly), `load_kg` (náklad na rameni), `tired`, `cold` (0..1).
+var gait_on := true
+var ground_fn := Callable()
+var load_kg := 0.0
+var tired := 0.0
+var cold := 0.0
+var _gait: Gait
+var _prev_yaw := 0.0
+
 
 func _ready() -> void:
+	_gait = Gait.new()
 	scale = Vector3.ONE * scale_factor
 	_root = _pivot(self, Vector3.ZERO)
 	_hips = _pivot(_root, Vector3(0, 0.95, 0))
@@ -666,6 +679,44 @@ func _process_impl(delta: float) -> void:
 	var elbow := -(0.25 + run * 0.9)
 	var lean := run * 0.22 + moving * 0.05
 	var bob := absf(c) * 0.05 * amp - _land * 0.18
+	var pelvis_x := 0.0
+	var slope_roll := 0.0
+	# M8.6: fázový cyklus `Gait` (stojná fáze beze klouzání, IK chodidel na terén, kymácení pánve,
+	# protipohyb paží) – zapnuto `gait_on` (viz pole výš); bez toho zůstává stará animace nad touto čarou.
+	var turn_rate := 0.0
+	if delta > 0.0001:
+		turn_rate = wrapf(rotation.y - _prev_yaw, -PI, PI) / delta
+	_prev_yaw = rotation.y
+	if gait_on and _gait != null and on_floor and pose == "stand" and not sliding:
+		_gait.scale_factor = scale_factor
+		_gait.animate(delta, speed, turn_rate, load_kg, tired)
+		leg_l = _gait.leg_l
+		leg_r = _gait.leg_r
+		knee_l = _gait.knee_l
+		knee_r = _gait.knee_r
+		arm_l = _gait.arm_l
+		arm_r = _gait.arm_r
+		elbow = -(0.25 + _gait.run_frac * 0.9)
+		bob = _gait.pelvis_y - _land * 0.18
+		pelvis_x = _gait.pelvis_x
+		lean = _gait.run_frac * 0.22 + _gait.move_w * 0.05
+		# terén pod chodidly: podélný sklon → náklon trupu (do kopce vpřed, z kopce vzad), boční
+		# sklon → náklon pánve (test „chůze napříč svahem“: chodidla rovnoběžně se svahem, pánev nakloněná)
+		if ground_fn.is_valid():
+			const SLOPE_D := 0.22
+			var fwd := -global_transform.basis.z
+			var right := global_transform.basis.x
+			var p := global_position
+			var h_f: float = ground_fn.call(p.x + fwd.x * SLOPE_D, p.z + fwd.z * SLOPE_D)
+			var h_b: float = ground_fn.call(p.x - fwd.x * SLOPE_D, p.z - fwd.z * SLOPE_D)
+			var h_r: float = ground_fn.call(p.x + right.x * SLOPE_D, p.z + right.z * SLOPE_D)
+			var h_l: float = ground_fn.call(p.x - right.x * SLOPE_D, p.z - right.z * SLOPE_D)
+			var slope_fwd := atan2(h_f - h_b, 2.0 * SLOPE_D)
+			slope_roll = clampf(atan2(h_r - h_l, 2.0 * SLOPE_D), -0.4, 0.4) * _gait.move_w
+			lean += clampf(-slope_fwd, -0.45, 0.45) * _gait.move_w
+		# náklad na rameni a vyčerpaná výdrž: shrbení (lean), chlad: ruce blíž k tělu (řeší se níž u `arm_out`)
+		lean += clampf(load_kg / Gait.LOAD_MAX_KG, 0.0, 1.0) * Gait.LOAD_LEAN_K * 10.0
+		lean += tired * Gait.TIRED_LEAN_K
 	if not on_floor and pose == "stand":
 		var up := clampf(vertical_speed / 6.0, -1.0, 1.0)
 		leg_l = 0.5 + up * 0.3
@@ -683,12 +734,19 @@ func _process_impl(delta: float) -> void:
 	knee_l = lerpf(knee_l, 1.9 if not sliding else 1.0, _crouch)
 	knee_r = lerpf(knee_r, 1.9 if not sliding else 0.2, _crouch)
 	lean = lerpf(lean, 0.35 if not sliding else -0.5, _crouch)
-	# opilost: potácení trupu, hlavy, ruce od těla
+	# opilost: potácení trupu, hlavy, ruce od těla (opilost staví na `Gait`: posun těžiště mimo opěrnou
+	# bázi = vrávorání a nápravný krok – `_gait.move_w` zesiluje rozkmit podle toho, jestli postava jde)
 	var sway := sin(_sway_t * 1.3) * 0.5 + sin(_sway_t * 2.9 + 1.0) * 0.3
-	var roll := sway * 0.16 * drunk
+	var roll := sway * 0.16 * drunk + slope_roll
 	var head_roll := sin(_sway_t * 1.1 + 0.5) * 0.25 * drunk
 	var arm_out := 0.2 * drunk
 	lean += drunk * 0.06 * (1.0 + sin(_sway_t * 0.7))
+	# chlad: ruce blíž k tělu, občasný třes (deterministický šum z `_sway_t`, ne `randf()`)
+	if cold > 0.0:
+		arm_out -= cold * 0.14
+		var shiver := sin(_sway_t * 26.0) * 0.012 * cold
+		roll += shiver
+		lean += absf(shiver) * 0.4
 	# sezení (lavice) / jízda (auto, kolo, motorka – končetiny dosahují na pedály a řízení přes IK)
 	var ik_l := Vector2(1.45, 1.35)
 	var ik_r := Vector2(1.45, 1.35)
@@ -725,6 +783,7 @@ func _process_impl(delta: float) -> void:
 	hips_y = lerpf(hips_y, s_hips, _sit)
 
 	_hips.position.y = hips_y
+	_hips.position.x = lerpf(pelvis_x, 0.0, _sit)   # boční posun pánve nad stojnou nohou (Gait); v sedu/jízdě vymizí
 	_torso.rotation.x = lean
 	_torso.rotation.z = roll
 	_head.rotation.x = -lean * 0.6

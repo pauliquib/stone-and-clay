@@ -54,3 +54,26 @@ a jakéhokoli M8 obsahu) běží ~27 fps / ~36 ms, ne 60 fps / 16,6 ms** z rozpo
 základem. M8.19 musí tohle zohlednit (buď vyšetřit Forward Mobile/renderer, nebo počítat rozpočet
 relativně k naměřenému základu, ne k teoretickým 16,6 ms). Drobná varování v logu (zóny obecní
 údržby/paseka se nevešly) nesouvisí s M8, jsou staré a nesouvisí s tímto měřením.
+
+## M8.6 – Pohyb člověka: fázová chůze, IK na svahu, postoj
+
+Co udělat (3. osoba, klávesa V): checklist z `M8_realismus/06_pohyb_cloveka.md` kap. 5, zkráceně:
+
+1. Pomalá chůze po rovině → chodidla stojí na místě, při kroku neujíždějí dopředu/dozadu.
+2. Chůze napříč svahem (např. od návsi dolů k potoku) → jedna noha níž, pánev/trup nakloněné do svahu.
+3. Rozběh (Shift) → plynulý přechod chůze → běh, při běhu chvilka, kdy se obě nohy nedotýkají země.
+4. Prudké zastavení ze sprintu a otočka na místě → přešlapování, ne otočení „na kolíku“.
+5. Naložit špalek/pytel na rameno (G u hromady/pytle) → viditelné shrbení a kratší krok s nákladem.
+6. Vyčerpat výdrž sprintem do nuly → shrbení a pomalejší krok; venku v mrazu bez bundy → ruce blíž k tělu,
+   občas se postava otřese.
+7. Opilost (vypít přes 1 ‰) → vrávorání s nápravnými kroky (staré potácení, teď nad `Gait`).
+8. Dojít k vesničanovi na návsi → chůze vypadá stejně věrohodně jako u hráče.
+9. Esc → Nastavení → „Realismus (M8)…“ → vypnout „Pohyb člověka“ → postava se vrátí ke staré (jednodušší)
+   animaci chůze; znovu zapnout → vrátí se nová.
+10. Vejít do bytového domu po schodech (pokud je po ruce) – chůze nevypadá rozbitě (žádná specializovaná
+    animace schodů v M8.6 – otevřený bod, viz log).
+
+Co změřit: `tools/launcher.sh --perfscene=ves_poledne` (víc vesničanů najednou – nejvíc postav v `_process`
+`Humanoid`/`Gait` současně). Zajímá nás, jestli se oproti baseline z 8. 10. 2026 (ves_poledne 26,8 fps /
+37,3 ms, viz výš) frame znatelně nezhoršil – `Gait.animate` je jen pár goniometrických funkcí a nejvýš
+4 volání `Terrain.height_at` na postavu, rozpočet je ≤ 0,05 ms/postavu (00_PRINCIPY kap. 6).

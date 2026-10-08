@@ -21,7 +21,9 @@ const REALISM_KEYS := ["site", "species", "wind", "sky", "gait", "soil_water", "
 	"animal_gait", "phenology", "crops", "terramech", "ground_veg", "habitat", "thermo", "village_life", "soundscape"]
 ## Řádky menu Realismus: [klíč, popisek, nápověda, odhad cena (text)] – prázdné, dokud ho nenaplní krok,
 ## který přepínač zavádí (data, ne větvení v `pause_menu.gd`).
-const REALISM_ROWS: Array = []
+const REALISM_ROWS: Array = [
+	["gait", "Pohyb člověka", "Fázová chůze/běh, chodidla na terénu, kymácení pánve (M8.6)", "~0,05 ms/postava"],
+]
 
 var realism: Dictionary = {}
 

@@ -1687,3 +1687,54 @@ M8 Realistický svět (`prompts/roadmapa/M8_realismus/00_START_M8.md`).
   historií repozitáře – do `main` byly ručně přeneseny jen nové soubory tohoto kroku
   (`tools/fetch_bpej.py`, `data/bpej_meta.json`, `docs/BPEJ.md`, řádek v `.gitignore`), žádný
   merge branche jako celku.
+
+## 2026-10-08 – M8.6 Pohyb člověka: biomechanika chůze, IK na svahu, postoj
+
+### Hotovo (staticky ověřeno čtením kódu + `--check-only` – ruční test čeká)
+- **Co**: nový `scripts/gait.gd` (`class_name Gait`, `RefCounted`) – fázový cyklus chůze/běhu podle
+  00_PRINCIPY kap. 8 „Člověk – pohyb“: duty factor ~60 % (chůze) → ~35 % (běh) s plynulým přechodem
+  kolem 2 m/s (Froudovo číslo), kmitočet a délka kroku z rychlosti a délky nohy (dynamická podobnost,
+  stejný princip jako `fauna/quadruped_rig.gd`, jen pro dvě nohy); stojná noha vykonává lineární výkyv
+  přesně tak rychlý jako posun těla → **chodidlo neklouže**; švihová noha opisuje oblouk (zdvih podle
+  rychlosti); kontralaterální protipohyb paží; boční posun a svislý pohup pánve (2× za cyklus);
+  přešlapování při otočce na místě (ne „na kolíku“); zkrácení kroku s nákladem na rameni.
+- **Zapojení** (`scripts/humanoid.gd`): nová pole `gait_on` (výchozí `true`), `ground_fn` (terén pod
+  chodidly), `load_kg`, `tired`, `cold`; `_gait: Gait` vytvořen v `_ready`. V `_process_impl` větev
+  `if gait_on and _gait != null and on_floor and pose == "stand" and not sliding:` nahradí výpočet
+  `leg_l/leg_r/knee_l/knee_r/arm_l/arm_r/elbow/lean/bob/pelvis_x` výstupem `Gait.animate()`; **stará
+  animace (sinus bez duty factoru) zůstává beze změny jako fallback**, když je `gait_on == false`
+  nebo `_gait == null`. Terén: podélný sklon (4 vzorky `ground_fn` kolem postavy) → náklon trupu
+  do/z kopce, boční sklon → náklon pánve/trupu (`slope_roll`, test „chůze napříč svahem“). Náklad
+  (`load_kg`) a vyčerpaná výdrž (`tired`) shrbí a zkrátí krok; chlad (`cold`) přitáhne ruce k tělu a
+  přidá deterministický třes (`sin(_sway_t*26)`, žádné `randf()` v animaci). Opilost (potácení)
+  zůstala jako byla, jen běží „nad“ `Gait` (`_gait.move_w`).
+- **Zdroj dat pro postoj** (`scripts/player.gd` `_process_impl`): `visual.gait_on = w.realism_on("gait")`,
+  `visual.ground_fn = Callable(w.terrain, "height_at")`, `visual.load_kg = w.cargo.carried_kg(id)`,
+  `visual.tired` z `1 − stamina/stamina_max()`, `visual.cold = body.cold` – vše s kontrolou `!= null`
+  (00_PRINCIPY kap. 3, jde dělat i bez M8.2/M8.7/M8.9, které `World.cargo`/`terrain`/`body` beztak
+  už mají hotové z dřívějších milníků). `scripts/villager.gd`: `ground_fn` v `_ready` (terén je
+  v `setup()` už dosazen), `gait_on` čte `World.realism_on("gait")` živě každý fyzikální snímek
+  (přepínač v Nastavení platí i za běhu, ne jen při spawnu).
+- **Přepínač**: `GameSettings.REALISM_ROWS` → řádek `"gait"` (Esc → Nastavení → „Realismus (M8)…“),
+  klíč `gait` v `REALISM_KEYS` byl už založen v M8.1.
+- Dokumentace: `docs/SYSTEMS.md` (nový odstavec „Pohyb člověka (M8.6)“), `README.md` (tabulka
+  přepínačů realismu – řádek `gait` zvlášť), `docs/testy_M8.md` (oddíl „M8.6“), odškrtnuto
+  `prompts/roadmapa/README.md` a `docs/VIZE_A_ROADMAPA.md`.
+- **Kontrola překladu**: `godot --headless --check-only` na `gait.gd`, `humanoid.gd`, `player.gd`,
+  `villager.gd`, `game_settings.gd` – prázdný výstup (žádný `SCRIPT ERROR`/`ERROR:`). Plný
+  `--import` v tomto běhu doběhl na timeout kvůli nesouvisejícím chybám LimboAI ikon
+  (`res://addons/limboai/icons/*.svg` – chybí naimportované, patrně starý stav projektu, ne
+  důsledek této změny); `--check-only` proběhlo i tak proti existujícímu importu.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v odpovědi / `docs/testy_M8.md` oddíl M8.6).
+- Žádný samostatný kloub kotníku v kostře (`Humanoid` má jen stehno+holeň/bota jako jeden mesh) –
+  natočení chodidla přesně podle normály svahu (bod 2 checklistu) je proto aproximace přes náklon
+  pánve/trupu, ne skutečná rotace chodidla v kotníku. Jemnější došlap (dopad paty → odval → odraz
+  špičkou) a schody v interiérech (bod 10) nejsou zvlášť řešené – `Gait` na schodech jen dál počítá
+  rovinnou chůzi (otevřený bod pro pozdější doladění, nekritické pro „Hotovo, když“).
+- Pohled/oči (look-at), stabilizace hlavy a dýchání (00_PRINCIPY kap. 8 zmiňuje, prompt „Co udělat“
+  bod 4–5) nejsou v tomto kroku – hlava se dál řídí starým kódem (`_head.rotation` z `lean`/`drunk`).
+- Zvuk kroků (`cadence_hz` je v `Gait` připraveno, ale nepoužité) čeká na M8.16/8.17/zvukový krok.
+- `tools/launcher.sh --perfscene=ves_poledne` – uživatel pošle fps/ms, porovnat s baseline
+  26,8 fps / 37,3 ms z 8. 10. 2026 (`docs/testy_M8.md`), ne s ideálními 60 fps.
