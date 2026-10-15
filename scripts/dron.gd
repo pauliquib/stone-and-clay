@@ -318,6 +318,9 @@ func _read_sticks(dt: float) -> void:
 ## Cílová rychlost podle režimu (let / start / rth / pristat).
 func _wish() -> Vector3:
 	var wv := world.weather.wind_vector() if world.weather else Vector3.ZERO
+	if world.wind_field != null and world.weather:
+		wv = world.wind_field.wind_at(global_position)   # M8.4: vítr v místě dronu (výška, závětří, nárazy)
+		wv.y = 0.0
 	var wk: float = spec["wind_k"]
 	_gust_t += 0.016
 	var gust := wv * wk * 0.35 * (sin(_gust_t * 2.1) * sin(_gust_t * 0.63 + 1.7))   # turbulence kolem středního driftu

@@ -132,6 +132,7 @@ var _collected := {}             # pořadí předmětu → true: už sebraný (u
 var _collected_jd := {}          # pořadí předmětu → juliánský den sběru (znovuvyrůstání sezónních předmětů)
 var surface: SurfaceMap          # maska povrchu terénu (data/surface.bin) – procedurální materiály, minimapa
 var site: Site                   # M8.2: mapa stanovišť (data/site.bin) – terén, voda, oslunění, půda (00_PRINCIPY §3)
+var wind_field: WindField        # M8.4: pole větru – nárazy, závětří, profil (scripts/eko/wind_field.gd)
 var surroundings: Surroundings   # M6.2: levná krajina za katastrem (bez kolizí, bez dat fallback prstenec)
 var villages: Villages           # vizuální zástavba 5 okolních vesnic (data/obce.json; jen pohled z dálky)
 var building_details: BuildingDetails   # okna, dveře, vrata a komíny budov (data/buildings.json; null bez dat)
@@ -307,6 +308,11 @@ func build() -> void:
 	site = Site.new()                        # M8.2: mapa stanovišť (tools/site.py); bez dat fallback z terrain
 	site.setup(terrain)
 	_register_site_debug_layers()
+	wind_field = WindField.new()             # M8.4: pole větru (Weather + Site.wind_exp, fallback 1); vrstva mapy „vitr“
+	wind_field.name = "PoleVetru"
+	add_child(wind_field)
+	wind_field.setup(self)
+	debug_layers["vitr"] = Callable(wind_field, "debug_layer")
 	surroundings = Surroundings.new()        # M6.2: krajina za katastrem (jen vzhled, bez kolizí)
 	surroundings.name = "Okoli"
 	add_child(surroundings)

@@ -8,7 +8,8 @@
 ## celé chunky podle vzdálenosti hráče k AABB buňky (`view_range` na typ – keře dohlédnou
 ## dál než tráva). `detail` (Nastavení → Grafika → Vegetace) dosah násobí, 0 = vypnuto.
 ##
-## Vítr: `_process` nastaví všem materiálům `wind_strength`/`wind_dir` z `Weather.wind_vector()`
+## Vítr: `_process` nastaví všem materiálům `wind_strength` z `Weather.wind_vector()` (stará cesta; M8.4: směr,
+## rychlost a nárazy jsou globální uniformy `wind_*` z `World.wind_field`, nastavuje Atmosphere)
 ## (clamp /10 → 0..2, §9.4). Sezóny řeší shader přes globální parametry (grass_green, foliage,
 ## snow_cover) a pro obilí tabulku `field_lut` (Fields.lut_image – klasy zrají a po žních
 ## strniště zůstane). Chybí-li vegetation.bin, jen varování – svět běží bez vegetace.
@@ -172,7 +173,6 @@ func _material(typ: int) -> ShaderMaterial:
 	m.shader = load("res://shaders/vegetation.gdshader")
 	m.set_shader_parameter("bend_k", VEG_CONFIG[typ]["bend_k"])
 	m.set_shader_parameter("season_mode", VEG_CONFIG[typ]["season_mode"])
-	m.set_shader_parameter("wind_dir", Vector2(0.8, 0.5))
 	_mats[typ] = m
 	return m
 
@@ -227,11 +227,9 @@ func _process_impl(delta: float) -> void:
 		var wv: Vector3 = world.weather.wind_vector()
 		wind = Vector2(wv.x, wv.z)
 	var s := clampf(wind.length() / 10.0, 0.0, 2.0)
-	var dir := wind.normalized() if wind.length() > 0.01 else Vector2(0.8, 0.5)
 	for m in _mats.values():
 		var mat := m as ShaderMaterial
 		mat.set_shader_parameter("wind_strength", s)
-		mat.set_shader_parameter("wind_dir", dir)
 
 
 # ------------------------------------------------------------------ testy / ladění
