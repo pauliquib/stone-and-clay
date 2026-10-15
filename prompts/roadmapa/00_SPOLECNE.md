@@ -157,6 +157,12 @@ zákon, respekt…) se na `emit_game_event` napojí stejně. **Nevolej HUD pří
   chyby v jiném skriptu – oprav první skutečnou příčinu a zkontroluj znovu. Hru samotnou ani testy (`--…test`)
   nespouštěj. (Ve vlně 0 tahle kontrola odhalila 3 chyby, kvůli kterým hra nešla spustit: duplicitní
   proměnná ve funkci, nespárovaná závorka, `:=` s hodnotou bez typu z proměnné typu `Node`.)
+- **Shadery (`*.gdshader`, `*.gdshaderinc`) `--check-only` nepokrývá.** Kdo mění shader, spustí navíc
+  ```bash
+  timeout 120 godot --path . --rendering-method mobile -s res://tools/shader_check.gd 2>&1 | grep -E "SHADER ERROR|E +[0-9]+->"
+  ```
+  (otevře okno na ~10 snímků, hru nespouští; uživatel to povolil 15. 10. 2026). Výstup musí být prázdný. (M8.4: parametr
+  funkce v `.gdshaderinc` se jmenoval stejně jako `uniform` shaderu → „Redefinition of …“ a stromy/tráva se nevykreslily.)
 - `grep -n` na každou nově volanou funkci / proměnnou – existuje a má správné parametry?
 - Nový `class_name` nekoliduje s existujícím (`grep -rn "class_name X" scripts`).
 - **Názvy metod a proměnných nesmí kolidovat s nativními členy** `Node` / `Node3D` / `Object` (`set_owner`, `owner`, `name`,

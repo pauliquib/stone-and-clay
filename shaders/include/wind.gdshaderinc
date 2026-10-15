@@ -44,8 +44,8 @@ float wind_gust_at(vec2 xz) {
 //   origin_w     – pata rostliny ve světě
 //   col          – barvy vrcholů podle konvence výše
 //   height       – výška rostliny (m)
-//   stiffness    – tuhost (1 = běžný strom; jehličnan ~1,3; keř ~2)
-vec3 wind_bend(vec3 vertex_local, vec3 origin_w, vec4 col, float height, float stiffness) {
+//   stiff        – tuhost (1 = běžný strom; jehličnan ~1,3; keř ~2)
+vec3 wind_bend(vec3 vertex_local, vec3 origin_w, vec4 col, float height, float stiff) {
 	float v = wind_speed;
 	vec2 d = normalize(wind_dir + vec2(1e-4));
 	float H = max(height, 0.5);
@@ -59,10 +59,10 @@ vec3 wind_bend(vec3 vertex_local, vec3 origin_w, vec4 col, float height, float s
 	// 1) kmen: statický průhyb po větru + pomalý kmit s vlastní frekvencí ∝ 1/H
 	float f0 = clamp(5.0 / H, 0.12, 1.5);
 	float sway = sin(6.2831853 * f0 * wind_time + ph);
-	float trunk = h * h * H * (0.045 * F + 0.004 * calm) * (1.0 + 0.35 * sway) / stiffness;
+	float trunk = h * h * H * (0.045 * F + 0.004 * calm) * (1.0 + 0.35 * sway) / stiff;
 	vec3 off = vec3(d.x, 0.0, d.y) * trunk;
 	off += vec3(-d.y, 0.0, d.x) * h * h * H * (0.006 * F + 0.0015 * calm)
-		* sin(6.2831853 * f0 * 0.77 * wind_time + ph * 1.3) / stiffness;
+		* sin(6.2831853 * f0 * 0.77 * wind_time + ph * 1.3) / stiff;
 	off.y -= 0.5 * trunk * trunk / max(vertex_local.y, 0.3);  // délka kmene se zhruba zachová
 
 	// 2) větve: ohebnost r, vlastní fáze g, rychlejší kmit
@@ -80,8 +80,8 @@ vec3 wind_bend(vec3 vertex_local, vec3 origin_w, vec4 col, float height, float s
 }
 
 // Tráva a obilí: ohyb od kořene (h01²), náraz z pole + krátká vlna („honami“) běžící po větru.
-// Vrací posun ve světových metrech; `plant_h` = výška stébla (m), `bend_k` = citlivost typu.
-vec3 wind_grass(vec3 root_w, float h01, float plant_h, float bend_k) {
+// Vrací posun ve světových metrech; `plant_h` = výška stébla (m), `bk` = citlivost typu.
+vec3 wind_grass(vec3 root_w, float h01, float plant_h, float bk) {
 	float v = wind_speed;
 	vec2 d = normalize(wind_dir + vec2(1e-4));
 	float g = wind_gust_at(root_w.xz);
@@ -94,9 +94,9 @@ vec3 wind_grass(vec3 root_w, float h01, float plant_h, float bend_k) {
 	float F = vg * vg / WIND_F_REF;
 	float ph = wind_hash(floor(root_w * 1.7) + 0.11) * 6.2831853;
 	float flutter = sin(wind_time * (2.0 + 0.25 * v) + ph) * (0.03 + 0.06 * calm);
-	float amp = h01 * h01 * plant_h * bend_k * (0.55 * clamp(F, 0.0, 1.6) + 0.04 * calm);
+	float amp = h01 * h01 * plant_h * bk * (0.55 * clamp(F, 0.0, 1.6) + 0.04 * calm);
 	vec3 off = vec3(d.x, 0.0, d.y) * amp;
-	off += vec3(-d.y, 0.0, d.x) * h01 * h01 * plant_h * bend_k * flutter * calm;
+	off += vec3(-d.y, 0.0, d.x) * h01 * h01 * plant_h * bk * flutter * calm;
 	off.y -= 0.5 * amp * amp / max(plant_h * h01, 0.05);
 	return off;
 }

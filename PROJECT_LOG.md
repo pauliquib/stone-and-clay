@@ -2006,3 +2006,13 @@ dopravy, ne o regresi.
 - Kalibrace (M8.19): `Q_SPEC`, `K_QUICK_H`/`K_SLOW_H`, `DRY_REL`, `PRECIP_MM` a citlivost na herní srážky
   (`Weather.RAIN_MM_H` = 25 mm/h při `rain` = 1 dává bouřkám velké úhrny).
 - Stavba mřížky po startu trvá ~30–40 s (rozložená do snímků, ~0,5 ms/snímek); do té doby staré globální chování.
+
+## 2026-10-15 – Oprava po vlně 3 M8: shadery větru se nepřeložily
+
+- Uživatel po spuštění hlásil opakované `ERROR: Parameter "version" is null` (`shader_rd.h`). Příčina:
+  `shaders/include/wind.gdshaderinc` (M8.4) měl parametry funkcí `stiffness` (`wind_bend`) a `bend_k` (`wind_grass`)
+  pojmenované stejně jako `uniform` v `tree.gdshader` / `vegetation.gdshader` → Godot 4.3 „Redefinition of …“,
+  shader stromů a vegetace se nepřeložil. Parametry přejmenovány na `stiff` / `bk`.
+- Nový nástroj `tools/shader_check.gd` (přeloží všechny prostorové shadery v okně na ~10 snímků); zapsán do
+  `00_SPOLECNE.md` kap. 6 jako povinná kontrola pro změny shaderů. Ověřeno: před opravou hlásí 2 chyby, po ní 0
+  (Mobile i Forward+).
