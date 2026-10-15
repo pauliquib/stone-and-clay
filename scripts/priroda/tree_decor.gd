@@ -123,6 +123,13 @@ func _load_trees() -> void:
 	_tree_data = out
 
 
+## M8.3: druhy dřevin (`World.tree_eco`), jen když je přepínač „species“ zapnutý; jinak staré pravidlo podle sadu.
+func _eco() -> TreeEco:
+	if world == null or world.tree_eco == null or not world.realism_on("species"):
+		return null
+	return world.tree_eco
+
+
 ## Volá se párkrát za sekundu (SeasonFx).
 func update(pos: Vector3, doy: float, snow: float, jd: int) -> void:
 	if _busy:
@@ -193,6 +200,11 @@ func _crown_r(h: float) -> float:
 
 
 func _is_fruit_tree(t: int) -> bool:
+	var eco := _eco()
+	if eco != null:      # M8.3: ovoce jen na ovocných druzích (jabloň, hrušeň, švestka, třešeň), ořešák bez plodů v koruně
+		var sid := eco.species(int(_tree_data[t * 5 + 4]))
+		return eco.is_fruit(int(_tree_data[t * 5 + 4])) and not eco.fruit_of(sid).is_empty() \
+			and String(eco.fruit_of(sid)["predmet"]) != ""
 	var h := _tree_data[t * 5 + 3]
 	if h < FRUIT_TREE_H[0] or h > FRUIT_TREE_H[1]:
 		return false
@@ -225,6 +237,11 @@ func _rebuild_fruit(pos: Vector3, frac: float) -> void:
 		var r := _crown_r(h)
 		var kind := Fields._hash(src, 99) % FRUIT_COLORS.size()
 		var base: Color = FRUIT_COLORS[kind]
+		var eco := _eco()
+		if eco != null:      # M8.3: barva plodů podle druhu (katalog dreviny.json)
+			var fr := eco.fruit_of(eco.species(src))
+			if not fr.is_empty():
+				base = fr["barva"]
 		for k in FRUIT_PER_TREE:
 			var hh := Fields._hash(src, k + 200)
 			if float(hh % 1000) / 1000.0 >= frac:

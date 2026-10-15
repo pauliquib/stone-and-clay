@@ -201,12 +201,19 @@ func _on_fell(id: int, _def: Dictionary, aim: Dictionary, ok: bool) -> void:
 	var h := trees.height_of(i)
 	var r := trees.trunk_radius(i)
 	var vol := PI * r * r * h * 0.6
+	var value := int(roundf(vol * WOOD_KC_PER_M3 / 10.0) * 10.0)
+	var eco: TreeEco = world.tree_eco if world.realism_on("species") else null
+	if eco != null:      # M8.3: objem z dbh a výšky (tvarové číslo), cena podle druhu – buk ≠ smrk
+		value = eco.wood_value_kc(i)
+		world.notify(id, "show_message", ["Padá %s – %.2f m³ dřeva, cena na pni ~%d Kč." % [
+			eco.species_name(i).to_lower(), eco.volume_m3(i), value], 4.0])
 	trees.hide_tree(i, _day())
 	_start_fall(i, base, dir, h, r, trees.is_conifer(i), id)
 	world.give_xp(id, "drevorubectvi", lerpf(XP_FELL[0], XP_FELL[1], clampf(vol / XP_VOLUME_FULL, 0.0, 1.0)), "kácení")
-	world.emit_game_event(id, "tree_felled", {"tree": i, "pos": base, "height": h, "tool": tool_id})
+	world.emit_game_event(id, "tree_felled", {"tree": i, "pos": base, "height": h, "tool": tool_id,
+		"species": eco.species(i) if eco != null else "", "value": value})
 	_check_gear(id, p, tool_id)
-	_check_law(id, base, tool_id, int(roundf(vol * WOOD_KC_PER_M3 / 10.0) * 10.0))
+	_check_law(id, base, tool_id, value)
 
 
 ## Ochranné pomůcky (M2.3): hráč nosí přilbu i ochranné kalhoty se štítkem `ochrana_pila` (`Wardrobe.has_saw_gear`).

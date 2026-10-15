@@ -295,6 +295,38 @@ func _make_stump(i: int) -> void:
 	_stumps[i] = b
 
 
+## M8.3: počet stromů v trees.bin (včetně těch, co zahodilo `Water`) – kontrola shody s `tree_eco.bin`.
+func raw_count() -> int:
+	return _d.size() / 11
+
+
+## M8.3: čísla stojících stromů (mapových i zasazených) do `r` m od bodu (vodorovně) – pro `TreeEco.species_near`.
+func ids_near(pos: Vector3, r: float) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	var r2 := r * r
+	var c0 := Vector2i(floori((pos.x - r) / CELL), floori((pos.z - r) / CELL))
+	var c1 := Vector2i(floori((pos.x + r) / CELL), floori((pos.z + r) / CELL))
+	for cx in range(c0.x, c1.x + 1):
+		for cz in range(c0.y, c1.y + 1):
+			var arr: PackedInt32Array = _cells.get(Vector2i(cx, cz), PackedInt32Array())
+			for i in arr:
+				if felled.has(i):
+					continue
+				var dx := _d[i * 11] - pos.x
+				var dz := _d[i * 11 + 2] - pos.z
+				if dx * dx + dz * dz < r2:
+					out.append(i)
+	if planted != null:
+		for id in planted.recs:
+			var rec: Dictionary = planted.recs[id]
+			if int(rec["felled"]) >= 0:
+				continue
+			var p: Vector3 = rec["pos"]
+			if Vector2(p.x - pos.x, p.z - pos.z).length_squared() < r2:
+				out.append(int(id))
+	return out
+
+
 # ------------------------------------------------------------------ ukládání
 
 func to_dict() -> Dictionary:

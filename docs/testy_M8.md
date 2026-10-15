@@ -196,3 +196,43 @@ běhu nepočítá navíc), `villager`/`humanoid` v PERF kategorii by měly klesn
 +0,5 ms/+1,0 ms rozpočtu kroku M8 dohromady, ne +27 %/+110 % na instanci. `car` sledovat jen pro
 ověření, že 33 vs. 39 volání byla skutečně jen variace hustoty dopravy (zkusit běh se stejným počtem
 aut, pokud launcher umí fixovat seed/hustotu).
+
+## M8.3 – Dřeviny a porosty podle stanoviště
+
+Nejdřív vygeneruj data (v hlavním checkoutu, po `tools/site.py`):
+
+```
+python3 tools/tree_species.py
+```
+
+Vypíše podíly druhů (všechny / les), počet porostů, kontext stromů, věk/vitalitu/dbh a kontrolu
+„severní svahy / jižní svahy / luh“. Agent naměřil (15. 10. 2026, `site.bin` z M8.2): smrk 39 %, buk 16 %,
+habr 10 %, dub zimní 6 %, bříza 5 %; 3 699 porostů (35 % smrčiny, 46 % smíšené, 18 % luhy); hlavní druh porostu
+na severu smrk 78 %, na jihu habr 34 % + dub 25 %, v luhu olše 79 %; ovocné v lese 0.
+
+Checklist (max. 10 bodů):
+1. `python3 tools/tree_species.py` doběhne (~4 s) – podíly dávají smysl pro moravskou pahorkatinu?
+2. F2 → Příroda – ladění → **druhy**: souvislé barevné plochy (porosty), ne „sůl a pepř“; modré (olše/vrby)
+   pásy podél potoků, tmavě zelený smrk / oranžový buk na severních svazích, hnědý dub / žlutavý habr na jižních.
+   Legenda barev: `TreeEco.DEBUG_COLORS` (smrk tmavě zelená, buk oranžová, dub hnědá, habr béžová, olše modrá,
+   bříza bílá, jabloň červená, švestka fialová).
+3. Vrstva **vitalita**: zelená = dobré stanoviště, do červena = slabší (mělká půda, nevhodné).
+4. Teleport k potoku (les u vody) → E na kmen („Prohlédnout strom“) → „Olše lepkavá, asi … let“ (u jehličnatého
+   tvaru stromu tam bude smrk – tvar zatím určuje prototyp, M8.8).
+5. Les na severním svahu → E → buk / smrk; jižní svah → dub / habr. S Dřevorubectvím ≥ 10 i výška, průměr,
+   vitalita; ≥ 20 i objem a cena dřeva.
+6. Pokácet listnáč a podobně vysoký jehličnan (M2.1) → hláška „Padá buk lesní – 0,xx m³ dřeva, cena na pni ~… Kč“;
+   buk a smrk stejné výšky dají jinou cenu.
+7. Zahrady u domu v září (`--perfscene=zahrady_zari` nebo F2 → Datum 15. 9.) → ovoce jen na jabloních /
+   hrušních / švestkách / třešních (barva podle druhu), lípy a břízy bez ovoce.
+8. Zasadit buk na vlhkou nivu u potoka a buk na hlinitý svah → E na sazenici → „stanoviště … (vitalita x %)“
+   se liší (niva nižší).
+9. Esc → Nastavení → Realismus → vypnout „Dřeviny a porosty“ → kácení zase starou cenou, „Divoký strom –
+   žádné údaje.“; F5/F9 uložení a načtení bez pádu (sazenice si vitalitu pamatují).
+10. Přejmenuj `data/tree_eco.bin` → hra běží (jedno varování), druh podle tvaru (buk/dub/lípa/smrk/borovice).
+
+**Co změřit:** `tools/launcher.sh --perfscene=zahrady_zari` a `--perfscene=les_rano_mlha` – M8.3 za běhu nic
+nesimuluje (jen čte data), čekej změnu FPS/frame ≤ 0,1 ms proti stavu před M8.3 (PERF kategorie `seasonfx`
+beze změny řádu). Načítání: řádek „Stromy (51 736)…“ delší nejvýš o ~20 ms (čtení 1,1 MB `tree_eco.bin`);
+bez souboru (fallback) o ~100 ms (dopočet mřížek z 51 tis. stromů).
+
