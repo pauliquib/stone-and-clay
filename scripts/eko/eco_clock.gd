@@ -80,8 +80,11 @@ func _drain_jobs() -> void:
 	if _jobs.is_empty():
 		return
 	var t0 := Time.get_ticks_usec()
-	while not _jobs.is_empty():
-		var job: Dictionary = _jobs[0]
+	# M8.7: každá práce nejvýš `per_frame` kusů za snímek (dřív smyčka točila první práci až do 2 ms
+	# rozpočtu – `per_frame` tak neplatil a dlouhé průchody brzdily každý snímek o celé 2 ms).
+	var j := 0
+	while j < _jobs.size():
+		var job: Dictionary = _jobs[j]
 		var remain: int = int(job["items"]) - int(job["idx"])
 		var n: int = mini(int(job["per_frame"]), remain)
 		var cb: Callable = job["cb"]
@@ -89,7 +92,9 @@ func _drain_jobs() -> void:
 			cb.call(int(job["idx"]) + k)
 		job["idx"] = int(job["idx"]) + n
 		if int(job["idx"]) >= int(job["items"]):
-			_jobs.pop_front()
+			_jobs.remove_at(j)
+		else:
+			j += 1
 		if Time.get_ticks_usec() - t0 > SLICE_BUDGET_US:
 			break
 

@@ -367,6 +367,7 @@ func build() -> void:
 	u_rampa.name = "URampa"
 	add_child(u_rampa)
 	u_rampa.build(self, terrain)
+	_setup_soil_water()                    # M8.7: vodní bilance (půda, sníh, odtok, toky) – po Water a Site
 
 	loading.emit("Stromy (51 736)…")
 	await _frames(1)
@@ -4499,3 +4500,20 @@ func drone_person_under(pos: Vector3, r: float) -> bool:
 				and Vector2(player_world_pos(pl2).x, player_world_pos(pl2).z).distance_to(p2) < r:
 			return true
 	return false
+
+
+# ------------------------------------------------------------------ M8.7 vodní bilance
+
+## M8.7: vlhkost půdy, sníh, odtok a průtoky toků (`scripts/eko/soil_water.gd`, 00_PRINCIPY kap. 3).
+## Mřížka se staví po kouscích přes `EcoClock.slice`, hodinový krok přes `eco_hour`; přepínač `soil_water`.
+var soil_water: SoilWater
+
+
+func _setup_soil_water() -> void:
+	soil_water = SoilWater.new()
+	soil_water.setup(self)
+	if weather != null:
+		weather.soil_water = soil_water
+	debug_layers["vlhkost"] = Callable(soil_water, "debug_moist")
+	debug_layers["snih"] = Callable(soil_water, "debug_snow")
+	debug_layers["odtok"] = Callable(soil_water, "debug_runoff")

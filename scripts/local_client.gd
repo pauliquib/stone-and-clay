@@ -929,7 +929,7 @@ func _update_water_sound(delta: float) -> void:
 			_brook.stop()
 	else:
 		_brook.global_position = near[0]
-		_brook.volume_db = {"river": 2.0, "stream": -2.0}.get(near[1], -8.0)
+		_brook.volume_db = {"river": 2.0, "stream": -2.0}.get(near[1], -8.0) + (float(near[2]) if near.size() > 2 else 0.0)   # M8.7: velká voda hlasitěji
 		if not _brook.playing:
 			_brook.play()
 	if player.wade > 0.05:

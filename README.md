@@ -128,6 +128,13 @@ podrobnosti rostou s Dřevorubectvím). Ovoce v korunách jen na ovocných druz�
 vitalitu podle stanoviště. Ladicí vrstvy `druhy`, `vitalita`. Bez `data/tree_eco.bin` fallback:
 druh podle prototypu stromu.
 
+**M8.7 Vodní bilance** (`World.soil_water`, `scripts/eko/soil_water.gd`, přepínač `soil_water` v Realismu):
+vlhkost půdy na mřížce 32 m (kyblík s AWC ze `Site`), tání sněhu, povrchový odtok (SCS-CN), výpar (Hargreaves),
+podpovrchový odtok po spádnici a potoky jako lineární nádrže – po bouřce vystoupají a zkalní, za 1–3 dny se vrátí,
+v suchém létě malé potoky vyschnou; bláto pro auta a louže podle místa, `Weather.drought` z vlhkosti půdy. Ladicí
+vrstvy mapy `vlhkost`, `snih`, `odtok` a F2 → Příroda – ladění → „Průtoky toků“. Žádný nový offline nástroj (vše
+se počítá z `site.bin`, `surface.bin` a `water.json` při startu, po kouscích).
+
 ## Dokumentace
 
 - [`GAME_DESIGN.md`](GAME_DESIGN.md) – vize, pilíře, herní smyčka, cílové parametry

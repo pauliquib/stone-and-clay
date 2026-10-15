@@ -1968,3 +1968,41 @@ dopravy, ne o regresi.
 - Kouř z ohně (`fire_fx.gd`), termické bubliny (`Thermals`), balistika (`weapons.gd`) a rukáv na letišti dál
   berou `Weather.wind_vector()` – napojit podle potřeby (M8.10/M8.18).
 - Vrstva mapy `vitr` je barevná (bez šipek).
+
+## 2026-10-15 – M8.7 Vodní bilance: vlhkost půdy, odtok, potoky a bláto
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu – ruční test čeká)
+- **`scripts/eko/soil_water.gd` `SoilWater` → `World.soil_water`** (API z 00_PRINCIPY kap. 3): mřížka 32 m přes rozsah
+  `Site` (355 × 236), kyblík `w` (0..AWC ze `Site`), sníh `swe`; hodiny z `eco_hour` do zásobníku forcingu, průchod
+  mřížkou po 48 buňkách/snímek přes `EcoClock.slice`. Zachycení v korunách (zápoj ze `SurfaceMap`), tání degree-day
+  (jih rychleji z `Site.insol_winter`), SCS-CN po srážkových událostech s AMC a zamrzlou půdou, výpar Hargreaves
+  (FAO-56 Ra), přetok/prosakování → podzemní nádrž toku + podpovrchově po D8 (offline ověřeno pythonem: 97,6 % buněk
+  ústí do toku). Toky: rychlá + podzemní lineární nádrž na úsek `water.json`, průtok sčítaný po proudu, povodí za
+  okrajem mapy, normál 4 l/s/km², hladina ∝ Q^0,4 (max +0,4 m), kalnost, vyschnutí malých potoků. Rozběh 60 dnů
+  z klimatu + TWI. Dotazy bez alokací `moisture_at`, `mud_at`, `snow_at`, `puddle_at`, `runoff_at`, `hollow_at`,
+  `add_water`, `drought_index`, `flows_text`. Uložení klíč `soil_water` (base64, kompaktně), starý save = rozběh.
+- **`water.gd`**: `Water.flow_at(x, z)` (m³/s), `Water.level_at(x, z)` (m vůči normálu); hladina/kalnost/proud
+  přes instance uniformy `level_ofs`, `turbid`, `flow_mult` (`shaders/water.gdshader`), vyschlé koryto schované,
+  `info_at` (brodění) podle hladiny, `nearest_stream` vynechá vyschlé a vrací třetí prvek = +dB šumění
+  (`local_client.gd` – 1 řádek).
+- **`weather.gd`**: `surface_grip(surf, mud := -1.0)`, nové `surface_grip_at(surf, pos)`; `drought` se blíží
+  `SoilWater.drought_index()` (vyhláška sucha – API beze změny). **`car.gd`** `_surface_grip`: bláto v místě kola.
+- **`puddles.gd`**: s bilancí louže jen na lokálně mokrých místech (nasycená prohlubeň / stékající voda, za deště
+  podle TWI), každá svou alphou, vysychají postupně.
+- `world.gd` (jen nový řádek v setupu + funkce `_setup_soil_water` a proměnná na konci), `save_game.gd`,
+  `game_settings.gd` (`REALISM_ROWS` – „Vodní bilance“), `game_menu.gd` (F2 → Příroda – ladění → „Průtoky toků“),
+  ladicí vrstvy `vlhkost`, `snih`, `odtok`.
+- **Oprava `EcoClock._drain_jobs`** (M8.1): smyčka točila první práci až do 2 ms rozpočtu, takže `per_frame` neplatil
+  – teď každá práce nejvýš `per_frame` kusů za snímek (jinak by průchody M8 brzdily každý snímek o celé 2 ms).
+- Kontrola překladu (00_SPOLECNE kap. 6): prázdná u všech změněných `.gd`.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M8.md` → M8.7) a měření `--perfscene=pole_leto,60`.
+- ~~TODO po mergi M8.3~~ **hotovo při sloučení vlny 3 (15. 10. 2026)**: zachycení v korunách bere zápoj z
+  `TreeEco.canopy_at(x, z)` (typovaně, `World.tree_eco`), fallback `SurfaceMap` / `Fauna.forest_at`.
+- Nedotažené části mimo „Minimum“: terénní shader (tmavší mokrá hlína z textury vlhkosti 32 m), hřiby z lokální
+  vlhkosti v lese (dnes `Weather.rain_recent`), zálivka záhonu do buňky (`garden.gd` → `SoilWater.add_water` je
+  připravené), slabší studánka v suchu (M5.10).
+- Kalibrace (M8.19): `Q_SPEC`, `K_QUICK_H`/`K_SLOW_H`, `DRY_REL`, `PRECIP_MM` a citlivost na herní srážky
+  (`Weather.RAIN_MM_H` = 25 mm/h při `rain` = 1 dává bouřkám velké úhrny).
+- Stavba mřížky po startu trvá ~30–40 s (rozložená do snímků, ~0,5 ms/snímek); do té doby staré globální chování.

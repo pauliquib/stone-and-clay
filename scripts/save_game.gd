@@ -116,6 +116,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["garden_visuals"] = world.garden.visuals_to_dict()   # kompost + skleník (Fáze 8)
 	if world.npc_grow:
 		d["npc_grow"] = world.npc_grow.to_dict()       # M4.8: záhon zahrádkáře (starý save = žádný)
+	if world.soil_water:
+		d["soil_water"] = world.soil_water.to_dict()   # M8.7: vlhkost půdy, sníh, zásoby toků (base64, kompaktně)
 	if world.fences:
 		d["fences"] = world.fences.to_dict()           # hráčem postavené úseky plotů (Fáze 7; procedurální se přegenerují)
 	if world.farm:
@@ -376,6 +378,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		world.garden.visuals_restore(d.get("garden_visuals", {}))   # starý save = kompost plný, skleník stojí (Fáze 8)
 	if world.npc_grow:
 		world.npc_grow.restore(d.get("npc_grow", {}))         # M4.8: starý save bez klíče = žádný záhon
+	if world.soil_water:
+		world.soil_water.restore(d.get("soil_water", {}))     # M8.7: starý save bez klíče = rozběh z klimatu
 	if world.fences:
 		world.fences.restore(d.get("fences", {}))            # starý save bez klíče = žádné hráčské ploty (Fáze 7)
 	if world.farm:
