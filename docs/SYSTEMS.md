@@ -519,6 +519,30 @@
   Ladicí vrstvy mapy M: `site_twi`, `site_soil`, `site_insol`, `site_cold`, `site_wind`. Drobnost:
   rozhovor (T, téma „půda“) – postava podle `Site.soil` na místě hráče utrousí větu o zemi
   (`scripts/dialog_themes.gd` → `THEMES.puda`).
+- **Voda v krajině – vodní bilance (M8.7)**: `World.soil_water` (`SoilWater`, `scripts/eko/soil_water.gd`), přepínač
+  Realismus `soil_water`. Mřížka 32 m přes rozsah `Site` (~355 × 236 buněk): v každé kyblík půdní vody `w` (0..AWC ze
+  `Site`) a sníh `swe` (mm v. e.). Hodiny z `World.eco_hour` se sčítají do zásobníku (srážky z `Weather.rain ×
+  RAIN_MM_H`, teplota, oblačnost; skok > 24 h bere klima `PRECIP_MM` / `Seasons`), jeden průchod mřížkou běží po
+  48 buňkách za snímek přes `EcoClock.slice`. V buňce: zachycení v korunách (3 mm/událost × zápoj lesa ze `SurfaceMap`;
+  TODO napojit `World.tree_eco` po M8.3), tání degree-day 3–5 mm/°C/den (jižní svahy rychleji podle `Site.insol_winter`,
+  les pomaleji), povrchový odtok **SCS-CN** po srážkových událostech (CN podle hydrologické skupiny z propustnosti půdy a
+  třídy povrchu, AMC I/II/III podle vlhkosti, zamrzlá půda → retence 8 mm), výpar **Hargreaves** (extraterestrické
+  záření FAO-56) × koeficient povrchu (orná podle sezóny) × oslunění svahu × stres suchem, přetok nad AWC a pomalé
+  prosakování nad polní kapacitou → část do podzemní nádrže toku, zbytek podpovrchově po spádnici D8 (předpočítaná
+  při načtení; bezodtoké buňky ke sousedovi blíž k vodě) do nižší buňky – niva tak zůstává mokrá déle než svah.
+  **Toky**: každý úsek z `water.json` = dvě lineární nádrže (rychlá `k` 6–30 h podle druhu, podzemní 150–1500 h),
+  přítok z buněk, které do něj po spádnici ústí, úseky u okraje mapy navíc „povodí za okrajem“; průtok se sčítá po
+  proudu (spojení konců úseků do 40 m). Normál `Q = 4 l/s/km² × povodí`; hladina `∝ Q^0,4` (max +0,4 m), kalnost
+  nad 1,6× normálu (čistí se ~14 h), malé potoky pod 12 % normálu vyschnou. Dotazy bez alokací: `moisture_at`,
+  `mud_at`, `snow_at`, `puddle_at`, `runoff_at`, `hollow_at`, `add_water(x, z, mm, plocha)` (hák pro zálivku),
+  `drought_index`, `flows_text`; `Water.flow_at / level_at` (m³/s, m vůči normálu). Napojení: `Weather.surface_grip_at`
+  (auto: bláto v místě kola na terénu a polní cestě), `Weather.drought` (vyhláška sucha) se blíží indexu z vlhkosti
+  půdy a průtoků, louže (`Puddles`) jen na lokálně mokrých místech a v prohlubních (TWI), hladina/kalnost/proud
+  v `water.gdshader` přes instance uniformy, šumění potoka hlasitější při velké vodě, brodění podle hladiny.
+  Rozběh: reprezentativní kyblík 60 dnů z klimatu + posun podle TWI. Ladění: vrstvy mapy `vlhkost`, `snih`,
+  `odtok`, F2 → Příroda – ladění → „Průtoky toků (M8.7)“. Uložení: klíč `soil_water` (vlhkost a sníh po bajtech v
+  base64, zásoby toků float32). Mřížka se po startu staví po kouscích (~30–40 s), do té doby platí staré
+  globální chování.
 - **Fyzikální obloha, světlo a expozice (M8.5)**: `Atmosphere.SkyModel` (vnořená třída v `scripts/priroda/atmosphere.gd`)
   – zjednodušený Rayleigh + Mie + ozon model (à la Hillaire 2020 / Preetham, `00_PRINCIPY.md` kap. 8), čisté
   statické funkce volatelné odkudkoli (`Atmosphere.SkyModel.sun_illuminance_lux(elev, cloud, haze)`), ne jen

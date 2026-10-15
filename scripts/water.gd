@@ -3,12 +3,21 @@
 ## pás podél osy toku (hladina po bodech klesá po proudu) a plochy nádrží.
 ## Dotazy: info_at (hloubka a jméno toku v bodě – brodění, kroky), nearest_stream (šumění potoka).
 ## V mrazu voda zamrzá (rybníky dřív, tekoucí voda později), v dešti a větru víc vlnek.
+## M8.7: průtok a hladina toků z vodní bilance (`World.soil_water`, lineární nádrže): `flow_at` (m³/s),
+## `level_at` (m vůči normálu); hladina pásu vody se zvedá/klesá (instance uniform `level_ofs`, max ±0,4 m),
+## po přívalu kalní (`turbid`), proud zrychlí (`flow_mult`), v suchu malý potok vyschne (pás se schová).
+## Bez bilance (přepínač Realismus → `soil_water` vypnutý) se chová jako dřív.
 class_name Water
 extends Node3D
 
 const CELL := 32.0                    # mřížka pro hledání nejbližšího úseku
 const VIS_RANGE := 1100.0
 const FLOW := {"river": 0.55, "canal": 0.3, "stream": 0.9, "ditch": 0.4, "drain": 0.4}
+## M8.7: normální průtok (m³/s) bez vodní bilance (fallback `flow_at`) a vizuál hladiny.
+const FLOW_NOMINAL := {"river": 1.2, "canal": 0.3, "stream": 0.03, "ditch": 0.01, "drain": 0.01}
+const STREAM_VIS_S := 1.0             # jak často se přepočte vzhled hladin toků (s)
+const STREAM_VIS_RATE := 0.08         # m za tick – plynulý posun hladiny (vizuál)
+const BROOK_DB_MAX := 6.0             # o kolik dB hlasitější šumění při velké vodě
 
 var world: World
 var terrain: Terrain
@@ -24,6 +33,11 @@ var _mat_stream: ShaderMaterial
 var _mats := []                       # všechny materiály (led, vlnky)
 var _last_min := -1.0
 var _tick := 0.0
+var _stream_mi: Array[MeshInstance3D] = []   # M8.7: mesh hladiny po úsecích (index = streams)
+var level_ofs := PackedFloat32Array()        # M8.7: aktuální (vyhlazený) posun hladiny úseku (m)
+var _turb_vis := PackedFloat32Array()
+var _flow_vis := PackedFloat32Array()
+var _vis_tick := 0.0
 
 
 ## Načte data (bez stavby) – hned po terénu, ať MapLoader ví, které stromy vynechat.
@@ -74,6 +88,11 @@ func build(w: World, t: Terrain) -> void:
 			by_kind[kind] = []
 		by_kind[kind].append(si)
 	# hladiny toků: jeden mesh na tok (po druzích kvůli rychlosti proudu)
+	_stream_mi.resize(streams.size())
+	level_ofs.resize(streams.size())
+	_turb_vis.resize(streams.size())
+	_flow_vis.resize(streams.size())
+	_flow_vis.fill(1.0)
 	for kind in by_kind:
 		var m := _material(ntex, float(FLOW.get(kind, 0.6)))
 		if kind == "river":
@@ -81,6 +100,8 @@ func build(w: World, t: Terrain) -> void:
 			m.set_shader_parameter("deep_color", Color(0.12, 0.14, 0.09))
 		for si in by_kind[kind]:
 			var mi := MeshInstance3D.new()
+			_stream_mi[si] = mi
+			mi.extra_cull_margin = 0.5          # M8.7: hladina se v shaderu posouvá o ±0,4 m
 			mi.name = "Tok_%d" % si
 			mi.mesh = _ribbon(streams[si])
 			mi.material_override = m
@@ -201,7 +222,9 @@ func info_at(x: float, z: float) -> Dictionary:
 		var t := clampf((p - a2).dot(ab) / maxf(ab.length_squared(), 1e-6), 0.0, 1.0)
 		if p.distance_to(a2 + ab * t) > float(st["half_w"]):
 			continue
-		var level := lerpf(a.y, b.y, t)
+		if _dry(e[0]):
+			continue                                 # M8.7: vyschlé koryto – žádná voda
+		var level := lerpf(a.y, b.y, t) + level_ofs[e[0]]
 		var depth := level - terrain.height_at(x, z)
 		if depth > best["depth"]:
 			best = {"depth": depth, "name": st["name"], "kind": st["kind"], "level": level}
@@ -228,6 +251,8 @@ func nearest_stream(pos: Vector3, r: float) -> Array:
 				if seen.has(k):
 					continue
 				seen[k] = true
+				if _dry(e[0]):
+					continue                         # M8.7: vyschlý potok nešumí
 				var st: Dictionary = streams[e[0]]
 				var pts: PackedVector3Array = st["pts"]
 				var a := pts[e[1]]
@@ -236,8 +261,89 @@ func nearest_stream(pos: Vector3, r: float) -> Array:
 				var d := Vector2(q.x, q.z).distance_to(p)
 				if d < bd:
 					bd = d
-					best = [q, st["kind"]]
+					best = [q, st["kind"], _brook_db(e[0])]
 	return best
+
+
+## M8.7: vyschlé koryto (jen s vodní bilancí).
+func _dry(si: int) -> bool:
+	var sw: SoilWater = world.soil_water if world != null else null
+	return sw != null and sw.active() and si < sw.st_dry.size() and sw.st_dry[si] == 1
+
+
+## M8.7: o kolik dB hlasitěji šumí úsek při velké vodě (tišeji při malé), 0 bez bilance.
+func _brook_db(si: int) -> float:
+	var sw: SoilWater = world.soil_water if world != null else null
+	if sw == null or not sw.active() or si >= sw.st_q.size():
+		return 0.0
+	var rel := sw.st_q[si] / maxf(sw.st_qn[si], 1e-6)
+	return clampf(6.0 * log(maxf(rel, 0.05)) / log(4.0), -10.0, BROOK_DB_MAX)
+
+
+## Nejbližší úsek toku do `r` m od bodu (-1 = žádný) – bez alokací pole (jen dotaz do mřížky).
+func _stream_near(x: float, z: float, r: float) -> int:
+	var key := Vector2i(floori(x / CELL), floori(z / CELL))
+	var p := Vector2(x, z)
+	var best := -1
+	var bd := r
+	for e in _cells.get(key, []):
+		var pts: PackedVector3Array = streams[e[0]]["pts"]
+		var a := pts[e[1]]
+		var b := pts[e[1] + 1]
+		var a2 := Vector2(a.x, a.z)
+		var ab := Vector2(b.x, b.z) - a2
+		var t := clampf((p - a2).dot(ab) / maxf(ab.length_squared(), 1e-6), 0.0, 1.0)
+		var d := p.distance_to(a2 + ab * t)
+		if d < bd:
+			bd = d
+			best = e[0]
+	return best
+
+
+## M8.7: průtok (m³/s) nejbližšího toku do 30 m (0 = žádný tok / vyschlý). Bez bilance normál podle druhu.
+func flow_at(x: float, z: float) -> float:
+	var si := _stream_near(x, z, 30.0)
+	if si < 0:
+		return 0.0
+	var sw: SoilWater = world.soil_water if world != null else null
+	if sw != null and sw.active() and si < sw.st_q.size():
+		return 0.0 if sw.st_dry[si] == 1 else sw.st_q[si]
+	return float(FLOW_NOMINAL.get(String(streams[si]["kind"]), 0.03))
+
+
+## M8.7: hladina nejbližšího toku do 30 m vůči normálu (m; + velká voda, − sucho). Bez bilance 0.
+func level_at(x: float, z: float) -> float:
+	var si := _stream_near(x, z, 30.0)
+	var sw: SoilWater = world.soil_water if world != null else null
+	if si < 0 or sw == null or not sw.active() or si >= sw.st_level.size():
+		return 0.0
+	return sw.st_level[si]
+
+
+## M8.7: vzhled hladin (klient): plynule k cíli z bilance, jen když se změní (instance uniformy).
+func _update_streams_vis() -> void:
+	var sw: SoilWater = world.soil_water if world != null else null
+	var on := sw != null and sw.active() and sw.st_level.size() == streams.size()
+	for si in _stream_mi.size():
+		var mi := _stream_mi[si]
+		if mi == null:
+			continue
+		var lv := sw.st_level[si] if on else 0.0
+		var tb := sw.st_turb[si] if on else 0.0
+		var fl := clampf(sqrt(sw.st_q[si] / maxf(sw.st_qn[si], 1e-6)), 0.3, 2.0) if on else 1.0
+		var dry := on and sw.st_dry[si] == 1
+		var nl := move_toward(level_ofs[si], lv, STREAM_VIS_RATE)
+		var nt := move_toward(_turb_vis[si], tb, 0.05)
+		var nf := move_toward(_flow_vis[si], fl, 0.1)
+		if absf(nl - level_ofs[si]) > 0.002 or absf(nt - _turb_vis[si]) > 0.005 or absf(nf - _flow_vis[si]) > 0.01:
+			level_ofs[si] = nl
+			_turb_vis[si] = nt
+			_flow_vis[si] = nf
+			mi.set_instance_shader_parameter("level_ofs", nl)
+			mi.set_instance_shader_parameter("turbid", nt)
+			mi.set_instance_shader_parameter("flow_mult", nf)
+		if mi.visible == dry:
+			mi.visible = not dry
 
 
 # ------------------------------------------------------------------ led, vlnky, brodění hráčů
@@ -276,6 +382,10 @@ func _process_impl(delta: float) -> void:
 	var temp: float = world.weather.temp
 	ice = move_toward(ice, clampf((-temp - 1.0) / 4.0, 0.0, 1.0), dh * 0.08)
 	ice_flow = move_toward(ice_flow, clampf((-temp - 5.0) / 6.0, 0.0, 1.0), dh * 0.05)
+	_vis_tick += 0.2
+	if _vis_tick >= STREAM_VIS_S:
+		_vis_tick = 0.0
+		_update_streams_vis()                     # M8.7: hladina, kalnost, proud podle průtoku
 	var waves := 1.0 + world.weather.rain * 0.8 + clampf(world.weather.wind / 10.0, 0.0, 1.0) * 0.7
 	for m in _mats:
 		var ic := ice_flow if m.get_meta("flowing") else ice

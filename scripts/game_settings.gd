@@ -24,6 +24,7 @@ const REALISM_KEYS := ["site", "species", "wind", "sky", "gait", "soil_water", "
 const REALISM_ROWS: Array = [
 	["sky", "Fyzikální obloha a expozice", "Obloha a slunce v luxech (Rayleigh/Mie), adaptace oka, pás Venuše při soumraku. Vypnuto = stará ruční obloha.", "≤ 0,8 ms GPU"],
 	["gait", "Pohyb člověka", "Fázová chůze/běh, chodidla na terénu, kymácení pánve (M8.6)", "~0,05 ms/postava"],
+	["soil_water", "Vodní bilance", "Vlhkost půdy, tání sněhu, odtok, potoky stoupají a kalní po bouřce, v suchu vysychají; bláto a louže podle místa (M8.7). Vypnuto = jedno globální mokro.", "~0,1 ms CPU"],
 ]
 
 var realism: Dictionary = {}

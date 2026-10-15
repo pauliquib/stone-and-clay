@@ -78,6 +78,11 @@ var wetness := 0.0                     # mokrý povrch 0..1
 var storm := 0.0                       # síla bouřky 0..1 (blesky)
 var rain_recent := 0.0                 # vlhko z posledních dnů 0..1 (roste deštěm, klesá ~0,5 za den) – hřiby
 var drought := 0.0                     # sucho 0..1 (roste bez deště, za horka víc; klesá deštěm) – vyhláška sucha (M4.4 B)
+## M8.7: vodní bilance (`World.soil_water`, přiřadí World) – bláto v místě kola, sucho z vlhkosti půdy a průtoků.
+## Null nebo vypnutý přepínač Realismus → dnešní globální chování (`wetness`, počítadlo sucha).
+var soil_water: SoilWater = null
+const DROUGHT_TAU_H := 24.0            # M8.7: jak rychle se `drought` přiblíží indexu z vodní bilance
+const MUD_STERK := 0.6                 # M8.7: polní / štěrková cesta bere bláto z okolní půdy jen z části
 
 ## Autorita nad počasím: true = simuluje se tady (singleplayer, server). Klient v multiplayeru ji vypne
 ## (`authority = false`): počasí si nevyvíjí samo (ani náhodné blesky), jen plynule doháhá stav ze serveru
@@ -249,6 +254,8 @@ func _advance() -> void:
 	storm = move_toward(storm, 1.0 if t.get("storm", false) else 0.0, dt_h * 2.0)
 	rain_recent = clampf(rain_recent + rain * dt_h * 0.25 - dt_h / 24.0 * 0.5, 0.0, 1.0)
 	drought = clampf(drought + dt_h / 24.0 * (0.04 + maxf(temp - 20.0, 0.0) * 0.01) - rain * dt_h * 0.15, 0.0, 1.0)
+	if soil_water != null and soil_water.active():   # M8.7: sucho z průměrné vlhkosti půdy a průtoků (API beze změny)
+		drought = lerpf(drought, soil_water.drought_index(), 1.0 - exp(-dt_h / DROUGHT_TAU_H))
 	temp = lerpf(temp, _temp_target(), 1.0 - exp(-dt_h / TAU_TEMP))
 	if forced and forced_frost:
 		temp = minf(temp, -2.0)
@@ -429,9 +436,15 @@ func forecast() -> Dictionary:
 
 ## Přilnavost povrchu `surf` ("asfalt" / "sterk" / "teren", jiné = 0.9) za aktuálního počasí.
 ## Mokro zmnoží, sníh a náledí stanoví strop; na terénu navíc bahno.
-func surface_grip(surf: String) -> float:
+## M8.7: `mud` ≥ 0 = bláto v místě z vodní bilance (`SoilWater.mud_at`) místo globálního `wetness`.
+func surface_grip(surf: String, mud := -1.0) -> float:
 	var g: float = SURF_GRIP.get(surf, 0.9)
-	if surf == "teren" and wetness > 0.45:
+	if mud >= 0.0:
+		if surf == "teren":
+			g = minf(g, lerpf(1.0, GRIP_MUD, mud))       # rozmočená hlína v místě (niva vs. kopec)
+		elif surf == "sterk":
+			g = minf(g, lerpf(1.0, GRIP_MUD, mud * MUD_STERK))
+	elif surf == "teren" and wetness > 0.45:
 		g = minf(g, lerpf(1.0, GRIP_MUD, wetness))   # rozmočená hlína
 	g *= lerpf(1.0, GRIP_WET, wetness)
 	if snow_cover > 0.02:
@@ -439,6 +452,13 @@ func surface_grip(surf: String) -> float:
 	if temp < 0.0 and wetness > ICE_WET:
 		g = minf(g, lerpf(1.0, GRIP_ICE, clampf(wetness / 0.7, 0.0, 1.0)))
 	return g
+
+
+## M8.7: přilnavost v bodě `p` (kolo auta) – bláto z lokální vlhkosti půdy; bez vodní bilance = `surface_grip`.
+func surface_grip_at(surf: String, p: Vector3) -> float:
+	if soil_water == null or surf == "asfalt" or not soil_water.active():
+		return surface_grip(surf)
+	return surface_grip(surf, soil_water.mud_at(p.x, p.z))
 
 
 ## Kolik ze „suché“ přilnavosti povrchu `surf` počasí ubralo (1 = sucho, 0.5 = poloviční).

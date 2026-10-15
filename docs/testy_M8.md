@@ -196,3 +196,27 @@ běhu nepočítá navíc), `villager`/`humanoid` v PERF kategorii by měly klesn
 +0,5 ms/+1,0 ms rozpočtu kroku M8 dohromady, ne +27 %/+110 % na instanci. `car` sledovat jen pro
 ověření, že 33 vs. 39 volání byla skutečně jen variace hustoty dopravy (zkusit běh se stejným počtem
 aut, pokud launcher umí fixovat seed/hustotu).
+
+## M8.7 – Vodní bilance: vlhkost půdy, odtok, potoky a bláto
+
+Pozn.: vodní bilance se po startu / načtení staví po kouscích ~30–40 s (mřížka 32 m) – do té doby platí staré
+globální chování. Hodinový krok běží ~30 s reálného času; po změně počasí počkej aspoň 1–2 herní hodiny.
+
+1. F2 → Počasí → Bouřka, nech běžet ~2 herní hodiny → potok u obce vystoupá (až +0,4 m) a je hnědý, šumí hlasitěji.
+   F2 → Příroda – ladění → „Průtoky toků (M8.7)“ → Q nad normálem, kalnost > 0 %.
+2. Pak F2 → Počasí → Jasno a přeskočit 2–3 dny → hladina zpět u normálu, voda čistá (kalnost ~0 %).
+3. Mapa M s vrstvou `vlhkost` (F2 → Příroda – ladění) po dešti: údolnice/niva modrá, hřbety světlé; po týdnu jasna zesvětlá,
+   niva zůstane modřejší déle než svah.
+4. Auto po dešti: polní cesta / louka v nivě u potoka → smyk a horší brzdění; stejný povrch na kopci → drží líp.
+5. Louže po dešti jen v nížinách / prohlubních a u potoků, ne na každé silnici; postupně vysychají (ne naráz).
+6. Zima se sněhem (F2 → Datum leden, Počasí Sníh, pak oteplení): vrstva `snih` – jižní svahy roztají dřív než severní a les.
+7. F2 → Datum červenec, nastavit jasno a přeskočit ~3 týdny → malé potoky „VYSCHLÉ“ (pás vody zmizí, nešumí),
+   `Průtoky` ukazují sucho > 60 % → vyhláška sucha (web obce / úřední deska).
+8. F5 → ukončit → F9: hladiny, kalnost a vrstva `vlhkost` stejné jako před uložením; starý save bez klíče se načte (rozběh).
+9. Esc → Nastavení → Realismus → vypnout „Vodní bilance“ → potoky na normálu, louže a bláto zase globální (jako dřív).
+10. Konzole bez chyb `SoilWater` / `Water` při startu i během prvních ~60 s.
+
+Co změřit: `tools/launcher.sh --perfscene=pole_leto,60` (60 s, ať měření zachytí hodinový průchod mřížkou; PERF kategorie
+`soil_water` a `water`). Očekávání: `soil_water` ≤ 0,3 ms průměr na snímek během průchodu (48 buněk/snímek), mimo průchod
+~0; po startu během stavby mřížky (prvních ~40 s) do ~0,5 ms. `water` se nemá zvednout o víc než ~0,05 ms (aktualizace
+426 hladin 1× za sekundu jen při změně). FPS/frame proti poslední baseline `pole_leto` bez zhoršení > 0,5 ms.

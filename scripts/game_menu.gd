@@ -299,6 +299,8 @@ func open_debug_layers() -> void:
 		if _hud().map_debug_layer == key:
 			label += "  (teď aktivní)"
 		opts.append([label, Callable(_hud(), "set_debug_layer").bind(key)])
+	if world.soil_water != null:     # M8.7: tabulka průtoků hlavních toků
+		opts.append(["Průtoky toků (M8.7)", _water_flows])
 	opts.append(["← Zpět", open_main])
 	_hud().open_menu("Příroda – ladění", "Vybraná vrstva se kreslí na mapě (M) místo podkladu – " +
 		"barevná mřížka po 16–64 m podle přiblížení. Každý krok M8 přidá svou vrstvu.", opts)
@@ -414,3 +416,9 @@ func open_player() -> void:
 		["Postavit ruční vozík", _cargo_debug.bind("vozik")],
 		["← Zpět", open_main],
 	])
+
+
+## M8.7: F2 → Příroda – ladění → Průtoky: Q, normál, hladina a kalnost hlavních toků + souhrn vodní bilance.
+func _water_flows() -> void:
+	_hud().open_menu("Průtoky toků", world.soil_water.flows_text(),
+		[["Obnovit", _water_flows], ["← Zpět", open_debug_layers]])

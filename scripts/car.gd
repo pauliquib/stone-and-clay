@@ -1342,7 +1342,7 @@ func _surface_grip(w: Wheel) -> float:
 	# (statická proměnná, bez drátování referencí World → MayorOffice do `car.gd`).
 	var bonus := MayorOffice.road_grip_bonus if s == "asfalt" else 0.0
 	if weather != null:
-		return weather.surface_grip(s) + bonus        # mokro / sníh / náledí / bahno
+		return weather.surface_grip_at(s, w.get_collision_point()) + bonus   # mokro / sníh / náledí / bahno (M8.7: bláto v místě kola)
 	return float(Weather.SURF_GRIP.get(s, 0.9)) + bonus      # bez počasí (test) – suchá tabulka
 
 

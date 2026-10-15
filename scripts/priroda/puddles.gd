@@ -2,6 +2,9 @@
 ## na silnicích/cestách (uzly `RoadGraph` pro auta) v okolí hráče. Objevují se při
 ## `Weather.wetness > WET_MIN` a plynule mizí, jak povrch schne (`modulate.a`).
 ## Jen vzhled (klient, SeasonFx) – přilnavost mokré vozovky řeší `Weather.surface_grip`.
+## M8.7: s vodní bilancí (`World.soil_water` aktivní) jen tam, kde je mokro lokálně: nasycená půda v prohlubni
+## (TWI) nebo stékající voda (`SoilWater.puddle_at`), za deště hlavně v prohlubních; každá louže má vlastní
+## viditelnost a vysychá postupně s půdou. Bez bilance = dřívější globální chování podle `wetness`.
 ## Headless-safe: bez rendereru se uzly jen vytvoří a schovají.
 class_name Puddles
 extends Node3D
@@ -14,6 +17,8 @@ const SPACING := 14.0         # min. rozestup dvou louží (m)
 const RESP_DIST := 30.0       # posun hráče, při kterém se louže přerozdělí
 const FADE_STEP := 0.25       # nárust alphy za tick SeasonFx (~0,5 s) → fade ~2 s
 const TEX_S := 64
+const LOCAL_MIN := 0.08       # M8.7: méně lokální vláhy = louže se tu nerozhodí
+const LOCAL_FADE := 0.04      # M8.7: posun alphy za tick (vysychání ~12 s, objevení ~6 s)
 
 var world: World
 var alpha := 0.0              # aktuální viditelnost louží 0..1 (čte i test)
@@ -22,6 +27,12 @@ var _rng := RandomNumberGenerator.new()
 var _anchor := Vector3(1e9, 0, 1e9)   # kam byly louže naposledy rozseté
 var _alb: ImageTexture
 var _orm: ImageTexture
+var _sw: SoilWater = null     # M8.7: aktivní vodní bilance pro tento tick (null = globální chování)
+var _rain_wet := 0.0          # M8.7: mokro z právě padajícího deště 0..1
+var _alphas := PackedFloat32Array()
+var _placed := 0              # M8.7: kolik louží z poolu je rozhozených
+var _since_scatter := 0       # M8.7: ticků od posledního rozhození (doplnění, když hráč stojí)
+const RESCATTER_TICKS := 20   # M8.7: ~10 s – zkusit doplnit louže na místě (když jich je málo)
 
 
 func setup(w: World) -> void:
@@ -45,6 +56,11 @@ func setup(w: World) -> void:
 ## Volá SeasonFx (~2× za sekundu): `pos` = poloha hráče/auta, `wetness` = Weather.wetness 0..1.
 func update(pos: Vector3, wetness: float) -> void:
 	var want := clampf((wetness - WET_MIN) / (WET_FULL - WET_MIN), 0.0, 1.0)
+	var sw: SoilWater = world.soil_water if world != null else null
+	_sw = sw if sw != null and sw.active() else null
+	if _sw != null:
+		_update_local(pos, want)
+		return
 	alpha = move_toward(alpha, want, FADE_STEP)
 	if alpha <= 0.0:
 		for d in _pool:
@@ -58,10 +74,36 @@ func update(pos: Vector3, wetness: float) -> void:
 		d.modulate.a = alpha
 
 
+## M8.7: louže podle lokální vláhy – každá svou alphou, rozhodí se jen na mokrá místa.
+func _update_local(pos: Vector3, rain_wet: float) -> void:
+	_rain_wet = rain_wet
+	if _alphas.size() != _pool.size():
+		_alphas.resize(_pool.size())
+	_since_scatter += 1
+	if pos.distance_to(_anchor) > RESP_DIST or (_placed < COUNT / 2 and _since_scatter >= RESCATTER_TICKS):
+		_scatter(pos)
+	alpha = 0.0
+	for k in _pool.size():
+		var d := _pool[k]
+		var tgt := _local_wet(d.position.x, d.position.z) if k < _placed else 0.0
+		_alphas[k] = move_toward(_alphas[k], clampf(tgt, 0.0, 1.0), LOCAL_FADE)
+		d.modulate.a = _alphas[k]
+		d.visible = _alphas[k] > 0.01
+		alpha = maxf(alpha, _alphas[k])
+
+
+## M8.7: lokální vláha pro louži 0..1 (nasycená prohlubeň / stékající voda, za deště hlavně v prohlubních).
+func _local_wet(x: float, z: float) -> float:
+	if _sw == null:
+		return 0.0
+	return maxf(_sw.puddle_at(x, z), _rain_wet * (0.3 + 0.7 * _sw.hollow_at(x, z)))
+
+
 ## Rozhodí louže na náhodné uzly vozovky (RoadGraph.CAR_KINDS) v okolí hráče;
 ## orientuje je podél směru silnice, výška těsně nad vozovku (silnice se "drapuje" +0,1 m).
 func _scatter(pos: Vector3) -> void:
 	_anchor = pos
+	_since_scatter = 0
 	var cand: Array = []
 	if world != null and world.graph != null:
 		cand = world.graph.nodes_within(Vector2(pos.x, pos.z), RADIUS, RoadGraph.CAR_KINDS)
@@ -86,13 +128,20 @@ func _scatter(pos: Vector3) -> void:
 		var p := n2 + side * _rng.randf_range(-0.9, 0.9) + dir * _rng.randf_range(-2.0, 2.0)
 		if world.terrain == null or not world.terrain.contains(p.x, p.y, 5.0):
 			continue
+		if _sw != null and _local_wet(p.x, p.y) < LOCAL_MIN:
+			continue                         # M8.7: tady je sucho – louže jen na lokálně mokrých místech
 		var d: Decal = _pool[placed]
+		if _sw != null and _alphas.size() > placed:
+			_alphas[placed] = 0.0            # nová louže naroste plynule
 		placed += 1
 		d.position = Vector3(p.x, world.terrain.height_at(p.x, p.y) + 0.14, p.y)
 		d.rotation = Vector3(0, atan2(dir.x, dir.y) + _rng.randf_range(-0.2, 0.2), 0)
 		d.size = Vector3(_rng.randf_range(1.0, 1.9), 1.6, _rng.randf_range(2.0, 3.6))
+	_placed = placed
 	for k in range(placed, _pool.size()):
 		_pool[k].visible = false            # méně uzlů než louží – zbytek schovat
+		if _alphas.size() > k:
+			_alphas[k] = 0.0
 
 
 ## Textury louže: albedo – tmavá nepravidelná skvrna s měkkým okrajem (šum),
