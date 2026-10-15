@@ -1934,3 +1934,37 @@ dopravy, ne o regresi.
   (generátor i `TreeEco`), ověřit.
 - Legenda vrstvy `druhy` je jen v `docs/testy_M8.md` / `TreeEco.debug_legend()`, ne v UI (popisky v
   `GameMenu.DEBUG_LAYER_LABELS` sdílí ostatní kroky – doplnit při slučování).
+
+## 2026-10-15 – M8.4 Pole větru: nárazy, závětří a hierarchický ohyb vegetace
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu – ruční test čeká)
+- **`WindField`** (`scripts/eko/wind_field.gd`, `World.wind_field`, uzel ve `World`): `wind_at(pos, agl := -1)`
+  (log. profil přes směšovací výšku 60 m, `z0` z `SurfaceMap`, expozice `Site.wind_exp` → 0,6…1,4, bez dat 1,
+  náraz z dlaždicové mřížky šumu 256² × 4 m posouvané po větru – Taylor, y = orografický vzestup `U·∇h`),
+  `gust_at`, `turbulence_at`, `roughness_at`, `dir()`, `speed()`, `enabled()`, ladicí vrstva mapy `vitr`.
+  Terén/povrch/stanoviště jednou na buňku 24 m (líná `PackedFloat32Array`, ~7 MB), `wind_at` bez alokací
+  a bez vzorkování terénu za běhu. Vypnutý přepínač `wind` → staré `Weather.wind_vector()` (+ (h/10)^0,14).
+- **Shadery:** `shaders/include/wind.gdshaderinc` (`wind_bend` kmen → větev → list, `wind_grass` s vlnou po
+  větru; konvence barev vrcholů v hlavičce), `tree.gdshader` (odvozené barvy vrcholů, uniformy
+  `use_vertex_color`, `local_height`, `stiffness`; kůra i koruna sdílí ohyb kmene), `vegetation.gdshader`
+  (lokální uniform `wind_dir` nahrazen globálním). Stará cesta zůstává při `wind_hier = 0`.
+- **`project.godot [shader_globals]`:** `wind_dir`, `wind_speed`, `wind_gust` (sampler2D), `wind_offset`,
+  `wind_time`, `wind_hier` (navíc proti promptu: `wind_offset` = integrovaný posun pole nárazů, ať změna
+  rychlosti/směru neskočí; `wind_hier` = přepínač modelu). `wind_strength` = speed/12 (dřív /16).
+- **`Atmosphere`:** globální uniformy každý snímek (`_set_wind_globals`), `WindField` si najde přes
+  `Weather → World`; šum větru podle nárazu u kamery a lesa; padající listí v bouřce (`LEAF_MAX` 300).
+- **Napojení (za přepínačem uvnitř `WindField`):** `Aircraft.wind_at` (paramotor, trike, letadla – hřebeny
+  silnější, vzestup na návětří), `Dron._wish`, `ChimneySmoke._apply` (vítr u komína vč. nárazu při obnově),
+  `Animal` čich (vítr u zvířete). `GameSettings.REALISM_ROWS` – řádek `wind`.
+
+### Otevřené body
+- Čeká na ruční test a měření `--perfscene=louka_vitr` (viz `docs/testy_M8.md`).
+- Shadery nejde staticky přeložit (kap. 6 kontroluje jen `.gd`) – při prvním spuštění zkontrolovat konzoli
+  na chyby `tree.gdshader` / `vegetation.gdshader` / `wind.gdshaderinc` (globální sampler bez hintů, `fract`).
+- `local_height = 1.0` předpokládá prototypy stromů ~1 j vysoké (jako starý shader); kdyby stromy ohýbaly
+  moc/málo, ladit `local_height` nebo koeficienty ve `wind_bend`. Tuhost jehličnanů zatím stejná jako listnáčů
+  (kůra je sdílený materiál – musela by se rozdělit).
+- `wind_time` se zalamuje po 3 600 s (drobné cuknutí kmitů jednou za hodinu).
+- Kouř z ohně (`fire_fx.gd`), termické bubliny (`Thermals`), balistika (`weapons.gd`) a rukáv na letišti dál
+  berou `Weather.wind_vector()` – napojit podle potřeby (M8.10/M8.18).
+- Vrstva mapy `vitr` je barevná (bez šipek).

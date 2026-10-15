@@ -575,6 +575,22 @@
   bez instance `Gait` = stará jednoduchá animace (fallback, beze změny). API používají M8.16 (únava,
   chlad → postoj – `tired`/`cold` jsou už zapojené, jen bez vlastní simulace zdrojů) a M8.17 (vesničané
   při práci). Měřicí scéna `ves_poledne` (víc vesničanů, M8.1).
+- **Pole větru (M8.4):** `scripts/eko/wind_field.gd` (`class_name WindField`, `World.wind_field`, uzel ve `World`,
+  deterministický z času a seedu) – `wind_at(pos, agl := -1) -> Vector3` (m/s): směr a rychlost 10 m nad loukou
+  z `Weather` × logaritmický profil `ln(z/z0)` navázaný přes směšovací výšku 60 m (drsnost `z0` z `SurfaceMap`:
+  louka 0,03, pole 0,1, sad 0,5, zástavba 0,8, les 1,0) × expozice `Site.wind_exp` (0,6 závětří … 1,4 hřeben,
+  bez `site.bin` 1; vliv terénu slábne nad ~200 m AGL) × náraz (zamrzlá turbulence – dlaždicová mřížka šumu
+  256² × 4 m posouvaná krajinou rychlostí větru, intenzita 0,15–0,30 podle drsnosti + 0,05 v bouřce);
+  složka y = orografický vzestup `U·∇h` nad návětrným svahem (pád v závětří). Dále `gust_at`, `turbulence_at`
+  (σ v m/s, víc v závětří hran), `roughness_at`. Terén/povrch/stanoviště se čtou jednou na buňku 24 m (líná
+  mezipaměť), `wind_at` nealokuje. Vizuál: globální uniformy `wind_dir`, `wind_speed`, `wind_gust` (stejná
+  textura nárazů), `wind_offset`, `wind_time`, `wind_hier` (nastavuje `Atmosphere`); `shaders/include/wind.gdshaderinc`
+  – `wind_bend` (kmen ∝ (y/H)² · v², vlastní kmit ∝ 1/H; větve podle `COLOR.r/g`; třepetání listů `COLOR.b`)
+  a `wind_grass` (ohyb od kořene + vlna po větru → vlny přes obilí); **konvence barev vrcholů** v hlavičce
+  (00_PRINCIPY kap. 4; dnešní stromy bez barev vrcholů je odvodí z výšky a vzdálenosti od osy). Napojeno:
+  letadla/paramotor/trike (`Aircraft.wind_at`), dron, kouř z komínů, čich zvěře; šum v korunách podle nárazu
+  a lesa u kamery, padající listí v bouřce (max. 300 částic). Přepínač `wind` – vypnuto = stará sinusovka
+  a `Weather.wind_vector()`. Ladicí vrstva mapy `vitr`, měřicí scéna `louka_vitr`.
 
 ## Co ve hře je
 

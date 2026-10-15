@@ -564,6 +564,9 @@ func _perceive(dt: float) -> void:
 	var smell := 0.0
 	if w and w.wind > 0.5:
 		var wv := w.wind_vector().normalized()
+		if fauna.world != null and fauna.world.wind_field != null:
+			var wl := fauna.world.wind_field.wind_at(global_position, 1.5)   # M8.4: vítr u zvířete (údolí, les)
+			wv = Vector3(wl.x, 0.0, wl.z).normalized()
 		var to_me := (global_position - tpos)
 		to_me.y = 0.0
 		if to_me.length() > 0.1 and wv.dot(to_me.normalized()) > 0.6:

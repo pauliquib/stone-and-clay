@@ -6,6 +6,9 @@
 ## - zvuk deště a větru
 ## - globální parametry shaderů (project.godot → shader_globals): snow_cover, wetness, grass_green,
 ##   foliage, autumn, wind_strength → terén, stromy, střechy a silnice
+## - M8.4: globální uniformy větru `wind_dir`, `wind_speed`, `wind_gust` (textura z `WindField`), `wind_offset`,
+##   `wind_time`, `wind_hier` (shaders/include/wind.gdshaderinc); šum v korunách podle nárazu a lesa u kamery,
+##   padající listí v bouřce (max. `LEAF_MAX` částic u kamery)
 class_name Atmosphere
 extends Node3D
 
@@ -17,6 +20,10 @@ const FOG_MIST := 0.012              # hustota v husté mlze
 const FOG_RAIN := 0.0022
 const RAIN_DROPS := 12000
 const SNOW_FLAKES := 7000
+## M8.4: vítr u kamery
+const LEAF_MAX := 300                # padající listí / jehličí v bouřce
+const LEAF_GUST_MS := 20.0           # od jaké rychlosti nárazu u kamery (m/s) padá listí naplno
+const WIND_SND_FOREST := 0.6         # o kolik hlasitěji šumí vítr v lese (koruny)
 
 ## M8.5: expozice (adaptace oka) – cíl EV100 → vyhlazená `exposure_ev`, pak na tonemapping.
 ## `EXPOSURE_MID_EV` je kalibrována na jasné poledne (SkyModel), aby se tam `tonemap_exposure`
@@ -149,6 +156,10 @@ var _snow_mat: ParticleProcessMaterial
 var _collider: GPUParticlesCollisionHeightField3D
 var _rain_snd: AudioStreamPlayer
 var _wind_snd: AudioStreamPlayer
+var wind_field: WindField            # M8.4: najde se sám přes Weather → World (null = staré chování)
+var _leaves: GPUParticles3D
+var _leaf_mat: ParticleProcessMaterial
+var _leaf_sm: StandardMaterial3D
 var _thunder: Array[AudioStreamPlayer] = []
 var _flash := 0.0
 var _flash_seq: Array = []           # [čas, síla] – záblesky jednoho blesku
@@ -167,6 +178,7 @@ func setup(c: Clock, w: Weather, e: Environment, s: DirectionalLight3D, m: Direc
 	north_deg = north
 	_build_sky()
 	_build_precip()
+	_build_leaves()
 	_build_sounds()
 	if weather:
 		weather.lightning.connect(_on_lightning)
@@ -273,6 +285,44 @@ func _build_precip() -> void:
 	_collider.follow_camera_enabled = true
 	_collider.update_mode = GPUParticlesCollisionHeightField3D.UPDATE_MODE_WHEN_MOVED
 	add_child(_collider)
+
+
+## M8.4: listí / jehličí, které v bouřce letí kolem kamery po větru.
+func _build_leaves() -> void:
+	_leaves = GPUParticles3D.new()
+	_leaves.name = "Listi"
+	_leaves.amount = LEAF_MAX
+	_leaves.lifetime = 5.0
+	_leaves.local_coords = false
+	_leaves.visibility_aabb = AABB(Vector3(-40, -30, -40), Vector3(80, 50, 80))
+	_leaves.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_leaf_mat = ParticleProcessMaterial.new()
+	_leaf_mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	_leaf_mat.emission_box_extents = Vector3(18, 6, 18)
+	_leaf_mat.direction = Vector3(1, 0, 0)
+	_leaf_mat.spread = 35.0
+	_leaf_mat.initial_velocity_min = 2.0
+	_leaf_mat.initial_velocity_max = 6.0
+	_leaf_mat.gravity = Vector3(0, -1.2, 0)
+	_leaf_mat.angular_velocity_min = -360.0
+	_leaf_mat.angular_velocity_max = 360.0
+	_leaf_mat.turbulence_enabled = true
+	_leaf_mat.turbulence_noise_strength = 2.0
+	_leaf_mat.turbulence_noise_scale = 3.0
+	_leaf_mat.scale_min = 0.7
+	_leaf_mat.scale_max = 1.4
+	_leaf_mat.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
+	_leaves.process_material = _leaf_mat
+	var q := QuadMesh.new()
+	q.size = Vector2(0.06, 0.045)
+	_leaf_sm = StandardMaterial3D.new()
+	_leaf_sm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_leaf_sm.albedo_color = Color(0.3, 0.42, 0.12)
+	_leaf_sm.roughness = 0.9
+	q.material = _leaf_sm
+	_leaves.draw_pass_1 = q
+	_leaves.emitting = false
+	add_child(_leaves)
 
 
 func _build_sounds() -> void:
@@ -445,7 +495,32 @@ func update(delta: float) -> void:
 	# --- zvuky
 	var muffle := -16.0 * _indoor_s          # uvnitř budovy je déšť i vítr slyšet jen tlumeně
 	_loop(_rain_snd, "rain", (rain if raining else 0.0), -30.0 + muffle, 0.0 + muffle)
-	_loop(_wind_snd, "wind", clampf((wind - 3.0) / 12.0, 0.0, 1.0), -32.0 + muffle, -6.0 + muffle)
+	var wind_amt := clampf((wind - 3.0) / 12.0, 0.0, 1.0)
+	if wind_field == null and weather != null:
+		wind_field = weather.get_parent().get("wind_field") as WindField
+	var wf_on := wind_field != null and wind_field.enabled()
+	if wf_on and cam:
+		# M8.4: šum podle nárazu u kamery; v lese (drsný povrch) hučí koruny hlasitěji
+		var cp2 := cam.global_position
+		var gv := wind_field.wind_at(cp2, 10.0)
+		var gs := Vector2(gv.x, gv.z).length()
+		var forest := clampf(wind_field.roughness_at(cp2), 0.0, 1.0)
+		wind_amt = clampf((gs - 3.0) / 12.0, 0.0, 1.0) * (1.0 + WIND_SND_FOREST * forest)
+		wind_amt = minf(wind_amt, 1.0)
+		var storm_k := smoothstep(LEAF_GUST_MS * 0.7, LEAF_GUST_MS, gs) * (0.4 + 0.6 * forest)
+		var fol := Seasons.foliage(clock.day_of_year())
+		_leaves.emitting = storm_k > 0.02 and _indoor_s < 0.5
+		_leaves.amount_ratio = clampf(storm_k, 0.05, 1.0)
+		if _leaves.emitting:
+			var d2 := wind_field.dir()
+			_leaves.global_position = cp2 + Vector3(-d2.x * 10.0, 5.0, -d2.y * 10.0)
+			_leaf_mat.direction = Vector3(d2.x, 0.15, d2.y)
+			_leaf_mat.initial_velocity_min = gs * 0.25
+			_leaf_mat.initial_velocity_max = gs * 0.55
+			_leaf_sm.albedo_color = Color(0.3, 0.42, 0.12).lerp(Color(0.62, 0.38, 0.1), clampf(Seasons.autumn(clock.day_of_year()) + (1.0 - fol) * 0.5, 0.0, 1.0))
+	else:
+		_leaves.emitting = false
+	_loop(_wind_snd, "wind", wind_amt, -32.0 + muffle, -6.0 + muffle)
 
 	# --- globální parametry shaderů (terén, stromy, střechy)
 	var doy := clock.day_of_year()
@@ -455,7 +530,25 @@ func update(delta: float) -> void:
 	rs.global_shader_parameter_set("grass_green", Seasons.green(doy) * (1.0 - (weather.snow_cover if weather else 0.0) * 0.3))
 	rs.global_shader_parameter_set("foliage", Seasons.foliage(doy))
 	rs.global_shader_parameter_set("autumn", Seasons.autumn(doy))
-	rs.global_shader_parameter_set("wind_strength", clampf(wind / 16.0, 0.0, 1.0))
+	rs.global_shader_parameter_set("wind_strength", clampf(wind / 12.0, 0.0, 1.0))   # zpětná kompatibilita (M8.4: = speed/12)
+	_set_wind_globals()
+
+
+## M8.4: globální uniformy větru pro vegetaci (include/wind.gdshaderinc) – stejná data jako `WindField`.
+var _gust_set := false
+func _set_wind_globals() -> void:
+	var rs := RenderingServer
+	if wind_field == null:
+		rs.global_shader_parameter_set("wind_hier", 0.0)
+		return
+	if not _gust_set and wind_field.gust_texture != null:
+		rs.global_shader_parameter_set("wind_gust", wind_field.gust_texture)
+		_gust_set = true
+	rs.global_shader_parameter_set("wind_dir", wind_field.dir())
+	rs.global_shader_parameter_set("wind_speed", wind_field.speed())
+	rs.global_shader_parameter_set("wind_offset", wind_field.offset)
+	rs.global_shader_parameter_set("wind_time", wind_field.time)
+	rs.global_shader_parameter_set("wind_hier", 1.0 if wind_field.enabled() else 0.0)
 
 
 ## Natočí směrové světlo tak, aby svítilo ze směru `to_light` (jednotkový vektor ke zdroji).

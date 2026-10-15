@@ -548,13 +548,16 @@ func total_kg() -> float:
 	return float(spec["kg"]) + PILOT_KG + fuel_l * FUEL_KG_L
 
 
-## Vítr v `pos`: v10 z Weather + výškový profil (h/10)^0,14 + svislá složka z termiky.
+## Vítr v `pos`: M8.4 `World.wind_field.wind_at` (fallback v10 z Weather + profil (h/10)^0,14) + termika.
 func wind_at(pos: Vector3) -> Vector3:
 	var w := Vector3.ZERO
 	if world and world.weather:
-		w = world.weather.wind_vector()
 		var agl := maxf(pos.y - _gh(pos.x, pos.z), 1.0)
-		w *= pow(agl / 10.0, 0.14)
+		if world.wind_field != null:
+			w = world.wind_field.wind_at(pos, agl)     # M8.4: profil podle drsnosti, expozice hřebenů, nárazy, vzestup u svahu
+		else:
+			w = world.weather.wind_vector()
+			w *= pow(agl / 10.0, 0.14)
 		if world.thermals:
 			w.y += world.thermals.lift_at(pos)
 	return w

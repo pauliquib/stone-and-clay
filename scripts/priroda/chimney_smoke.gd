@@ -177,6 +177,9 @@ func _apply(s: Dictionary, w: Weather, hour: float, clock: Clock) -> void:
 	var life: float = SmokeRules["life"] * (1.0 - 0.4 * clampf(w.rain, 0.0, 1.0)) * (1.0 - 0.4 * windy)
 	# vítr: zrychlení po větru (částice za život urazí zhruba polovinu rychlosti větru × život)
 	var wv := w.wind_vector()
+	if world != null and world.wind_field != null:
+		wv = world.wind_field.wind_at(s["key"], 8.0)   # M8.4: vítr u komína (expozice, náraz v okamžiku obnovy)
+		wv.y = 0.0
 	var buoy := 0.28 * (1.0 - 0.7 * windy)
 	if inversion:
 		m.direction = Vector3.UP

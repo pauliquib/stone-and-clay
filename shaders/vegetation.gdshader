@@ -3,8 +3,9 @@
 // vrcholu (0 patka, 1 špička), albedo v barvách vrcholů, INSTANCE_CUSTOM.rgb = tint
 // instance a INSTANCE_CUSTOM.a = číslo pole / 255 (jen plodiny na orné půdě).
 //
-// Vítr: `wind_strength` + `wind_dir` nastavuje VegetationManager z Weather.wind_vector()
-// (0..2). Fáze mávání = INSTANCE_ID + poloha instance – trsy se nevlní synchronně.
+// Vítr (M8.4): `wind_grass` z include/wind.gdshaderinc – ohyb od kořene ∝ v², náraz z globální textury
+// `wind_gust` (stejné pole jako WindField) a krátká vlna běžící po větru. Stará cesta (wind_hier = 0):
+// `wind_strength` (VegetationManager, 0..2) + globální `wind_dir`. Fáze mávání = INSTANCE_ID + poloha instance – trsy se nevlní synchronně.
 // Ohyb roste s UV.y² (patka stojí, špička mává). Směr větru se přepočítává do lokálního
 // prostoru instance transponovanou bází (instance mají náhodnou rotaci kolem Y).
 //
@@ -15,8 +16,8 @@
 shader_type spatial;
 render_mode cull_disabled, diffuse_burley;
 
-uniform float wind_strength = 0.0;             // 0..2 (Weather.wind / 10)
-uniform vec2 wind_dir = vec2(0.8, 0.5);        // světový směr větru (normalizovaný xz)
+uniform float wind_strength = 0.0;             // 0..2 (Weather.wind / 10) – stará cesta (wind_hier = 0)
+// M8.4: směr větru je globální `wind_dir` (include/wind.gdshaderinc, nastavuje Atmosphere z World.wind_field)
 uniform float bend_k = 1.0;                    // citlivost typu na vítr (keř < tráva)
 uniform int season_mode = 0;                   // 0 bylina, 1 keř, 2 plodina (field_lut)
 uniform sampler2D field_lut : filter_nearest, repeat_disable;
@@ -24,6 +25,8 @@ uniform sampler2D field_lut : filter_nearest, repeat_disable;
 global uniform float snow_cover;               // sníh na zemi 0..1 (Atmosphere)
 global uniform float grass_green;              // svěžest trávy 0..1 (Seasons.GREEN)
 global uniform float foliage;                  // olistění listnáčů 0..1 (Seasons.FOLIAGE)
+
+#include "res://shaders/include/wind.gdshaderinc"
 
 varying vec3 v_col;
 varying float v_snow;
@@ -50,6 +53,13 @@ void vertex() {
 	}
 
 	VERTEX.y *= grow;
+	float sc = max(length(MODEL_MATRIX[0].xyz), 0.001);
+	if (wind_hier > 0.5) {
+		// M8.4: ohyb od kořene, náraz z pole větru a vlna po větru (přes obilí běží viditelné vlny)
+		float plant_h = max(VERTEX.y * sc / max(UV.y, 0.1), 0.1);
+		vec3 off_m = wind_grass(org, UV.y, plant_h, bend_k);
+		VERTEX += transpose(mat3(MODEL_MATRIX)) * off_m / (sc * sc);
+	} else {
 	float bend = UV.y * UV.y;
 	float phase = float(INSTANCE_ID) * 0.618 + org.x * 0.37 + org.z * 0.53;
 	float wave = sin(TIME * (1.3 + wind_strength) + phase)
@@ -59,9 +69,9 @@ void vertex() {
 		0.0,
 		wdir.y * (0.6 + 0.4 * wave) + cos(phase * 2.3) * 0.12);
 	// do lokálního prostoru instance (transponovaná báze = inverze rotace; měřítko vyňato)
-	float sc = max(length(MODEL_MATRIX[0].xyz), 0.001);
 	vec3 off = transpose(mat3(MODEL_MATRIX)) * off_w / sc;
 	VERTEX += off * (bend * bend_k * (0.15 + wind_strength * 0.13));
+	}
 
 	v_col = COLOR.rgb * tint;
 	v_snow = snow_cover * smoothstep(0.15, 0.9, UV.y + NORMAL.y * 0.4);

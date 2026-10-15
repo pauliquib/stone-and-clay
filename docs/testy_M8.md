@@ -236,3 +236,19 @@ nesimuluje (jen čte data), čekej změnu FPS/frame ≤ 0,1 ms proti stavu před
 beze změny řádu). Načítání: řádek „Stromy (51 736)…“ delší nejvýš o ~20 ms (čtení 1,1 MB `tree_eco.bin`);
 bez souboru (fallback) o ~100 ms (dopočet mřížek z 51 tis. stromů).
 
+## M8.4 – Pole větru: nárazy, závětří, hierarchický ohyb
+
+1. F2 → Počasí → Bouřka, léto (F2 → Datum, červenec) → stát u pole s obilím → přes pole běží vlny po větru.
+2. Les v bouřce → koruny se ohýbají postupně (ne všechny stromy naráz), padá listí kolem kamery, vítr hučí víc než na louce.
+3. F2 → Počasí → Jasno (vítr ~2 m/s) → stromy a tráva téměř nehybné; Mlha (0,6 m/s) → klid.
+4. F2 → Příroda – ladění → `vitr` → mapa M: hřebeny teplejší barva (silnější), údolí a les modřejší.
+5. Paramotor/trike (M6.4–6.5) nad hřebenem vs. nad údolím → silnější drift a na návětří stoupání.
+6. Zima, vítr (Přeháňky/Bouřka) → kouř z komínů se sklání po větru, v nárazech víc.
+7. Dron v lese / za kopcem → slabší drift než na otevřeném poli.
+8. Esc → Nastavení → Realismus → vypnout „Pole větru“ → stromy se vrátí ke staré sinusovce, tráva ke starému mávání.
+9. Konzole po startu: žádná chyba překladu shaderů (`tree`, `vegetation`, `wind.gdshaderinc`).
+
+Co změřit: `tools/launcher.sh --perfscene=louka_vitr` (bouřka, otevřená louka) a pro srovnání totéž s vypnutým
+„Pole větru“. Očekávání: GPU +≤ 0,3 ms proti vypnutému (jedno čtení textury + pár sinů na vrchol stromů a
+trávy), CPU +≤ 0,1 ms (`WindField._tick` + `wind_at` u kamery, letadla, dronu, komínů a zvěře; první
+průchod mapou dopočítá buňky 24 m – jednorázově). Kontrolně `--perfscene=les_rano_mlha` (hodně stromů).

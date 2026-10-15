@@ -1,5 +1,8 @@
 // Stromy (MultiMesh): barva koruny z ortofota je v INSTANCE_CUSTOM (jako atribut instanceru v Blenderu),
-// lehké pohupování ve větru.
+// ohyb ve větru: M8.4 hierarchicky (kmen → větev → list, nárazy z pole větru, include/wind.gdshaderinc);
+// s vypnutým realismem „wind“ (global wind_hier = 0) stará sinusovka.
+// Dnešní prototypy barvy vrcholů nemají → `use_vertex_color = false` odvodí ohebnost z výšky a vzdálenosti
+// od osy, fázi z hashe polohy a třepetání = is_leaf (přesné barvy dodá generátor M8.8 a přepne uniform).
 shader_type spatial;
 render_mode cull_back, diffuse_burley;
 
@@ -12,7 +15,12 @@ uniform bool deciduous = true;     // listnáč: na podzim barví a shazuje list
 global uniform float foliage;      // olistění listnáčů 0..1 (Seasons.FOLIAGE)
 global uniform float autumn;       // podzimní zbarvení 0..1
 global uniform float snow_cover;
-global uniform float wind_strength; // 0 bezvětří … 1 vichr (Weather.wind)
+global uniform float wind_strength; // 0 bezvětří … 1 vichr (Weather.wind / 12) – stará cesta
+uniform bool use_vertex_color = false;   // M8.8: barvy vrcholů podle konvence (wind.gdshaderinc)
+uniform float local_height = 1.0;        // výška prototypu v lokálních jednotkách (měřítko instance = výška v m)
+uniform float stiffness = 1.0;           // tuhost kmene – musí být stejná u kůry i koruny téhož prototypu (jinak se rozejdou)
+
+#include "res://shaders/include/wind.gdshaderinc"
 
 varying vec3 tint;
 varying vec3 lpos;
@@ -23,7 +31,21 @@ void vertex() {
 	tint = INSTANCE_CUSTOM.rgb;
 	lpos = VERTEX;
 	vec3 origin = MODEL_MATRIX[3].xyz;
-	if (is_leaf) {
+	if (wind_hier > 0.5) {
+		mat3 b = mat3(MODEL_MATRIX);
+		vec3 vl = b * VERTEX;
+		float H = length(MODEL_MATRIX[1].xyz) * local_height;
+		vec4 col = COLOR;
+		if (!use_vertex_color) {
+			float hh = clamp(vl.y / max(H, 0.5), 0.0, 1.0);
+			float rad = clamp(length(vl.xz) / max(0.3 * H, 0.3), 0.0, 1.0);
+			col = vec4(0.0, 0.0, 0.0, 1.0);          // kůra: jen ohyb kmene (drží se listí)
+			if (is_leaf) {
+				col = vec4(smoothstep(0.25, 0.9, hh) * (0.35 + 0.65 * rad), wind_hash(floor(vl * 1.3) + 0.5), 1.0, 1.0);
+			}
+		}
+		VERTEX += inverse(b) * wind_bend(vl, origin, col, H, stiffness);
+	} else if (is_leaf) {
 		float t = TIME * 1.1 + origin.x * 0.043 + origin.z * 0.061;
 		float gust = 0.35 + wind_strength * 2.2;
 		float k = VERTEX.y * VERTEX.y * 0.045 * wind * gust;
