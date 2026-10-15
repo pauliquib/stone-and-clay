@@ -1883,3 +1883,54 @@ dopravy, ne o regresi.
   vrátily do rozpočtu.
 - `car` +18 %/instanci zůstává nevysvětlené s jistotou (nejpravděpodobněji šum v počtu aut), pokud se
   při dalším měření zopakuje i se stejným počtem volání, je potřeba se na `car.gd` podívat znovu.
+
+## 2026-10-15 – M8.3 Dřeviny a porosty podle stanoviště
+
+### Hotovo (staticky ověřeno čtením kódu + běh offline generátoru – ruční test čeká)
+- **Katalog `data/dreviny.json`**: 23 druhů (dub zimní/letní, buk, habr, lípa, javor klen, jasan, olše, vrba bílá,
+  jíva, bříza, třešeň ptačí, akát, topol, smrk, borovice, modřín, jedle + jabloň, hrušeň, švestka, třešeň, ořešák):
+  typ, Ellenberg L/T/F/R/N, tolerance (zamokření, sucho, stín, mráz), `podil_les`, růst Chapman–Richards
+  (`H_max`, `k`, `p`, dožití), Näslund `[a, b]`, tvarové číslo, koruna (poměr, hustota, prototyp), barvy
+  jaro/léto/podzim, fenologie (klíče pro M8.11, `null`), dřevo (hustota, výhřevnost, cena Kč/m³), houby, ovoce.
+  Čísla = odhad, zdroje a „ověřit“ v `_zdroje`.
+- **`tools/tree_species.py`** → `data/tree_eco.bin` (`TECO` v1, 12 B/strom: druh, věk, vitalita, příznaky, f16 výška,
+  f16 dbh, u16 porost; mřížky `CANO`/`DOMI`/`VIGO`). Vhodnost z `site.bin` (gaussovská odchylka od Ellenberga s
+  tolerancemi), porosty (deformovaný Voronoi × třída stanoviště, hospodářský typ smrčina/smíšený/luh, 1–3 hlavní
+  druhy, jeden věk ± rozptyl), omezení prototypem, ovocné jen sad/zahrada/zástavba/alej (silnice z `map.json`),
+  ortofoto jako nápověda, věk inverzí Chapman–Richards z naměřené výšky, dbh Näslund. Deterministický seed, `--help`.
+  Běh nad skutečnými daty (4 s): smrk 39 %, buk 16 %, habr 10 %, dub zimní 6 %, bříza 5 %, borovice 4 %;
+  3 699 porostů (smrčiny 35 %, smíšené 46 %, luhy 18 %, medián ~0,7 ha); hlavní druh porostu – sever: smrk 78 %,
+  jih: habr 34 % + dub 25 %, luh: olše 79 %; ovocné v lese 0; věk medián 54 let, dbh medián 18 cm.
+- **`scripts/eko/tree_eco.gd` `TreeEco`** → `World.tree_eco` (vytváří se hned po `MapLoader.build_trees`):
+  `species(i)`, `species_info(id)`, `species_name(i)`, `age(i)`, `vigor(i)`, `height(i)`, `dbh(i)`, `volume_m3(i)`,
+  `wood_value_kc(i)`, `stand_of(i)`, `flags(i)`, `is_fruit(i)`, `fruit_of(id)`, `species_near(pos, r)`,
+  **`canopy_at(x: float, z: float) -> float`** (zápoj 0..1, mřížka 16 m, bilineárně – pro M8.7/M8.9/M8.14),
+  `mushroom_weight(pos, kind)`, `site_suitability(id, pos)`, `site_vigor(id, pos)`, `age_from_height`,
+  `height_at_age`, `dbh_from_height`, `describe(i, lvl)`. Fallback bez `tree_eco.bin`: druh z prototypu, věk
+  z výšky, mřížky dopočítané z poloh stromů. Ladicí vrstvy `druhy` a `vitalita` (registruje sám TreeEco).
+- **Napojení**: `Forestry._on_fell` – objem z dbh × výška × tvarové číslo, cena podle druhu (do zákona,
+  hláška „Padá buk lesní – x m³, ~y Kč“, `tree_felled` nese `species`, `value`; XP beze změny);
+  `PlantedTrees` – „Prohlédnout strom“ i na mapových stromech („Buk lesní, asi 80 let.“, přesnost věku a detaily
+  podle Dřevorubectví), `ECO_IDS`, vitalita sazenice `vig` ze stanoviště (×růst `VIGOR_GROWTH`, ukládá se, starý
+  save → dopočet); `TreeDecor` – ovoce jen na ovocných druzích, barva plodů podle druhu; `TreeManager.raw_count()`,
+  `ids_near(pos, r)`. Přepínač `species` (`GameSettings.REALISM_ROWS`), měřicí scéna `zahrady_zari`.
+- Dokumentace: README (přepínač, odstavec, nástroj), `docs/SYSTEMS.md`, `docs/testy_M8.md` (oddíl M8.3).
+- **Kontrola překladu**: `--check-only` na `tree_eco.gd`, `tree_manager.gd`, `planted_trees.gd`, `forestry.gd`,
+  `tree_decor.gd`, `world.gd`, `game_settings.gd`, `tests.gd` – prázdný výstup. Plný `--import` doběhl na
+  timeout 300 s (známý stav projektu, viz M8.6), třída `TreeEco` je v cache tříd.
+
+### Otevřené body
+- Čeká na ruční test (checklist `docs/testy_M8.md` → M8.3) a vygenerování `data/tree_eco.bin` v hlavním checkoutu
+  (`python3 tools/tree_species.py`).
+- Prototypy v `trees.bin` jsou prakticky náhodné (jehličnatý tvar ~46 % stromů všude, korelace se sousedy slabá) →
+  i v olšovém luhu stojí „smrky“ podle tvaru. Mapa `druhy` proto ukazuje **hlavní druh porostu**; skutečný soulad
+  tvaru a druhu přinese M8.8 (tvar podle druhu).
+- Houby: tabulka vah (`houby` v katalogu) a `TreeEco.mushroom_weight(pos, kind)` jsou hotové, ale nejsou zapojené
+  do `World._item_present` (hřiby) – souběžně ho může měnit M8.7 (vlhkost půdy); zapojit po sloučení vlny 3.
+- Polena nenesou druh (výhřevnost v `fire.gd` – nejde o jeden řádek), dalekohled druh neukazuje (jen E na kmen).
+- `site.bin` v1 ukládá pH × 10 se `scale` 1 → `Site.ph()` vrací 60 místo 6,0 (chyba M8.2). `TreeEco` i generátor
+  to obcházejí (> 14 → /10); opravit v `tools/site.py` / `Site` (M8.19).
+- `ELEV` v `site.bin` je relativní k domu hráče – absolutní výška počátku je odhad `ELEV_ABS0 = 330 m n. m.`
+  (generátor i `TreeEco`), ověřit.
+- Legenda vrstvy `druhy` je jen v `docs/testy_M8.md` / `TreeEco.debug_legend()`, ne v UI (popisky v
+  `GameMenu.DEBUG_LAYER_LABELS` sdílí ostatní kroky – doplnit při slučování).

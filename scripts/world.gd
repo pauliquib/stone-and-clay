@@ -146,6 +146,7 @@ var bazaar: Bazaar               # bazar vozidel u silnice (M1.6): nabídka na t
 var airfield: Airfield           # M6.5: polní letiště – trávníková dráha, větrný rukáv, hangár triku
 var trees: TreeManager           # stromy za běhu (M2.1): index instancí, pokácené stromy, pařezy
 var forestry: Forestry           # kácení a zpracování dřeva (M2.1): pád stromu, kmeny, špalky, zákon
+var tree_eco: TreeEco            # M8.3: druhy dřevin a porosty (data/tree_eco.bin + data/dreviny.json), fallback z prototypů
 var unreported := {}             # M4.4: id hráče → [{...}] činy, které nikdo neviděl (sdílený registr, viz `add_unreported`)
 var witness_sources: Array[Callable] = []   # M4.4/M4.6: další zdroje svědků (hajný, stráže) – `add_witness_source`
 var fire_mgr: FireManager        # oheň a topení (M2.2): ohniště, opékání, zákon u lesa, požár trávy, kamna doma
@@ -367,6 +368,8 @@ func build() -> void:
 	add_child(trees)
 	trees.setup(self, terrain)
 	MapLoader.build_trees(map_root, water.drop_trees, terrain, trees)
+	tree_eco = TreeEco.new()                 # M8.3: až po indexu stromů (fallback čte TreeManager)
+	tree_eco.setup(self)
 
 	loading.emit("Vegetace…")
 	await _frames(1)

@@ -519,6 +519,27 @@
   Ladicí vrstvy mapy M: `site_twi`, `site_soil`, `site_insol`, `site_cold`, `site_wind`. Drobnost:
   rozhovor (T, téma „půda“) – postava podle `Site.soil` na místě hráče utrousí větu o zemi
   (`scripts/dialog_themes.gd` → `THEMES.puda`).
+- **Dřeviny a porosty (M8.3)**: `World.tree_eco` (`TreeEco`, `scripts/eko/tree_eco.gd`) + katalog
+  `data/dreviny.json` (23 druhů střední Moravy: Ellenberg L/T/F/R/N, tolerance k zamokření/suchu/stínu/mrazu,
+  apriorní podíl v lesích, růst Chapman–Richards `H_max, k, p`, dožití, Näslundova alometrie, tvarové číslo,
+  koruna, barvy jaro/léto/podzim, klíče fenologie pro M8.11, dřevo – hustota, výhřevnost, cena; houby; ovoce).
+  Offline `tools/tree_species.py` → `data/tree_eco.bin` (`TECO` v1, záznam 12 B na strom v pořadí `trees.bin`:
+  druh, věk, vitalita, příznaky, f16 výška, f16 dbh, u16 porost; + mřížky `CANO` zápoj 16 m, `DOMI` dominantní
+  druh 32 m, `VIGO` vitalita 32 m). Model: stanoviště (`site.bin`) → Ellenbergovy hodnoty buňky (F z TWI/HAND/AWC/
+  oslunění, R z pH, N ze živin, T z výšky −6,5 K/km + oslunění − mrazová kotlina, L ze zápoje) → gaussovská
+  vhodnost druhu; les rozdělen na porosty (deformovaný Voronoi ~220 m × třída stanoviště sever/jih/plošina/luh),
+  porost má hospodářský typ (smrčina, smíšený, luh) a 1–3 hlavní druhy, jeden věk ± 12 %; jehličnatý prototyp →
+  jen jehličnany, ovocné jen v sadech/zahradách/zástavbě/alejích; ortofoto jen jako nápověda; věk inverzí
+  Chapman–Richards z naměřené výšky, dbh z Näslunda. API: `species(i)`, `species_info(id)`, `species_name(i)`,
+  `age(i)`, `vigor(i)`, `height(i)`, `dbh(i)`, `volume_m3(i)`, `wood_value_kc(i)`, `stand_of(i)`, `flags(i)`,
+  `is_fruit(i)`, `fruit_of(id)`, `species_near(pos, r) -> {id: podíl}`, `canopy_at(x, z) -> 0..1`,
+  `mushroom_weight(pos, kind)`, `site_suitability(id, pos)`, `site_vigor(id, pos)`, `age_from_height`,
+  `height_at_age`, `dbh_from_height`, `describe(i, lvl)`. Zasazené stromy (≥ `DYN_BASE`) přes
+  `PlantedTrees.ECO_IDS`. Napojení: `Forestry._on_fell` (cena dřeva → zákon, hláška, `tree_felled.species`),
+  `PlantedTrees` (akce „Prohlédnout strom“ i na mapových stromech, vitalita sazenice `vig` ze stanoviště
+  zrychlí/zpomalí růst, ukládá se), `TreeDecor` (ovoce jen na ovocných druzích, barva podle druhu),
+  `TreeManager.ids_near / raw_count`. Přepínač `species`. **Fallback** bez `tree_eco.bin`: druh z prototypu
+  (`FALLBACK_PROTO`), věk z výšky, mřížky dopočítané z poloh stromů. Ladicí vrstvy `druhy`, `vitalita`.
 - **Fyzikální obloha, světlo a expozice (M8.5)**: `Atmosphere.SkyModel` (vnořená třída v `scripts/priroda/atmosphere.gd`)
   – zjednodušený Rayleigh + Mie + ozon model (à la Hillaire 2020 / Preetham, `00_PRINCIPY.md` kap. 8), čisté
   statické funkce volatelné odkudkoli (`Atmosphere.SkyModel.sun_illuminance_lux(elev, cloud, haze)`), ne jen

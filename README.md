@@ -93,6 +93,7 @@ krocích: Esc → Nastavení → „Realismus (M8)…“. M8.1 (základ) jen zak
 | klíč (`GameSettings.realism`) | krok M8 | co zapíná |
 |---|---|---|
 | `sky` | M8.5 | fyzikální obloha a expozice – Rayleigh/Mie, slunce a měsíc v luxech, adaptace oka, pás Venuše; vypnuto = stará ruční obloha |
+| `species` | M8.3 | **Dřeviny a porosty** (`scripts/eko/tree_eco.gd`): cena dřeva podle druhu, „Prohlédnout strom“ u mapových stromů, ovoce jen na ovocných druzích, vitalita sazenic; vypnuto = staré chování |
 | `gait` | M8.6 | **Pohyb člověka** (`scripts/gait.gd`): fázová chůze/běh, chodidla bez klouzání, náklon do svahu, náklad/únava/chlad → postoj; vypnuto = stará animace |
 | `site`, `species`, `wind`, `soil_water`, `treegen`, `micro`, `animal_gait`, `phenology`, `crops`, `terramech`, `ground_veg`, `habitat`, `thermo`, `village_life`, `soundscape` | M8.2–M8.18 | výchozí zapnuto; konkrétní popisek a cena v menu přibude s krokem, který klíč zavádí |
 
@@ -115,6 +116,16 @@ ranker/litozem, arenosol, pseudoglej/glej, fluvizem, antropozem) – **reálná 
 katastr nebyla k dispozici** (geoportál SPÚ nedostupný, viz `docs/BPEJ.md`); `--soils=soubor.geojson`
 je připravený hák pro budoucí reálná data, teď je bez geometrie bez účinku. Bez `data/site.bin` hra
 běží dál (fallback: sklon/orientace z `Terrain`, zbytek střední hodnoty).
+
+**M8.3 Dřeviny a porosty** (`World.tree_eco`, `TreeEco` v `scripts/eko/tree_eco.gd`, katalog
+`data/dreviny.json` – 23 druhů s Ellenbergovými hodnotami, růstem, alometrií, dřevem; data
+`tools/tree_species.py` → `data/tree_eco.bin`): každý strom z mapy má druh, věk, vitalitu, výšku,
+výčetní tloušťku a porost. Les je rozdělený na porosty (smrčiny na části kopců, smíšené listnaté,
+olšové luhy u potoků), ovocné druhy jen v sadech, zahradách a alejích. Kácení: objem a cena dřeva
+podle druhu (buk ≠ smrk). E na kmen („Prohlédnout strom“) → „Buk lesní, asi 80 let.“ (přesnost a
+podrobnosti rostou s Dřevorubectvím). Ovoce v korunách jen na ovocných druzích, sazenice dostanou
+vitalitu podle stanoviště. Ladicí vrstvy `druhy`, `vitalita`. Bez `data/tree_eco.bin` fallback:
+druh podle prototypu stromu.
 
 ## Dokumentace
 
@@ -158,6 +169,7 @@ Generované soubory a jejich nástroje (výstupy se commitují, kromě `data/*.b
 | `python3 tools/gen_interior_textures.py` | `assets/textures/interiors/*.png` | po změně vzhledu interiérových textur (vyžaduje Pillow) |
 | `python3 tools/obce.py` | `data/obce.json` | po změně výběru/geometrie okolních obcí (5 fiktivních katastrů; vyžaduje `osmium`, `numpy`) |
 | `python3 tools/site.py` (M8.2) | `data/site.bin` (**není v gitu**) | po přegenerování `terrain_height.bin`/`water.json`/`surface.bin`/`landuse.bin` – mapa stanovišť (sklon, orientace, TWI, vzdálenost k vodě, HAND, TPI, expozice větru, oslunění, mrazové kotliny, půda); vyžaduje `numpy`, `scipy` |
+| `python3 tools/tree_species.py` (M8.3) | `data/tree_eco.bin` (**není v gitu**) | po `tools/site.py`, po změně `data/trees.bin` nebo `data/dreviny.json` – druh, věk, vitalita, dbh a porost každého stromu + mřížky zápoje / dominantního druhu; vypíše podíly druhů a kontrolu sever/jih/luh; vyžaduje `numpy`, `scipy`, `Pillow` |
 | `tools/launcher.sh [parametry hry…]` (M8.1) | `logs/m8_perf_<datum_čas>.log` + `logs/latest.log` (**mimo git**) | kdy chceš spustit hru / `--perfscene=…` a poslat výsledek dál bez ručního přepisování konzole – spustí `run.sh`, zachytí výstup, zapíše kompaktní deduplikovaný log (`tools/launcher_log.py`); `--help` jen vypíše nápovědu |
 
 Binární data mapy (`data/*.bin`) se regenerují exportem z Blenderu přes `tools/export_map.py`

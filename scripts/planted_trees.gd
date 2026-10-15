@@ -69,6 +69,11 @@ const SPECIES := {
 		"protos": [4], "leaf": Color(0.07, 0.16, 0.06), "fruit_color": Color.WHITE},
 }
 const SPECIES_ORDER := ["jablon", "slivon", "hrusen", "tresen", "dub", "buk", "smrk", "borovice"]
+## M8.3: sazenice → id druhu v katalogu `data/dreviny.json` (`TreeEco`).
+const ECO_IDS := {"jablon": "jablon", "slivon": "svestka", "hrusen": "hrusen", "tresen": "tresen", "dub": "dub_letni",
+	"buk": "buk", "smrk": "smrk", "borovice": "borovice"}
+## M8.3: růst zasazeného stromu × lerp(min, max, vitalita stanoviště) – na vhodném místě roste rychleji.
+const VIGOR_GROWTH := [0.6, 1.15]
 const GUARD_COLOR := Color(0.75, 0.92, 0.75, 0.4)
 
 var world: World
@@ -284,10 +289,17 @@ func plant(sp: String, pos: Vector3, owner: int, age := 0.0) -> int:
 		p.y = world.terrain.height_at(p.x, p.z) - 0.1
 	recs[id] = {"id": id, "sp": sp, "pos": p, "rot": randf() * TAU, "proto": int(pl[id % pl.size()]),
 		"planted": world.clock.jd() if world.clock != null else 0, "age": age, "cal": 0, "health": 1.0, "moist": WATER_DAYS,
-		"prot": false, "felled": -1, "py": 0, "pk": 0, "owner": owner, "rewarded": false}
+		"prot": false, "felled": -1, "py": 0, "pk": 0, "owner": owner, "rewarded": false, "vig": _site_vigor(sp, p)}
 	_dirty = true
 	_fruit_dirty = true
 	return id
+
+
+## M8.3: vitalita stanoviště pro druh v místě výsadby (`TreeEco.site_vigor`), −1 = neznámá (bez TreeEco / vypnuto).
+func _site_vigor(sp: String, pos: Vector3) -> float:
+	if world == null or world.tree_eco == null or not world.realism_on("species"):
+		return -1.0
+	return snappedf(world.tree_eco.site_vigor(String(ECO_IDS.get(sp, "")), pos), 0.01)
 
 
 func _check_plant(aim: Dictionary, id: int) -> String:
@@ -417,9 +429,15 @@ func _on_pick(id: int, _def: Dictionary, aim: Dictionary, ok: bool) -> void:
 
 func _check_info(aim: Dictionary, _id: int) -> String:
 	var rec := rec_of(aim)
+	if rec.is_empty() and _eco_on() and int(aim.get("tree", -1)) >= 0:
+		return ""                       # M8.3: mapový strom – druh a věk z `TreeEco`
 	if rec.is_empty() or int(rec["felled"]) >= 0:
 		return "Divoký strom – žádné údaje."
 	return ""
+
+
+func _eco_on() -> bool:
+	return world != null and world.tree_eco != null and world.realism_on("species")
 
 
 func info_text(rec: Dictionary) -> String:
@@ -427,6 +445,10 @@ func info_text(rec: Dictionary) -> String:
 	var parts := ["%s – vzrostlá z %d %%" % [species_name(rec), roundi(growth(rec) * 100.0)],
 		"výška %.1f m" % (float(spec["h"]) * size_of(rec)), "zdraví %d %%" % roundi(float(rec["health"]) * 100.0),
 		"půda %s" % ("vlhká" if float(rec["moist"]) > 0.0 else "suchá")]
+	var vig := float(rec.get("vig", -1.0))
+	if vig >= 0.0:      # M8.3: vitalita stanoviště (Site v místě výsadby)
+		parts.append("stanoviště %s (vitalita %d %%)" % ["výborné" if vig > 0.8 else "dobré" if vig > 0.6
+			else "slabší" if vig > 0.35 else "nevhodné", roundi(vig * 100.0)])
 	if bool(rec["prot"]) and size_of(rec) < GUARD_OUTGROWN:
 		parts.append("obalená")
 	if int(rec["cal"]) < ESTABLISH_DAYS:
@@ -440,6 +462,10 @@ func _on_info(id: int, _def: Dictionary, aim: Dictionary, _ok: bool) -> void:
 	var rec := rec_of(aim)
 	if not rec.is_empty():
 		world.notify(id, "show_message", [info_text(rec), 5.0])
+	elif _eco_on() and int(aim.get("tree", -1)) >= 0:      # M8.3: „Buk lesní, asi 80 let.“
+		var sk: Skills = world.skills.get(id)
+		var lvl := sk.level("drevorubectvi") if sk != null else 1
+		world.notify(id, "show_message", [world.tree_eco.describe(int(aim["tree"]), lvl), 5.0])
 
 
 # ------------------------------------------------------------------ denní krok
@@ -541,7 +567,9 @@ func _grow(rec: Dictionary, rained: bool, month: int) -> void:
 	if winter:
 		return
 	var thrive := wet or int(rec["cal"]) >= ESTABLISH_DAYS
-	rec["age"] = float(rec["age"]) + (1.0 if thrive else DRY_GROWTH) * lerpf(0.4, 1.0, clampf(float(rec["health"]), 0.0, 1.0))
+	var vig := float(rec.get("vig", -1.0))
+	var vk := lerpf(VIGOR_GROWTH[0], VIGOR_GROWTH[1], vig) if vig >= 0.0 else 1.0      # M8.3
+	rec["age"] = float(rec["age"]) + (1.0 if thrive else DRY_GROWTH) * lerpf(0.4, 1.0, clampf(float(rec["health"]), 0.0, 1.0)) * vk
 
 
 ## Strom se ujal: karma +1 a pověst +1 (nejvýš `REWARD_MAX_PER_YEAR`× za rok).
@@ -726,7 +754,8 @@ func to_dict() -> Dictionary:
 			"rot": snappedf(float(r["rot"]), 0.001), "proto": int(r["proto"]), "planted": int(r["planted"]),
 			"age": snappedf(float(r["age"]), 0.01), "cal": int(r["cal"]), "health": snappedf(float(r["health"]), 0.01),
 			"moist": snappedf(float(r["moist"]), 0.1), "prot": bool(r["prot"]), "felled": int(r["felled"]),
-			"py": int(r["py"]), "pk": int(r["pk"]), "owner": int(r["owner"]), "rewarded": bool(r["rewarded"])})
+			"py": int(r["py"]), "pk": int(r["pk"]), "owner": int(r["owner"]), "rewarded": bool(r["rewarded"]),
+			"vig": float(r.get("vig", -1.0))})
 	var rw := {}
 	for id in rewards:
 		rw[str(id)] = rewards[id]
@@ -750,7 +779,7 @@ func restore(d: Dictionary) -> void:
 			"age": float(e.get("age", 0.0)), "cal": int(e.get("cal", 0)), "health": float(e.get("health", 1.0)),
 			"moist": float(e.get("moist", 0.0)), "prot": bool(e.get("prot", false)), "felled": int(e.get("felled", -1)),
 			"py": int(e.get("py", 0)), "pk": int(e.get("pk", 0)), "owner": int(e.get("owner", 1)),
-			"rewarded": bool(e.get("rewarded", false))}
+			"rewarded": bool(e.get("rewarded", false)), "vig": float(e.get("vig", -1.0))}
 	next_id = maxi(int(d.get("next_id", TreeManager.DYN_BASE)), TreeManager.DYN_BASE)
 	for id in recs:
 		next_id = maxi(next_id, int(id) + 1)
