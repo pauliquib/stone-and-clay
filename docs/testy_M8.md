@@ -571,3 +571,36 @@ Co změřit: `--perfscene=pole_blato,30` (déšť na poli; sednout do auta / tra
 4× pár `pow` za fyzikální krok, půda po 0,2 s; AI auta dál než 80 m nic; okno kolejí: přepis slotu ~0,5 ms jen při
 přejezdu hranice 64 m, nahrání textury 768² při změně nejvýš 4×/s, mizení ~1 ms jednou za několik herních hodin
 na dlaždici); GPU +≤ 0,1 ms (3–5 vzorků textury na pixel terénu do 120 m). Cíl kroku +≤ 0,3 ms CPU, +≤ 0,3 ms GPU.
+
+
+## M8.14 – Přízemní vegetace: louky, seč, sukcese, interaktivní tráva
+
+Pozn.: typy porostu potřebují nová data – jednou `python3 tools/vegetation.py --eco` (po `site.py` a `tree_species.py`;
+bez toho běží stará `VEG1` vegetace a funguje jen seč, sukcese, sešlapání a pěšiny). Louky se po startu inicializují
+po řádcích (~3–5 s), vrstva mapy `louky` (barva = typ, jas = výška, červeně roky bez seče) a `pesiny` ukáže stav.
+
+1. `python3 tools/vegetation.py --eco` → v logu počty nových typů (vlhká louka, suchá stráň, kapradí, borůvčí, mech,
+   jarní podrost, hrabanka, devětsil), typy luk a skupiny dřevin; součet ≤ 117 000.
+2. Niva u potoka vs. jižní stráň (mapa M, vrstva `louky`: modrá vs. žlutá) → vlhká: vysoké trsy s fialovými hlávkami;
+   suchá: nízké šedozelené trsy s drobnými fialovými květy.
+3. Bučina vs. smrčina (vrstva `druhy`) → pod bukem holá rezavá hrabanka, skoro žádná líska; pod smrkem tmavé jehličí,
+   mech, borůvčí, kapradí. Dubohabřina v dubnu (`--perfscene=les_jaro`) → bílé sasanky, v červenci nejsou.
+4. F2 → 18. 6. → část luk na seno je posekaná (nízká, zelenější, vrstva `louky` tmavší), na čerstvě posekaných
+   řádky sena; F2 → o 6 dní později → balíky. Tráva u obce posekaná už 20. 5. a 9. 7.
+5. F2 → 20. 7. → posekaná louka zase dorůstá (vrstva `louky` světlejší), květy jen na neposekaných.
+6. Chůze vysokou trávou (3. osoba) → tráva se od hráče rozhrnuje, za ním zůstane stopa, která se ~30 s narovnává;
+   totéž kolem koně, kol auta, vesničana a srnce.
+7. Chodit 10× tam a zpět stejnou trasou přes louku → prošlapaná hlína a nižší řidší tráva; F2 → posun o 3 týdny bez
+   chůze → pěšina zaroste.
+8. Neposekaná louka za obcí (vrstva `louky` – opuštěné parcely), F2 → +6 let → trnky a šípky, mladé břízy (borovice
+   na suché stráni); Esc → Realismus → vypnout „Louky, seč a interaktivní tráva“ → tráva všude stejná a nehybná.
+9. F5 → F9 → seč a pěšiny zůstanou (klíče `meadows`, `footpaths`); starý save se načte (louky podle data).
+10. F3 → Příroda/Vítr – ohyb vegetace: „Tráva – ohyb ∝ F“ 0,55 → 1,5 při bouřce → tráva se ohýbá víc; ↺ vrátí
+    (výchozí = dřívější vzhled). F3 → Příroda/Louky a podrost: „Sešlapání – síla sklopení“.
+
+Co změřit: `--perfscene=louka_vitr,30` a `--perfscene=pole_leto,30` s přepínačem zapnutým / vypnutým a
+`--perfscene=louka_cerven,30` (seno, keře, sešlapání – profil „groundveg“). Očekávání: GPU +≤ 0,6 ms (nové typy v rámci
+LOD do 55–90 m; u rostlin do 40 m od kamery smyčka ≤ 48 zdrojů sešlapání; 1 vzorek `meadow_h` a 4 `path_tex` na vrchol,
+terén 4 vzorky do 160 m), CPU +≤ 0,3 ms (zdroje 1× za 2 snímky ~0,1 ms, pěšiny po 0,4 s, přestavba keřů a sena jen po
+posunu o 30 m ~1–2 ms; denní krok luk po 700 buňkách za snímek přes EcoClock).
+

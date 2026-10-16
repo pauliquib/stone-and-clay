@@ -297,6 +297,8 @@ func _on_tile(id: int, what: String, aim: Dictionary, ok: bool) -> void:
 	match what:
 		"trava":
 			t["m"] = _today()
+			if world.meadows:
+				world.meadows.mow_at(t["pos"], TILE * 0.5)     # M8.14: posekaná dlaždice i v simulaci luk (výška trávy)
 		"listi":
 			t["r"] = _today()
 		"snih":

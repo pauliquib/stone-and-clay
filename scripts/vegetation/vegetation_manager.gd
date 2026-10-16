@@ -13,6 +13,12 @@
 ## (clamp /10 → 0..2, §9.4). Sezóny řeší shader přes globální parametry (grass_green, foliage,
 ## snow_cover) a pro obilí tabulku `field_lut` (Fields.lut_image – klasy zrají a po žních
 ## strniště zůstane). Chybí-li vegetation.bin, jen varování – svět běží bez vegetace.
+##
+## M8.14 Přízemní vegetace: formát `VEG2` (`tools/vegetation.py --eco`, `VEG1` dál funguje) přidává typy podle
+## stanoviště a druhu stromu nad nimi (vlhká / suchá louka, kapradí, borůvčí, mech, jarní byliny, hrabanka a jehličí,
+## devětsil). Nové modely mají barvy vrcholů podle 00_PRINCIPY kap. 4 a albedo z uniformů (`color`, `lo`, `hi`, `acc`
+## ve `VEG_CONFIG`); bez `.res` je postaví `GroundVegMeshes`. Klíče `mow` / `path` / `trample` říkají, jak typ reaguje
+## na seč louky (`Meadows` → `meadow_h`), pěšiny (`Footpaths` → `path_tex`) a sešlapání (`GroundVegFx` → `trample_src`).
 class_name VegetationManager
 extends Node3D
 
@@ -29,8 +35,18 @@ enum VegType {
 	BUSH_BLACKTHORN, # 3 trnky na mezích a okrajích cest
 	CROP_WHEAT,      # 4 obilné klasy v řádcích (pole s obilninou)
 	WEED_FIELD,      # 5 plevel v řádcích
-	GARDEN_VEG       # 6 zahrádkové rostliny u domů
+	GARDEN_VEG,      # 6 zahrádkové rostliny u domů
+	HERB_WET,        # 7 M8.14 vlhká louka (pcháč, kohoutek, tužebník)
+	HERB_DRY,        # 8 M8.14 suchá stráň (šalvěj, mateřídouška)
+	FERN,            # 9 M8.14 kapradí (smrčina, stinný les)
+	BILBERRY,        # 10 M8.14 borůvčí (smrk, borovice)
+	MOSS,            # 11 M8.14 mech (smrčina)
+	SPRING_FLOWERS,  # 12 M8.14 jarní podrost (dub, habr, lípa – sasanky, dymnivky)
+	LITTER,          # 13 M8.14 hrabanka (buk) / jehličí (smrk) – barva v tintu instance
+	BUTTERBUR,       # 14 M8.14 devětsil a kopřivy v olšině u potoka
+	ROSEHIP          # 15 M8.14 šípek – keř sukcese (jen GroundVegFx, ne ve vegetation.bin)
 }
+const MAX_TYPE := VegType.ROSEHIP
 
 ## mesh = model z tools/gen_vegetation_meshes.gd; density_per_m2 ≈ efektivní hustota ve
 ## výchozím roce (rozmístění určuje tools/vegetation.py); view_range = dosah LOD (m);
@@ -58,6 +74,54 @@ static var VEG_CONFIG := {
 	VegType.GARDEN_VEG: {"mesh": "res://assets/models/vegetation/garden_veg.res",
 		"density_per_m2": 0.05, "max_instances": 5000, "view_range": 75.0,
 		"bend_k": 1.0, "season_mode": 0, "shader_param": "wind_strength"},
+	# M8.14 – nové typy (color 1 = barvy vrcholů podle kap. 4, albedo lo → hi po výšce, acc = květ / bobule)
+	VegType.HERB_WET: {"mesh": "res://assets/models/vegetation/herb_wet.res", "gen": "herb_wet",
+		"density_per_m2": 0.004, "max_instances": 7000, "view_range": 90.0, "bend_k": 1.3, "season_mode": 0,
+		"color": 1, "lo": Color(0.12, 0.24, 0.08), "hi": Color(0.34, 0.48, 0.20), "acc": Color(0.62, 0.30, 0.62)},
+	VegType.HERB_DRY: {"mesh": "res://assets/models/vegetation/herb_dry.res", "gen": "herb_dry",
+		"density_per_m2": 0.004, "max_instances": 7000, "view_range": 70.0, "bend_k": 1.2, "season_mode": 0,
+		"color": 1, "lo": Color(0.26, 0.32, 0.14), "hi": Color(0.52, 0.56, 0.30), "acc": Color(0.50, 0.36, 0.72)},
+	VegType.FERN: {"mesh": "res://assets/models/vegetation/fern.res", "gen": "fern",
+		"density_per_m2": 0.003, "max_instances": 5000, "view_range": 90.0, "bend_k": 0.8, "season_mode": 1,
+		"color": 1, "lo": Color(0.08, 0.20, 0.05), "hi": Color(0.26, 0.46, 0.14), "acc": Color(0.26, 0.46, 0.14)},
+	VegType.BILBERRY: {"mesh": "res://assets/models/vegetation/bilberry.res", "gen": "bilberry",
+		"density_per_m2": 0.004, "max_instances": 6000, "view_range": 70.0, "bend_k": 0.6, "season_mode": 1,
+		"color": 1, "lo": Color(0.07, 0.18, 0.06), "hi": Color(0.18, 0.36, 0.12), "acc": Color(0.10, 0.12, 0.30)},
+	VegType.MOSS: {"mesh": "res://assets/models/vegetation/moss.res", "gen": "moss",
+		"density_per_m2": 0.003, "max_instances": 5000, "view_range": 55.0, "bend_k": 0.0, "season_mode": 4,
+		"color": 1, "lo": Color(0.12, 0.24, 0.06), "hi": Color(0.30, 0.44, 0.10), "acc": Color(0.30, 0.44, 0.10)},
+	VegType.SPRING_FLOWERS: {"mesh": "res://assets/models/vegetation/spring_flowers.res", "gen": "spring_flowers",
+		"density_per_m2": 0.004, "max_instances": 6000, "view_range": 60.0, "bend_k": 0.9, "season_mode": 3,
+		"color": 1, "lo": Color(0.12, 0.26, 0.08), "hi": Color(0.28, 0.46, 0.16), "acc": Color(0.92, 0.92, 0.88)},
+	VegType.LITTER: {"mesh": "res://assets/models/vegetation/litter.res", "gen": "litter",
+		"density_per_m2": 0.004, "max_instances": 6000, "view_range": 55.0, "bend_k": 0.0, "season_mode": 4,
+		"color": 1, "lo": Color(0.42, 0.28, 0.15), "hi": Color(0.50, 0.34, 0.18), "acc": Color(0.50, 0.34, 0.18)},
+	VegType.BUTTERBUR: {"mesh": "res://assets/models/vegetation/butterbur.res", "gen": "butterbur",
+		"density_per_m2": 0.002, "max_instances": 2000, "view_range": 80.0, "bend_k": 0.7, "season_mode": 1,
+		"color": 1, "lo": Color(0.10, 0.24, 0.07), "hi": Color(0.22, 0.42, 0.14), "acc": Color(0.22, 0.42, 0.14)},
+	VegType.ROSEHIP: {"mesh": "res://assets/models/vegetation/rosehip.res", "gen": "rosehip",
+		"density_per_m2": 0.0, "max_instances": 2000, "view_range": 220.0, "bend_k": 0.3, "season_mode": 1,
+		"color": 1, "lo": Color(0.10, 0.18, 0.07), "hi": Color(0.24, 0.38, 0.14), "acc": Color(0.75, 0.10, 0.06)},
+}
+## M8.14: reakce typu na seč louky (`mow`), pěšiny (`path`) a sešlapání (`trample` – citlivost ohybu). Laditelné
+## (F3 → Příroda/Louky a podrost); chybějící typ = 0.
+static var REACT := {
+	VegType.GRASS_TALL: {"mow": 1.0, "path": 1.0, "trample": 1.0},
+	VegType.NETTLE: {"mow": 0.0, "path": 1.0, "trample": 0.7},
+	VegType.BUSH_HAZEL: {"mow": 0.0, "path": 0.0, "trample": 0.12},
+	VegType.BUSH_BLACKTHORN: {"mow": 0.0, "path": 0.0, "trample": 0.12},
+	VegType.CROP_WHEAT: {"mow": 0.0, "path": 1.0, "trample": 0.9},
+	VegType.WEED_FIELD: {"mow": 0.0, "path": 1.0, "trample": 0.8},
+	VegType.GARDEN_VEG: {"mow": 0.0, "path": 0.0, "trample": 0.6},
+	VegType.HERB_WET: {"mow": 1.0, "path": 1.0, "trample": 1.0},
+	VegType.HERB_DRY: {"mow": 1.0, "path": 1.0, "trample": 0.9},
+	VegType.FERN: {"mow": 0.0, "path": 1.0, "trample": 0.8},
+	VegType.BILBERRY: {"mow": 0.0, "path": 1.0, "trample": 0.4},
+	VegType.MOSS: {"mow": 0.0, "path": 1.0, "trample": 0.0},
+	VegType.SPRING_FLOWERS: {"mow": 0.0, "path": 1.0, "trample": 0.8},
+	VegType.LITTER: {"mow": 0.0, "path": 1.0, "trample": 0.0},
+	VegType.BUTTERBUR: {"mow": 0.0, "path": 1.0, "trample": 0.6},
+	VegType.ROSEHIP: {"mow": 0.0, "path": 0.0, "trample": 0.1},
 }
 
 ## M8.D2c: stará cesta větru (`wind_strength` = vítr / WIND_FULL_MS, strop WIND_MAX) – laditelné.
@@ -77,6 +141,7 @@ var counts := {}                      # VegType → počet instancí
 var _chunks: Array = []               # {mmi, min: Vector2, max: Vector2, range: float}
 var _mats := {}                       # VegType → ShaderMaterial
 var _wind_t := 0.0
+var fx: GroundVegFx                   # M8.14
 
 
 func set_detail(d: float) -> void:
@@ -92,6 +157,9 @@ func setup(w: World) -> void:
 	name = "Vegetace"
 	top_level = true
 	_load_vegetation()
+	fx = GroundVegFx.new()               # M8.14: sešlapání, výška louky (meadow_h), keře sukcese a seno – klient
+	add_child(fx)
+	fx.setup(w, self)
 
 
 ## Načte data/vegetation.bin a naplní chunky MultiMeshů. Bez souboru jen varování (hra běží).
@@ -100,7 +168,8 @@ func _load_vegetation() -> void:
 		push_warning("VegetationManager: chybí %s (tools/vegetation.py) – svět bez detailní vegetace" % PATH)
 		return
 	var b := FileAccess.get_file_as_bytes(PATH)
-	if b.size() < HEADER or b.slice(0, 4).get_string_from_ascii() != "VEG1":
+	var magic := b.slice(0, 4).get_string_from_ascii() if b.size() >= HEADER else ""
+	if magic != "VEG1" and magic != "VEG2":            # M8.14: VEG2 = --eco (nové typy), záznam stejný
 		push_warning("VegetationManager: neznámý formát vegetation.bin")
 		return
 	var n := b.decode_s32(8)
@@ -113,7 +182,7 @@ func _load_vegetation() -> void:
 	for i in n:
 		var o := HEADER + i * RECORD
 		var typ := b.decode_s32(o)
-		if typ < 0 or typ > VegType.GARDEN_VEG:
+		if typ < 0 or typ > MAX_TYPE:
 			continue
 		var x := b.decode_float(o + 4)
 		var y := b.decode_float(o + 8)
@@ -142,7 +211,7 @@ func _load_vegetation() -> void:
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.use_custom_data = true               # rgb = tint, a = číslo pole (plodiny)
-		mm.mesh = load(String(VEG_CONFIG[typ]["mesh"]))
+		mm.mesh = _mesh(typ)
 		mm.instance_count = xforms.size()
 		for i in xforms.size():
 			mm.set_instance_transform(i, xforms[i])
@@ -178,16 +247,62 @@ static func invalidate() -> void:
 	_gen += 1
 
 
+## Model typu: `.res` z tools/gen_vegetation_meshes.gd, u typů M8.14 bez souboru postavený `GroundVegMeshes`.
+static func mesh_of(typ: int) -> Mesh:
+	var cfg: Dictionary = VEG_CONFIG[typ]
+	var path := String(cfg["mesh"])
+	if ResourceLoader.exists(path):
+		return load(path)
+	if cfg.has("gen"):
+		return GroundVegMeshes.build(String(cfg["gen"]))
+	return load(path)
+
+
+var _mesh_cache := {}
+
+func _mesh(typ: int) -> Mesh:
+	if not _mesh_cache.has(typ):
+		_mesh_cache[typ] = mesh_of(typ)
+	return _mesh_cache[typ]
+
+
 ## ShaderMaterial typu – jeden na všechny chunky (uniform vítr/sezóna se nastavuje jednou).
+## M8.14: veřejné i pro GroundVegFx (keře sukcese sdílí materiál trnky / šípku).
+func material_for(typ: int) -> ShaderMaterial:
+	return _material(typ)
+
+
 func _material(typ: int) -> ShaderMaterial:
 	if _mats.has(typ):
 		return _mats[typ]
 	var m := ShaderMaterial.new()
 	m.shader = load("res://shaders/vegetation.gdshader")
-	m.set_shader_parameter("bend_k", VEG_CONFIG[typ]["bend_k"])
-	m.set_shader_parameter("season_mode", VEG_CONFIG[typ]["season_mode"])
 	_mats[typ] = m
+	_apply_params(typ)
+	if world != null and not _mats.is_empty() and terrain != null and terrain.material != null:
+		var lut = terrain.material.get_shader_parameter("field_lut")
+		if lut != null:
+			m.set_shader_parameter("field_lut", lut)
 	return m
+
+
+## Uniformy typu z VEG_CONFIG / REACT (při stavbě a po změně v menu F3).
+func _apply_params(typ: int) -> void:
+	var m: ShaderMaterial = _mats.get(typ)
+	if m == null:
+		return
+	var cfg: Dictionary = VEG_CONFIG[typ]
+	m.set_shader_parameter("bend_k", cfg["bend_k"])
+	m.set_shader_parameter("season_mode", cfg["season_mode"])
+	m.set_shader_parameter("veg_color_mode", int(cfg.get("color", 0)))
+	if cfg.has("lo"):
+		m.set_shader_parameter("veg_lo", cfg["lo"])
+		m.set_shader_parameter("veg_hi", cfg["hi"])
+		m.set_shader_parameter("veg_acc", cfg["acc"])
+	var re: Dictionary = REACT.get(typ, {})
+	m.set_shader_parameter("veg_mow", float(re.get("mow", 0.0)))
+	m.set_shader_parameter("veg_path", float(re.get("path", 0.0)))
+	m.set_shader_parameter("veg_trample", float(re.get("trample", 0.0)))
 
 
 ## Tabulka barev/stavu polí (Fields.lut_image jako ImageTexture) pro plodiny (season_mode 2).
@@ -238,7 +353,7 @@ func _process_impl(delta: float) -> void:
 	if _seen_gen != _gen:                         # M8.D2c: změna citlivosti na vítr v menu F3
 		_seen_gen = _gen
 		for typ in _mats:
-			(_mats[typ] as ShaderMaterial).set_shader_parameter("bend_k", VEG_CONFIG[typ]["bend_k"])
+			_apply_params(typ)                    # M8.14: i barvy a reakce na seč / pěšiny / sešlapání
 	var wind := Vector2.ZERO
 	if world != null and world.weather != null:
 		var wv: Vector3 = world.weather.wind_vector()

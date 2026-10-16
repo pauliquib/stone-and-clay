@@ -626,6 +626,45 @@
   (`Cargo`). Ladění: vrstva mapy `unosnost`, F3 → Vozidla/Terén a bláto, Člověk/Pohyb hráče (Bláto –), Zvěř/Hospodářská
   zvířata (Kůň – bláto), Příroda/Louže, stopy (Koleje v blátě –). Uložení: klíč `ruts` (dlaždice se stopami ZSTD +
   base64, nejnovější do 2 MB, po 60 dnech bez nové stopy zapomenuté); starý save = žádné koleje.
+- **Přízemní vegetace, seč, sukcese, interaktivní tráva (M8.14)**: přepínač Realismus `ground_veg`.
+  **Typy porostu** offline: `tools/vegetation.py --eco` → `data/vegetation.bin` formát `VEG2` (záznam jako VEG1, bez
+  přepínače beze změny bajt po bajtu): typ louky ze `site.bin` (vlhká: TWI ≥ 10 / < 15 m od vody / glej, fluvizem od TWI 8 →
+  `HERB_WET` pcháč, kohoutek; suchá: oslunění z-skóre ≥ 0,5 a půda < 60 cm / svah > 8° / ranker → `HERB_DRY` šalvěj,
+  mateřídouška; ruderální u dvorů a cest → víc kopřiv; jinak mezofilní `GRASS_TALL`), lesní podrost podle dominantní
+  dřeviny `DOMI` a zápoje `CANO` z `tree_eco.bin` (buk → hrabanka `LITTER`, líska a kopřivy ×0,1–0,15; smrk / jedle →
+  jehličí (tint), mech, borůvčí, kapradí; borovice → borůvčí, mech; dub / habr / lípa → jarní byliny `SPRING_FLOWERS`
+  – v shaderu jen mezi táním a olistěním; olše / vrby a les u vody → devětsil `BUTTERBUR`), hustoty × světlo pod korunou;
+  rozpočet `ECO_TARGET`, celkem ≤ `MAX_CAP` + 30 %. Modely `GroundVegMeshes` (`scripts/vegetation/ground_veg_meshes.gd`,
+  ≤ 50 tris; generátor `tools/gen_vegetation_meshes.gd`, bez `.res` je hra postaví sama) mají **barvy vrcholů podle
+  00_PRINCIPY kap. 4**, albedo z uniformů `veg_lo/hi/acc` (`VegetationManager.VEG_CONFIG` klíče `color`, `lo`, `hi`, `acc`).
+  **Louky – simulace** `World.meadows` (`Meadows`, `scripts/eko/meadows.gd`): mřížka 16 m přes rozsah landuse, louka =
+  převaha trávy (`SurfaceMap`) nebo OSM louky (`Fields` třída 2); typ louky za běhu stejnými prahy ze `Site`; výška
+  porostu dh = 0,0018 m/°C·d · GDD(5 °C, z hodinových teplot `eco_hour`) · vláha (`SoilWater`) · (1 − h/H_MAX typu);
+  mimo vegetační dobu slehne k 0,15 m. Hospodaření po parcelách 64 m (hash): seno (OSM louka) seč 15. 6. a 16. 8. ± 9 d,
+  u obce (`Fauna.settle_at`) 3× (20. 5., 9. 7., 28. 8.), ostatní tráva 1× v červenci s 60 %; opuštěné parcely (6 % / 0 / 45 %)
+  se nesečou. Pastva (výběh koně `Paddock`, ohrada statku `Pen`) drží ≤ 0,12 m. Obecní údržba (`udrzba_trava`) seče
+  přes `mow_at`. Inicializace po řádcích (`EcoClock.slice`), denní krok po 700 buňkách za snímek, skok času > 3 dny =
+  hrubý krok (plán parcel + analytické dorůstání τ 28 d). Konec roku: roky bez seče; 2+ roky → keře (trnka, šípek),
+  5+ let → nálet (5 %/buňka/rok, bříza / borovice na suché stráni a arenosolu) přes `PlantedTrees.plant` (vlastník −1,
+  ujatý, velikost 0,55 – nad hranicí okusu; strop 300). API `height_at(pos)`, `rel_at`, `cut_days_at`, `info_at`,
+  `shrub_of`, `mow_at`; vrstva mapy `louky`. Výstup `image` (R8, relativní výška) → klient.
+  **Pěšiny** `World.footpaths` (`Footpaths`, `scripts/eko/footpaths.gd`): opotřebení 0..1 v dlaždicích 64 m × 64 px
+  (1 m/px), krok chodce (hráč pěšky / na koni, vesničané a psi z `World.bots_root`, zvěř do 150 m; vzorek po 0,8 m, ne
+  skoky > 8 m) přičte 0,07 (zvěř ×0,5), zarůstání exp(−d/9 d) (zima ×0,3) aplikované líně `Image.adjust_bcs`; okno
+  3 × 3 dlaždice jako kruhový buffer v globálu `path_tex` (+ `path_origin`, `path_size`) → terén prošlapaná hlína (ne
+  na poli), tráva nižší a řidší. API `wear_at(pos)` (M8.15 stezky), vrstva mapy `pesiny`.
+  **Klient** `GroundVegFx` (`scripts/vegetation/ground_veg_fx.gd`, dítě `VegetationManager`): sešlapání – zdroje
+  (hráč / kůň / 4 kola auta, vesničané, psi, zvěř, AI auta do 40 m od kamery + stopa po 0,9 m, síla klesá za 30 s)
+  v textuře 48 × 1 RGBA32F `trample_src` (`trample_n` platných) 1× za 2 snímky, shader (`shaders/include/ground_veg.gdshaderinc`
+  `gv_trample`) sklopí stéblo od zdroje rotací kolem patky (úhel ∝ tlak, strop ~77°) jen do `trample_range` od kamery;
+  `meadow_h` z `Meadows.image` po změně; keře sukcese (MultiMesh, materiál trnky / šípku z `VegetationManager.material_for`)
+  do 200 m a seno (řádky 4 dny po seči, pak balíky do 12 dnů) do 160 m, přestavba po posunu o 30 m nebo denním kroku luk.
+  Shader `vegetation.gdshader`: `veg_mow` (výška × relativní výška louky, posekaná zelenější), `veg_path`, `veg_trample`
+  podle `VegetationManager.REACT`; `MeadowFlowers` nekvetou na louce pod 45 % plné výšky. **Vítr**: síla ohybu stromů
+  a trávy z `wind.gdshaderinc` je teď 20 globálních parametrů `wind_k_*` (výchozí = dřívější konstanty) – F3 → Příroda/
+  Vítr – ohyb vegetace. Ladění F3 → Příroda/Louky a podrost (`scripts/dev/tune_m8_14.gd`, 162 parametrů s větrem).
+  Uložení: klíče `meadows` (výška u8, den seče, roky bez seče – ZSTD + base64; neshodná mřížka = ignorovat) a
+  `footpaths` (dlaždice ZSTD + base64 ≤ 768 kB); starý save = louky podle data, žádné pěšiny. Měřicí scéna `louka_cerven`.
 - **Mikroklima (M8.9)**: `World.micro` (`Microclimate`, `scripts/eko/microclimate.gd`), přepínač Realismus `micro`;
   vrstva **nad** `Weather` (nic v něm nemění) bez vlastní mřížky – stav je pár čísel: síla přízemní inverze `I` (K),
   rosný bod vzduchové hmoty, výška a hustota radiační mlhy nad dnem údolí, rosa, mrazová hranice. Krok jednou za herní

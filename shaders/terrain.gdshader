@@ -41,6 +41,7 @@ global uniform float grass_green;  // svěžest trávy 0..1 (zima / sucho → hn
 global uniform float micro_dew;    // M8.9: rosa na trávě 0..1 (Microclimate → MicroFx)
 global uniform float micro_frost;  // M8.9: 1 = rosa na dně údolí je zmrzlá (jinovatka)
 global uniform float micro_frost_y; // M8.9: svět Y, pod kterým je zem zmrzlá
+#include "res://shaders/include/ground_veg.gdshaderinc"   // M8.14: pěšiny (path_tex) – prošlapaná hlína
 // M8.13: koleje a stopy v blátě (RutMap) – hloubka v m, okno 3 × 3 dlaždic kolem hráče jako kruhový buffer
 // (uv = fract(svět / šířka okna), proto repeat_enable); rut_rect.z = 0 → vypnuto
 uniform sampler2D rut_tex : filter_linear, repeat_enable;
@@ -355,6 +356,15 @@ void fragment() {
 				rut = max(rut, rd);
 				rpud = smoothstep(0.04, 0.12, rdep) * smoothstep(0.35, 0.8, wetness) * rut_puddle * rfade * (1.0 - snow);
 			}
+		}
+	}
+	// M8.14: pěšina z opakované chůze – prošlapaná hlína (na trávě a v lese), okraj rozbitý šumem
+	if (path_size > 0.0 && dist < 160.0) {
+		float pw = gv_path_wear(wpos.xz);
+		if (pw > 0.01) {
+			float pd = smoothstep(0.12, 0.7, pw + (d2 - 0.5) * 0.25) * (1.0 - smoothstep(110.0, 160.0, dist))
+				* (1.0 - snow * 0.85) * (lcls == 1 ? 0.0 : 1.0);
+			col = mix(col, vec3(0.36, 0.29, 0.20) * (0.85 + 0.3 * d1), pd * 0.8);
 		}
 	}
 	// mokro: tmavší a lesklejší povrch; v kolejích polních cest drží voda déle

@@ -13,6 +13,14 @@
 // foliage zmenší a zhnědne), 2 = plodina (barva a růst z `field_lut` = ta samá tabulka
 // 256×2, kterou Fields.lut_image dodává terénnímu shaderu – zralost i posklizňové
 // strniště se drží skutečného pole). Sníh bělí špičky a vegetaci mírně shrnuje.
+//
+// M8.14 Přízemní vegetace (include/ground_veg.gdshaderinc, globální vstupy plní Meadows / Footpaths / GroundVegFx):
+//   * `veg_color_mode` 1 = nové typy podle konvence barev vrcholů (00_PRINCIPY kap. 4: r ohebnost, g fáze, b list,
+//     a okluze) – albedo z uniformů `veg_lo` → `veg_hi` po výšce (UV.y), `veg_acc` pro květ / bobule (UV.x > 0,5);
+//     0 = staré modely (albedo v barvách vrcholů).
+//   * `season_mode` 3 = jarní efemér (sasanky, dymnivky – kvetou před olistěním), 4 = beze změny (hrabanka, mech).
+//   * `veg_mow` – výška podle porostu louky (`meadow_h`: po seči nízká a zelenější), `veg_path` – na pěšině nižší
+//     a řidší, `veg_trample` – ohyb od hráče / NPC / zvířat / kol (sešlapání kolem kamery).
 shader_type spatial;
 render_mode cull_disabled, diffuse_burley;
 
@@ -21,15 +29,24 @@ uniform float wind_strength = 0.0;             // 0..2 (Weather.wind / 10) – s
 uniform float bend_k = 1.0;                    // citlivost typu na vítr (keř < tráva)
 uniform int season_mode = 0;                   // 0 bylina, 1 keř, 2 plodina (field_lut)
 uniform sampler2D field_lut : filter_nearest, repeat_disable;
+uniform int veg_color_mode = 0;                // M8.14: 0 albedo v barvách vrcholů, 1 konvence kap. 4 + barvy z uniformů
+uniform vec3 veg_lo : source_color = vec3(0.2, 0.35, 0.1);    // M8.14: barva u patky
+uniform vec3 veg_hi : source_color = vec3(0.4, 0.55, 0.2);    // M8.14: barva špičky
+uniform vec3 veg_acc : source_color = vec3(0.6, 0.3, 0.7);    // M8.14: květ / bobule (UV.x > 0,5)
+uniform float veg_mow = 0.0;                   // M8.14: 1 = výška podle seče louky (meadow_h)
+uniform float veg_path = 0.0;                  // M8.14: 1 = pěšina sníží a proředí
+uniform float veg_trample = 0.0;               // M8.14: citlivost na sešlapání (0 = nehýbe se)
 
 global uniform float snow_cover;               // sníh na zemi 0..1 (Atmosphere)
 global uniform float grass_green;              // svěžest trávy 0..1 (Seasons.GREEN)
 global uniform float foliage;                  // olistění listnáčů 0..1 (Seasons.FOLIAGE)
+global uniform float autumn;                   // podzim 0..1 (Seasons.autumn) – M8.14 jarní efeméry v létě a na podzim nejsou
 global uniform float micro_dew;                // M8.9: rosa 0..1 (Microclimate → MicroFx)
 global uniform float micro_frost;              // M8.9: 1 = rosa na dně údolí zmrzlá (jinovatka)
 global uniform float micro_frost_y;            // M8.9: svět Y, pod kterým je zem zmrzlá
 
 #include "res://shaders/include/wind.gdshaderinc"
+#include "res://shaders/include/ground_veg.gdshaderinc"
 
 varying vec3 v_col;
 varying float v_snow;
@@ -56,14 +73,36 @@ void vertex() {
 	} else if (season_mode == 1) {
 		tint *= mix(vec3(1.0), vec3(0.75, 0.62, 0.45), (1.0 - foliage) * 0.55);  // keř zezelená
 		grow *= 0.75 + 0.25 * foliage;                                //   a v zimě „spadne“ listí
+	} else if (season_mode == 3) {
+		// M8.14 jarní efemér: vidět jen mezi táním a olistěním korun (zelená tráva, holé koruny, ne podzim)
+		grow *= clamp(grass_green * (1.0 - foliage) * (1.0 - autumn) * 2.5, 0.0, 1.0);
+	}
+	// M8.14: louka po seči / pastvě nízká (a svěže zelená), na pěšině nižší a řidší
+	if (veg_mow > 0.0) {
+		float mrel = gv_meadow_rel(org.xz);
+		grow *= mix(1.0, max(mrel, 0.06), veg_mow);
+		tint *= mix(vec3(0.9, 1.1, 0.88), vec3(1.0), clamp(mrel * 1.6, 0.0, 1.0));
+	}
+	if (veg_path > 0.0) {
+		float pw = gv_path_wear(org.xz) * veg_path;
+		if (pw > 0.003) {
+			grow *= 1.0 - 0.7 * clamp(pw, 0.0, 1.0);
+			if (wind_hash(org * 1.37 + 0.5) < pw * 0.85) {
+				grow = 0.0;                                  // proředění: trs na pěšině chybí
+			}
+		}
 	}
 
 	VERTEX.y *= grow;
+	if (grow <= 0.0) {
+		VERTEX = vec3(0.0);                                  // zhroucená instance se nevykreslí
+	}
 	float sc = max(length(MODEL_MATRIX[0].xyz), 0.001);
+	float flex = veg_color_mode == 1 ? COLOR.r : UV.y;      // M8.14: ohebnost z barvy vrcholu (kap. 4)
 	if (wind_hier > 0.5) {
 		// M8.4: ohyb od kořene, náraz z pole větru a vlna po větru (přes obilí běží viditelné vlny)
 		float plant_h = max(VERTEX.y * sc / max(UV.y, 0.1), 0.1);
-		vec3 off_m = wind_grass(org, UV.y, plant_h, bend_k);
+		vec3 off_m = wind_grass(org, flex, plant_h, bend_k);
 		VERTEX += transpose(mat3(MODEL_MATRIX)) * off_m / (sc * sc);
 	} else {
 	float bend = UV.y * UV.y;
@@ -78,8 +117,19 @@ void vertex() {
 	vec3 off = transpose(mat3(MODEL_MATRIX)) * off_w / sc;
 	VERTEX += off * (bend * bend_k * (0.15 + wind_strength * 0.13));
 	}
+	// M8.14: sešlapání – rostlina se sklopí od hráče / NPC / zvířat / kol a pomalu narovná (síla zdroje klesá)
+	if (veg_trample > 0.0 && grow > 0.0) {
+		vec3 off_t = gv_trample(org, max(VERTEX.y, 0.0) * sc, veg_trample * flex, CAMERA_POSITION_WORLD);
+		VERTEX += transpose(mat3(MODEL_MATRIX)) * off_t / (sc * sc);
+	}
 
-	v_col = COLOR.rgb * tint;
+	if (veg_color_mode == 1) {
+		vec3 base = mix(veg_lo, veg_hi, clamp(UV.y, 0.0, 1.0));
+		base = UV.x > 0.5 ? veg_acc : base;
+		v_col = base * (0.55 + 0.45 * COLOR.a) * tint;
+	} else {
+		v_col = COLOR.rgb * tint;
+	}
 	v_snow = snow_cover * smoothstep(0.15, 0.9, UV.y + NORMAL.y * 0.4);
 	float rime_k = micro_dew * micro_frost * smoothstep(micro_frost_y + 8.0, micro_frost_y - 8.0, org.y);
 	v_rime = rime_k * smoothstep(0.2, 0.9, UV.y) * (1.0 - snow_cover);
