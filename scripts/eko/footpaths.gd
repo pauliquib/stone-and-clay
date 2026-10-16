@@ -38,6 +38,7 @@ var world: World
 var _tiles := {}                        # Vector2i → Image (R8)
 var _touch := {}                        # Vector2i → jd posledního zápisu
 var _fade := {}                         # Vector2i → čekající násobek (1 = nic)
+var _fade_scan := true                  # M8.19B: má smysl procházet _fade (po denním kroku / načtení), jinak ne každý snímek
 var _last := {}                         # instance id chodce → Vector2 posledního vzorku
 var _win: Image
 var _tex: ImageTexture
@@ -235,6 +236,8 @@ func _blit_slot(s: int) -> void:
 
 ## Jedna dlaždice s nahromaděným zarůstáním → aplikovat na obraz (a do okna).
 func _fade_one() -> void:
+	if not _fade_scan:
+		return
 	for t in _fade:
 		var f: float = _fade[t]
 		if f >= FADE_APPLY:
@@ -247,6 +250,7 @@ func _fade_one() -> void:
 		if _slot[s] == t and not _blit_q.has(s):
 			_blit_q.append(s)
 		return
+	_fade_scan = false                     # nic nečeká – do dalšího denního kroku se slovník neprochází
 
 
 func _drop(t: Vector2i) -> void:
@@ -265,6 +269,7 @@ func _on_eco_day(jd: int) -> void:
 	var f := exp(-k / maxf(REGROW_DAYS, 0.1))
 	_last.clear()                          # chodci, kteří zmizeli, se zapomenou (první vzorek dne jen založí polohu)
 	var gone: Array[Vector2i] = []
+	_fade_scan = true
 	for t in _fade:
 		_fade[t] = float(_fade[t]) * f
 		if jd - int(_touch.get(t, jd)) > FORGET_DAYS:
@@ -309,6 +314,7 @@ func restore(d: Dictionary) -> void:
 		_tiles[t] = Image.create_from_data(TILE_PX, TILE_PX, false, Image.FORMAT_R8, raw)
 		_touch[t] = int(e.get("jd", 0))
 		_fade[t] = float(e.get("f", 1.0))
+	_fade_scan = true
 	_slot.fill(NONE)
 	_center = NONE
 	_blit_q.clear()

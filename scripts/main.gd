@@ -30,6 +30,8 @@
 ##                   obcí, obec_at, postavená zástavba; --shot=… navíc snímek mapy okolí
 ##   --perfscene=jméno[,sekund]  M8.1: měřicí scéna (Tests.PERF_SCENES) – pevné místo/čas/počasí,
 ##                   pak vzorkování jako --perf (výchozí 20 s) do konzole + user://perf/<jméno>.csv
+##   --preset=nizka|stredni|vysoka|ultra  M8.19B: předvolba grafiky jen pro tento běh (měření; nic neukládá)
+##   --realism=klíč:off[,klíč:on…]       M8.19B: přepínače realismu jen pro tento běh (např. micro:off,soundscape:off)
 class_name Main
 extends Node3D
 

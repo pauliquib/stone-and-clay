@@ -321,6 +321,12 @@ var _ai_pass_until := -1               # index bodu trasy, kde objíždění kon
 var _ai_yield_ignore := 0.0            # vzájemné zablokování na křižovatce → jedno auto projede
 var _ai_obst_t := 0.0
 var _ai_obst := {}
+## M8.19B: dotaz a kvádry pro `_obstacle_ahead` se vytvoří jednou (dřív 2× BoxShape3D + dotaz při každém
+## přepočtu překážky = nový tvar ve fyzikálním serveru několikrát za sekundu na každé AI auto).
+var _obst_q: PhysicsShapeQueryParameters3D
+var _obst_box: BoxShape3D
+var _obst_sbox: BoxShape3D
+var _obst_hw := -1.0
 
 var steering := 0.0               # úhel natočení řízených kol (rad, + = doleva) – dřív na VehicleBody3D
 var vis: Node3D
@@ -1673,7 +1679,8 @@ func _powertrain(delta: float) -> void:
 	_si_prev = steer_in
 	# brzdová světla
 	var bl := 3.0 if (brake_in > 0.1 or handbrake) else (0.9 if lights_on else 0.3)
-	model.tail_mat.emission_energy_multiplier = bl
+	if model.tail_mat.emission_energy_multiplier != bl:     # M8.19B: zápis do materiálu jen při změně
+		model.tail_mat.emission_energy_multiplier = bl
 
 
 ## Kolo: síla šlapání (klesá k maximální rychlosti), zpátky jen pomalu (tlačení), volnoběžka – bez brzdění motorem.
@@ -1702,7 +1709,9 @@ func _pedal_force(wrpm: float, dead: bool) -> void:
 			w.brake = mass * tn.hand_decel / 4.0
 	var max_steer := _max_steer_at(speed)
 	steering = move_toward(steering, steer_in * max_steer, get_physics_process_delta_time() * float(spec.get("steer_rate", 2.6)))
-	model.tail_mat.emission_energy_multiplier = 0.9 if lights_on else 0.3
+	var bl := 0.9 if lights_on else 0.3
+	if model.tail_mat.emission_energy_multiplier != bl:     # M8.19B: zápis do materiálu jen při změně
+		model.tail_mat.emission_energy_multiplier = bl
 
 
 func _surface_grip(w: Wheel) -> float:
@@ -1766,6 +1775,10 @@ func _detect_crash(delta: float) -> void:
 
 
 func _detect_people() -> void:
+	# M8.19B: srazit člověka jde jen nad HIT_V (rel ≤ vodorovná rychlost) – pomalé / stojící auto nemusí
+	# každý fyzikální krok alokovat seznam kontaktů
+	if linear_velocity.x * linear_velocity.x + linear_velocity.z * linear_velocity.z <= HIT_V * HIT_V:
+		return
 	for b in get_colliding_bodies():
 		if b is CharacterBody3D:
 			# rozhoduje jen rychlost auta směrem k člověku – když do stojícího
@@ -2041,10 +2054,15 @@ func _lane_pt(k: int) -> Vector3:
 ## (`AI_GROUND`), takže hrbol silnice překážkou není, ale dům zasahující do silnice ano.
 func _obstacle_ahead(reach: float) -> Dictionary:
 	var space := get_world_3d().direct_space_state
-	var q := PhysicsShapeQueryParameters3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3(model.half_width * 1.7, 1.0, 0.6)
-	q.shape = box
+	if _obst_q == null or _obst_hw != model.half_width:
+		_obst_hw = model.half_width
+		_obst_q = PhysicsShapeQueryParameters3D.new()
+		_obst_box = BoxShape3D.new()
+		_obst_box.size = Vector3(model.half_width * 1.7, 1.0, 0.6)
+		_obst_sbox = BoxShape3D.new()
+		_obst_sbox.size = Vector3(model.half_width * 1.5, 1.0, 0.6)
+	var q := _obst_q
+	q.shape = _obst_box
 	q.collision_mask = 2 | 4 | 8 | 16
 	q.exclude = [get_rid()]
 	var lift := Vector3(0, 0.85, 0)
@@ -2063,9 +2081,7 @@ func _obstacle_ahead(reach: float) -> Dictionary:
 		pts.append(pts[0] + global_transform.basis.z * reach)
 	var hit := _cast_path(space, q, pts, reach, false)
 	# statika: vrstva 1 bez povrchu pod koly, o něco užší kvádr (zrcátka se o fasádu neotřou)
-	var sbox := BoxShape3D.new()
-	sbox.size = Vector3(model.half_width * 1.5, 1.0, 0.6)
-	q.shape = sbox
+	q.shape = _obst_sbox
 	q.collision_mask = 1
 	q.exclude = [get_rid()]
 	var up := Vector3(0, AI_STATIC_LIFT - lift.y, 0)

@@ -2814,3 +2814,92 @@ Zahájena kalibrace na realitu a konzistence API (subagent M8.19 část A).
 - `vegetation_manager.gd` (tráva) bere sílu větru z `Weather.wind_vector()`, ne z `WindField.speed()` – soubor patří M8.19B
   (výkon), nesahal jsem.
 - Hustoty zvěře závisí na skutečném HSI mapy (skript předpokládá 0,45/0,35/0,4) – ověřit deníkem J → Zvěř v honitbách.
+## M8.19B – start práce
+
+Start: výkonový audit, předvolby, savy, dokumentace a plán testů (vlna 8, část B).
+
+## 2026-10-17 – M8.19B Výkon, předvolby, savy
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou překladu – měření a ruční test čekají)
+- **Výkonový audit (statický, bez změny chování)** – čísla po vlnách 3–7 nejsou, odhady úspory jsou řádové:
+
+| Soubor | Oprava | Odhad úspory |
+|---|---|---|
+| `car.gd` `_obstacle_ahead` | dotaz + 2 kvádry (`BoxShape3D`) se vytvoří jednou na auto (dřív nové tvary ve fyzikálním serveru při každém přepočtu překážky, ~5×/s × AI auto) | 0,1–0,5 ms (`car`, podle počtu AI aut) |
+| `car.gd` `_detect_people` | pod `HIT_V` (vodorovná rychlost) se nevolá `get_colliding_bodies()` (nové pole každý fyzikální krok na auto); výsledek totožný (rel ≤ rychlost) | 0,05–0,2 ms (`car`) |
+| `car.gd` `_powertrain` / `_pedal_force` | `tail_mat.emission_energy_multiplier` jen při změně (dřív zápis do materiálu = aktualizace v RenderingServeru každý krok na auto) | 0,1–0,3 ms (`car`) |
+| `villager.gd` `_bt_fill_vars` | po naplnění blackboardu hned návrat (dřív 2× dynamické `world.get()` za krok na vesničana); `player.car` místo `get("car")` | 0,1–0,3 ms (`villager`) |
+| `world.gd` `nearest_player` | bez `players.values()` (nové pole na každé volání – vesničané, psi, domácnosti…) | 0,05–0,2 ms (`villager` aj.) |
+| `hud.gd` `_draw_minimap` | čáry a rybníky transformované jedním `Transform2D` nativně místo `Callable.call` na každý vrchol; rybníky mimo dosah (AABB) se netransformují ani neořezávají (24 hran) | 1–1,5 ms z 2,2 ms (`hud_minimap`) |
+| `eko/footpaths.gd`, `priroda/rut_map.gd` `_fade_one` | slovník dlaždic se prochází jen po denním / hodinovém kroku a načtení, ne každý snímek, když nic nečeká | 0,02–0,1 ms |
+
+  Prošlo bez nálezu (throttling / časové plátky už jsou): `EcoClock`, `soil_water`, `habitat`, `meadows`, `households`
+  (`_process` zvuky 1×/s), `soundscape` (výběr 2×/s), `small_life` (1×/s), `micro_fx`, `wind_field`, `vegetation_manager`,
+  `tree_lod_streamer` (≤ 1 ms/snímek), `chimney_smoke`, `nature_log`, `humanoid`/`gait` (už opraveno po vlně 2), `body_state`
+  (4×/s), `quadruped_rig`, `animal.gd` (výška porostu po 0,5 s). `DevTune` se za snímek nikde nečte.
+- **Předvolby – „Detail přírody M8“** (`GameSettings.ECO_LEVELS`, gfx klíč `eco` v `PRESETS`, řádek v Nastavení → Grafika;
+  starý `nastaveni.cfg` bez klíče = podle uložené předvolby). Jen vzhled a zvuk, simulace beze změny:
+
+| Předvolba | LOD0 stromů (`TreeGen.lod0_k`) | Interaktivní tráva | Drobný život | Hlasů / okruh zvuků | Údolní mlha | Fyzikální obloha |
+|---|---|---|---|---|---|---|
+| Nízká | 0,5× (27,5 m) | ne (+ Vegetace vyp.) | ne | 6 / 0,6× | ne | vypnout |
+| Střední | 0,75× (41 m) | ne | ½ kotev | 10 / 0,8× | ano | zapnout |
+| Vysoká | 1× (55 m) | ano | plný | 16 / 1× | ano | zapnout |
+| Ultra | 1,3× (71,5 m) | ano | plný | 16 / 1× | ano | zapnout |
+
+  Napojení: `TreeGen.set_lod0_scale` (přepíše pásma materiálů, `TreeLodStreamer` bere `gen.l0_end()`),
+  `GroundVegFx.interactive` (`trample_n` 0), `Soundscape.set_detail(hlasy, okruh)` (`voice_cap`, `scan_k`; pool beze změny),
+  `SmallLife.density`, `MicroFx.layer_on` (rosa a jinovatka zůstávají). Přepínač `sky` mění jen výslovná volba předvolby /
+  detailu (`_eco_realism`), ne start hry. Výchozí předvolba nové instalace zůstává **Vysoká** (beze změny – viz otevřené body).
+  Měření: `--preset=nizka|stredni|vysoka|ultra` a `--realism=klíč:off,…` jen pro jeden běh (`GameSettings.preset_arg`,
+  `realism_args`; `realism_saved` je bere i pro `treegen` při stavbě světa), dávka `tools/perf_m8_19.sh`.
+- **Staré savy (M7, bez klíčů M8)** – ověřeno čtením `save_game.gd` a `restore()` všech systémů: `eco` (−1 → rozjezd od teď),
+  `soil_water` (bez klíče = stav ze startu, rozběh 60 dní z klimatu proběhl při stavbě světa), `ruts`, `footpaths` (prázdné),
+  `micro` (znovu z počasí), `phenology` (rozběh roku z klimatu, `_regrow_pending`), `wildlife` (populace z kapacity, nový průchod),
+  `fields_eco` (`_init_from_clim`), `households` (seed), tělo M8.16 (výchozí hodnoty), deník přírody (prázdný).
+  **Opraveno:** `meadows` bez klíče dřív nedělalo nic (louky zůstaly k datu startu hry) → teď `Meadows.on_date_set()` k datu savu.
+- **Drobné body:** (a) `World.FLY_*` → `static var`, registrace `scripts/dev/tune_m8_19.gd` (Létání/Hranice letu, 5 parametrů);
+  (b) popisek `village.mow_pitch` opraven (vlastní zvuk sekačky od M8.18); (c) `Paramotor.EARS_SINK` odstraněna (uši působí
+  přes `EARS_CD` – druhé klesání by se počítalo dvakrát); (d) F2 → Příroda – ladění → „Zvuková krajina (M8.18)“ =
+  `Soundscape.debug_text()`; (e) F3 s otevřenou nabídkou HUD pod sebou: vrstva propouští kliky a panel uhne doprava
+  (`DevMenu.PANEL_LEFT_HUD`), jinak beze změny.
+- **Dokumentace:** `docs/SYSTEMS.md` → nová kapitola „Realistický svět (M8)“ (Mermaid diagram závislostí, tabulka systémů –
+  přepínač, krok, klíč savu, předvolby, výkon, MP poznámka); README (Realismus – všechny přepínače, předvolby, pořadí offline
+  nástrojů, F3, `tools/perf_m8_19.sh`); `GAME_DESIGN.md` pilíř „Uvěřitelná simulace“; `docs/VIZE_A_ROADMAPA.md` stav M8
+  (M8.2 odškrtnuta podle `prompts/roadmapa/README.md`); `docs/testy_M8.md` → nový oddíl **„Plán testování po dokončení M8“**
+  na začátku (příprava, 4 dávky měření podle priority, ruční testy po oblastech, co poslat); `main.gd` hlavička (nové parametry).
+- Kontrola překladu (kap. 6) všech změněných a nových `.gd`: výstup prázdný (kontrola ověřena záměrnou chybou). Shadery beze změny.
+
+### Otevřené body
+- **Čeká na měření uživatele** (`tools/perf_m8_19.sh zaklad` + `stredni`, pak `prepinace`, `vysoka`) – podle čísel doladit
+  `ECO_LEVELS` / `PRESETS` (hlavně Střední) a rozhodnout výchozí předvolbu nové instalace (dnes Vysoká; základ před M8
+  byl ~27 fps, takže Střední je asi rozumnější výchozí). Neodhadováno.
+- `SoilWater` u starého savu s jiným ročním obdobím než start hry: vlhkost a sníh zůstanou ze startu (stejně jako po F2 → Datum)
+  a dorovnají se hodinovým krokem; přesnější by byl nový rozběh k datu savu (zásah do `soil_water.gd` – nechán části A / později).
+- `pole_blato` měří bez auta (terramechanika se projeví až v jízdě) – profil `car` v blátě jen ručně.
+- `car` (7,9 ms) a `villager` (6,8 ms) zůstávají hlavně fyzikou (`force_raycast_update` kol, `move_and_slide`, BT LimboAI) –
+  další úspora jen snížením kvality (počet AI aut / vesničanů ve fyzikální bublině přes „Aktivita světa“) – po měření.
+- F3 přes HUD nabídku: panel uhne na 66 % šířky – na úzkém okně může nabídku HUD pořád částečně krýt.
+
+## Uzavření M8 – návrh (čeká na měření a ruční testy, M8.19 se neodškrtává)
+
+### Stav kroků
+- **Napsané a sloučené (staticky ověřené, kontrola překladu):** M8.1–M8.18, M8.D a M8.D2a–d (menu F3, ~3 600+ parametrů),
+  M8.19 část B (výkon, předvolby, savy, dokumentace); část A (kalibrace `tools/eco_calibrate.py`, konstanty) běží souběžně
+  a slučuje se před B – její výsledky (tabulka „před → po“) doplní vlastní záznam.
+- **Změřeno:** jen základ 8. 10. (před M8) a po vlně 2 (22,8 fps); vlny 3–8 neměřené.
+- **Ručně otestováno:** základ M8.1 (měření 8. 10.) a regrese po vlně 2 (M8.6, „stále lehce laguje“ po vlně 3); ostatní
+  kroky čekají (checklisty v `docs/testy_M8.md`, pořadí v „Plán testování po dokončení M8“).
+- **Částečně / zjednodušeně:** insolace bez zastínění terénem (M8.2), HAND vzdušnou čarou (M8.2), `site.bin` nad rozpočtem
+  paměti (M8.2), ochozy zvěře jen v Habitatu (M8.15), rozrytí jen decal (M8.15), BT jen pro 5 vesničanů (M8.17),
+  netopýři bez vazby na lampy (M8.18), vzdálený vlak / silnice ve zvukové krajině chybí (M8.18), voda u starého savu (výš).
+
+### Otevřené body pro milník N (nástroje) a V2 (multiplayer)
+- **N:** přenos vyladěných hodnot z `config.json` do kódu po testech; měřicí dávka jako součást nástrojů (CSV → tabulka
+  scéna × předvolba); zúžení mřížek `site.bin` (`uint8`); horizont oslunění v `tools/site.py`.
+- **V2:** synchronizace eko-stavu ze serveru – `EcoClock` (hodina / den), `SoilWater` (mřížka 32 m po bajtech, toky),
+  `Microclimate` (pár čísel), `Phenology` (GDD, fáze, roky růstu), `Fields`, `Meadows` (mřížka), `Habitat` (populace),
+  `Households` (stav domů, vztahy, drby), `RutMap` / `Footpaths` (dlaždice – jen u hráčů); formát = stejný jako klíče savu,
+  posílat po hodinovém / denním kroku a při připojení. Klient počítá jen vzhled (`MicroFx`, `GroundVegFx`, `Soundscape`,
+  `SmallLife`, stromy), detail přírody je per klient (předvolba). Náhoda v simulaci je seedovaná (deterministická) – ověřit
+  při dvou klientech.

@@ -28,8 +28,8 @@ static var FUMBLE_LOCK := 1.6           # s blokáda po vytržení křídla vět
 const SHIFT_WARN_CD := 3.0         # s mezi varováními „plyn až s křídlem nad hlavou“
 static var BRAKE_CD := 0.5              # přídavný odpor obou brzd naplno (S)
 static var SIDE_BRAKE_CD := 0.18        # přídavný odpor jednostranné brzdy (A/D)
-static var EARS_CD := 0.25              # „uši“ (Ctrl) – přídavný odpor → rychlejší klesání
-const EARS_SINK := 0.8             # m/s přídavné klesání při „uších“ (přes odpor, laditelné)
+static var EARS_CD := 0.25              # „uši“ (Ctrl) – přídavný odpor → rychlejší klesání (M8.19B: nepoužívaná EARS_SINK
+                                        # odstraněna – vyšší klesání se svěšenými ušima vzniká jen tímto odporem, ne dvakrát)
 static var TRIM_V := 1.0                # m/s bonus k v_max na povolených trimrech (Mezerník)
 static var COLLAPSE_TURB := 1.1         # m/s² turbulence, od které hrozí zavření křídla
 static var COLLAPSE_P := 0.06           # šance zavření za s nad práhem (× přebytek turbulence)

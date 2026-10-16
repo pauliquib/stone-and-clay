@@ -55,11 +55,11 @@ const SEASON_CHECK_S := 4.0
 # M6.2 letové hranice (rozhodnutí uživatele): létající prostředky (dron, M6.3+ letouny) smí
 # max. FLY_LIMIT_M za obdélník katastru – v pásmu FLY_WARN_M před ní měkké odpuzení (protivítr)
 # + varování; strop FLY_CEIL_AGL nad terénem. Chodec a auto drží dál Terrain._add_bounds.
-const FLY_LIMIT_M := 2000.0      # vodorovná hranice letu za hranicí katastru (m)
-const FLY_WARN_M := 400.0        # šířka pásma varování / protivětru před hranicí (m)
-const FLY_PUSH_MS := 18.0        # max. rychlost odpuzujícího „větru“ u hranice (m/s)
-const FLY_CEIL_AGL := 1500.0     # strop letu nad terénem (m AGL)
-const FLY_CEIL_PUSH := 6.0       # jak rychle stroj tlačí dolů nad stropem (m/s)
+static var FLY_LIMIT_M := 2000.0     # vodorovná hranice letu za hranicí katastru (m)
+static var FLY_WARN_M := 400.0       # šířka pásma varování / protivětru před hranicí (m)
+static var FLY_PUSH_MS := 18.0       # max. rychlost odpuzujícího „větru“ u hranice (m/s)
+static var FLY_CEIL_AGL := 1500.0    # strop letu nad terénem (m AGL)
+static var FLY_CEIL_PUSH := 6.0      # jak rychle stroj tlačí dolů nad stropem (m/s)
 
 var args := {}
 var meta: Dictionary
@@ -790,7 +790,8 @@ func quests_of(id: int) -> Quests:
 func nearest_player(pos: Vector3) -> Player:
 	var best: Player = null
 	var bd := INF
-	for p in players.values():
+	for pid in players:                    # M8.19B: bez `values()` – volá se za fyzikální krok z každého NPC (nová Array)
+		var p: Player = players[pid]
 		var d: float = player_world_pos(p).distance_squared_to(pos)
 		if d < bd:
 			bd = d

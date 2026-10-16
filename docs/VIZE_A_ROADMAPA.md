@@ -551,7 +551,7 @@ kroky přehazovat, mezi milníky platí závislosti.
 ### M8 – Realistický svět (transformační upgrade, E14, po M7)
 Start: `prompts/roadmapa/M8_realismus/00_START_M8.md` (orchestrátor, 8 vln), společné principy `00_PRINCIPY.md`.
 - [x] **M8.1 Základ** – přepínače Realismu, eko-takt (`eco_hour` / `eco_day`), měřicí scény `--perfscene`, ladicí vrstvy mapy.
-- [ ] **M8.2 Mapa stanovišť** – `tools/site.py` → `site.bin` (TWI, oslunění se zastíněním, půda, AWC, kotliny, expozice větru), `Site`.
+- [x] **M8.2 Mapa stanovišť** – `tools/site.py` → `site.bin` (TWI, oslunění se zastíněním, půda, AWC, kotliny, expozice větru), `Site`.
 - [x] **M8.3 Dřeviny a porosty** – `dreviny.json`, druh / věk / vitalita pro každý strom z mapy, porosty, dřevo podle druhu.
 - [x] **M8.4 Pole větru** – nárazy běžící krajinou, závětří, hierarchický ohyb, vlny přes obilí, vítr pro létání a kouř.
 - [x] **M8.5 Fyzikální obloha a světlo** – Rayleigh/Mie, soumraky, světlo v luxech, adaptace oka, vzdušná perspektiva, stíny mraků.
@@ -569,6 +569,11 @@ Start: `prompts/roadmapa/M8_realismus/00_START_M8.md` (orchestrátor, 8 vln), sp
 - [x] **M8.17 Život vesnice** – domácnosti, potřeby, okna a komíny podle obsazenosti, vztahy a drby mezi obyvateli.
 - [x] **M8.18 Zvuková krajina** – ptačí chorál, cvrčci (Dolbear), žáby, netopýři, světlušky, útlum lesem a ozvěna.
 - [ ] **M8.19 Kalibrace a uzavření** – srovnání s reálnými daty, výkon na GTX 1050, předvolby, dokumentace.
+  *Stav 17. 10. 2026:* část A (kalibrace `tools/eco_calibrate.py`, konstanty) a část B (statický výkonový audit a opravy,
+  předvolby „Detail přírody M8“ – konzervativně, kontrola starých savů, dokumentace `docs/SYSTEMS.md` → „Realistický svět
+  (M8)“, plán testů v `docs/testy_M8.md`) napsány; **čeká na měření a ruční testy uživatele** (`tools/perf_m8_19.sh`),
+  podle čísel se doladí předvolby a krok se odškrtne. Kroky M8.1–M8.18 napsané a sloučené (M8.2 odškrtnuta dodatečně
+  podle `prompts/roadmapa/README.md`), vše staticky ověřené; ruční testy a měření po vlnách 3–7 chybí.
 
 ### Doporučené pořadí v kostce
 

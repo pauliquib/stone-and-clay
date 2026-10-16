@@ -21,6 +21,10 @@ static var FLOOR_RATE := 6.0          # m/s – jak rychle se posouvá dno údol
 static var FLOOR_SNAP_M := 60.0       # větší rozdíl (teleport, let) → skočit rovnou
 static var MIN_TOP_M := 1.0           # tenčí vrstva se nekreslí
 
+## M8.19B: údolní mlha jako vrstva podle detailu přírody v předvolbě grafiky (`GameSettings.ECO_LEVELS`; Nízká = vypnuto,
+## vzhled jako před M8). Rosa a jinovatka zůstávají. Nastavuje `GameSettings.apply_graphics`, ne menu F3.
+static var layer_on := true
+
 var micro: Microclimate
 var _floor := NAN
 var _off := true
@@ -43,7 +47,7 @@ func update(env: Environment, cam: Camera3D, delta: float, indoor: float) -> voi
 		_floor = move_toward(_floor, fl, delta * FLOOR_RATE)
 	_off = false
 	var top := micro.fog_top_m()
-	var k := micro.fog_layer() if top >= MIN_TOP_M else 0.0
+	var k := micro.fog_layer() if top >= MIN_TOP_M and layer_on else 0.0
 	var top_y := _floor + top
 	var inside := smoothstep(top_y + ABOVE_BAND_M, top_y - INSIDE_BAND_M, p.y) * k
 	env.fog_height = top_y

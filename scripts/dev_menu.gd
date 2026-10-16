@@ -16,6 +16,11 @@ var is_open := false
 var typing := false                       # fokus v textovém poli (hledání, číslo) – LocalClient nepouští vstup do hry
 var _group := ""                          # vybraná kategorie („Vozidla“) nebo podskupina („Vozidla/Auto“)
 var _root: Control
+var _panel: PanelContainer
+var _hud_menu := false                    # M8.19B: je pod F3 otevřená nabídka HUD (pak F3 uhne doprava a pustí kliky)
+## M8.19B: levý okraj panelu F3 (podíl šířky) – normálně a když je pod ním otevřená nabídka HUD (ta je uprostřed obrazovky).
+const PANEL_LEFT := 0.3
+const PANEL_LEFT_HUD := 0.66
 var _tree: Tree
 var _search: LineEdit
 var _rows_box: VBoxContainer
@@ -41,6 +46,7 @@ func _ready() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP     # klik vedle menu nezachytí myš pro rozhlížení
 	add_child(_root)
 	var panel := PanelContainer.new()
+	_panel = panel
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(Hud.MENU_BG, 0.9)
 	sb.set_corner_radius_all(10)
@@ -48,7 +54,7 @@ func _ready() -> void:
 	sb.set_border_width_all(1)
 	sb.border_color = Color(Hud.ACCENT, 0.4)
 	panel.add_theme_stylebox_override("panel", sb)
-	panel.anchor_left = 0.3
+	panel.anchor_left = PANEL_LEFT
 	panel.anchor_right = 1.0
 	panel.anchor_bottom = 1.0
 	panel.offset_left = 0.0
@@ -190,6 +196,14 @@ func _process(delta: float) -> void:
 	typing = f is LineEdit
 	if Input.mouse_mode != Input.MOUSE_MODE_VISIBLE and not client.hud.menu_open:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	# M8.19B: celoobrazovková vrstva F3 blokovala kliky do nabídky HUD pod ní – s otevřenou nabídkou HUD
+	# vrstva kliky propouští (IGNORE) a panel uhne doprava, ať nabídku uprostřed nezakrývá
+	var hm: bool = client.hud.menu_open
+	if hm != _hud_menu:
+		_hud_menu = hm
+		_root.mouse_filter = Control.MOUSE_FILTER_IGNORE if hm else Control.MOUSE_FILTER_STOP
+		_panel.anchor_left = PANEL_LEFT_HUD if hm else PANEL_LEFT
+		_panel.offset_left = 0.0
 	if _search_t >= 0.0:
 		_search_t -= delta
 		if _search_t < 0.0:

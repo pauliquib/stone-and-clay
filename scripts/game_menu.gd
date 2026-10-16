@@ -310,6 +310,8 @@ func open_debug_layers() -> void:
 		opts.append(["Populace zvěře (M8.15)", _habitat_info])
 	if world.households != null:     # M8.17: domácnosti u hráče – kdo bydlí, co dělá, potřeby, dřevo, komín, drby
 		opts.append(["Domácnosti (M8.17)", _households_info])
+	if client != null and client.get("soundscape") != null:     # M8.19B: aktivní druhy zvukové krajiny a obsazené hlasy
+		opts.append(["Zvuková krajina (M8.18)", _soundscape_info])
 	opts.append(["← Zpět", open_main])
 	_hud().open_menu("Příroda – ladění", "Vybraná vrstva se kreslí na mapě (M) místo podkladu – " +
 		"barevná mřížka po 16–64 m podle přiblížení. Každý krok M8 přidá svou vrstvu.", opts)
@@ -452,6 +454,13 @@ func _micro_info() -> void:
 	if jl != "":
 		t += "\n" + jl
 	_hud().open_menu("Mikroklima", t, [["Obnovit", _micro_info], ["← Zpět", open_debug_layers]])
+
+
+## M8.19B: F2 → Příroda – ladění → Zvuková krajina: východ / západ slunce, aktivní druhy a obsazené hlasy (`Soundscape.debug_text`).
+func _soundscape_info() -> void:
+	var ss: Soundscape = client.get("soundscape") if client != null else null
+	var t := ss.debug_text() if ss != null else "Zvuková krajina není spuštěná."
+	_hud().open_menu("Zvuková krajina", t, [["Obnovit", _soundscape_info], ["← Zpět", open_debug_layers]])
 
 
 ## M8.17: F2 → Příroda – ladění → Domácnosti: nejbližší domy (kdo bydlí, co dělá, potřeby, dřevo, komín) a poslední drb.

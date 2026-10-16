@@ -103,7 +103,7 @@ static func register_all() -> void:
 		["CHOP_VOL", "chop_vol", "Zvuky – hlasitost štípání u zdroje", "dB", "", -30.0, 10.0],
 		["MOW_VOL", "mow_vol", "Zvuky – hlasitost sekačky u zdroje", "dB", "", -30.0, 10.0],
 		["SOUND_ATTEN", "sound_atten", "Zvuky – útlum se vzdáleností", "dB/m", "", 0.0, 0.5],
-		["MOW_PITCH", "mow_pitch", "Zvuky – výška sekačky (zpomalená pila)", "×", "", 0.1, 2.0],
+		["MOW_PITCH", "mow_pitch", "Zvuky – výška (ladění) zvuku sekačky", "×", "Sekačka má od M8.18 vlastní zvuk „mower“ (NatureSfx); 1 = původní výška.", 0.1, 2.0],
 		["HIDE_INSIDE", "hide_inside", "Postavy – doma se schovají do domu (bez fyziky)", "", "Spánek, jídlo, odpočinek, návštěva.", 0.0, 1.0],
 		["SNAP_DEEP", "snap_deep", "Postavy – za simulační bublinou se přesunou rovnou na místo", "", "", 0.0, 1.0],
 		["DRESS_WARM_C", "dress_warm_c", "Postavy – pod touto teplotou větrovka", "°C", "Teplota u domu (Microclimate).", -10.0, 30.0],

@@ -1,5 +1,59 @@
 # Ruční testy – M8 Realistický svět
 
+## Plán testování po dokončení M8
+
+> Sepsáno v M8.19B (17. 10. 2026). Čísla z `--perfscene` po vlnách 3–7 zatím nejsou – předvolby jsou nastavené
+> konzervativně a podle tvých měření se doladí. Pořadí: nejdřív výkon (bez něj nejde nastavit předvolby), pak ruční
+> testy po oblastech. Podrobné kroky jsou v oddílech M8.x níž – tady jen co a v jakém pořadí.
+
+### 1. Příprava (jednou)
+1. Offline data (pokud chybí nebo se měnil terén / `dreviny.json`), v tomto pořadí:
+   `python3 tools/site.py` → `python3 tools/tree_species.py` → `python3 tools/treegen/treegen.py` →
+   `python3 tools/vegetation.py --eco` (ten už pustil orchestrátor – stačí, když `data/vegetation.bin` existuje).
+2. `./run.sh` jednou normálně (obnoví import a seznam tříd), zavřít.
+3. Esc → Nastavení → Grafika: poznamenej si **Renderer** (Forward+ / Mobile – 8. 10. běžel Mobile) a předvolbu, kterou
+   hraješ. Měření níže si předvolbu vnutí samo (`--preset=`), nic se neukládá.
+
+### 2. Měření výkonu (`tools/perf_m8_19.sh`, každá scéna ~25 s, souhrnný log na konci)
+Srovnávací základ: 8. 10. `ves_poledne` **26,8 fps / 37,3 ms**, `les_rano_mlha` 26,1 fps, `udoli_noc` 28,6 fps
+(Quadro M2200, Mobile, před M8); profil tehdy `car` 7,9 ms, `villager` 6,8 ms, `hud_minimap` 2,2 ms, `humanoid` 2,0 ms.
+Cíl M8: Střední ≈ 60 fps na GTX 1050 – tady sleduj hlavně **rozdíl proti základu** a řádky profilu `PERF … ms/frame`.
+
+| Priorita | Příkaz | Běhy | Co sleduje |
+|---|---|---|---|
+| 1 | `tools/perf_m8_19.sh zaklad` | 6 | `ves_poledne` na Nízká / Střední / Vysoká (vliv předvolby, Nízká ≈ před M8), `les_leto` (generované stromy LOD0/LOD1), `dron_200m` (impostory, dohled), `les_rano_mlha` (mlha, mikroklima) – proti základu 8. 10. |
+| 2 | `tools/perf_m8_19.sh stredni` | 18 | zbytek scén na Střední: vesnice (`ves_rano_zima`, `ves_sobota_rijen` – `villager`), louka (`louka_cerven` – `groundveg`), zvuky (`les_rano_kveten`, `rybnik_soumrak`, `les_cerven_noc` – `soundscape`, `small_life`), denní kroky o půlnoci (`zver_pulnoc`, `pole_pulnoc` – špička ≤ 2 ms), pole, inverze, vítr, zima (`body_thermo`), `pole_blato` (déšť; terramechanika se projeví až v autě – viz ruční testy) |
+| 3 | `tools/perf_m8_19.sh prepinace` | 8 | stejné scény s jedním přepínačem Realismu vypnutým (`village_life`, `gait`, `treegen`, `micro`, `soundscape`, `wind`, `habitat`, `crops`) – rozdíl = cena kroku (rozpočet ≤ 0,5 ms CPU / 1 ms GPU) |
+| 4 | `tools/perf_m8_19.sh vysoka` | 6 | `les_leto`, `louka_cerven` (interaktivní tráva je až od Vysoké), `dron_200m` na Vysoká; `ves_poledne`, `les_leto`, `dron_200m` na Ultra |
+
+- Stačí `zaklad` + `stredni` (24 běhů, ~11 min); `prepinace` a `vysoka` když zbude čas. Vše najednou: `tools/perf_m8_19.sh vse`.
+- Jednotlivá scéna ručně: `tools/launcher.sh --preset=stredni --perfscene=les_leto,30` (přepínač: `--realism=treegen:off`).
+- Během měření na hru nesahej (myš ani klávesy), okno nech v popředí. Volitelně jeden běh `zaklad` s druhým rendererem
+  (Esc → Nastavení → Grafika → Renderer, restart) – ukáže, jestli Forward+ / Mobile dělá rozdíl.
+- **Poslat:** soubor(y) `logs/m8_19_<skupina>_<datum>.log` (vypíše je skript na konci) + renderer a předvolba, kterou hraješ.
+
+### 3. Ruční testy po oblastech (odkazy na oddíly níž; F2 = teleport / datum / počasí)
+1. **Svět a výkon** – M8.1 (přepínače, eko-takt, F5/F9), předvolby: Esc → Nastavení → Grafika → přepni Nízká → Střední →
+   Vysoká a sleduj „Detail přírody M8“ (Nízká: stromy zblízka hrubší dřív, bez sešlapávání trávy, bez netopýrů/motýlů,
+   bez údolní mlhy, stará obloha – vzhled jako před M8; simulace dál běží), M8.5 (obloha), M8.2 (vrstvy mapy).
+2. **Příroda** – M8.3 → M8.4 → M8.7 → M8.8 → M8.9 → M8.11 → M8.12 → M8.14 (stromy, vítr, voda, mikroklima, fenologie, plodiny,
+   louky). Rok přeskočený po měsících (F2 → Datum) → kalendář přírody bez skoků a chyb v konzoli.
+3. **Zvěř** – M8.10 (lokomoce, let, hejna) → M8.15 (stanoviště, populace) → M8.18 (zvuky, drobný život; nově F2 → Příroda –
+   ladění → „Zvuková krajina (M8.18)“ ukáže aktivní druhy a obsazené hlasy).
+4. **Člověk a vesnice** – M8.6 (chůze) → M8.16 (tělo) → M8.17 (domácnosti, okna, komíny, drby).
+5. **Vozidla a terén** – M8.13 (bláto, zapadlé auto, koleje; na `pole_blato` sednout do auta a jet po poli – profil `car`),
+   létání u hranice: dron/letadlo za katastr → varování, protivítr, návrat; strop nad terénem (hodnoty teď v F3 → Létání/Hranice letu).
+6. **Menu F3 a uložení** – M8.D (F3): otevři F2 a pak F3 → panel F3 uhne doprava a nabídka F2 jde klikat myší; F3 → Létání/
+   Hranice letu (5 parametrů). **Starý save z M7** (pozice uložená před M8, `--load=slot`) → načte se, louky se srovnají k datu
+   savu, vlhkost / mikroklima / fenologie / populace / domácnosti se rozběhnou z klimatu a seedu, žádná chyba v konzoli.
+   Nová hra → hodina hraní po vsi a lese bez `push_warning` M8 systémů. Přepínače Realismu po jednom vypnout → nic nespadne.
+
+### 4. Co poslat zpět
+- Logy měření (`logs/m8_19_*.log`) a renderer / předvolbu, kterou hraješ.
+- `config.json` z F3 → Exportovat, pokud jsi něco ladil (hodnoty se při kalibraci přenesou do kódu).
+- Poznámky k ručním testům: číslo oddílu a bodu (např. „M8.14/5“), co bylo vidět, `logs/latest.log` u chyb a pádů.
+
+
 > Testování dělá výhradně uživatel (00_SPOLECNE kap. 2 bod 3). Agent jen čte kód a offline generátory
 > (`tools/*.py`), hru ani `--…test` nespouští. Výkon se měří přes `--perfscene=<jméno>` (viz M8.1) –
 > čísla (CPU/GPU ms, FPS) pošli zpátky, agent je porovná s rozpočtem v `M8_realismus/00_PRINCIPY.md`

@@ -101,6 +101,9 @@ var _sig := PackedInt64Array()          # podpis kotev (změna → přepis trans
 var _anchors: Array[PackedVector3Array] = []
 var _t := 0.0
 var _light := 1.0
+## M8.19B: hustota podle detailu přírody v předvolbě grafiky (`GameSettings.ECO_LEVELS`): násobek počtu kotev
+## (hejnek) každého druhu; 0 = drobný život se nekreslí (zvuková krajina běží dál podle svého přepínače).
+var density := 1.0
 
 
 func setup(w: World, c: Node, s: Soundscape) -> void:
@@ -222,7 +225,7 @@ func _tick() -> void:
 	var c: Clock = world.clock
 	if p == null or c == null or soundscape == null:
 		return
-	var on := world.realism_on("soundscape") and p.inside == ""
+	var on := world.realism_on("soundscape") and p.inside == "" and density > 0.0
 	var pos := p.global_position
 	var elev := c.sun_elevation()
 	var month := c.month()
@@ -297,6 +300,7 @@ func _pick_anchors(k: int, pos: Vector3) -> int:
 	var r := int(ceil(LIFE_R / cell))
 	var c0 := Vector2i(floori(pos.x / cell), floori(pos.z / cell))
 	var want: int = [BAT_ANCHORS, FF_ANCHORS, BF_ANCHORS, MQ_ANCHORS, MF_ANCHORS][k]
+	want = maxi(roundi(want * density), 1)      # M8.19B: hustota z předvolby
 	var best_w := PackedFloat32Array()
 	var best_c: Array[Vector2i] = []
 	for dx in range(-r, r + 1):

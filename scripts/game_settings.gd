@@ -85,14 +85,28 @@ const SIMS := [250.0, 400.0, 600.0, 900.0]
 const SIM_NAMES := ["Malá", "Střední", "Velká", "Maximální"]
 const FPS_CAPS := [0, 30, 60, 75, 120, 144]
 const FPS_NAMES := ["Bez omezení", "30", "60", "75", "120", "144"]
-## předvolby: scale, upscale, aa, shadows, view, veg, sim, glow, ssao
-const PRESETS := [
-	{"scale": 0, "upscale": 1, "aa": 0, "shadows": 0, "view": 0, "veg": 0, "sim": 0, "glow": false, "ssao": false},
-	{"scale": 3, "upscale": 1, "aa": 1, "shadows": 2, "view": 1, "veg": 1, "sim": 1, "glow": true, "ssao": false},
-	{"scale": 4, "upscale": 0, "aa": 2, "shadows": 3, "view": 2, "veg": 3, "sim": 2, "glow": true, "ssao": false},
-	{"scale": 4, "upscale": 0, "aa": 3, "shadows": 4, "view": 3, "veg": 3, "sim": 3, "glow": true, "ssao": true},
+## M8.19B: detail přírody M8 (gfx klíč "eco") – jen vzhled a zvuk u klienta; simulace (voda, mikroklima, fenologie,
+## plodiny, populace, domácnosti…) běží na všech úrovních stejně. Konzervativně (čísla z --perfscene po M8 zatím nejsou,
+## viz docs/testy_M8.md → Plán testování): Nízký = vzhled jako před M8, Střední střídmě, plné jen Vysoký / Ultra.
+const ECO_NAMES := ["Nízký (vzhled jako před M8)", "Střední (střídmě)", "Vysoký (plný)", "Ultra (delší LOD stromů)"]
+## lod0 = násobek dosahu LOD0 generovaných stromů (TreeGen.L0_END 55 m), trample = interaktivní tráva (sešlapání),
+## life = hustota drobného života (0 = nekreslí se), voices = nejvýš současných hlasů zvukové krajiny (pool 16),
+## sound_r = násobek okruhu výběru zdrojů (SCAN_R 200 m), fog_layer = údolní mlha jako vrstva (M8.9),
+## sky = fyzikální obloha (přepínač realismu „sky“ – nastaví se jen při volbě předvolby / detailu, ne při každém startu).
+const ECO_LEVELS := [
+	{"lod0": 0.5, "trample": false, "life": 0.0, "voices": 6, "sound_r": 0.6, "fog_layer": false, "sky": false},
+	{"lod0": 0.75, "trample": false, "life": 0.5, "voices": 10, "sound_r": 0.8, "fog_layer": true, "sky": true},
+	{"lod0": 1.0, "trample": true, "life": 1.0, "voices": 16, "sound_r": 1.0, "fog_layer": true, "sky": true},
+	{"lod0": 1.3, "trample": true, "life": 1.0, "voices": 16, "sound_r": 1.0, "fog_layer": true, "sky": true},
 ]
-const GFX_KEYS := ["scale", "upscale", "aa", "shadows", "view", "veg", "sim", "glow", "ssao"]
+## předvolby: scale, upscale, aa, shadows, view, veg, sim, glow, ssao, eco (M8.19B)
+const PRESETS := [
+	{"scale": 0, "upscale": 1, "aa": 0, "shadows": 0, "view": 0, "veg": 0, "sim": 0, "glow": false, "ssao": false, "eco": 0},
+	{"scale": 3, "upscale": 1, "aa": 1, "shadows": 2, "view": 1, "veg": 1, "sim": 1, "glow": true, "ssao": false, "eco": 1},
+	{"scale": 4, "upscale": 0, "aa": 2, "shadows": 3, "view": 2, "veg": 3, "sim": 2, "glow": true, "ssao": false, "eco": 2},
+	{"scale": 4, "upscale": 0, "aa": 3, "shadows": 4, "view": 3, "veg": 3, "sim": 3, "glow": true, "ssao": true, "eco": 3},
+]
+const GFX_KEYS := ["scale", "upscale", "aa", "shadows", "view", "veg", "sim", "glow", "ssao", "eco"]
 ## podání barev: [tonemapper, sytost, kontrast, bílá (tonemap_white)] – Přirozené odpovídá původnímu
 ## vzhledu (LocalClient.build_environment); sytější režimy jedou přes ACES (víc kontrastu a nasycení
 ## než Filmic; AgX je až od Godotu 4.4)
@@ -148,6 +162,8 @@ func load_file() -> void:
 	ItemsDB.adult_on = adult_content     # M4.8: katalog hned ví, jestli je obsah pro dospělé zapnutý
 	volume = clampf(float(cf.get_value("zvuk", "hlasitost", volume)), 0.0, 1.0)
 	preset = clampi(int(cf.get_value("grafika", "predvolba", preset)), 0, PRESET_NAMES.size() - 1)
+	if preset < PRESETS.size():
+		gfx["eco"] = PRESETS[preset]["eco"]    # M8.19B: starý cfg bez klíče "eco" → detail přírody podle uložené předvolby
 	for k in GFX_KEYS:
 		gfx[k] = cf.get_value("grafika", k, gfx[k])
 	fps_cap = clampi(int(cf.get_value("grafika", "strop_fps", fps_cap)), 0, FPS_CAPS.size() - 1)
@@ -208,6 +224,7 @@ func set_preset(i: int) -> void:
 	preset = i
 	if i < PRESETS.size():
 		gfx = PRESETS[i].duplicate()
+		_eco_realism()
 
 
 func set_gfx(key: String, v) -> void:
@@ -216,6 +233,36 @@ func set_gfx(key: String, v) -> void:
 	for i in PRESETS.size():
 		if PRESETS[i] == gfx:
 			preset = i
+	if key == "eco":
+		_eco_realism()
+
+
+## M8.19B: úroveň detailu přírody (index do ECO_LEVELS).
+func eco_level() -> Dictionary:
+	return ECO_LEVELS[clampi(int(gfx.get("eco", 2)), 0, ECO_LEVELS.size() - 1)]
+
+
+## M8.19B: grafické přepínače realismu, které určuje předvolba (00_PRINCIPY kap. 5) – jen při výslovné volbě
+## předvolby / detailu přírody, aby start hry nepřepisoval, co si hráč vypnul / zapnul v Realismu ručně.
+func _eco_realism() -> void:
+	set_realism("sky", bool(eco_level()["sky"]))
+
+
+## M8.19B: detail přírody do běžících systémů klienta (stromy LOD0, interaktivní tráva, drobný život, zvuková krajina,
+## údolní mlha). Systém, který ještě neexistuje, si hodnotu vezme při dalším `apply_graphics` (start, změna v Nastavení).
+func _apply_eco(client: Node) -> void:
+	var lv := eco_level()
+	if MapLoader.tree_gen != null:
+		MapLoader.tree_gen.set_lod0_scale(float(lv["lod0"]))
+	if client.world and client.world.vegetation and client.world.vegetation.fx:
+		client.world.vegetation.fx.interactive = bool(lv["trample"])
+	var ss: Soundscape = client.get("soundscape")
+	if ss:
+		ss.set_detail(int(lv["voices"]), float(lv["sound_r"]))
+	var sl: SmallLife = client.get("small_life")
+	if sl:
+		sl.density = float(lv["life"])
+	MicroFx.layer_on = bool(lv["fog_layer"])
 
 
 func apply_graphics(client: Node) -> void:
@@ -268,6 +315,7 @@ func apply_graphics(client: Node) -> void:
 		client.season_fx.decor.set_detail(veg)
 	if client.world and client.world.vegetation:   # Fáze 9: statická vegetace – 0 = vypnuto
 		client.world.vegetation.set_detail(veg)
+	_apply_eco(client)                              # M8.19B: detail přírody M8
 	# aktivita světa – poloměr plné simulace NPC/fauny/dopravy okolo hráče
 	if client.world:
 		client.world.sim_radius = SIMS[clampi(int(gfx.get("sim", 2)), 0, SIMS.size() - 1)]
@@ -316,6 +364,9 @@ func look(rel: Vector2) -> Vector2:
 ## M8.8: přepínač realismu přímo z nastavení na disku – pro věci, které se staví už při načtení světa (`World.build`
 ## běží dřív, než klient načte nastavení v `LocalClient.attach`). Automatické testy a snímky (`args`) mají výchozí true.
 static func realism_saved(key: String, args := {}) -> bool:
+	var ov: Dictionary = realism_args(args)          # M8.19B: --realism=klíč:off má přednost (měření)
+	if ov.has(key):
+		return bool(ov[key])
 	for k in args:
 		if k == "shot" or String(k).ends_with("test"):
 			return true
@@ -323,3 +374,29 @@ static func realism_saved(key: String, args := {}) -> bool:
 	if cf.load(PATH) != OK:
 		return true
 	return bool(cf.get_value("realismus", key, true))
+
+
+## M8.19B: přepínače realismu z příkazové řádky pro měření – `--realism=micro:off,soundscape:off` (on / off; bez
+## dvojtečky = on). Platí jen pro tento běh; do `nastaveni.cfg` se zapíšou, jen když hráč v Nastavení něco uloží.
+static func realism_args(args: Dictionary) -> Dictionary:
+	var out := {}
+	if not args.has("realism"):
+		return out
+	for part in String(args["realism"]).split(",", false):
+		var kv := part.strip_edges().split(":", true, 1)
+		if kv[0] != "":
+			out[kv[0]] = kv.size() < 2 or kv[1] != "off"
+	return out
+
+
+## M8.19B: `--preset=nizka|stredni|vysoka|ultra` (nebo 0–3) → index předvolby; −1 = parametr není / neznámý.
+static func preset_arg(args: Dictionary) -> int:
+	if not args.has("preset"):
+		return -1
+	var v := String(args["preset"]).to_lower()
+	var names := ["nizka", "stredni", "vysoka", "ultra"]
+	if names.has(v):
+		return names.find(v)
+	if v.is_valid_int():
+		return clampi(int(v), 0, PRESETS.size() - 1)
+	return -1
