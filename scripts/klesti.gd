@@ -13,14 +13,14 @@ extends Node3D
 
 const TICK_MIN := 60.0                 # herní minuty mezi průchody sušení
 const TICK_S := 2.0                    # reálné s mezi kontrolou nových hráčů
-const MAX_TAKE := 20                   # nejvíc suchých větví z hromady najednou
+static var MAX_TAKE := 20                   # nejvíc suchých větví z hromady najednou
 const PILE_OFFSET := Vector3(3.0, 0.0, 0.0)   # m od dveří domu (vpravo)
 const TARGET_R := 1.8                  # m – dosah cíle hromady
 const KIND := "klesti_hromada"
 const FRESH_ITEM := "vetve_cerstve"
 const DRY_ITEM := "vetve"
-const DRY_DROUGHT_K := 1.5             # stejné ladění jako `Vyhlasky` (sucho zrychluje)
-const DRY_RAIN_K := 0.4                # déšť zpomaluje
+static var DRY_DROUGHT_K := 1.5             # stejné ladění jako `Vyhlasky` (sucho zrychluje)
+static var DRY_RAIN_K := 0.4                # déšť zpomaluje
 const VIS_MAX := 30                    # víc klestí hromada vizuálně neroste
 const COL_DRY := Color(0.4, 0.3, 0.18)
 const COL_FRESH := Color(0.45, 0.4, 0.22)

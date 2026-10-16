@@ -13,23 +13,36 @@ class_name Gait
 extends RefCounted
 
 const LEG_LEN := 0.44            # m – délka nohy (stehno + holeň, shoduje se s `Humanoid._leg_ik`)
-const DUTY_WALK := 0.6           # podíl stojné fáze při chůzi
-const DUTY_RUN := 0.35           # podíl stojné fáze při běhu (zbytek = letová fáze, oba chodidla ve vzduchu)
-const RUN_SPEED := 2.0           # m/s – práh chůze → běh
-const RUN_SPAN := 3.0            # m/s – šířka přechodu (plynulé duty/kadence)
-const STEP_K := 0.85             # ladění kadence (dynamická podobnost, jako `QuadrupedRig.GAITS.k`)
-const RUN_K := 1.25
-const LIFT_WALK := 0.5           # zdvih chodidla ve švihu (rad ekvivalent přes koleno)
-const LIFT_RUN := 1.0
-const ARM_SWING_K := 0.8         # protipohyb paží vůči protilehlé noze
-const PELVIS_SHIFT := 0.045      # m – boční posun pánve nad stojnou nohou
-const PELVIS_BOB := 0.045        # m – svislý pohup (dvakrát za cyklus)
-const TURN_SHUFFLE_MIN_RATE := 0.3   # rad/s – od kdy se otočka na místě řeší přešlapováním
-const LOAD_MAX_KG := 30.0
-const LOAD_LEAN_K := 0.012       # rad náklonu vpřed na kg (shrbení pod břemenem)
-const LOAD_STEP_K := 0.3         # zkrácení kroku s nákladem (0..1 na LOAD_MAX_KG)
-const TIRED_LEAN_K := 0.1        # rad shrbení při vyčerpané výdrži
-const TIRED_CADENCE_K := 0.25    # zpomalení kadence při vyčerpané výdrži
+static var DUTY_WALK := 0.6           # podíl stojné fáze při chůzi
+static var DUTY_RUN := 0.35           # podíl stojné fáze při běhu (zbytek = letová fáze, oba chodidla ve vzduchu)
+static var RUN_SPEED := 2.0           # m/s – práh chůze → běh
+static var RUN_SPAN := 3.0            # m/s – šířka přechodu (plynulé duty/kadence)
+static var STEP_K := 0.85             # ladění kadence (dynamická podobnost, jako `QuadrupedRig.GAITS.k`)
+static var RUN_K := 1.25
+static var LIFT_WALK := 0.5           # zdvih chodidla ve švihu (rad ekvivalent přes koleno)
+static var LIFT_RUN := 1.0
+static var ARM_SWING_K := 0.8         # protipohyb paží vůči protilehlé noze
+static var PELVIS_SHIFT := 0.045      # m – boční posun pánve nad stojnou nohou
+static var PELVIS_BOB := 0.045        # m – svislý pohup (dvakrát za cyklus)
+static var TURN_SHUFFLE_MIN_RATE := 0.3   # rad/s – od kdy se otočka na místě řeší přešlapováním
+static var LOAD_MAX_KG := 30.0
+static var LOAD_LEAN_K := 0.012       # rad náklonu vpřed na kg (shrbení pod břemenem)
+static var LOAD_STEP_K := 0.3         # zkrácení kroku s nákladem (0..1 na LOAD_MAX_KG)
+static var TIRED_LEAN_K := 0.1        # rad shrbení při vyčerpané výdrži
+static var TIRED_CADENCE_K := 0.25    # zpomalení kadence při vyčerpané výdrži
+## M8.D2b: dřív čísla ve vzorci `animate` – laditelné v menu F3 (Člověk / Chůze a postoj). Čte se jen `static var`
+## (žádný registr, žádná alokace za snímek – `animate` běží u každé postavy každý snímek).
+static var CADENCE_G := 9.8           # m/s² – „g“ v dynamické podobnosti kadence (√(g / délka nohy))
+static var TURN_BLEND := 5.0          # /s – náběh přešlapování při otočce na místě
+static var MOVE_BLEND := 5.0          # /s – náběh / útlum chůze při rozchodu a zastavení
+static var SHUFFLE_SPEED_K := 0.6     # m/s přešlapování na rad/s otáčení
+static var SHUFFLE_V_MIN := 0.15      # m/s – nejpomalejší přešlapování
+static var SHUFFLE_V_MAX := 0.9       # m/s – nejrychlejší přešlapování
+static var STEP_AMP_MAX := 0.9        # rad – největší rozkmit stehna
+static var KNEE_BASE := 0.05          # rad – mírně pokrčené koleno ve stoje
+static var KNEE_LIFT_K := 0.5         # ohnutí kolene ve švihu (chůze)
+static var KNEE_RUN_K := 0.85         # + ohnutí kolene ve švihu při běhu
+static var TIRED_ARM_K := 0.4         # o kolik vyčerpaná výdrž zmenší rozkmit paží
 
 var scale_factor := 1.0          # výška postavy (Humanoid.scale_factor) – délka kroku ∝ výška
 
@@ -61,19 +74,19 @@ func animate(delta: float, speed: float, turn_rate: float, load_kg: float, tired
 	duty = lerpf(DUTY_WALK, DUTY_RUN, run_frac)
 	var leg_len := LEG_LEN * clampf(scale_factor, 0.55, 1.6)
 	var k := lerpf(STEP_K, RUN_K, run_frac) * (1.0 - tired * TIRED_CADENCE_K)
-	var freq := k * sqrt(9.8 / leg_len) / PI
+	var freq := k * sqrt(CADENCE_G / leg_len) / PI
 	# přešlapování při otočce na místě (ne „na kolíku“ – jako `QuadrupedRig._pick_gait` turning_in_place)
 	var turning_in_place := v < 0.1 and absf(turn_rate) > TURN_SHUFFLE_MIN_RATE
-	_turn_w = move_toward(_turn_w, 1.0 if turning_in_place else 0.0, delta * 5.0)
+	_turn_w = move_toward(_turn_w, 1.0 if turning_in_place else 0.0, delta * TURN_BLEND)
 	var vv := v
 	if turning_in_place:
-		vv = clampf(absf(turn_rate) * 0.6, 0.15, 0.9)
-	move_w = move_toward(move_w, 1.0 if vv > 0.04 else 0.0, delta * 5.0)
+		vv = clampf(absf(turn_rate) * SHUFFLE_SPEED_K, SHUFFLE_V_MIN, SHUFFLE_V_MAX)
+	move_w = move_toward(move_w, 1.0 if vv > 0.04 else 0.0, delta * MOVE_BLEND)
 	cadence_hz = freq if move_w > 0.01 else 0.0
 	if vv > 0.02:
 		phase = fposmod(phase + freq * delta, 1.0)
 	var stride := vv / maxf(freq, 0.05)
-	var amp := clampf(atan(stride * duty * 0.5 / leg_len), 0.0, 0.9) * move_w
+	var amp := clampf(atan(stride * duty * 0.5 / leg_len), 0.0, STEP_AMP_MAX) * move_w
 	var load_frac := clampf(load_kg / LOAD_MAX_KG, 0.0, 1.0)
 	amp *= 1.0 - load_frac * LOAD_STEP_K
 	var lift := lerpf(LIFT_WALK, LIFT_RUN, run_frac) * move_w
@@ -101,14 +114,14 @@ func animate(delta: float, speed: float, turn_rate: float, load_kg: float, tired
 		f_r = sin(PI * t_r) * lift
 	leg_l = s_l
 	leg_r = s_r
-	knee_l = 0.05 + f_l * (0.5 + run_frac * 0.85)
-	knee_r = 0.05 + f_r * (0.5 + run_frac * 0.85)
+	knee_l = KNEE_BASE + f_l * (KNEE_LIFT_K + run_frac * KNEE_RUN_K)
+	knee_r = KNEE_BASE + f_r * (KNEE_LIFT_K + run_frac * KNEE_RUN_K)
 	# protipohyb paží vůči protilehlé noze (kontralaterální koordinace)
 	arm_l = -leg_r * ARM_SWING_K
 	arm_r = -leg_l * ARM_SWING_K
 	if tired > 0.0:    # vyčerpaná výdrž: menší rozkmit paží
-		arm_l *= 1.0 - tired * 0.4
-		arm_r *= 1.0 - tired * 0.4
+		arm_l *= 1.0 - tired * TIRED_ARM_K
+		arm_r *= 1.0 - tired * TIRED_ARM_K
 	# pánev: boční posun nad stojnou nohou + svislý pohup dvakrát za cyklus
 	pelvis_x = PELVIS_SHIFT * sin(phase * TAU) * move_w
 	pelvis_y = PELVIS_BOB * (0.5 - 0.5 * cos(phase * TAU * 2.0)) * move_w

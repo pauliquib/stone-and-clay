@@ -2221,3 +2221,53 @@ dopravy, ne o regresi.
 - Exportovaná hra: `res://config.json` musí být v exportním filtru (`*.json`), `export_presets.cfg` zatím není.
 - Kamera vozidel, zvuky, světla a stěrače nejsou registrované (nejsou „fyzika světa“); gravitace hráče patří do
   Člověk (M8.D2b), počasí / vítr / mikroklima do Příroda (M8.D2c) – povrchy a přilnavost už jsou ve Svět.
+
+## 2026-10-16 – M8.D2b Menu pro vývojáře: Člověk a Činnosti
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu – ruční test čeká)
+- **Člověk** (`scripts/dev/tune_clovek.gd`, 382): Pohyb hráče 140 · Tělo 95 · Chůze a postoj 66 · NPC a vesničané 51 · Pes 30.
+  - `player.gd`: `@export` pohybu (chůze, sprint, přikrčení, zrychlení, skok, gravitace hráče, coyote, buffer, skluz) →
+    `static var` (stejná jména, sdílené všemi hráči; `mouse_sensitivity` zůstává – je to nastavení); konstanty plavání,
+    dechu, skateboardu, nosnosti, výšek kapsle, pádu → `static var`; ~95 čísel ze vzorců vytaženo (výdrž, skluz, brodění,
+    svahy, strkání, opilost – zpoždění, drift, zakopnutí, nárazy, opilé dopady –, pád z výšky, sražení autem, rozbití
+    lahví, výdej kcal, skateboard, délky pití / jídla / kouření / zvracení).
+  - `body_state.gd`: všechny konstanty → `static var` + ~85 čísel ze vzorců (Widmark, vstřebávání, odbourávání, trávení,
+    bazál, rychlost / výdrž / únava / skok podle BMI, dehtu, chladu a přehřátí, schnutí, pocitová teplota, nevolnost,
+    zvracení, otrava, okno, hojení, nikotin, kofein, THC, psilocybin).
+  - `gait.gd` (kromě `LEG_LEN` – geometrie IK) + 11 čísel z `animate`; `humanoid.gd` 38 čísel postoje (propružení,
+    přechody pozic, stará animace, lokty, předklon, svah, přikrčení, potácení v opilosti, třes zimou). Akční klíčové
+    pózy (sekání, rytí…) a IK geometrie se neladí.
+  - `villager.gd` 4 konstanty + 40 čísel (pásma simulace, chůze, zastavování, zaseknutí, zdravení, repliky, útěk,
+    sražení, opilost); `npc.gd` 3; `npc_grow.gd` 5; `dog.gd` 30 (toulání, sledování, návrat, skok, kadence, pásma).
+- **Činnosti** (`scripts/dev/tune_cinnosti.gd`, 371): Rybaření 73 · Lov a balistika 111 · Oheň a požáry 65 · Těžba
+  a řemesla 76 · Návykové látky a efekty 46.
+  - `fishing.gd`: konstanty + `PLACE_MULT` / `MONTH_MULT` (po klíčích / měsících) + 31 čísel (denní doba, počasí, náhoda
+    čekání, velikost úlovku, záběry ryby, XP).
+  - `weapons.gd`: `WEAPONS` jako `static var` – ladí se každá nenulová číselná vlastnost zbraně (natažení, kadence,
+    přebíjení, zásobník, v0, hluk, kolísání, hmotnost, odpor, vítr, rozptyl); balistika, dech, kolísání mušky (17 čísel),
+    zpětný ráz, `OFFENSE_CD_MIN`, `CALL_P` (šance zavolat policii podle povahy). `hunting.gd` 21 konstant + 11 čísel
+    + `SHOT_WITNESS_R`; `shooting_range.gd` 2 + XP. `carcass.gd` nemá co ladit (vše v `data/lov.json`).
+  - `fire.gd`, `fire_manager.gd` (34 konstant + 13 čísel: zapálení, přeskok požáru, kamna, domov), `grass_fire.gd`.
+    `fire_fx.gd` je čistě vizuální – nic.
+  - `forestry.gd` 24 konstant (včetně tabulek nástrojů po klíčích) + 22 čísel (doby kácení / odvětvení / řezání,
+    úrazy, zásah padajícím stromem); `klesti.gd` 3; `skills.gd` 12 (XP křivka, řízení, výřečnost, jezdectví, události).
+  - Návykové látky: tělo (nikotin, chuť, závislost, kofein, THC, psilocybin, muchomůrka), doby akcí hráče,
+    `Consumables.ETHANOL_DENSITY`, prahy obrazových efektů `DrunkFx` (12 čísel).
+- Chování ve výchozím stavu beze změny (výchozí = původní čísla; vzorce přepsané 1:1). Za snímek se čte jen `static var`
+  (žádný registr, žádné nové alokace – Humanoid / Gait / Villager / Dog).
+- Ověřeno offline skriptem (`godot --headless -s`, bez hry): počty po podskupinách, zápis do `static var`, Dictionary
+  i Array cílů (zbraň, měsíc, nástroj, kůň, dřevo, událost XP) a reset; po startu 0 parametrů odlišných od kódu; celkem
+  v registru 1272 (Svět + Vozidla + Člověk + Činnosti). Kontrola překladu všech změněných skriptů a 72 skriptů, které
+  na změněné třídy odkazují: prázdná.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M8.md` → M8.D2b).
+- Pohyb hráče je teď sdílený všemi hráči (`static var`) – v MP (V2) by šel ladit jen společně (to je u ladění žádoucí).
+- Jen při stavbě se projeví: `Player.WALK_FLOOR_ANGLE` (po startu / seskoku ze skateboardu), `BOARD_FLOOR_ANGLE` (při
+  dalším naskočení), tempo a odstup vesničanů (`SPEED_*`, `SIDE_*` – nově vytvoření), `GARDEN_D` (další naplnění BT).
+- Parametry uzlů behavior stromu (`ai/villager_routine.tres`: doby čekání, hodiny, `arrive`, limit promile) jsou
+  `@export` v resource stromu, ne konstanty kódu – registr je neumí (cíl by musel být každý uzel stromu každého
+  vesničana); ladí se v editoru LimboAI.
+- Data `data/ryby.json`, `data/lov.json` a katalog `ItemsDB` (kcal, obj. %, ceny) se v menu neladí (data, ne kód).
+- Zákonné závažnosti (`severity`) a změny pověsti zapsané přímo ve voláních `commit_offense` / `rep.change` nejsou
+  vytažené – nejsou to fyzika ani časování.

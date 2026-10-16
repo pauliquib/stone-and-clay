@@ -20,43 +20,134 @@ signal passed_out
 signal injured(amount: float, reason: String)
 signal knocked_out(reason: String)
 
-const HEIGHT_M := 1.80
-const OBESITY_GAIN := 6.0          # herní zrychlení tloustnutí
-const KCAL_PER_KG := 7700.0
-const BETA := 0.15                 # ‰ / h odbourávání (průměrný muž)
+static var HEIGHT_M := 1.80
+static var OBESITY_GAIN := 6.0          # herní zrychlení tloustnutí
+static var KCAL_PER_KG := 7700.0
+static var BETA := 0.15                 # ‰ / h odbourávání (průměrný muž)
 # --- počasí na těle (env z Player._update_body: rain 0..1, temp °C, wind m/s, in bool)
-const WET_RAIN := 1.1              # /h – promočení při rain = 1 (liják)
-const WET_DRY_IN := 0.7            # /h – schnutí pod střechou / uvnitř
-const WET_DRY_OUT := 0.35          # /h – venku za sucha (škáluje teplotou a větrem)
-const COLD_COMFORT := 13.0         # °C – pocitová teplota, od které tělo chladne
-const CHILL_RATE := 0.016          # /h·°C – růst prochladnutí pod pohodlí
-const WARM_RATE := 0.09            # /h·°C – zahřívání v teple
-const HEAT_DRY_K := 3.0            # u ohně / kamen (heat = 1) se schne o tolik násobků rychleji navíc (celkem 4×)
-const HEAT_WARM_C := 14.0          # °C, o které oheň (heat = 1) zvedne pocitovou teplotu
-const SHELTER_MIN_C := 18.0        # výchozí nejnižší pocitová teplota pod střechou
+static var WET_RAIN := 1.1              # /h – promočení při rain = 1 (liják)
+static var WET_DRY_IN := 0.7            # /h – schnutí pod střechou / uvnitř
+static var WET_DRY_OUT := 0.35          # /h – venku za sucha (škáluje teplotou a větrem)
+static var COLD_COMFORT := 13.0         # °C – pocitová teplota, od které tělo chladne
+static var CHILL_RATE := 0.016          # /h·°C – růst prochladnutí pod pohodlí
+static var WARM_RATE := 0.09            # /h·°C – zahřívání v teple
+static var HEAT_DRY_K := 3.0            # u ohně / kamen (heat = 1) se schne o tolik násobků rychleji navíc (celkem 4×)
+static var HEAT_WARM_C := 14.0          # °C, o které oheň (heat = 1) zvedne pocitovou teplotu
+static var SHELTER_MIN_C := 18.0        # výchozí nejnižší pocitová teplota pod střechou
 # --- oblečení (M2.3; Wardrobe.refresh nastavuje `insulation` a `waterproof`)
-const INSUL_BASE := 0.4            # izolace výchozího oblečení (triko + džíny + polobotky) – s ním platí COLD_COMFORT beze změny
-const INSUL_COMFORT_C := 12.0      # °C, o které každá 1,0 izolace navíc posune pohodlí (tepleji oblečený snese větší mráz)
-const INSUL_MAX := 1.5             # strop součtu izolace
-const OVERHEAT_TEMP := 25.0        # °C – nad tuto teplotu v silném oblečení hrozí přehřátí
-const OVERHEAT_INSUL := 0.8        # izolace, od které se přehřívá
-const OVERHEAT_RATE := 0.6         # /h za (°C nad limit × izolace nad limit)
-const OVERHEAT_STAMINA := 0.2      # o tolik přehřátí (1,0) snižuje maximální výdrž
+static var INSUL_BASE := 0.4            # izolace výchozího oblečení (triko + džíny + polobotky) – s ním platí COLD_COMFORT beze změny
+static var INSUL_COMFORT_C := 12.0      # °C, o které každá 1,0 izolace navíc posune pohodlí (tepleji oblečený snese větší mráz)
+static var INSUL_MAX := 1.5             # strop součtu izolace
+static var OVERHEAT_TEMP := 25.0        # °C – nad tuto teplotu v silném oblečení hrozí přehřátí
+static var OVERHEAT_INSUL := 0.8        # izolace, od které se přehřívá
+static var OVERHEAT_RATE := 0.6         # /h za (°C nad limit × izolace nad limit)
+static var OVERHEAT_STAMINA := 0.2      # o tolik přehřátí (1,0) snižuje maximální výdrž
 # --- M4.8 návykové látky (jen při „Obsah pro dospělé“): THC (konopí) a psilocybin (lysohlávky) – mírné, nepříjemné efekty
-const THC_HALF_H := 1.5            # h – poločas THC v krvi (kouření: rychlý nástup, krátké)
-const EDIBLE_THC_DELAY_H := 1.0  # h – nástup THC po snědení (pomalejší než kouření)
-const MUSHROOM_TOXIC_HP := 12.0    # zdraví ztracené při otravě muchomůrkou (× síla jedu) – ladit
-const PSILO_HALF_H := 3.0          # h – poločas psilocybinu (snědení: pomalý nástup, déle)
-const THC_SPEED := 0.12            # zpomalení reakce (speed_mult) na 1,0 THC
-const THC_NAUSEA := 0.02           # nevolnost za hodinu nad THC 1,5
-const PSILO_NAUSEA := 0.03         # nevolnost za hodinu při psilocybinu (1,0)
+static var THC_HALF_H := 1.5            # h – poločas THC v krvi (kouření: rychlý nástup, krátké)
+static var EDIBLE_THC_DELAY_H := 1.0  # h – nástup THC po snědení (pomalejší než kouření)
+static var MUSHROOM_TOXIC_HP := 12.0    # zdraví ztracené při otravě muchomůrkou (× síla jedu) – ladit
+static var PSILO_HALF_H := 3.0          # h – poločas psilocybinu (snědení: pomalý nástup, déle)
+static var THC_SPEED := 0.12            # zpomalení reakce (speed_mult) na 1,0 THC
+static var THC_NAUSEA := 0.02           # nevolnost za hodinu nad THC 1,5
+static var PSILO_NAUSEA := 0.03         # nevolnost za hodinu při psilocybinu (1,0)
 # --- závislost na nikotinu (M.smoke)
-const ADDICTION_DECAY_K := 0.0578  # /h – poločas klouzavého průměru kouření ~12 h
-const ADDICTION_NORM := 80.0       # _smoke_rate odpovídající ustálené závislosti 1,0 (~2 krabičky/den)
-const CRAVING_NICOTINE_MIN := 0.25 # mg – pod touto hladinou nikotinu chuť roste (po cigaretě ~4 h herních)
-const CRAVING_RATE := 0.07         # /h – růst chuti (do plné chuti zhruba 14 h herních, tj. ~30 min reálně)
-const CRAVING_BASE_CAP := 0.35     # strop chuti u nezávislé postavy; závislost ho zvedá až k 1,0
-const CRAVING_SLEEP_K := 0.2       # násobek růstu chuti ve spánku (spící po ránu nevstává s 100% chutí)
+static var ADDICTION_DECAY_K := 0.0578  # /h – poločas klouzavého průměru kouření ~12 h
+static var ADDICTION_NORM := 80.0       # _smoke_rate odpovídající ustálené závislosti 1,0 (~2 krabičky/den)
+static var CRAVING_NICOTINE_MIN := 0.25 # mg – pod touto hladinou nikotinu chuť roste (po cigaretě ~4 h herních)
+static var CRAVING_RATE := 0.07         # /h – růst chuti (do plné chuti zhruba 14 h herních, tj. ~30 min reálně)
+static var CRAVING_BASE_CAP := 0.35     # strop chuti u nezávislé postavy; závislost ho zvedá až k 1,0
+static var CRAVING_SLEEP_K := 0.2       # násobek růstu chuti ve spánku (spící po ránu nevstává s 100% chutí)
+
+## M8.D2b: čísla, která dřív byla přímo ve vzorcích – laditelné v menu F3 (Člověk / Tělo, Činnosti / Návykové
+## látky). Výchozí hodnoty = původní čísla (chování beze změny).
+static var WIDMARK_BASE := 0.68            # Widmarkův faktor při BMI 24
+static var WIDMARK_BMI_K := 0.006          # pokles faktoru na 1 BMI navíc
+static var WIDMARK_BMI_REF := 24.0         # BMI, při kterém platí základ
+static var WIDMARK_MIN := 0.52
+static var WIDMARK_MAX := 0.72
+static var FIRST_PASS_BASE := 0.05         # podíl alkoholu odbouraný už v žaludku nalačno
+static var FIRST_PASS_FOOD := 0.15         # + s plným žaludkem
+static var FOOD_FULL_KCAL := 600.0         # kcal v žaludku = „plný žaludek“ (food_factor 1)
+static var ELIM_FOOD_K := 0.4              # jídlo zrychlí odbourávání až o tolik
+static var ELIM_KM := 1.5                  # g – pod touto hladinou odbourávání přechází do 1. řádu
+static var ABSORB_RATE := 6.0              # /h – vstřebávání ze žaludku nalačno
+static var ABSORB_FOOD_KCAL := 250.0       # kcal v žaludku, které vstřebávání zpomalí na polovinu
+static var ETHANOL_KCAL_G := 7.0           # kcal z 1 g odbouraného alkoholu
+static var DRUNK_FROM := 0.15              # ‰ – od kdy je opilost znát (drunk_level 0)
+static var DRUNK_FULL := 3.0               # ‰ – opilost naplno (drunk_level 1)
+static var NICOTINE_FOCUS_MIN := 0.3       # mg – nad touto hladinou nikotin krátce „zaostří“
+static var NICOTINE_FOCUS_K := 0.88        # × opilost s nikotinem
+static var SPEED_BMI_FROM := 26.0          # BMI – od kdy obezita zpomaluje
+static var SPEED_BMI_K := 0.025            # zpomalení na 1 BMI navíc
+static var SPEED_DRUNK_FROM := 1.2         # ‰ – od kdy opilost zpomaluje
+static var SPEED_DRUNK_K := 0.12           # zpomalení na ‰
+static var SPEED_COLD_K := 0.08            # zpomalení při plném prochladnutí
+static var SPEED_MIN := 0.45               # nejpomalejší (× rychlost)
+static var STAM_TAR_K := 0.012             # ztráta max. výdrže na 1 cigaretu dehtu
+static var STAM_TAR_MAX := 0.45            # strop ztráty výdrže dehtem
+static var STAM_COLD_K := 0.35             # ztráta max. výdrže při plném prochladnutí
+static var STAM_BMI_FROM := 27.0           # BMI – od kdy obezita snižuje výdrž
+static var STAM_BMI_K := 0.03              # ztráta výdrže na 1 BMI navíc
+static var STAM_MIN := 0.25                # nejnižší max. výdrž
+static var DRAIN_BMI_FROM := 26.0          # BMI – od kdy obezita zrychluje únavu
+static var DRAIN_BMI_K := 0.08             # zrychlení únavy na 1 BMI navíc
+static var DRAIN_TAR_K := 0.01             # zrychlení únavy na 1 cigaretu dehtu
+static var DRAIN_TAR_MAX := 0.4
+static var DRAIN_COLD_K := 0.5             # zrychlení únavy při plném prochladnutí
+static var DRAIN_HEAT_K := 0.4             # zrychlení únavy při plném přehřátí
+static var JUMP_BMI_FROM := 27.0           # BMI – od kdy obezita snižuje skok
+static var JUMP_BMI_K := 0.03
+static var JUMP_MIN := 0.6                 # nejnižší násobek skoku
+static var DRINK_KCAL_K := 0.4             # podíl kcal nápoje ze sacharidů (zbytek z alkoholu při odbourání)
+static var CAFFEINE_MAX := 1.5
+static var DRINK_NAUSEA_PROMILE := 1.4     # ‰ – panák na lačno nad touto hladinou zvedá žaludek
+static var DRINK_NAUSEA_EMPTY_KCAL := 150.0  # kcal – „lačný“ žaludek
+static var DRINK_NAUSEA_K := 0.06          # nevolnost na 20 g alkoholu
+static var TOXIC_NAUSEA := 0.5             # nevolnost z jedovaté houby (× síla jedu)
+static var OVEREAT_KCAL := 1600.0          # kcal v žaludku = přejedení
+static var OVEREAT_PROMILE := 1.0          # ‰ – přejedení v opilosti zvedá žaludek
+static var OVEREAT_NAUSEA := 0.15
+static var NICOTINE_PER_CIG := 1.1         # mg nikotinu za cigaretu
+static var SMOKE_NAUSEA_PROMILE := 1.2     # ‰ – cigareta v opilosti „točí“
+static var SMOKE_NAUSEA := 0.08
+static var THC_STRONG := 1.5               # THC nad touto hladinou = nevolnost
+static var THC_STRONG_NAUSEA := 0.05       # nevolnost ze silné dávky konopí
+static var PSILO_NAUSEA_FROM := 0.3        # psilocybin nad touto hladinou = nevolnost
+static var VOMIT_ALC_KEEP := 0.25          # podíl alkoholu, který po zvracení zůstane v žaludku
+static var VOMIT_FOOD_KEEP := 0.2          # podíl jídla, který zůstane
+static var VOMIT_HP := 2.0                 # zdraví za zvracení
+static var DRY_BASE_K := 0.3               # schnutí venku – základ (× WET_DRY_OUT)
+static var DRY_TEMP_C := 22.0              # °C, při kterých teplota přidá plné schnutí
+static var DRY_TEMP_MAX := 1.3             # strop příspěvku teploty
+static var DRY_WIND_K := 0.03              # příspěvek větru na m/s
+static var WINDCHILL_K := 0.6              # °C ochlazení na m/s větru (suchý oděv)
+static var WINDCHILL_WET_K := 0.9          # + °C na m/s při promoklém oděvu
+static var WET_CHILL_C := 7.0              # °C ochlazení promoklým oděvem
+static var OVERHEAT_DECAY := 0.5           # /h – ústup přehřátí
+static var COLD_HURT_FROM := 0.85          # prochladnutí, od kterého ubývá zdraví
+static var COLD_HURT_K := 9.0              # zdraví za hodinu na jednotku nad prahem
+static var DIGEST_KCAL_H := 500.0          # kcal/h – trávení
+static var BMR_KCAL_H := 75.0              # kcal/h – bazální výdej v bdělosti
+static var BMR_SLEEP_KCAL_H := 60.0        # kcal/h – ve spánku
+static var WEIGHT_MIN := 52.0              # kg – nejnižší hmotnost
+static var NICOTINE_DECAY := 0.35          # /h – odbourávání nikotinu (poločas ~2 h)
+static var TAR_DECAY := 0.04               # cigaret dehtu za hodinu z plic
+static var CAFFEINE_DECAY := 0.25          # /h
+static var NAUSEA_RISE_PROMILE := 1.3      # ‰ – rychlé pití nad touto hladinou dělá nevolno
+static var NAUSEA_RISE_RATE := 0.8         # ‰/h – „rychlé pití“
+static var NAUSEA_RISE_K := 0.9            # nevolnost za hodinu na ‰/h nad prahem
+static var NAUSEA_HIGH_PROMILE := 2.2      # ‰ – nad touto hladinou nevolnost roste sama
+static var NAUSEA_HIGH_K := 0.8
+static var NAUSEA_CALM_PROMILE := 1.0      # ‰ – pod touto hladinou nevolnost ustupuje
+static var NAUSEA_RECOVER := 0.5           # /h
+static var POISON_PROMILE := 3.0           # ‰ – otrava alkoholem
+static var POISON_HP := 25.0               # zdraví za hodinu na ‰ nad prahem
+static var HEAL_H := 1.5                   # zdraví za hodinu (bdělost)
+static var HEAL_SLEEP_H := 6.0             # zdraví za hodinu ve spánku
+static var PASSOUT_PROMILE := 3.0          # ‰ – od kdy hrozí okno
+static var PASSOUT_K := 0.9                # šance okna za hodinu na ‰ nad prahem
+static var PASSOUT_CAFFEINE_K := 0.5       # × šance s kofeinem
+static var PASSOUT_CD_H := 1.0             # h – nejkratší rozestup oken
 
 var weight := 82.0                 # kg
 var stomach_alc := 0.0             # g ethanolu v žaludku
@@ -103,7 +194,7 @@ func bmi() -> float:
 
 ## Widmarkův faktor – podíl vody v těle; obézní člověk má vyšší promile při stejné dávce.
 func widmark_r() -> float:
-	return clampf(0.68 - 0.006 * (bmi() - 24.0), 0.52, 0.72)
+	return clampf(WIDMARK_BASE - WIDMARK_BMI_K * (bmi() - WIDMARK_BMI_REF), WIDMARK_MIN, WIDMARK_MAX)
 
 
 func promile() -> float:
@@ -113,15 +204,15 @@ func promile() -> float:
 ## Promile, kterých by hráč dosáhl, kdyby se vstřebalo vše ze žaludku (bez odbourání).
 func promile_peak_estimate() -> float:
 	var ff := food_factor()
-	return (body_alc + stomach_alc * (1.0 - (0.05 + 0.15 * ff))) / (widmark_r() * weight)
+	return (body_alc + stomach_alc * (1.0 - (FIRST_PASS_BASE + FIRST_PASS_FOOD * ff))) / (widmark_r() * weight)
 
 
 func food_factor() -> float:
-	return clampf(stomach_kcal / 600.0, 0.0, 1.0)
+	return clampf(stomach_kcal / FOOD_FULL_KCAL, 0.0, 1.0)
 
 
 func elimination_rate() -> float:          # ‰ / h
-	return BETA * (1.0 + 0.4 * food_factor())
+	return BETA * (1.0 + ELIM_FOOD_K * food_factor())
 
 
 ## Hodin do střízlivosti (0,00 ‰).
@@ -131,9 +222,9 @@ func hours_to_sober() -> float:
 
 ## 0 (střízlivý) … 1 (na mol) – řídí vizuální a pohybové efekty.
 func drunk_level() -> float:
-	var d := smoothstep(0.15, 3.0, promile())
-	if nicotine > 0.3:
-		d *= 0.88      # nikotin krátkodobě "zaostří"
+	var d := smoothstep(DRUNK_FROM, DRUNK_FULL, promile())
+	if nicotine > NICOTINE_FOCUS_MIN:
+		d *= NICOTINE_FOCUS_K      # nikotin krátkodobě "zaostří"
 	return d
 
 
@@ -170,30 +261,30 @@ func stage_color() -> Color:
 func speed_mult() -> float:
 	var m := 1.0
 	var b := bmi()
-	if b > 26.0:
-		m -= (b - 26.0) * 0.025
+	if b > SPEED_BMI_FROM:
+		m -= (b - SPEED_BMI_FROM) * SPEED_BMI_K
 	var p := promile()
-	if p > 1.2:
-		m -= (p - 1.2) * 0.12
-	m -= cold * 0.08                     # prochladlý ujede míň
+	if p > SPEED_DRUNK_FROM:
+		m -= (p - SPEED_DRUNK_FROM) * SPEED_DRUNK_K
+	m -= cold * SPEED_COLD_K                     # prochladlý ujede míň
 	m -= clampf(thc, 0.0, 1.5) * THC_SPEED   # M4.8: THC zpomaluje reakce
-	return clampf(m, 0.45, 1.0)
+	return clampf(m, SPEED_MIN, 1.0)
 
 
 func stamina_max() -> float:
-	var m := 1.0 - minf(tar * 0.012, 0.45) - cold * 0.35 - overheat * OVERHEAT_STAMINA
+	var m := 1.0 - minf(tar * STAM_TAR_K, STAM_TAR_MAX) - cold * STAM_COLD_K - overheat * OVERHEAT_STAMINA
 	var b := bmi()
-	if b > 27.0:
-		m -= (b - 27.0) * 0.03
-	return clampf(m, 0.25, 1.0)
+	if b > STAM_BMI_FROM:
+		m -= (b - STAM_BMI_FROM) * STAM_BMI_K
+	return clampf(m, STAM_MIN, 1.0)
 
 
 func stamina_drain_mult() -> float:
-	return 1.0 + maxf(bmi() - 26.0, 0.0) * 0.08 + minf(tar * 0.01, 0.4) + cold * 0.5 + overheat * 0.4
+	return 1.0 + maxf(bmi() - DRAIN_BMI_FROM, 0.0) * DRAIN_BMI_K + minf(tar * DRAIN_TAR_K, DRAIN_TAR_MAX) + cold * DRAIN_COLD_K + overheat * DRAIN_HEAT_K
 
 
 func jump_mult() -> float:
-	return clampf(1.0 - maxf(bmi() - 27.0, 0.0) * 0.03, 0.6, 1.0)
+	return clampf(1.0 - maxf(bmi() - JUMP_BMI_FROM, 0.0) * JUMP_BMI_K, JUMP_MIN, 1.0)
 
 
 ## 0..1 – jak moc je postava při těle (pro vizuál).
@@ -210,14 +301,14 @@ func drink(id: String, ml: float) -> float:
 	total_alc_g += g
 	var info := Consumables.info(id)
 	var kcal := float(info.get("kcal", 0)) * ml / float(info.get("ml", ml))
-	_add_energy(kcal * 0.4)             # sacharidy; kcal z ethanolu se připíšou při odbourání
+	_add_energy(kcal * DRINK_KCAL_K)             # sacharidy; kcal z ethanolu se připíšou při odbourání
 	if info.get("caffeine", 0.0) > 0.0:
-		caffeine = minf(caffeine + info["caffeine"], 1.5)
+		caffeine = minf(caffeine + info["caffeine"], CAFFEINE_MAX)
 	if g > 0.0:
 		drinks += 1
 		# panák na lačný žaludek při vyšších promile zvedá žaludek
-		if promile() > 1.4 and stomach_kcal < 150.0:
-			nausea += 0.06 * g / 20.0
+		if promile() > DRINK_NAUSEA_PROMILE and stomach_kcal < DRINK_NAUSEA_EMPTY_KCAL:
+			nausea += DRINK_NAUSEA_K * g / 20.0
 	return g
 
 
@@ -229,33 +320,33 @@ func eat(id: String) -> void:
 		_thc_later.append([EDIBLE_THC_DELAY_H, te])
 	var tox := float(Consumables.info(id).get("toxic", 0.0))     # M4.8: muchomůrka – otrava (nevolnost, zdraví)
 	if tox > 0.0:
-		nausea = minf(nausea + 0.5 * tox, 1.0)
+		nausea = minf(nausea + TOXIC_NAUSEA * tox, 1.0)
 		hurt(MUSHROOM_TOXIC_HP * tox, "otrava houbou")
 	stomach_kcal += kcal
 	total_kcal += kcal
 	_add_energy(kcal)
 	# přejedení v opilosti
-	if stomach_kcal > 1600.0 and promile() > 1.0:
-		nausea += 0.15
+	if stomach_kcal > OVEREAT_KCAL and promile() > OVEREAT_PROMILE:
+		nausea += OVEREAT_NAUSEA
 
 
 func smoke() -> void:
-	nicotine += 1.1
+	nicotine += NICOTINE_PER_CIG
 	tar += 1.0
 	ever_smoked = true
 	cigarettes_smoked += 1
 	craving = 0.0
 	_smoke_rate += 1.0
-	if promile() > 1.2:
-		nausea += 0.08       # "točí se to"
+	if promile() > SMOKE_NAUSEA_PROMILE:
+		nausea += SMOKE_NAUSEA       # "točí se to"
 
 
 ## Zvracení – vyprázdní žaludek (včetně nevstřebaného alkoholu).
 func vomit() -> void:
-	stomach_alc *= 0.25
-	stomach_kcal *= 0.2
+	stomach_alc *= VOMIT_ALC_KEEP
+	stomach_kcal *= VOMIT_FOOD_KEEP
 	nausea = 0.0
-	health = maxf(health - 2.0, 1.0)
+	health = maxf(health - VOMIT_HP, 1.0)
 	vomited.emit()
 
 
@@ -284,8 +375,8 @@ func skip_hours(hours: float, sleeping := true) -> void:
 ## M4.8: vykouření konopí (THC). Tabák jde přes `smoke()`; zde jen stav THC, bez nikotinu a závislosti.
 func smoke_thc(strength: float) -> void:
 	thc += strength
-	if thc > 1.5:
-		nausea += 0.05       # silná dávka = nevolnost (ne odměna)
+	if thc > THC_STRONG:
+		nausea += THC_STRONG_NAUSEA       # silná dávka = nevolnost (ne odměna)
 
 
 ## M4.8: snědení lysohlávek (psilocybin). Efekty obrazu jsou zatím jen HUD stav (viz otevřené body).
@@ -318,7 +409,7 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 	var env_heat: float = clampf(env.get("heat", 0.0), 0.0, 1.0)
 	var shelter_c: float = env.get("shelter_min", SHELTER_MIN_C)
 	var dry_base := WET_DRY_IN if env_in else \
-		WET_DRY_OUT * (0.3 + clampf(env_temp / 22.0, 0.0, 1.3) + env_wind * 0.03)
+		WET_DRY_OUT * (DRY_BASE_K + clampf(env_temp / DRY_TEMP_C, 0.0, DRY_TEMP_MAX) + env_wind * DRY_WIND_K)
 	if env_rain > 0.02:
 		wetness = minf(wetness + env_rain * WET_RAIN * (1.0 - clampf(waterproof, 0.0, 1.0)) * dt_h, 1.0)   # pláštěnka promáčení zpomalí
 		if env_heat > 0.0:      # oheň promáčení zpomalí
@@ -326,7 +417,7 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 	else:
 		wetness = maxf(wetness - dry_base * (1.0 + HEAT_DRY_K * env_heat) * dt_h, 0.0)
 	# pocitová teplota: vítr a mokrý oděv ochlazují; uvnitř / pod střechou je teplo, u ohně teplo navíc
-	var feels := env_temp - env_wind * (0.6 + wetness * 0.9) - wetness * 7.0 + env_heat * HEAT_WARM_C
+	var feels := env_temp - env_wind * (WINDCHILL_K + wetness * WINDCHILL_WET_K) - wetness * WET_CHILL_C + env_heat * HEAT_WARM_C
 	if env_in:
 		feels = maxf(feels, shelter_c)
 	var comfort := COLD_COMFORT - (clampf(insulation, 0.0, INSUL_MAX) - INSUL_BASE) * INSUL_COMFORT_C   # teplé oblečení posune pohodlí dolů
@@ -339,30 +430,30 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 	if not env_in and env_temp > OVERHEAT_TEMP and insulation > OVERHEAT_INSUL:
 		overheat = minf(overheat + (env_temp - OVERHEAT_TEMP) * (insulation - OVERHEAT_INSUL) * OVERHEAT_RATE * dt_h, 1.0)
 	else:
-		overheat = maxf(overheat - 0.5 * dt_h, 0.0)
-	if not sleeping and cold > 0.85:
-		hurt((cold - 0.85) * 9.0 * dt_h, "prochladnutí")
+		overheat = maxf(overheat - OVERHEAT_DECAY * dt_h, 0.0)
+	if not sleeping and cold > COLD_HURT_FROM:
+		hurt((cold - COLD_HURT_FROM) * COLD_HURT_K * dt_h, "prochladnutí")
 	var ff := food_factor()
 	# --- vstřebávání ze žaludku (1. řád)
-	var k_abs := 6.0 / (1.0 + stomach_kcal / 250.0)
+	var k_abs := ABSORB_RATE / (1.0 + stomach_kcal / ABSORB_FOOD_KCAL)
 	var absorbed := stomach_alc * (1.0 - exp(-k_abs * dt_h))
 	stomach_alc -= absorbed
-	var first_pass := 0.05 + 0.15 * ff
+	var first_pass := FIRST_PASS_BASE + FIRST_PASS_FOOD * ff
 	body_alc += absorbed * (1.0 - first_pass)
 	# --- odbourávání v játrech (≈ 0. řád, u nízkých hladin přechází do 1. řádu)
 	var cap := elimination_rate() * widmark_r() * weight
-	var elim := cap * body_alc / (body_alc + 1.5) * dt_h
+	var elim := cap * body_alc / (body_alc + ELIM_KM) * dt_h
 	elim = minf(elim, body_alc)
 	body_alc -= elim
-	_add_energy((elim + absorbed * first_pass) * 7.0)
+	_add_energy((elim + absorbed * first_pass) * ETHANOL_KCAL_G)
 	# --- trávení
-	stomach_kcal = maxf(stomach_kcal - 500.0 * dt_h, 0.0)
+	stomach_kcal = maxf(stomach_kcal - DIGEST_KCAL_H * dt_h, 0.0)
 	# --- výdej energie (bazál ~1700 kcal/den + aktivita; spánek nižší)
-	var burn := (60.0 if sleeping else 75.0) + activity_kcal_h
-	weight = maxf(weight - burn * dt_h * OBESITY_GAIN / KCAL_PER_KG, 52.0)
+	var burn := (BMR_SLEEP_KCAL_H if sleeping else BMR_KCAL_H) + activity_kcal_h
+	weight = maxf(weight - burn * dt_h * OBESITY_GAIN / KCAL_PER_KG, WEIGHT_MIN)
 	# --- nikotin, dehet, chuť
-	nicotine *= exp(-dt_h * 0.35)
-	tar = maxf(tar - dt_h * 0.04, 0.0)
+	nicotine *= exp(-dt_h * NICOTINE_DECAY)
+	tar = maxf(tar - dt_h * TAR_DECAY, 0.0)
 	if ever_smoked and nicotine < CRAVING_NICOTINE_MIN:
 		var crave_cap := CRAVING_BASE_CAP + (1.0 - CRAVING_BASE_CAP) * addiction
 		var grow := CRAVING_RATE * (CRAVING_SLEEP_K if sleeping else 1.0)
@@ -370,7 +461,7 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 			craving = minf(craving + dt_h * grow, crave_cap)
 	_smoke_rate *= exp(-dt_h * ADDICTION_DECAY_K)
 	addiction = clampf(_smoke_rate / ADDICTION_NORM, 0.0, 1.0)
-	caffeine = maxf(caffeine - dt_h * 0.25, 0.0)
+	caffeine = maxf(caffeine - dt_h * CAFFEINE_DECAY, 0.0)
 	# --- M4.8: THC a psilocybin odeznívají; při vyšší hladině nevolnost (žádné bonusy)
 	var keep := []
 	for e in _thc_later:
@@ -382,32 +473,32 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 	_thc_later = keep
 	thc *= exp(-dt_h * log(2.0) / THC_HALF_H)
 	psilo *= exp(-dt_h * log(2.0) / PSILO_HALF_H)
-	if thc > 1.5:
+	if thc > THC_STRONG:
 		nausea = minf(nausea + THC_NAUSEA * dt_h, 1.0)
-	if psilo > 0.3:
+	if psilo > PSILO_NAUSEA_FROM:
 		nausea = minf(nausea + PSILO_NAUSEA * psilo * dt_h, 1.0)
 	# --- nevolnost
 	var p := promile()
 	var rate := (p - _prev_promile) / dt_h
 	_prev_promile = p
 	_rise = lerpf(_rise, rate, clampf(dt_h * 8.0, 0.0, 1.0))
-	if p > 1.3 and _rise > 0.8:
-		nausea += dt_h * 0.9 * (_rise - 0.8)
-	if p > 2.2:
-		nausea += dt_h * (p - 2.2) * 0.8
-	if p < 1.0 and stomach_kcal < 1600.0:
-		nausea = maxf(nausea - dt_h * 0.5, 0.0)
+	if p > NAUSEA_RISE_PROMILE and _rise > NAUSEA_RISE_RATE:
+		nausea += dt_h * NAUSEA_RISE_K * (_rise - NAUSEA_RISE_RATE)
+	if p > NAUSEA_HIGH_PROMILE:
+		nausea += dt_h * (p - NAUSEA_HIGH_PROMILE) * NAUSEA_HIGH_K
+	if p < NAUSEA_CALM_PROMILE and stomach_kcal < OVEREAT_KCAL:
+		nausea = maxf(nausea - dt_h * NAUSEA_RECOVER, 0.0)
 	if nausea >= 1.0 and not sleeping:
 		vomit()
 	# --- otrava alkoholem
-	if p > 3.0:
-		hurt((p - 3.0) * 25.0 * dt_h, "otrava alkoholem")
+	if p > POISON_PROMILE:
+		hurt((p - POISON_PROMILE) * POISON_HP * dt_h, "otrava alkoholem")
 	elif health < 100.0 and alive:
-		health = minf(health + dt_h * (6.0 if sleeping else 1.5), 100.0)
+		health = minf(health + dt_h * (HEAL_SLEEP_H if sleeping else HEAL_H), 100.0)
 	# --- ztráta vědomí (okno)
 	_passout_cool = maxf(_passout_cool - dt_h, 0.0)
-	if not sleeping and p > 3.0 and _passout_cool <= 0.0:
-		var chance := (p - 3.0) * 0.9 * dt_h * (0.5 if caffeine > 0.3 else 1.0)
+	if not sleeping and p > PASSOUT_PROMILE and _passout_cool <= 0.0:
+		var chance := (p - PASSOUT_PROMILE) * PASSOUT_K * dt_h * (PASSOUT_CAFFEINE_K if caffeine > 0.3 else 1.0)
 		if _rng.randf() < chance:
-			_passout_cool = 1.0
+			_passout_cool = PASSOUT_CD_H
 			passed_out.emit()

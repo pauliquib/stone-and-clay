@@ -13,8 +13,8 @@ extends Node
 const MAX_LEVEL := 50
 ## Křivka: XP potřebné pro dosažení úrovně L = round(BASE * (GROWTH^(L-1) - 1) / (GROWTH - 1)).
 ## Úroveň 10 ≈ 1 040 XP, 30 ≈ 15 500 XP, 50 ≈ 184 000 XP.
-const BASE := 60.0
-const GROWTH := 1.13
+static var BASE := 60.0
+static var GROWTH := 1.13
 
 ## id → [název, popis, barva ikony]. Pořadí = pořadí v deníku.
 const SKILLS := {
@@ -37,25 +37,25 @@ const SKILLS := {
 }
 
 ## Zisk XP z herních událostí: kind → [dovednost, XP]. Události s podmínkou řeší `on_event` (rozhovor).
-const EVENT_XP := {
+static var EVENT_XP := {
 	"car_repaired": ["kutilstvi", 25.0],
 	"quest_done": ["vyrecnost", 30.0],
 }
 ## Slušné rozhovorové záměry (Dialog intent) dávají Výřečnosti XP; urážky a vyhrůžky nic.
-const CHAT_XP := 2.0
+static var CHAT_XP := 2.0
 const CHAT_INTENTS := ["greeting", "goodbye", "thanks", "compliment", "sorry", "howareyou", "introduce", "name", "weather", "joke", "news"]
-const CHAT_COOLDOWN_S := 12.0     # skutečné sekundy mezi dvěma odměněnými větami (proti farmení)
+static var CHAT_COOLDOWN_S := 12.0     # skutečné sekundy mezi dvěma odměněnými větami (proti farmení)
 
 ## Řízení: XP za ujetou vzdálenost střízlivě a bez nehody.
-const DRIVE_M_PER_XP := 100.0
-const DRIVE_MAX_PROMILE := 0.2
-const DRIVE_MIN_SPEED := 3.0      # m/s
-const CRASH_IMPACT := 4.0         # nehoda tohoto nárazu zablokuje zisk XP z řízení na CRASH_PAUSE_S
-const CRASH_PAUSE_S := 60.0
+static var DRIVE_M_PER_XP := 100.0
+static var DRIVE_MAX_PROMILE := 0.2
+static var DRIVE_MIN_SPEED := 3.0      # m/s
+static var CRASH_IMPACT := 4.0         # nehoda tohoto nárazu zablokuje zisk XP z řízení na CRASH_PAUSE_S
+static var CRASH_PAUSE_S := 60.0
 ## Jízda na koni: XP za sekundu podle chodu (Horse.level: 1 krok … 4 trysk).
-const HORSE_XP_PER_S := {1: 0.04, 2: 0.25, 3: 0.5, 4: 0.7}
+static var HORSE_XP_PER_S := {1: 0.04, 2: 0.25, 3: 0.5, 4: 0.7}
 ## Sprint pěšky: XP Kondice za sekundu.
-const SPRINT_XP_PER_S := 0.15
+static var SPRINT_XP_PER_S := 0.15
 ## Drobné XP se hromadí a hlásí až po dosažení této hodnoty (ať HUD nebliká).
 const FLUSH_XP := 1.0
 

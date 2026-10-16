@@ -15,46 +15,60 @@ extends Node
 # ------------------------------------------------------------------ laditelné hodnoty
 
 const MAX_FIRES := 24                  # nejvíc ohnišť ve světě (nejstarší vyhaslé se ruší)
-const MIN_GAP := 1.6                   # m – nejmenší odstup dvou ohnišť
+static var MIN_GAP := 1.6                   # m – nejmenší odstup dvou ohnišť
 const KINDLING_FULL := {"vetve": 2, "polena": 2}      # 2× větve + 2× polena …
 const KINDLING_ALT := {"vetve": 4}                    # … nebo 4× větve
-const IGNITE_BASE := 0.9               # základní šance zapálení
-const IGNITE_RAIN := -0.4              # déšť / sněžení
-const IGNITE_WIND := -0.25             # vítr nad WIND_HARD
-const IGNITE_WET := -0.2               # mokré dřevo (Weather.wetness ≥ WET_HARD)
-const IGNITE_LIGHTER := 0.05           # zapalovač je spolehlivější než sirky
-const IGNITE_SKILL := 0.08             # + při nejvyšší úrovni Topení a oheň
-const WIND_HARD := 6.0                 # m/s
-const WET_HARD := 0.35
-const XP_LIGHT := 10.0
-const XP_LIGHT_FAIL := 3.0
+static var IGNITE_BASE := 0.9               # základní šance zapálení
+static var IGNITE_RAIN := -0.4              # déšť / sněžení
+static var IGNITE_WIND := -0.25             # vítr nad WIND_HARD
+static var IGNITE_WET := -0.2               # mokré dřevo (Weather.wetness ≥ WET_HARD)
+static var IGNITE_LIGHTER := 0.05           # zapalovač je spolehlivější než sirky
+static var IGNITE_SKILL := 0.08             # + při nejvyšší úrovni Topení a oheň
+static var WIND_HARD := 6.0                 # m/s
+static var WET_HARD := 0.35
+static var XP_LIGHT := 10.0
+static var XP_LIGHT_FAIL := 3.0
 # --- zákon
-const FOREST_BUFFER := 50.0            # m od okraje lesa (zákon o lesích)
-const WITNESS_R := 150.0               # m – svědek (vesničan, myslivec, policie)
-const SMOKE_SEEN_PER_H := 0.30         # šance odhalení kouře za hodinu hoření bez svědka
-const KARMA_ILLEGAL := -1.0
-const REP_SEEN := -3.0
+static var FOREST_BUFFER := 50.0            # m od okraje lesa (zákon o lesích)
+static var WITNESS_R := 150.0               # m – svědek (vesničan, myslivec, policie)
+static var SMOKE_SEEN_PER_H := 0.30         # šance odhalení kouře za hodinu hoření bez svědka
+static var KARMA_ILLEGAL := -1.0
+static var REP_SEEN := -3.0
 # --- šíření trávou
-const UNATTENDED_R := 40.0             # m – dál od hráče je oheň „nehlídaný“
-const SPREAD_P_MIN := 0.03             # šance přeskoku za herní minutu (× vítr / 6)   DOPLNIT: ladit
-const DRY_RAIN_RECENT := 0.2           # Weather.rain_recent pod tímto = sucho
-const SPREAD_WIND := 4.0               # m/s
-const OFFENSE_MIN_R := 4.0             # od tohoto poloměru je požár přestupek (menší jde uhasit „včas“)
-const KARMA_FIRE := -5.0
+static var UNATTENDED_R := 40.0             # m – dál od hráče je oheň „nehlídaný“
+static var SPREAD_P_MIN := 0.03             # šance přeskoku za herní minutu (× vítr / 6)   DOPLNIT: ladit
+static var DRY_RAIN_RECENT := 0.2           # Weather.rain_recent pod tímto = sucho
+static var SPREAD_WIND := 4.0               # m/s
+static var OFFENSE_MIN_R := 4.0             # od tohoto poloměru je požár přestupek (menší jde uhasit „včas“)
+static var KARMA_FIRE := -5.0
 # --- kamna doma
-const STOVE_LOAD_MIN := 180.0          # 2 polena = 3 herní hodiny
-const STOVE_MAX_MIN := 360.0
-const STOVE_LOGS := 2
-const HOME_HEATED_TEMP := 22.0         # °C pocitově doma s topením
-const HOME_UNHEATED_OFFSET := 8.0      # doma bez topení = venku + tolik °C (nejvýš 18) → v zimě zima
-const RADIATOR_HEAT_K := 0.6           # byt (M1.7): radiátor suší slaběji než kamna (násobek STOVE_HEAT)
-const STOVE_HEAT := 0.5                # „teplo“ pro sušení doma
-const HOME_COLD_MAX := 0.5             # nejvyšší prochladnutí po noci v nevytopeném domě
-const HOME_COLD_PER_DEG := 0.04        # …za každý °C pod 5 °C
+static var STOVE_LOAD_MIN := 180.0          # 2 polena = 3 herní hodiny
+static var STOVE_MAX_MIN := 360.0
+static var STOVE_LOGS := 2
+static var HOME_HEATED_TEMP := 22.0         # °C pocitově doma s topením
+static var HOME_UNHEATED_OFFSET := 8.0      # doma bez topení = venku + tolik °C (nejvýš 18) → v zimě zima
+static var RADIATOR_HEAT_K := 0.6           # byt (M1.7): radiátor suší slaběji než kamna (násobek STOVE_HEAT)
+static var STOVE_HEAT := 0.5                # „teplo“ pro sušení doma
+static var HOME_COLD_MAX := 0.5             # nejvyšší prochladnutí po noci v nevytopeném domě
+static var HOME_COLD_PER_DEG := 0.04        # …za každý °C pod 5 °C
 const SOUP_RECIPE := {"brambory": 2, "cibule": 1, "voda": 1}   # M2.4: bramborová polévka na kamnech
-const SOUP_PORTIONS := 2
-const SOUP_XP := 15.0
-const HOME_COLD_HEAL := 6.0            # o kolik HP horší odpočinek v nevytopeném domě při < 5 °C
+static var SOUP_PORTIONS := 2
+static var SOUP_XP := 15.0
+static var HOME_COLD_HEAL := 6.0            # o kolik HP horší odpočinek v nevytopeném domě při < 5 °C
+## M8.D2b: dřív čísla ve vzorcích – laditelné v menu F3 (Činnosti / Oheň a požáry). Výchozí = původní čísla.
+static var IGNITE_MIN := 0.05            # nejnižší šance zapálení
+static var IGNITE_MAX := 0.98            # nejvyšší šance zapálení
+static var SNOW_RAIN_K := 0.35           # sněžení hasí oheň jen z části (× déšť)
+static var WATER_EXTINGUISH_K := 0.35    # s vodou se hasí rychleji (× doba)
+static var SPREAD_WIND_REF := 6.0        # m/s – vítr, při kterém platí SPREAD_P_MIN
+static var SPREAD_WIND_MIN_K := 0.6      # nejmenší násobek šance přeskoku podle větru
+static var SPREAD_WIND_MAX_K := 2.0      # největší násobek
+static var SPREAD_OFFSET := 2.0          # m od ohniště – kde chytne tráva
+static var SHELTER_DEFAULT := 18.0       # °C – nejnižší pocitová teplota uvnitř (mimo domov)
+static var HOME_UNHEATED_MIN := 3.0      # °C – nevytopený domov nejméně
+static var HOME_UNHEATED_MAX := 18.0     # °C – nevytopený domov nejvíc
+static var XP_STOVE_FRESH := 4.0         # XP za zatopení
+static var XP_STOVE_ADD := 2.0           # XP za přiložení
 
 var world: World
 var stove_min := 0.0                   # zbývající herní minuty hoření v kamnech domova
@@ -89,7 +103,7 @@ func _rain_on_fire() -> float:
 	if w.is_raining():
 		return w.rain
 	if w.is_snowing():
-		return w.rain * 0.35
+		return w.rain * SNOW_RAIN_K
 	return 0.0
 
 
@@ -158,7 +172,7 @@ func ignite_chance(id: int, tool_id: String) -> float:
 	var sk: Skills = world.skills.get(id)
 	if sk:
 		c += IGNITE_SKILL * sk.bonus("ohen")
-	return clampf(c, 0.05, 0.98)
+	return clampf(c, IGNITE_MIN, IGNITE_MAX)
 
 
 # ------------------------------------------------------------------ rozdělání ohně
@@ -348,7 +362,7 @@ func _check_extinguish(aim: Dictionary, _id: int) -> String:
 
 func _mod_extinguish(aim: Dictionary, _tool_id: String) -> float:
 	var pl := world.nearest_player(aim.get("pos", Vector3.ZERO))
-	return 0.35 if pl != null and pl.item_count("voda") > 0 else 1.0
+	return WATER_EXTINGUISH_K if pl != null and pl.item_count("voda") > 0 else 1.0
 
 
 func _on_extinguish(id: int, _def: Dictionary, aim: Dictionary, ok: bool) -> void:
@@ -491,7 +505,7 @@ func stove_load(id: int) -> void:
 		world.play_sfx(id, "lighter")
 	p.remove_item("polena", STOVE_LOGS)
 	stove_min = minf(stove_min + STOVE_LOAD_MIN, STOVE_MAX_MIN)
-	world.give_xp(id, "ohen", 4.0 if fresh else 2.0, "topení")
+	world.give_xp(id, "ohen", XP_STOVE_FRESH if fresh else XP_STOVE_ADD, "topení")
 	world.notify(id, "show_message", ["%s Kamna hoří ještě asi %s." % ["Zatopeno." if fresh else "Přiloženo.", _hm(stove_min)], 3.0])
 	world.emit_game_event(id, "stove_lit", {"minutes": stove_min})
 
@@ -602,7 +616,7 @@ func _try_spread(f: Fire, dm: float) -> void:
 	for p in world.players.values():
 		if world.player_world_pos(p).distance_to(f.global_position) < UNATTENDED_R:
 			return
-	var pm := SPREAD_P_MIN * clampf(w.wind / 6.0, 0.6, 2.0)
+	var pm := SPREAD_P_MIN * clampf(w.wind / SPREAD_WIND_REF, SPREAD_WIND_MIN_K, SPREAD_WIND_MAX_K)
 	if randf() < 1.0 - pow(1.0 - pm, dm):
 		_spread(f)
 
@@ -610,7 +624,7 @@ func _try_spread(f: Fire, dm: float) -> void:
 func _spread(f: Fire) -> void:
 	f.spread_done = true
 	var a := randf() * TAU
-	var pos := f.global_position + Vector3(cos(a) * 2.0, 0.0, sin(a) * 2.0)
+	var pos := f.global_position + Vector3(cos(a) * SPREAD_OFFSET, 0.0, sin(a) * SPREAD_OFFSET)
 	pos.y = _ground_y(pos)
 	world.grass_fires.append(GrassFire.make(world, pos, f.owner_id))
 	var first := -1
@@ -645,7 +659,7 @@ func _apply_heat() -> void:
 	for id in world.players:
 		var p: Player = world.players[id]
 		var heat := 0.0
-		var shelter := 18.0
+		var shelter := SHELTER_DEFAULT
 		if p.inside == "":
 			for f in world.fires:
 				if is_instance_valid(f):
@@ -659,7 +673,7 @@ func _apply_heat() -> void:
 				shelter = HOME_HEATED_TEMP
 			else:
 				var t := world.weather.temp if world.weather else 10.0
-				shelter = clampf(t + HOME_UNHEATED_OFFSET, 3.0, 18.0)
+				shelter = clampf(t + HOME_UNHEATED_OFFSET, HOME_UNHEATED_MIN, HOME_UNHEATED_MAX)
 		p.heat = heat
 		p.shelter_min = shelter
 

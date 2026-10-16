@@ -21,32 +21,50 @@
 class_name Weapons
 extends Node3D
 
-const G := 9.81
+static var G := 9.81
 const MASK := 1 | 4 | 8 | 16                  # statika (terén, budovy, stromy), vesničané + zvěř, rekvizity, auta
 const MAX_DT := 0.05
-const LIFE_S := 10.0                           # nejdéle letí projektil (s)
-const MAX_RANGE_M := 1800.0
-const STUCK_LIFE_S := 120.0                    # zapíchnutý šíp zůstane 2 min
+static var LIFE_S := 10.0                           # nejdéle letí projektil (s)
+static var MAX_RANGE_M := 1800.0
+static var STUCK_LIFE_S := 120.0                    # zapíchnutý šíp zůstane 2 min
 const STUCK_MAX := 80
-const STICK_MIN_SPEED := 8.0                   # pomalejší šíp jen spadne (nezapíchne se)
-const PICKUP_R := 1.9
-const BREATH_S := 3.0                          # jak dlouho jde zadržet dech
-const WINDED_S := 2.5                          # po vydechnutí je muška horší
-const MIN_DRAW_S := 0.3                        # kratší natažení luku = šíp zůstává
-const OVERDRAW_S := 4.0                        # tolik s po plném natažení se ruka unaví úplně
-const WILD_R := 400.0                          # do kolika m výstřel z pušky zvěř splaší
-const VILLAGE_R := 30.0                        # do kolika m vesničana vyděsí puška v ruce
-const OFFENSE_CD_MIN := {"strelba_v_obci": 10.0, "zbran_pod_vlivem": 15.0, "nedovolene_ozbrojovani": 30.0,
+static var STICK_MIN_SPEED := 8.0                   # pomalejší šíp jen spadne (nezapíchne se)
+static var PICKUP_R := 1.9
+static var BREATH_S := 3.0                          # jak dlouho jde zadržet dech
+static var WINDED_S := 2.5                          # po vydechnutí je muška horší
+static var MIN_DRAW_S := 0.3                        # kratší natažení luku = šíp zůstává
+static var OVERDRAW_S := 4.0                        # tolik s po plném natažení se ruka unaví úplně
+static var WILD_R := 400.0                          # do kolika m výstřel z pušky zvěř splaší
+static var VILLAGE_R := 30.0                        # do kolika m vesničana vyděsí puška v ruce
+static var OFFENSE_CD_MIN := {"strelba_v_obci": 10.0, "zbran_pod_vlivem": 15.0, "nedovolene_ozbrojovani": 30.0,
 	"policie_kontrola_zbrane": 120.0}
-const SHOW_CD_S := 30.0                        # jeden vesničan se leknout stejné zbraně nejvýš jednou za tolik s
-const CHECK_S := 1.5                           # jak často (s) se kontroluje pěší se zbraní (vesnice, policie)
+static var SHOW_CD_S := 30.0                        # jeden vesničan se leknout stejné zbraně nejvýš jednou za tolik s
+static var CHECK_S := 1.5                           # jak často (s) se kontroluje pěší se zbraní (vesnice, policie)
+## M8.D2b: dřív čísla ve vzorcích – laditelné v menu F3 (Činnosti / Lov a balistika). Výchozí = původní čísla.
+static var BREATH_REGEN := 0.5        # s dechu za s (obnova po zadržení)
+static var SWAY_DRUNK_K := 4.0        # kolísání mušky: + při plné opilosti (×)
+static var SWAY_COLD_K := 2.0         # + při plném prochladnutí
+static var SWAY_TIRED_K := 1.5        # + při vyčerpané výdrži
+static var SWAY_SKILL_MIN := 0.5      # × při nejvyšší dovednosti Střelba
+static var SWAY_MOVE_K := 0.35        # + za m/s pohybu
+static var SWAY_CROUCH_K := 0.7       # × v přikrčení
+static var SWAY_HOLD_K := 0.25        # × se zadrženým dechem
+static var SWAY_WINDED_K := 1.6       # × po vydechnutí
+static var SWAY_OVERDRAW_K := 1.5     # + při dlouho nataženém luku
+static var SWAY_FOLLOW := 10.0        # /s – jak rychle muška sleduje kolísání
+static var OVERDRAW_POWER := 0.75     # × síla výstřelu po přetaženém luku
+static var DRAW_MIN_V := 0.35         # × úsťová rychlost slabě nataženého luku
+static var HIP_SPREAD_K := 4.0        # rozptyl „od boku“ (bez míření) = kolísání × tohle
+static var RECOIL_PITCH := 0.02       # rad – zpětný ráz pušky (zvednutí pohledu)
+static var RECOIL_SWAY := 0.012       # rad – kopnutí mušky nahoru
+static var RECOIL_SWAY_SIDE := 0.004  # rad – kopnutí mušky do stran (±)
 
 ## Zbraně: id předmětu → parametry. Nabití a výkon jsou laditelné tady (DOPLNIT: hodnoty orientační, dle zadání).
 ##   kind   arrow (šíp/šipka, viditelný) / bullet (kulka)    draw_s  natahování (luk)    cycle_s  napnutí po ráně (kuše)
 ##   shot_cd / reload_s / mag  pauza mezi ranami, přebíjení, zásobník    v0  úsťová rychlost m/s    range  účinný dostřel m
 ##   noise  slyšet do m    fov  zorný úhel míření    optic  míření = dalekohled    sway  základní kolísání mušky (rad)
 ##   mass kg  drag 1/s  wind_k  vítr → zrychlení    spread  rozptyl (rad)    permit  potřebné oprávnění ("" = volně)
-const WEAPONS := {
+static var WEAPONS := {
 	"luk": {"name": "Luk", "ammo": "sipy", "kind": "arrow", "draw_s": 1.2, "cycle_s": 0.0, "shot_cd": 0.4, "reload_s": 0.0,
 		"mag": 1, "v0": 60.0, "range": 30.0, "noise": 25.0, "fov": 45.0, "optic": false, "sway": 0.0075,
 		"mass": 0.025, "drag": 0.04, "wind_k": 0.35, "spread": 0.004, "firearm": false, "permit": "",
@@ -66,7 +84,7 @@ const PERMIT_ITEMS := {"puska": "zbrojni", "naboje": "zbrojni"}
 const SCARED_LINES := ["Pane, schovejte to!", "Jéžišmarjá, co to má bejt?!", "Ježiši, nemíř na mě!", "Zbláznil ses? Odlož to!",
 	"To je zbraň! Volám někoho!", "Do zástavby se nestřílí!"]
 ## Šance, že vesničan po leknutí zavolá policii, podle povahy (Persona.profile["trait"]).
-const CALL_P := {"prisny": 0.6, "drbna": 0.7, "plachy": 0.5, "bruclavy": 0.4, "moudry": 0.35, "mlady": 0.3,
+static var CALL_P := {"prisny": 0.6, "drbna": 0.7, "plachy": 0.5, "bruclavy": 0.4, "moudry": 0.35, "mlady": 0.3,
 	"pratelsky": 0.25, "veselak": 0.2}
 
 var world: World
@@ -234,14 +252,14 @@ func _tick_player(id: int, p: Player, dt: float) -> void:
 		if float(s["breath"]) <= 0.0:
 			s["winded"] = WINDED_S
 	else:
-		s["breath"] = minf(float(s["breath"]) + dt * 0.5, BREATH_S)
+		s["breath"] = minf(float(s["breath"]) + dt * BREATH_REGEN, BREATH_S)
 		s["winded"] = maxf(float(s["winded"]) - dt, 0.0)
 	# --- kolísání mušky
 	var amp := _sway_amp(id, p, s, spec, hold)
 	s["amp"] = amp
 	var t := float(s["t"])
 	var sw := Vector2(sin(t * 1.7) + 0.5 * sin(t * 4.3 + 1.0), cos(t * 1.3) + 0.5 * sin(t * 3.1 + 2.0)) * (amp / 1.5)
-	p.aim_sway = p.aim_sway.lerp(sw if aiming else Vector2.ZERO, 1.0 - exp(-10.0 * dt))
+	p.aim_sway = p.aim_sway.lerp(sw if aiming else Vector2.ZERO, 1.0 - exp(-SWAY_FOLLOW * dt))
 	# --- zbraň podle druhu
 	if float(spec["draw_s"]) > 0.0:
 		_tick_bow(id, p, s, spec, w, dt)
@@ -257,23 +275,23 @@ func _tick_player(id: int, p: Player, dt: float) -> void:
 
 func _sway_amp(id: int, p: Player, s: Dictionary, spec: Dictionary, hold: bool) -> float:
 	var a := float(spec["sway"])
-	a *= 1.0 + 4.0 * p.body.drunk_level()                          # opilost – hodně
-	a *= 1.0 + 2.0 * clampf(p.body.cold, 0.0, 1.0)                 # chlad
+	a *= 1.0 + SWAY_DRUNK_K * p.body.drunk_level()                          # opilost – hodně
+	a *= 1.0 + SWAY_COLD_K * clampf(p.body.cold, 0.0, 1.0)                 # chlad
 	var st := clampf(p.stamina / maxf(p.body.stamina_max(), 0.1), 0.0, 1.0)
-	a *= 1.0 + 1.5 * (1.0 - st)                                    # výdrž – po sprintu víc
+	a *= 1.0 + SWAY_TIRED_K * (1.0 - st)                                    # výdrž – po sprintu víc
 	var sk: Skills = world.skills.get(id)
 	if sk:
-		a *= lerpf(1.0, 0.5, sk.bonus("strelba"))                  # dovednost Střelba – méně
-	a *= 1.0 + Vector2(p.velocity.x, p.velocity.z).length() * 0.35
+		a *= lerpf(1.0, SWAY_SKILL_MIN, sk.bonus("strelba"))                  # dovednost Střelba – méně
+	a *= 1.0 + Vector2(p.velocity.x, p.velocity.z).length() * SWAY_MOVE_K
 	if p.visual != null and p.visual.crouching:
-		a *= 0.7
+		a *= SWAY_CROUCH_K
 	if hold:
-		a *= 0.25
+		a *= SWAY_HOLD_K
 	elif float(s["winded"]) > 0.0:
-		a *= 1.6
+		a *= SWAY_WINDED_K
 	if bool(s["drawing"]):
 		var over := (float(s["draw"]) - float(spec["draw_s"])) / OVERDRAW_S
-		a *= 1.0 + 1.5 * clampf(over, 0.0, 1.0)                    # dlouho natažený luk se třese
+		a *= 1.0 + SWAY_OVERDRAW_K * clampf(over, 0.0, 1.0)                    # dlouho natažený luk se třese
 	return a
 
 
@@ -406,7 +424,7 @@ func _tick_bow(id: int, p: Player, s: Dictionary, spec: Dictionary, w: String, d
 		return
 	var power := clampf(d / full, 0.0, 1.0)
 	if d > full + OVERDRAW_S:
-		power *= 0.75
+		power *= OVERDRAW_POWER
 		_msg(id, "Ruka se ti třese, natáhl jsi moc dlouho.", 2.0)
 	_fire(id, p, s, w, spec, power)
 	s["cd"] = float(spec["shot_cd"])
@@ -458,11 +476,11 @@ func _fire(id: int, p: Player, s: Dictionary, w: String, spec: Dictionary, power
 	var dir := _aim_dir(p, origin)
 	var spread := float(spec["spread"])
 	if not p.aim_on:
-		spread += float(s.get("amp", 0.0)) * 4.0                   # bez míření se střílí „od boku“ – velký rozptyl
+		spread += float(s.get("amp", 0.0)) * HIP_SPREAD_K                   # bez míření se střílí „od boku“ – velký rozptyl
 	dir = _spread(dir, spread)
 	var v0 := float(spec["v0"])
 	if float(spec["draw_s"]) > 0.0:
-		v0 *= lerpf(0.35, 1.0, power)                              # slabě natažený luk = pomalý šíp
+		v0 *= lerpf(DRAW_MIN_V, 1.0, power)                              # slabě natažený luk = pomalý šíp
 	var pr := {"w": w, "kind": String(spec["kind"]), "pos": origin, "vel": dir * v0, "t": 0.0, "id": id,
 		"start": origin, "node": null, "mass": float(spec["mass"])}
 	if String(spec["kind"]) == "arrow":
@@ -473,8 +491,8 @@ func _fire(id: int, p: Player, s: Dictionary, w: String, spec: Dictionary, power
 	projectiles.append(pr)
 	world.sound.emit(origin, String(spec["snd"]), randf_range(0.93, 1.07), 0.0, float(spec["noise"]))
 	if bool(spec["firearm"]):
-		p.pitch = clampf(p.pitch + 0.02, -1.45, 1.35)              # zpětný ráz
-		p.aim_sway += Vector2(randf_range(-0.004, 0.004), 0.012)
+		p.pitch = clampf(p.pitch + RECOIL_PITCH, -1.45, 1.35)              # zpětný ráz
+		p.aim_sway += Vector2(randf_range(-RECOIL_SWAY_SIDE, RECOIL_SWAY_SIDE), RECOIL_SWAY)
 	_alarm_wildlife(origin, minf(float(spec["noise"]), WILD_R))
 	world.emit_game_event(id, "gunshot", {"pos": origin, "weapon": w, "noise": float(spec["noise"]), "dir": dir})
 	_law_on_shot(id, p, spec, origin, dir)

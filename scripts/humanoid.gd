@@ -40,6 +40,47 @@ const DRINK_WRIST := 0.7          # ohnutí zápěstí při zvednutí láhve k �
 const DRINK_WRIST_TILT := 0.95    # další ohnutí při napití (rad × naklonění 0..0,9)
 const AIM_FOREARM := 1.65         # úhel předloktí při míření (−arm −fore) → tolik musí dát úchop + zápěstí dohromady
 
+## M8.D2b: postoj a pohybová animace – dřív čísla v `_process_impl`, laditelné v menu F3 (Člověk / Chůze a postoj).
+## Humanoid je nejdražší skript hry (desítky instancí): za snímek se čte jen `static var`, registr nikdy, nic se nealokuje.
+static var LAND_IMPACT := 12.0        # m/s dopadu = plné propružení v kolenou
+static var LAND_RECOVER := 4.0        # /s – návrat z propružení po dopadu
+static var LAND_DIP := 0.18           # m – pokles pánve při plném propružení
+static var CROUCH_BLEND := 6.0        # /s – přechod do přikrčení / skluzu
+static var WAVE_BLEND := 4.0          # /s – zvednutí ruky k mávání
+static var ACT_BLEND := 3.0           # /s – náběh akce rukou (pití, kouření, práce)
+static var SIT_BLEND := 4.0           # /s – přechod do sedu / jízdy
+static var LIE_BLEND := 3.0           # /s – přechod do lehu (pád, okno)
+static var OLD_RUN_FROM := 3.5        # m/s – stará animace (bez Gait): od kdy běh
+static var OLD_RUN_SPAN := 4.0        # m/s – stará animace: šířka přechodu chůze → běh
+static var OLD_MOVE_V := 1.5          # m/s – od této rychlosti plný rozkmit (stará animace, ohnutí loktů)
+static var OLD_PHASE_K := 2.2         # rad/m – fáze kroku staré animace
+static var OLD_PHASE_RUN := 0.5       # o kolik se při běhu krok prodlouží
+static var OLD_AMP_WALK := 0.55       # rad – rozkmit nohou při chůzi (stará animace)
+static var OLD_KNEE := 0.4            # rad – ohnutí kolene při chůzi (stará animace)
+static var OLD_KNEE_RUN := 0.9        # + při běhu
+static var OLD_ARM_K := 0.8           # protipohyb paží (stará animace)
+static var OLD_BOB := 0.05            # m – pohup pánve (stará animace)
+static var ELBOW_BASE := 0.25         # rad – ohnutí loktů při chůzi
+static var ELBOW_RUN := 0.9           # + při běhu
+static var LEAN_RUN := 0.22           # rad – předklon při běhu
+static var LEAN_MOVE := 0.05          # rad – předklon při chůzi
+static var SLOPE_ROLL_MAX := 0.4      # rad – nejvyšší náklon pánve napříč svahem
+static var SLOPE_LEAN_MAX := 0.45     # rad – nejvyšší náklon trupu do kopce / z kopce
+static var HIPS_STAND := 0.95         # m – výška pánve ve stoje
+static var CROUCH_DROP := 0.38        # m – pokles pánve v přikrčení
+static var CROUCH_LEAN := 0.35        # rad – předklon v přikrčení
+static var SLIDE_LEAN := -0.5         # rad – záklon ve skluzu
+static var SWAY_RATE := 0.9           # rychlost potácení (střízlivý základ)
+static var SWAY_DRUNK_RATE := 0.6     # + rychlost potácení v opilosti
+static var DRUNK_ROLL := 0.16         # rad – boční potácení trupu v opilosti
+static var DRUNK_HEAD_ROLL := 0.25    # rad – kývání hlavy v opilosti
+static var DRUNK_ARM_OUT := 0.2       # rad – ruce od těla v opilosti
+static var DRUNK_LEAN := 0.06         # rad – předklon v opilosti
+static var COLD_ARMS_IN := 0.14       # rad – ruce k tělu v zimě
+static var SHIVER_HZ := 26.0          # rad/s – třes zimou
+static var SHIVER_AMP := 0.012        # rad – třes zimou
+static var SHIVER_LEAN := 0.4         # předklon z třesu (× třes)
+
 
 ## Náklon úchopu nástroje v ruce (rot.x, rad) – viz ToolModels.GRIPS.
 func _tool_grip_x() -> float:
@@ -566,7 +607,7 @@ func set_first_person(fp: bool) -> void:
 
 
 func land(impact: float) -> void:
-	_land = clampf(impact / 12.0, 0.0, 1.0)
+	_land = clampf(impact / LAND_IMPACT, 0.0, 1.0)
 
 
 ## Vezme předmět do pravé ruky (lahev, jídlo…). null = pustit.
@@ -655,33 +696,33 @@ func _process(delta: float) -> void:
 
 
 func _process_impl(delta: float) -> void:
-	var run := clampf((speed - 3.5) / 4.0, 0.0, 1.0)
-	var moving := clampf(speed / 1.5, 0.0, 1.0)
-	_phase += delta * (speed * (2.2 - run * 0.5) + 0.0001)
-	_land = move_toward(_land, 0.0, delta * 4.0)
-	_crouch = move_toward(_crouch, 1.0 if (crouching or sliding) else 0.0, delta * 6.0)
-	_wave = move_toward(_wave, 1.0 if waving else 0.0, delta * 4.0)
-	_act_w = move_toward(_act_w, 1.0 if action != "" else 0.0, delta * 3.0)
-	_sit = move_toward(_sit, 1.0 if pose == "sit" or pose == "ride" else 0.0, delta * 4.0)
-	_lie = move_toward(_lie, 1.0 if pose == "lie" else 0.0, delta * 3.0)
+	var run := clampf((speed - OLD_RUN_FROM) / OLD_RUN_SPAN, 0.0, 1.0)
+	var moving := clampf(speed / OLD_MOVE_V, 0.0, 1.0)
+	_phase += delta * (speed * (OLD_PHASE_K - run * OLD_PHASE_RUN) + 0.0001)
+	_land = move_toward(_land, 0.0, delta * LAND_RECOVER)
+	_crouch = move_toward(_crouch, 1.0 if (crouching or sliding) else 0.0, delta * CROUCH_BLEND)
+	_wave = move_toward(_wave, 1.0 if waving else 0.0, delta * WAVE_BLEND)
+	_act_w = move_toward(_act_w, 1.0 if action != "" else 0.0, delta * ACT_BLEND)
+	_sit = move_toward(_sit, 1.0 if pose == "sit" or pose == "ride" else 0.0, delta * SIT_BLEND)
+	_lie = move_toward(_lie, 1.0 if pose == "lie" else 0.0, delta * LIE_BLEND)
 	_act_t += delta
-	_sway_t += delta * (0.9 + drunk * 0.6)
+	_sway_t += delta * (SWAY_RATE + drunk * SWAY_DRUNK_RATE)
 	if action != "":
 		_last_action = action
 	if _tool and is_instance_valid(_tool):
 		_tool.visible = pose == "stand" and (_held == null or not is_instance_valid(_held))
 	var s := sin(_phase)
 	var c := cos(_phase)
-	var amp := lerpf(0.55, 1.0, run) * moving
+	var amp := lerpf(OLD_AMP_WALK, 1.0, run) * moving
 	var leg_l := s * amp
 	var leg_r := -s * amp
-	var knee_l := maxf(0.0, -c) * (0.4 + run * 0.9) * moving + 0.05
-	var knee_r := maxf(0.0, c) * (0.4 + run * 0.9) * moving + 0.05
-	var arm_l := -s * amp * 0.8
-	var arm_r := s * amp * 0.8
-	var elbow := -(0.25 + run * 0.9)
-	var lean := run * 0.22 + moving * 0.05
-	var bob := absf(c) * 0.05 * amp - _land * 0.18
+	var knee_l := maxf(0.0, -c) * (OLD_KNEE + run * OLD_KNEE_RUN) * moving + 0.05
+	var knee_r := maxf(0.0, c) * (OLD_KNEE + run * OLD_KNEE_RUN) * moving + 0.05
+	var arm_l := -s * amp * OLD_ARM_K
+	var arm_r := s * amp * OLD_ARM_K
+	var elbow := -(ELBOW_BASE + run * ELBOW_RUN)
+	var lean := run * LEAN_RUN + moving * LEAN_MOVE
+	var bob := absf(c) * OLD_BOB * amp - _land * LAND_DIP
 	var pelvis_x := 0.0
 	var slope_roll := 0.0
 	# M8.6: fázový cyklus `Gait` (stojná fáze beze klouzání, IK chodidel na terén, kymácení pánve,
@@ -699,10 +740,10 @@ func _process_impl(delta: float) -> void:
 		knee_r = _gait.knee_r
 		arm_l = _gait.arm_l
 		arm_r = _gait.arm_r
-		elbow = -(0.25 + _gait.run_frac * 0.9)
-		bob = _gait.pelvis_y - _land * 0.18
+		elbow = -(ELBOW_BASE + _gait.run_frac * ELBOW_RUN)
+		bob = _gait.pelvis_y - _land * LAND_DIP
 		pelvis_x = _gait.pelvis_x
-		lean = _gait.run_frac * 0.22 + _gait.move_w * 0.05
+		lean = _gait.run_frac * LEAN_RUN + _gait.move_w * LEAN_MOVE
 		# terén pod chodidly: podélný sklon → náklon trupu (do kopce vpřed, z kopce vzad), boční
 		# sklon → náklon pánve (test „chůze napříč svahem“: chodidla rovnoběžně se svahem, pánev nakloněná)
 		# Oprava regrese po vlně 2 M8: 4x Callable.call() do Terrain.height_at KAŽDÝ frame (60 Hz)
@@ -723,9 +764,9 @@ func _process_impl(delta: float) -> void:
 				var h_r: float = ground_fn.call(p.x + right.x * SLOPE_D, p.z + right.z * SLOPE_D)
 				var h_l: float = ground_fn.call(p.x - right.x * SLOPE_D, p.z - right.z * SLOPE_D)
 				_slope_fwd = atan2(h_f - h_b, 2.0 * SLOPE_D)
-				_slope_roll_raw = clampf(atan2(h_r - h_l, 2.0 * SLOPE_D), -0.4, 0.4)
+				_slope_roll_raw = clampf(atan2(h_r - h_l, 2.0 * SLOPE_D), -SLOPE_ROLL_MAX, SLOPE_ROLL_MAX)
 			slope_roll = _slope_roll_raw * _gait.move_w
-			lean += clampf(-_slope_fwd, -0.45, 0.45) * _gait.move_w
+			lean += clampf(-_slope_fwd, -SLOPE_LEAN_MAX, SLOPE_LEAN_MAX) * _gait.move_w
 		# náklad na rameni a vyčerpaná výdrž: shrbení (lean), chlad: ruce blíž k tělu (řeší se níž u `arm_out`)
 		lean += clampf(load_kg / Gait.LOAD_MAX_KG, 0.0, 1.0) * Gait.LOAD_LEAN_K * 10.0
 		lean += tired * Gait.TIRED_LEAN_K
@@ -740,25 +781,25 @@ func _process_impl(delta: float) -> void:
 		elbow = -0.5
 		lean = 0.08
 	# přikrčení / skluz
-	var hips_y := 0.95 - _crouch * 0.38 + bob
+	var hips_y := HIPS_STAND - _crouch * CROUCH_DROP + bob
 	leg_l = lerpf(leg_l, 1.1 if not sliding else 1.4, _crouch)
 	leg_r = lerpf(leg_r, 1.1 if not sliding else 0.2, _crouch)
 	knee_l = lerpf(knee_l, 1.9 if not sliding else 1.0, _crouch)
 	knee_r = lerpf(knee_r, 1.9 if not sliding else 0.2, _crouch)
-	lean = lerpf(lean, 0.35 if not sliding else -0.5, _crouch)
+	lean = lerpf(lean, CROUCH_LEAN if not sliding else SLIDE_LEAN, _crouch)
 	# opilost: potácení trupu, hlavy, ruce od těla (opilost staví na `Gait`: posun těžiště mimo opěrnou
 	# bázi = vrávorání a nápravný krok – `_gait.move_w` zesiluje rozkmit podle toho, jestli postava jde)
 	var sway := sin(_sway_t * 1.3) * 0.5 + sin(_sway_t * 2.9 + 1.0) * 0.3
-	var roll := sway * 0.16 * drunk + slope_roll
-	var head_roll := sin(_sway_t * 1.1 + 0.5) * 0.25 * drunk
-	var arm_out := 0.2 * drunk
-	lean += drunk * 0.06 * (1.0 + sin(_sway_t * 0.7))
+	var roll := sway * DRUNK_ROLL * drunk + slope_roll
+	var head_roll := sin(_sway_t * 1.1 + 0.5) * DRUNK_HEAD_ROLL * drunk
+	var arm_out := DRUNK_ARM_OUT * drunk
+	lean += drunk * DRUNK_LEAN * (1.0 + sin(_sway_t * 0.7))
 	# chlad: ruce blíž k tělu, občasný třes (deterministický šum z `_sway_t`, ne `randf()`)
 	if cold > 0.0:
-		arm_out -= cold * 0.14
-		var shiver := sin(_sway_t * 26.0) * 0.012 * cold
+		arm_out -= cold * COLD_ARMS_IN
+		var shiver := sin(_sway_t * SHIVER_HZ) * SHIVER_AMP * cold
 		roll += shiver
-		lean += absf(shiver) * 0.4
+		lean += absf(shiver) * SHIVER_LEAN
 	# sezení (lavice) / jízda (auto, kolo, motorka – končetiny dosahují na pedály a řízení přes IK)
 	var ik_l := Vector2(1.45, 1.35)
 	var ik_r := Vector2(1.45, 1.35)

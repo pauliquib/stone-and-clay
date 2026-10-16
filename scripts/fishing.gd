@@ -26,34 +26,67 @@ extends Node3D
 const PATH := "res://data/ryby.json"
 const ROD_TOOLS := ["udice", "udice_lepsi"]
 const BAITS := ["navnada_zizaly", "navnada_kukurice", "navnada_testo"]   # v tomto pořadí se bere z kapsy
-const MIN_CAST_M := 1.5              # blíž než tolik metrů od hráče nahodit nejde
-const MIN_DEPTH := 0.3               # nejmenší hloubka vody v místě dopadu (m)
-const FROZEN := 0.6                  # zamrznutí (Water.ice / ice_flow), od kterého nejde nahodit
-const WAIT_MIN_S := 5.0
-const WAIT_MAX_S := 90.0
-const WAIT_MEAN_S := 40.0            # průměrná doba čekání při šanci 1
-const STRIKE_WINDOW_S := 1.2
-const LEAVE_M := 14.0                # dál od splávku se vlasec sám stáhne
-const TENSION_START := 0.3
-const GREEN_LO := 0.4
-const GREEN_HI := 0.8
-const REEL_RATE := 0.45              # růst napětí za s při navíjení
-const SLACK_RATE := 0.35             # pokles napětí za s při povolení
-const SURGE_S := 0.35                # délka jednoho „záběru“ ryby
-const SLIP_K := 0.35                 # o kolik rychleji se ryba vzdaluje pod zelenou zónou (× rychlost přitahování)
-const FIGHT_MIN_S := 5.0
-const FIGHT_MAX_S := 40.0
-const NET_CM := 40.0                 # větší ryby bez podběráku častěji utečou
-const NET_LOSS_P := 0.3
-const WITNESS_R := 45.0              # do kolika m svědek vidí rybáře
-const FINE_COOLDOWN_MIN := 120.0     # herní minuty mezi dvěma pokutami za pytláctví (ať to nesype při každém hodu)
-const ROD_BETTER_BITE := 1.15
-const ROD_BETTER_REEL := 0.85
+static var MIN_CAST_M := 1.5              # blíž než tolik metrů od hráče nahodit nejde
+static var MIN_DEPTH := 0.3               # nejmenší hloubka vody v místě dopadu (m)
+static var FROZEN := 0.6                  # zamrznutí (Water.ice / ice_flow), od kterého nejde nahodit
+static var WAIT_MIN_S := 5.0
+static var WAIT_MAX_S := 90.0
+static var WAIT_MEAN_S := 40.0            # průměrná doba čekání při šanci 1
+static var STRIKE_WINDOW_S := 1.2
+static var LEAVE_M := 14.0                # dál od splávku se vlasec sám stáhne
+static var TENSION_START := 0.3
+static var GREEN_LO := 0.4
+static var GREEN_HI := 0.8
+static var REEL_RATE := 0.45              # růst napětí za s při navíjení
+static var SLACK_RATE := 0.35             # pokles napětí za s při povolení
+static var SURGE_S := 0.35                # délka jednoho „záběru“ ryby
+static var SLIP_K := 0.35                 # o kolik rychleji se ryba vzdaluje pod zelenou zónou (× rychlost přitahování)
+static var FIGHT_MIN_S := 5.0
+static var FIGHT_MAX_S := 40.0
+static var NET_CM := 40.0                 # větší ryby bez podběráku častěji utečou
+static var NET_LOSS_P := 0.3
+static var WITNESS_R := 45.0              # do kolika m svědek vidí rybáře
+static var FINE_COOLDOWN_MIN := 120.0     # herní minuty mezi dvěma pokutami za pytláctví (ať to nesype při každém hodu)
+static var ROD_BETTER_BITE := 1.15
+static var ROD_BETTER_REEL := 0.85
+## M8.D2b: dřív čísla ve vzorcích – laditelné v menu F3 (Činnosti / Rybaření). Výchozí = původní čísla.
+static var BITE_NIGHT := 0.8          # šance na záběr v noci (×)
+static var BITE_DAWN_DUSK := 1.5      # ráno 5–9 h a večer 17–21 h
+static var BITE_NOON := 0.7           # poledne 11–15 h
+static var BITE_OVERCAST := 1.2       # zataženo, přeháňky, déšť
+static var BITE_CLOUDY := 1.1         # oblačno
+static var BITE_STORM := 0.5          # bouřka
+static var BITE_HOT := 0.7            # jasno a horko
+static var BITE_HOT_C := 25.0         # °C – „horko“
+static var BITE_WIND := 8.0           # m/s – silný vítr
+static var BITE_WIND_K := 0.8         # × při silném větru
+static var BITE_SKILL_K := 0.5        # + šance při nejvyšší dovednosti Rybaření
+static var WAIT_RAND_MIN := 0.15      # náhoda doby čekání (× průměr)
+static var WAIT_RAND_MAX := 1.8
+static var SIZE_EXPO := 2.2           # rozdělení délky ryby (víc = víc malých kusů)
+static var SIZE_SKILL_K := 0.9        # dovednost posune k větším kusům
+static var SIZE_ROD_K := 0.4          # lepší udice posune k větším kusům
+static var SIZE_EXPO_MIN := 0.8
+static var DITCH_SIZE_K := 0.6        # příkop / strouha: největší kus × tohle
+static var SURGE_BASE := 0.15         # síla záběru malé ryby (skok napětí)
+static var SURGE_SIZE_K := 0.25       # + u největší ryby
+static var SURGE_SKILL_K := 0.35      # dovednost zmenší záběry
+static var SURGE_GAP_MIN := 1.5       # s mezi záběry ryby
+static var SURGE_GAP_MAX := 4.0
+static var SURGE_GAP_SKILL_K := 0.3   # dovednost prodlouží mezery mezi záběry
+static var FIGHT_SIZE_EXPO := 0.8     # délka zdolávání podle velikosti (mocnina)
+static var TENSION_MAX := 1.2         # strop napětí (nad 1,0 vlasec praskne)
+static var SNAP_WEAR := 3             # opotřebení udice při prasknutí vlasce
+static var NET_SKILL_K := 0.5         # dovednost zmenší ztrátu bez podběráku
+static var XP_BASE := 6.0             # XP za úlovek: základ
+static var XP_PER_KG := 8.0
+static var XP_PER_CM := 0.2
+static var XP_MAX := 150.0
 const DEFAULT_NADRZ_M2 := 20000.0
 ## Činitel místa podle druhu vody (`Water.info_at()["kind"]`).
-const PLACE_MULT := {"pond": 1.0, "river": 0.9, "canal": 0.8, "stream": 0.8, "ditch": 0.6, "drain": 0.6}
+static var PLACE_MULT := {"pond": 1.0, "river": 0.9, "canal": 0.8, "stream": 0.8, "ditch": 0.6, "drain": 0.6}
 ## Činitel sezóny podle měsíce (leden … prosinec): zima ×0,3.
-const MONTH_MULT := [0.3, 0.3, 0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.7, 0.3]
+static var MONTH_MULT := [0.3, 0.3, 0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.7, 0.3]
 
 ## Vestavěná záloha, kdyby chyběl / byl poškozený `data/ryby.json`.
 const FALLBACK_SPECIES := {
@@ -221,29 +254,29 @@ func bite_factor(id: int, kind: String, bait: String, rod: String) -> Dictionary
 	var h: float = world.clock.hour()
 	var day := 1.0
 	if world.clock.is_night():
-		day = 0.8
+		day = BITE_NIGHT
 	elif (h >= 5.0 and h < 9.0) or (h >= 17.0 and h < 21.0):
-		day = 1.5              # ráno a večer
+		day = BITE_DAWN_DUSK     # ráno a večer
 	elif h >= 11.0 and h < 15.0:
-		day = 0.7              # poledne
+		day = BITE_NOON          # poledne
 	var wth := 1.0
 	var w = world.weather
 	if w != null:
 		if w.kind in ["zatazeno", "prehanky", "dest"]:
-			wth = 1.2          # zataženo / před deštěm
+			wth = BITE_OVERCAST  # zataženo / před deštěm
 		elif w.kind == "oblacno":
-			wth = 1.1
+			wth = BITE_CLOUDY
 		elif w.kind == "bourka":
-			wth = 0.5
-		elif w.temp > 25.0 and w.kind in ["jasno", "polojasno"]:
-			wth = 0.7          # jasno a horko
-		if w.wind > 8.0:
-			wth *= 0.8
+			wth = BITE_STORM
+		elif w.temp > BITE_HOT_C and w.kind in ["jasno", "polojasno"]:
+			wth = BITE_HOT          # jasno a horko
+		if w.wind > BITE_WIND:
+			wth *= BITE_WIND_K
 	var season: float = MONTH_MULT[clampi(world.clock.month() - 1, 0, 11)]
 	var baits: Dictionary = data().get("navnady", {})
 	var bf := float((baits.get(bait, {}) as Dictionary).get("faktor", 1.0))
 	var sk: Skills = world.skills.get(id)
-	var lvl := 1.0 + 0.5 * (sk.bonus("rybareni") if sk else 0.0)
+	var lvl := 1.0 + BITE_SKILL_K * (sk.bonus("rybareni") if sk else 0.0)
 	if rod == "udice_lepsi":
 		lvl *= ROD_BETTER_BITE
 	return {"f": place * day * wth * season * bf * lvl, "misto": place, "doba": day, "pocasi": wth,
@@ -310,7 +343,7 @@ func _on_cast(id: int, _def: Dictionary, aim: Dictionary, ok: bool) -> void:
 func _new_session(id: int, p: Player, pos: Vector3, info: Dictionary, bait: String) -> Dictionary:
 	var kind := String(info.get("kind", ""))
 	var f := bite_factor(id, kind, bait, p.equipped)
-	var wait := clampf(WAIT_MEAN_S / maxf(float(f["f"]), 0.05) * randf_range(0.15, 1.8), WAIT_MIN_S, WAIT_MAX_S)
+	var wait := clampf(WAIT_MEAN_S / maxf(float(f["f"]), 0.05) * randf_range(WAIT_RAND_MIN, WAIT_RAND_MAX), WAIT_MIN_S, WAIT_MAX_S)
 	var s := {"state": "wait", "pos": pos, "start": pos, "kind": kind, "tags": water_tags(info, pos), "bait": bait,
 		"rod": p.equipped, "t": wait, "bite_left": 0.0, "nibble_t": randf_range(2.0, 6.0), "nibble": 0.0, "age": 0.0,
 		"cast_m": maxf(Vector2(pos.x - p.global_position.x, pos.z - p.global_position.z).length(), 1.0),
@@ -352,8 +385,8 @@ func _hook(id: int, s: Dictionary) -> void:
 	var b := sk.bonus("rybareni") if sk else 0.0
 	s["state"] = "fight"
 	s["frac"] = frac
-	s["fight_len"] = lerpf(FIGHT_MIN_S, FIGHT_MAX_S, pow(frac, 0.8)) * randf_range(0.85, 1.15)
-	s["surge_str"] = (0.15 + 0.25 * frac) * (1.0 - 0.35 * b)
+	s["fight_len"] = lerpf(FIGHT_MIN_S, FIGHT_MAX_S, pow(frac, FIGHT_SIZE_EXPO)) * randf_range(0.85, 1.15)
+	s["surge_str"] = (SURGE_BASE + SURGE_SIZE_K * frac) * (1.0 - SURGE_SKILL_K * b)
 	s["surge_in"] = randf_range(1.0, 2.5)
 	s["surge_left"] = 0.0
 	s["dist"] = 1.0
@@ -421,8 +454,8 @@ func _tick_wait(id: int, s: Dictionary, delta: float) -> void:
 	var mn := float(sp.get("min_cm", 10.0))
 	var mx := float(sp.get("max_cm", 40.0))
 	if String(s["kind"]) in ["ditch", "drain"]:
-		mx = maxf(mn + 1.0, mx * 0.6)          # malé příkopy = malé kusy
-	var expo := maxf(2.2 - 0.9 * b - (0.4 if String(s["rod"]) == "udice_lepsi" else 0.0), 0.8)
+		mx = maxf(mn + 1.0, mx * DITCH_SIZE_K)          # malé příkopy = malé kusy
+	var expo := maxf(SIZE_EXPO - SIZE_SKILL_K * b - (SIZE_ROD_K if String(s["rod"]) == "udice_lepsi" else 0.0), SIZE_EXPO_MIN)
 	var cm := roundf(lerpf(mn, mx, pow(randf(), expo)))
 	s["species"] = sid
 	s["cm"] = cm
@@ -461,8 +494,8 @@ func _tick_fight(id: int, s: Dictionary, p: Player, delta: float) -> bool:
 		s["surge_in"] = float(s["surge_in"]) - delta
 		if float(s["surge_in"]) <= 0.0:
 			s["surge_left"] = SURGE_S
-			s["surge_in"] = randf_range(1.5, 4.0) * (1.0 + 0.3 * b)
-	var t := clampf(float(s["tension"]) + rate * delta, 0.0, 1.2)
+			s["surge_in"] = randf_range(SURGE_GAP_MIN, SURGE_GAP_MAX) * (1.0 + SURGE_GAP_SKILL_K * b)
+	var t := clampf(float(s["tension"]) + rate * delta, 0.0, TENSION_MAX)
 	s["tension"] = t
 	var step := delta / maxf(float(s["fight_len"]), 1.0)
 	if t > 1.0:
@@ -486,7 +519,7 @@ func _tick_fight(id: int, s: Dictionary, p: Player, delta: float) -> bool:
 
 
 func _snap(id: int, s: Dictionary, p: Player) -> void:
-	if not p.wear_tool(String(s["rod"]), 3):
+	if not p.wear_tool(String(s["rod"]), SNAP_WEAR):
 		_msg(id, "%s se rozlomila." % ItemsDB.name_of(String(s["rod"])), 3.0)
 	_end(id, "Vlasec praskl! Ryba je pryč i s návnadou.", false)
 
@@ -496,7 +529,7 @@ func _land(id: int, s: Dictionary, p: Player) -> void:
 	if cm > NET_CM and p.item_count("podberak") <= 0:
 		var sk: Skills = world.skills.get(id)
 		var b := sk.bonus("rybareni") if sk else 0.0
-		if randf() < NET_LOSS_P * (1.0 - 0.5 * b):
+		if randf() < NET_LOSS_P * (1.0 - NET_SKILL_K * b):
 			_end(id, "Velká ryba se těsně u břehu utrhla – podběrák by pomohl.", false)
 			return
 	var sid := String(s["species"])
@@ -504,7 +537,7 @@ func _land(id: int, s: Dictionary, p: Player) -> void:
 	var kg := float(s["kg"])
 	if not p.wear_tool(String(s["rod"]), 1):
 		_msg(id, "%s se rozlomila." % ItemsDB.name_of(String(s["rod"])), 3.0)
-	var xp := minf(6.0 + kg * 8.0 + cm * 0.2, 150.0)
+	var xp := minf(XP_BASE + kg * XP_PER_KG + cm * XP_PER_CM, XP_MAX)
 	world.give_xp(id, "rybareni", xp, "úlovek")
 	world.emit_game_event(id, "fish_caught", {"species": sid, "cm": cm, "kg": kg})
 	var name_ := String(sp.get("nazev", sid))

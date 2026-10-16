@@ -19,6 +19,11 @@ var _say_t := 0.0
 var _yaw := 0.0
 var _far := false                 # za simulační bublinou – vizuál schovaný (NPC „jen u hráče“)
 
+## M8.D2b: laditelné v menu F3 (Člověk / NPC a vesničané) – sdílené všemi NPC.
+static var FACE_R := 7.0          # m – stojící NPC se otočí k hráči blíž než tohle
+static var TURN := 4.0            # /s – rychlost otáčení
+static var WAVE_S := 1.2          # s – mává na konci repliky
+
 
 static func make(name_: String, outfit: String, shirt: Color, seed_: int, pos: Vector3, yaw: float,
 		w: Node, sit := false) -> Npc:
@@ -121,8 +126,8 @@ func _process_impl(delta: float) -> void:
 		_far = false
 		visual.visible = true
 	var want := base_yaw
-	if face_player and d < 7.0 and not sitting:
+	if face_player and d < FACE_R and not sitting:
 		want = atan2(to.x, to.z)
-	_yaw = lerp_angle(_yaw, want, 1.0 - exp(-4.0 * delta))
+	_yaw = lerp_angle(_yaw, want, 1.0 - exp(-TURN * delta))
 	visual.rotation.y = _yaw
-	visual.waving = _say_t > 0.0 and _say_t < 1.2 and not sitting
+	visual.waving = _say_t > 0.0 and _say_t < WAVE_S and not sitting

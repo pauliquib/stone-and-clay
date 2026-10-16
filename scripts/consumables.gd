@@ -5,7 +5,7 @@
 class_name Consumables
 extends RefCounted
 
-const ETHANOL_DENSITY := 0.789   # g/ml
+static var ETHANOL_DENSITY := 0.789   # g/ml
 
 ## Alias na jednotný katalog `ItemsDB.ITEMS` (M0.2).
 const ITEMS := ItemsDB.ITEMS

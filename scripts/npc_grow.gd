@@ -11,11 +11,11 @@ extends Node3D
 
 const NPC_NAME := "Ladislav Hrubý"
 const SOW_MONTHS := [4, 5]
-const DAYS := 110.0                    # dny od výsevu do sklizně (jako `konopi` v Garden.CROPS)
-const PLANTS_MIN := 4
-const PLANTS_MAX := 8
-const SEE_R := 25.0                    # m – dohled souseda na záhon
-const CHECK_R := 150.0                 # m – hráči v tomto okruhu mohou čin zaznamenat
+static var DAYS := 110.0                    # dny od výsevu do sklizně (jako `konopi` v Garden.CROPS)
+static var PLANTS_MIN := 4
+static var PLANTS_MAX := 8
+static var SEE_R := 25.0                    # m – dohled souseda na záhon
+static var CHECK_R := 150.0                 # m – hráči v tomto okruhu mohou čin zaznamenat
 const PLOT_OFFSET := Vector3(0.0, 0.0, -9.0)   # m od dveří chaty – „za chatou“ (ladit)
 const PLOT_SIZE := Vector2(3.0, 2.0)
 const LEAF := Color(0.22, 0.5, 0.2)
