@@ -38,6 +38,16 @@ const RELOCATE_AWAY := 30.0                    # nové bidýlko aspoň tak dalek
 ## Režimy a cíle přistání jako čísla pro síť (index v poli = číslo ve stavu; nové jen na konec).
 const MODES := ["ground", "fly", "perch", "hunt", "soar"]
 const LANDS := ["", "ground", "perch"]
+## M8.10 boidy (Reynolds 1987) pro letící hejno vran: oddělení, zarovnání, soudržnost → posun cíle ptáka
+const BOID_S := 0.2                            # s – jak často se síly hejna přepočítají
+const BOID_SEP_R := 3.0                        # m – blíž než tohle se ptáci odpuzují
+const BOID_K := Vector3(4.0, 0.6, 0.15)        # váhy: oddělení, zarovnání, soudržnost
+const BOID_MAX := 8.0                          # m – největší posun cíle
+## M8.10 káně a termika: krouží v nejbližší bublině `Thermals` (tam, kde stoupá i paraglide); bez bubliny
+## v dosahu krouží nad okrskem ve „slabé termice“, kterou letecký model nesimuluje (BUZZARD_WEAK_LIFT)
+const BUZZARD_THERMAL_R := 1200.0              # m – jak daleko od domova káně bublinu najde
+const BUZZARD_WEAK_LIFT := 1.2                 # m/s
+const BUZZARD_CEIL := 220.0                    # m nad terénem – strop kroužení (výš ji termika „nepustí“)
 
 var fauna: Fauna
 var net_id := 0                      # stabilní síťové číslo (Fauna ho přiděluje)
@@ -97,6 +107,7 @@ func _ready() -> void:
 		if species == "kane":
 			p.y += 70.0
 		b.setup(species, fauna.terrain, p, rng.randi())
+		b.world = fauna.world                # M8.10: vítr a termika pro letový model
 		b.state = "ground" if mode == "ground" else "fly"
 		add_child(b)
 		birds.append(b)
@@ -284,14 +295,7 @@ func _client_hunt(delta: float, weather: Weather) -> void:
 ## Káně krouží nad domovem (stejný střed jako `_buzzard`, čas v režimu se hlídá se serverem).
 func _client_soar(delta: float) -> void:
 	var b: Bird = birds[0]
-	var r := 55.0
-	_soar_a += delta * b.speed / r
-	spot = home + Vector3(sin(_mode_t * 0.01) * 150.0, 0, cos(_mode_t * 0.013) * 150.0)
-	var gy: float = fauna.terrain.height_at(spot.x, spot.z) + 90.0 + sin(_mode_t * 0.05) * 25.0
-	b.target = Vector3(spot.x + cos(_soar_a) * r, gy, spot.z + sin(_soar_a) * r)
-	b.state = "soar"
-	b.land_on = ""
-	b.fly_step(delta, 9.5)
+	_soar_step(delta, b)
 
 
 # ------------------------------------------------------------------ vrány
@@ -474,15 +478,7 @@ func _buzzard(delta: float, day: float, weather: Weather, w: Node) -> void:
 			return
 	if thermals:
 		mode = "soar"
-		# kruhy ~55 m, střed pomalu putuje nad okrskem
-		var r := 55.0
-		_soar_a += delta * b.speed / r
-		spot = home + Vector3(sin(_mode_t * 0.01) * 150.0, 0, cos(_mode_t * 0.013) * 150.0)
-		var gy := fauna.terrain.height_at(spot.x, spot.z) + 90.0 + sin(_mode_t * 0.05) * 25.0
-		b.target = Vector3(spot.x + cos(_soar_a) * r, gy, spot.z + sin(_soar_a) * r)
-		b.state = "soar"
-		b.land_on = ""
-		b.fly_step(delta, 9.5)
+		_soar_step(delta, b)
 		# občas si sedne na strom (jednou za pár minut kostka)
 		_rest_t += delta
 		if _rest_t > BUZZARD_REST_EVERY:
@@ -491,6 +487,39 @@ func _buzzard(delta: float, day: float, weather: Weather, w: Node) -> void:
 				_buzzard_perch()
 	elif mode == "soar":
 		_buzzard_perch()
+
+
+## Kroužení káně: kruhy ~55 m kolem středu, který pomalu putuje nad okrskem (původní chování). M8.10: je-li
+## v dosahu bublina `Thermals`, krouží v ní (střed bubliny táhne s větrem) a stoupá; jinak ji nese slabá termika
+## `BUZZARD_WEAK_LIFT` u středu kruhu. Termika slábne pod stropem kroužení (`BUZZARD_CEIL` nad terénem).
+func _soar_step(delta: float, b: Bird) -> void:
+	var r := 55.0
+	_soar_a += delta * b.speed / r
+	spot = home + Vector3(sin(_mode_t * 0.01) * 150.0, 0, cos(_mode_t * 0.013) * 150.0)
+	var gy := fauna.terrain.height_at(spot.x, spot.z) + 90.0 + sin(_mode_t * 0.05) * 25.0
+	if FlightModel.on and b.fm:
+		var w: World = fauna.world
+		var best := BUZZARD_THERMAL_R
+		var found := false
+		if w and w.thermals:
+			for bb in w.thermals.bubbles:
+				var bp: Vector2 = bb["pos"]
+				var d := bp.distance_to(Vector2(home.x, home.z))
+				if d < best:
+					best = d
+					found = true
+					spot = Vector3(bp.x, 0.0, bp.y)
+					r = clampf(float(bb["r"]) * 0.4, 35.0, 60.0)
+		var ground := fauna.terrain.height_at(spot.x, spot.z)
+		b.fm.soar_ceil = ground + BUZZARD_CEIL
+		# bez bubliny: slabá termika u středu kruhu (ať káně neztrácí výšku a nemává)
+		b.fm.lift_bias = 0.0 if found else BUZZARD_WEAK_LIFT
+		# cíl výšky = strop (stoupá, kolik ji termika pustí); v bublině kruh dle poloměru bubliny
+		gy = ground + BUZZARD_CEIL if found else gy
+	b.target = Vector3(spot.x + cos(_soar_a) * r, gy, spot.z + sin(_soar_a) * r)
+	b.state = "soar"
+	b.land_on = ""
+	b.fly_step(delta, 9.5)
 
 
 func _buzzard_perch() -> void:
@@ -564,13 +593,15 @@ func _fly_all_to_ground(p: Vector3, spread: float) -> void:
 func _fly_all(delta: float) -> void:
 	var landed := 0
 	var last := ""
+	_boids(delta)
 	for b in birds:
 		if b.state == "fly":
 			var g: Vector3 = _goals[b]
+			# na zemi i na předmětu stojí pták na nohách (0,28 délky), na větvi jen 0,05 m
+			var off: float = float(b.spec["length"]) * 0.28 if b.land_on == "ground" else float(b.perch_off)
+			b.set_land_goal(g + Vector3(0, off, 0))      # M8.10: letový model k tomu bodu brzdí a klesá
 			var d: float = b.fly_step(delta, float(b.spec["cruise"]) * (1.0 if b.global_position.distance_to(g) > 15.0 else 0.6))
-			if d < 2.5 or _mode_t > 40.0:
-				# na zemi i na předmětu stojí pták na nohách (0,28 délky), na větvi jen 0,05 m
-				var off: float = float(b.spec["length"]) * 0.28 if b.land_on == "ground" else float(b.perch_off)
+			if d < b.land_reach() or _mode_t > 40.0:
 				b.global_position = g + Vector3(0, off, 0)
 				b.yaw = rng.randf() * TAU                 # každý pták jinam
 				b.state = "ground" if b.land_on == "ground" else "perch"
@@ -584,6 +615,48 @@ func _fly_all(delta: float) -> void:
 		mode = last
 		_mode_t = 0.0
 		_stay = _roll_stay()
+
+
+var _boid_t := 0.0
+
+
+## M8.10 boidy (Reynolds): letícím vránám se 5× za s spočte posun cíle – oddělení od sousedů blíž než
+## BOID_SEP_R, zarovnání s průměrnou rychlostí hejna, soudržnost ke středu. Hejno ≤ ~18 ptáků → n² stačí.
+func _boids(delta: float) -> void:
+	if species != "vrana" or not FlightModel.on:
+		return
+	_boid_t -= delta
+	if _boid_t > 0.0:
+		return
+	_boid_t = BOID_S
+	var n := 0
+	var c := Vector3.ZERO
+	var av := Vector3.ZERO
+	for b in birds:
+		if b.state == "fly":
+			n += 1
+			c += b.global_position
+			av += b.vel
+	if n < 3:
+		for b in birds:
+			b.boid_bias = Vector3.ZERO
+		return
+	c /= float(n)
+	av /= float(n)
+	for b in birds:
+		if b.state != "fly":
+			continue
+		var p: Vector3 = b.global_position
+		var sep := Vector3.ZERO
+		for o in birds:
+			if o == b or o.state != "fly":
+				continue
+			var dd: Vector3 = p - o.global_position
+			var l2 := dd.length_squared()
+			if l2 < BOID_SEP_R * BOID_SEP_R and l2 > 0.0001:
+				sep += dd / l2
+		var bias: Vector3 = sep * BOID_K.x + (av - b.vel) * BOID_K.y + (c - p) * BOID_K.z
+		b.boid_bias = bias.limit_length(BOID_MAX)
 
 
 ## Jak dlouho potrvá klidový režim, do kterého se hejno právě dostalo (ground / perch / hunt).

@@ -160,6 +160,28 @@
   pobodají), mraveniště v lesích se stezkami ke stromům (kdo si na ně stoupne, toho kousnou).
 - **Kůň** (`fauna/horse.gd`): ve výběhu u domova se pase kůň hráče se sedlem; chody krok ~6, klus ~14, cval ~25,
   trysk ~50 km/h, výdrž, skok, náraz do zdi v trysku jezdce shodí. Návod k úpravám: [`ZVIRATA.md`](ZVIRATA.md).
+- **Lokomoce zvířat 2 a let ptáků (M8.10)**, přepínač realismu `animal_gait` (Fauna → `QuadrupedRig.v2`,
+  `FlightModel.on`; vypnuto = dřívější pohyb). **Čtyřnožci** (`fauna/quadruped_rig.gd`, sdílí zvěř, kůň pod jezdcem
+  i hospodářská zvířata): chod podle Froudova čísla `Fr = v²/(g·L)` (L = výška ramene; prahy a hystereze per druh
+  `AnimalSpecs` „froude“ / „froude_hyst“), posuny fází, střída, kmitočet a styl pohupu se prolínají; páteř – boční
+  ohyb v zatáčce, flexe/extenze ve cvalu (přední a zadní nohy k sobě / od sebe), předek nahoru při rozjezdu, trup
+  podle dráhy skoku, dech v klidu (po běhu rychlejší); uši a ocas jako tlumené oscilátory (`ear_spring`,
+  `tail_spring`), uši se natáčí ke zdroji zvuku (`Animal` → `rig.listen_yaw` z hrozby / výstřelu), ocas při útěku
+  nahoru, srnci se rozevře bílé zrcátko (`rump_flare`, geometrie v síti ocasu), divočák běží s nízkou hlavou,
+  zajíc se v kličkách víc naklání (`lean_k`), srnec skáče odrazovými skoky výš a častěji ve vysoké trávě / obilí
+  (`Animal.TALL_VEG_MONTHS` z `Fields.class_at` – hrubě do M8.12). Detail (páteř, dech, pružiny) jen do 60 m od
+  kamery; `animate()` nealokuje, IK chodidel čte rovinu terénu ze 3 vzorků 10× za s. **Ptáci**
+  (`fauna/flight_model.gd` `FlightModel`, jeden na `Bird`): pádová rychlost z hmotnosti, plochy křídel a C_Lmax,
+  odpor ∝ v² s klouzavostí druhu, styly „flap_glide“ (vrána, vlaštovka), „bound“ (kos) a „soar“ (káně); vítr
+  z `WindField` (oprava kurzu na boční vítr, proti větru pomalejší postup), termika z `Thermals.lift_at`; vzlet
+  silnými mávnutími, přistání s klapkou (křídla nahoru a dopředu, brzdění, proti větru) přímo na místo dosednutí
+  (`BirdFlock` → `Bird.set_land_goal`, `land_reach`). Káně krouží v nejbližší bublině `Thermals` (tam, kde stoupá
+  i paraglide), jinak ve slabé termice nad okrskem, strop 220 m nad terénem. Letící vrány drží hejno boidy
+  (`BirdFlock._boids`). **Murmurace** (`fauna/murmuration.gd` + `shaders/murmuration.gdshader`): září–listopad
+  za soumraku (výška slunce +6° … −4°, 2 ze 3 večerů, bez deště) nad polem 150–380 m od hráče 180–400 špačků
+  v jedné MultiMesh, boidy se 7 topologickými sousedy v plátcích (¼ hejna za snímek, mřížka sousedů), mezi
+  přepočty polohu dopočítá shader; dravec občas hejnem prožene vlnu, po západu slunce hejno sestoupí a zmizí.
+  Měřicí scéna `pole_rijen_vecer`, PERF kategorie `animal`, `flock`, `murmuration`.
 
 - **Obyvatelé** (`characters.gd`, `persona.gd`): 28 vesničanů jsou různé smyšlené postavy – jméno, věk,
   povolání, povaha (přátelský, drbna, bručoun, přísný, veselá kopa, plachý, moudrý, mladý), vlastní vzhled

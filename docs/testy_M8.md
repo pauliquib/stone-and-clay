@@ -339,3 +339,32 @@ přepínačem „Mikroklima“). Očekávání: CPU ≈ +0,05 ms (HUD řádek 2�
 krok ~40 vyhodnocení profilu jednou za 2 min); GPU ≤ +0,1 ms (výšková mlha je jen pár instrukcí ve stávající mlze, rosa
 a jinovatka pár ALU v terénu a vegetaci) – cíl +≤ 0,5 ms na Střední. Volumetrická mlha se nepoužívá.
 `--perfscene=les_rano_mlha` beze změny proti baseline (advekční mlha z Weather jako dřív).
+## M8.10 – Lokomoce zvířat 2 a let ptáků
+
+Přepínač Esc → Nastavení → Realismus → „Lokomoce zvířat a let ptáků“ (`animal_gait`). Páteř, dech a pružiny uší /
+ocasu jsou vidět jen do 60 m od kamery.
+
+1. Dalekohled (X) na pasoucí se srnce (soumrak, okraj lesa) → uši kmitají a dopruží; přiblížit se během (Shift) → uši
+   se natočí k hráči, hlava nahoru, boky klidně dýchají.
+2. Vyplašit srnce zblízka → krok → klus → cval bez skoku v animaci (nohy se „přeskládají“ plynule), bílé zrcátko se
+   rozevře, ocas nahoru; ve cvalu se přední a zadní nohy střídavě přitahují k sobě (pružná páteř).
+3. F2 → Datum červen, srnci u obilí / na louce → útěk polem: vyšší a častější odrazové skoky než na strništi (v říjnu).
+4. Zajíc (pole, noc/ráno) → kličky s výrazným náklonem do zatáčky, ocas a uši plandají.
+5. Divočáci (les v noci) → klus s nízkou hlavou, ocas při útěku vztyčený; selata cupitají (rychlejší krok).
+6. Kůň pod jezdcem: postupně zrychlovat krok → klus → cval → trysk – plynule bez cukání nohou; na místě boky dýchají, uši kmitají.
+7. Červenec 13–15 h, jasno (F2 → Počasí) nad polem → káně krouží bez mávání a stoupá (a kde stoupá paraglide/paramotor,
+   tam krouží i ona – termika `Thermals`); mimo sezónu termiky krouží kolem okrsku, také bez mávání.
+8. Vrány na poli – přiblížit se → vzlétnou pár silnými mávnutími, pak střídají mávání a klouzání a drží hejno; na stromě
+   přistanou s brzděním (křídla nahoru a dopředu, tělo vztyčené, ocas dolů) přímo na větev – bez „teleportu“ o metr.
+9. F2 → Počasí Bouřka / silný vítr → ptáci letí proti větru znatelně pomaleji, po větru rychleji; přistávají čelem
+   proti větru. Říjen ~17:30–18:30 nad polem, jasno → hejno špačků (stovky teček) se vlní, občas se roztrhne vlnou
+   (dravec), po západu slunce sestoupí a zmizí (ne každý večer – 2 ze 3).
+10. Vypnout přepínač → zvěř i ptáci jako dřív (chod podle rychlosti, bez pružin, staré „body po křivce“), žádné hejno
+    špačků; konzole bez chyb (`QuadrupedRig`, `FlightModel`, `Murmuration`, shader `murmuration`).
+
+Co změřit: `tools/launcher.sh --perfscene=pole_leto` – PERF kategorie `animal` a `flock` proti poslední baseline;
+očekávání **+≤ 0,3 ms CPU** celkem (rig nově nealokuje a IK vzorkuje terén 3× za 0,1 s místo 4× za snímek, takže
+`animal` může vyjít i levněji; `flock` +≤ 0,05 ms – vítr a termika 4× za s na ptáka). Dále
+`tools/launcher.sh --perfscene=pole_rijen_vecer` (říjen, soumrak, pole – zvěř na poli, vrány, hejno špačků; pokud se
+hejno ten den neobjeví, posunout datum o den): `murmuration` **≤ 0,3 ms** průměr (¼ hejna za snímek, max. 400 ptáků,
+1 draw call), GPU +≤ 0,2 ms. Pro srovnání totéž s vypnutým „Lokomoce zvířat a let ptáků“.

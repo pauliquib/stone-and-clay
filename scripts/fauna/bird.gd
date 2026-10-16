@@ -5,6 +5,11 @@
 ## pták musí mávat, jinak klesá. Přistání = zpomalení a sestup k cíli, pak chůze / poskakování po zemi
 ## nebo sezení na větvi / střeše (klidová animace: otáčí hlavou, probírá peří). Mávání křídel a jejich
 ## složení se animuje podle stavu.
+##
+## M8.10: s přepínačem realismu „animal_gait“ (`FlightModel.on`) řídí let `FlightModel` (vztlak ∝ v², klouzavost,
+## mávání vs. klouzání, plachtění v termice, vítr z `WindField`, přistání s brzděním) – `fly_step` jen předá krok.
+## Animace: vzlet = pár silných mávnutí, klouzání (vrána, vlaštovka špičky dozadu, kos složená křídla mezi
+## mávnutími), káně plachtí s roztaženými „prsty“, přistání = křídla nahoru a dopředu, tělo vztyčené, ocas dolů.
 class_name Bird
 extends Node3D
 
@@ -58,6 +63,9 @@ var terrain: Terrain
 var female := false
 var grey := false
 var perch_off := 0.05                # o kolik výš než bidýlko se pták posadí (střecha / předmět: nohy, strom: 0,05 m)
+var world: World                     # M8.10: vítr a termika pro FlightModel (nastavuje hejno; null = bez vzduchu)
+var fm: FlightModel                  # M8.10: letový model (vytvoří se v setup)
+var boid_bias := Vector3.ZERO        # M8.10: posun cíle od hejna (boidy – oddělení, zarovnání, soudržnost)
 
 var _body: Node3D
 var _head: Node3D
@@ -94,6 +102,7 @@ func setup(id: String, t: Terrain, pos: Vector3, seed_: int) -> void:
 	grey = spec.has("grey_morph") and rng.randf() < 0.35
 	yaw = rng.randf() * TAU
 	speed = spec["cruise"]
+	fm = FlightModel.new(id, spec, seed_)
 
 
 func _ready() -> void:
@@ -226,8 +235,23 @@ func _wing_panel(k: MeshKit, s: float, x0: float, x1: float, c0: float, c1: floa
 
 # ------------------------------------------------------------------ let
 
+## Hejno posadí ptáka, když je k cíli blíž než tohle (M8.10 dolétne až k místu dosednutí).
+func land_reach() -> float:
+	return FlightModel.LAND_REACH if FlightModel.on and fm else 2.5
+
+
+## Kam pták dosedne (hejno nastaví při letu na přistání; FlightModel k němu brzdí a klesá).
+func set_land_goal(p: Vector3) -> void:
+	if fm:
+		fm.land_goal = p
+
+
 ## Krok letu směrem k `target`. Vrací vzdálenost k cíli.
 func fly_step(delta: float, want_speed: float) -> float:
+	if FlightModel.on and fm:
+		var d := fm.step(self, delta, want_speed)
+		_flapping = fm.flapping
+		return d
 	var to := target - global_position
 	var dist := to.length()
 	var hd := Vector2(to.x, to.z).length()
@@ -267,9 +291,19 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	# poloha těla a animace křídel
-	_body.rotation = Vector3(-pitch, yaw, -bank) if state in ["fly", "soar"] else Vector3(0.05 + _peck * 0.35, yaw, 0.0)
-	var flying := state in ["fly", "soar"]
-	_fold = move_toward(_fold, 0.0 if flying else 1.0, delta * 4.0)
+	var flying := state == "fly" or state == "soar"
+	var model := FlightModel.on and fm != null
+	var fl := fm.flare if model and flying else 0.0
+	var tko := fm.takeoff / FlightModel.TAKEOFF_S if model and flying else 0.0
+	if flying and not _was_fly and model:
+		fm.start_takeoff()                     # vzlet: pár silných mávnutí
+	# přistání: tělo vztyčené (klapka), jinak podle dráhy letu
+	_body.rotation = Vector3(-lerpf(pitch, 0.75, fl), yaw, -bank) if flying else Vector3(0.05 + _peck * 0.35, yaw, 0.0)
+	# kos v klouzavé fázi vlnovitého letu přitiskne křídla k tělu
+	var fold_t := 0.0 if flying else 1.0
+	if flying and model and not _flapping and fm.style == "bound":
+		fold_t = 0.85
+	_fold = move_toward(_fold, fold_t, delta * (8.0 if flying and model else 4.0))
 	# klouzavý let: vlaštovka a vrána zahnete špičky křídel dozadu (káně drží roztažené kruhy)
 	var want_g := 1.0 if flying and not _flapping and species != "kane" else 0.0
 	_glide = lerpf(_glide, want_g, minf(delta * 4.0, 1.0))
@@ -285,8 +319,9 @@ func _process(delta: float) -> void:
 			_flick = 1.0
 	var amp := 0.0
 	if flying and _flapping:
-		_flap += delta * float(spec["flap_hz"]) * TAU
-		amp = 0.85 if species != "kane" else 0.45
+		# vzlet: silnější a rychlejší mávání; přistání: rychlé krátké brzdné záběry
+		_flap += delta * float(spec["flap_hz"]) * TAU * (1.0 + 0.3 * tko + 0.5 * fl)
+		amp = (0.85 if species != "kane" else 0.45) * (1.0 + 0.2 * tko) * (1.0 - 0.45 * fl)
 	elif flying:
 		_flap = lerp_angle(_flap, 0.0, delta * 3.0)
 	var a := sin(_flap) * amp
@@ -297,9 +332,13 @@ func _process(delta: float) -> void:
 		var inner := _wings[i * 2]
 		var outer := _wings[i * 2 + 1]
 		var up := a if flying else 0.0
-		inner.rotation = Vector3(0, s * (_fold * 1.35 + _glide * 0.3), s * (up + glide_dihedral) * (1.0 - _fold) + s * _fold * 0.2)
-		outer.rotation = Vector3(0, s * (_fold * 2.6 + _glide * 0.9), s * b * (1.0 - _fold))
-	_tail.rotation.x = -pitch * 0.4 if flying else 0.22 + _flick * 0.55
+		# přistávací klapka: křídla nahoru a dopředu
+		inner.rotation = Vector3(0, s * (_fold * 1.35 + _glide * 0.3 - fl * 0.35), s * (up + glide_dihedral + fl * 0.8) * (1.0 - _fold) + s * _fold * 0.2)
+		outer.rotation = Vector3(0, s * (_fold * 2.6 + _glide * 0.9 - fl * 0.2), s * b * (1.0 - _fold))
+	_tail.rotation.x = lerpf(-pitch * 0.4, -0.5, fl) if flying else 0.22 + _flick * 0.55
+	var tail_fan := 1.0 + 0.4 * fl
+	if _tail.scale.x != tail_fan:
+		_tail.scale = Vector3(tail_fan, 1.0, 1.0)
 	_head.position.z = _head_z + sin(_walk_p) * float(spec["length"]) * 0.06 * _moving
 	# na bidýlku: hlava se plynule otáčí do stran, občas se pták probere v peří (hlava dolů k boku)
 	var kk := 1.0 - exp(-delta * 6.0)

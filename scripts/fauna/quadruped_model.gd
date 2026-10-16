@@ -300,6 +300,18 @@ static func _build_meshes(spec: Dictionary, g: Dictionary, male: bool, winter: b
 		k.sphere(Vector3(0, 0, -tlen), tr * 3.0, dark)
 	if rump.r >= 0.0 and spec["behaviour"] == "hare":
 		k.sphere(Vector3(0, 0, -tlen * 0.5), tr * 1.2, rump)
+	# M8.10: zrcátko srnce – bílý „vějíř“ chlupů pod ocasem, při útěku ho QuadrupedRig rozevře (měřítko uzlu ocasu).
+	# Ocas je v klidu sklopený o tl[2] → geometrie se otočí zpět, aby zrcátko leželo svisle na zádi.
+	var flare: Array = spec.get("rump_flare", [])
+	if flare.size() >= 2 and rump.r >= 0.0:
+		var undo := Basis(Vector3.RIGHT, float(tl[2]))
+		var fm := SphereMesh.new()
+		fm.radius = 1.0
+		fm.height = 2.0
+		fm.radial_segments = 10
+		fm.rings = 6
+		var fc := undo * Vector3(0, -float(flare[1]) * 0.7, -0.012)
+		k.add_prim(fm, Transform3D(undo * Basis.from_scale(Vector3(float(flare[0]), float(flare[1]), 0.018)), fc), rump)
 	ms["tail"] = k.commit(fur)
 
 	# ---------------- nohy (podél −Y)

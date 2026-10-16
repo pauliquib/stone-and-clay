@@ -97,6 +97,7 @@ krocích: Esc → Nastavení → „Realismus (M8)…“. M8.1 (základ) jen zak
 | `wind` | M8.4 | **Pole větru** (`scripts/eko/wind_field.gd`): nárazy běžící krajinou, závětří a hřebeny, ohyb stromů po úrovních, vlny přes obilí, padající listí v bouřce; létání, dron, kouř a čich zvěře podle větru v místě; vypnuto = stará sinusovka |
 | `gait` | M8.6 | **Pohyb člověka** (`scripts/gait.gd`): fázová chůze/běh, chodidla bez klouzání, náklon do svahu, náklad/únava/chlad → postoj; vypnuto = stará animace |
 | `treegen` | M8.8 | **Generované stromy** (`scripts/vegetation/tree_gen.gd`, data `tools/treegen/`): tvar podle druhu, věku a vitality (kužel smrku, deštník borovice, kopule buku, bílá bříza), listí a kůra z atlasu, LOD0/LOD1 zblízka + impostory v dálce; **projeví se po novém načtení světa**; vypnuto / bez `data/tree_species_protos.bin` = 6 původních modelů |
+| `animal_gait` | M8.10 | **Lokomoce zvířat a let ptáků** (`scripts/fauna/quadruped_rig.gd`, `flight_model.gd`, `murmuration.gd`): chody podle Froudova čísla s plynulými přechody, páteř, uši a ocas jako pružiny (uši ke zvuku), zrcátko a skoky srnce v obilí; ptáci mávají / kloužou / plachtí v termice, přistávají s brzděním, letí proti větru; podzimní hejna špačků; vypnuto = dřívější pohyb |
 | `site`, `species`, `wind`, `soil_water`, `treegen`, `micro`, `animal_gait`, `phenology`, `crops`, `terramech`, `ground_veg`, `habitat`, `thermo`, `village_life`, `soundscape` | M8.2–M8.18 | výchozí zapnuto; konkrétní popisek a cena v menu přibude s krokem, který klíč zavádí |
 
 Měření výkonu po krocích M8: `--perfscene=<jméno>[,sekund]` (`ves_poledne`, `les_rano_mlha`,
@@ -151,6 +152,12 @@ ve dne jižní svahy tepleji, les chladněji, obec o kousek tepleji. HUD a tělo
 píše „V údolí v noci mrzlo, na kopci ne“, rybníky zamrzají podle teploty v údolí, kouř z komínů se za inverze drží
 nízko. Ladicí vrstvy mapy `teplota`, `mlha`, `mraz` a F2 → Příroda – ladění → „Mikroklima“; měřicí scéna
 `--perfscene=kopec_inverze`. Bez nového offline nástroje (bere `site.bin`).
+**M8.10 Lokomoce zvířat 2 a let ptáků** (přepínač `animal_gait`): zvěř, kůň i hospodářská zvířata mění chod podle
+Froudova čísla (krok → klus → cval plynule, s hysterezí), ohýbají páteř v zatáčce a ve cvalu, dýchají, uši a ocas
+dopruží za pohybem a uši se natočí za zvukem; vyplašený srnec rozevře bílé zrcátko a v obilí / vysoké trávě skáče.
+Ptáci létají podle zjednodušené aerodynamiky (`FlightModel`): vrána mává a klouže, kos vlní, káně krouží bez mávání
+v termice (`Thermals`, tam kde paraglide), proti větru letí pomaleji, přistávají s brzděním. V září–listopadu
+za soumraku se nad poli vlní hejna špačků (murmurace, až 400 ptáků). Měřicí scéna `pole_rijen_vecer`.
 
 ## Dokumentace
 

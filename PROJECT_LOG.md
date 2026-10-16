@@ -2107,3 +2107,54 @@ dopravy, ne o regresi.
 - Tělo používá svůj vzorec chladu s větrem; `wind_chill_at` je připravené pro M8.16 (aby se vítr nezapočítal dvakrát).
 - Kalibrace (M8.19): `DEP_K`, `INV_RATE_K_H`, `INV_DEPTH_M`, `GROUND_K`, `FOG_H_DENS`, rosa `DEW_*`; vrstva `teplota` ukazuje
   odchylku od `Weather.temp`.
+## 2026-10-16 – M8.10 Lokomoce zvířat 2 a let ptáků
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Přepínač** `animal_gait` (řádek v `GameSettings.REALISM_ROWS`); `Fauna._process` ho každý snímek promítne do
+  `QuadrupedRig.v2` a `FlightModel.on` (static). Vypnuto = dřívější pohyb, výkonové úpravy rigu platí vždy.
+- **`QuadrupedRig`** (`scripts/fauna/quadruped_rig.gd`, sdílí zvěř, kůň pod jezdcem i hospodářská zvířata – kůň tedy
+  přechody chodů pod jezdcem dostal bez změny `horse.gd`): chod podle Froudova čísla `Fr = v²/(g·L)` (L = výška
+  ramenního kloubu) s hysterezí, prolínání posunů fází, střídy, kmitočtu a stylu pohupu; páteř (boční ohyb v zatáčce →
+  krk, trup a ocas do oblouku; flexe/extenze ve cvalu posunem kloubů předních a zadních nohou), předek nahoru při
+  rozjezdu, trup podle dráhy skoku (`vy`), dech (jen síť trupu, po běhu rychlejší); uši a ocas jako tlumené oscilátory
+  buzené svislým zrychlením trupu, natočení uší ke zdroji zvuku (`listen`, `listen_yaw`), ocas nahoru a rozevření
+  zrcátka při útěku (`flee`), stabilizace hlavy, natažení krku při pastvě, nízká hlava divočáka v běhu, větší náklon
+  zajíce. Detail (`detail`) podle vzdálenosti kamery (do 60 m, test 2× za s, `detail_auto`).
+  **Výkon:** `animate()` nealokuje (pryč `Array` literály v `_pick_gait` a pole úhlů `aj` na každou nohu, data nohou /
+  uší v Packed polích, hodnoty ze `spec` předpočítané v `_prep`), IK chodidel čte rovinu terénu ze 3 vzorků
+  (`ground_fn`) jednou za 0,1 s místo 4× `Callable.call` za snímek.
+- **`AnimalSpecs`**: nové klíče v `DEFAULT` (`froude`, `froude_hyst`, `spine`, `lean_k`, `surge_pitch`, `head_stab`,
+  `neck_reach`, `breath`, `ear_spring`, `ear_turn`, `ear_flop`, `tail_spring`, `tail_flop`, `rump_flare`, `run_head_low`,
+  `pronk_tall`) a hodnoty pro srnce, divočáka, sele (kadence 1,8), zajíce a koně. `QuadrupedModel`: geometrie zrcátka
+  (`rump_flare`) v síti ocasu (žádný draw call navíc).
+- **`Animal`**: rig dostává `flee`, `vy`, `listen`/`listen_yaw` (hrozba z vnímání, jinak hluk/výstřel `_noise_pos`);
+  srnec ve vysoké trávě / obilí (`TALL_VEG_MONTHS` z `World.fields.class_at`, dotaz 2× za s) skáče výš (`pronk_tall`),
+  častěji a už od klusu.
+- **`FlightModel`** (nový `scripts/fauna/flight_model.gd`, jeden na `Bird`): pádová rychlost z hmotnosti, plochy křídel
+  a C_Lmax, odpor ∝ v² kalibrovaný na klouzavost druhu, tah mávání (vzlet × 1,8 na 0,9 s), styly `flap_glide` /
+  `bound` / `soar`, vítr z `World.wind_field.wind_at` (oprava kurzu na boční vítr, strop 0,75 × cestovní rychlost),
+  termika `World.thermals.lift_at` (jen plachtící druh), vítr / termika / terén 4× za s; přistání s klapkou a brzděním
+  přímo na místo dosednutí, proti větru. `Bird`: `world`, `fm`, `boid_bias`, `set_land_goal`, `land_reach`; animace
+  vzletu, klouzání (kos složená křídla), přistávací klapky (křídla nahoru a dopředu, tělo vztyčené, ocas dolů a rozevřený).
+- **`BirdFlock`**: `_fly_all` nastavuje místo dosednutí a sedá při `land_reach` (0,4 m místo 2,5 m teleportu);
+  `_soar_step` (server i klient) – káně krouží v nejbližší bublině `Thermals` do 1 200 m od okrsku, jinak ve slabé
+  termice `BUZZARD_WEAK_LIFT`, strop 220 m nad terénem; boidy pro letící vrány (`_boids`, 5× za s, n²≤ ~18²).
+- **Murmurace** (nový `scripts/fauna/murmuration.gd` + `shaders/murmuration.gdshader`, jen vzhled, neukládá se):
+  září–listopad, večer s výškou slunce +6° … −4°, 2 ze 3 večerů (podle data), bez deště, vítr ≤ 9 m/s, nad polem
+  150–380 m od hráče; 180–400 špačků v jedné MultiMesh, boidy se 7 topologickými sousedy (Ballerini 2008) přes
+  prostorovou mřížku v Packed polích, ¼ hejna za snímek, mezi přepočty polohu dopočítá vertex shader z rychlosti
+  v `INSTANCE_CUSTOM`; dravec občas hejnem prožene vlnu; po západu slunce sestup a zánik. `Fauna.murmuration` +
+  `Murmuration.tick()` jednou za `ENCOUNTER_T`. PERF kategorie `murmuration`.
+- **Měřicí scéna** `pole_rijen_vecer` (`Tests.PERF_SCENES`). Dokumentace: `docs/SYSTEMS.md`, README (Realismus),
+  `ZVIRATA.md` (nové parametry), `docs/testy_M8.md` (oddíl M8.10), roadmapa odškrtnuta.
+- Kontrola překladu (`--import` + `--check-only` všech změněných a nových `.gd` + `horse.gd`, `farm_animal.gd`):
+  bez chyb; `tools/shader_check.gd` (mobile i forward_plus): bez chyb.
+
+### Otevřené body
+- Čeká na ruční test uživatele a měření `--perfscene=pole_leto` a `--perfscene=pole_rijen_vecer` (docs/testy_M8.md).
+- „Vysoká tráva“ je hrubá tabulka měsíců podle třídy plochy – po M8.12 (plodiny) napojit skutečnou výšku porostu.
+- Ptákům se nehýbou nohy (jsou součástí sítě těla) – „nohy dopředu“ při přistání chybí, jen klapka křídel, tělo a ocas.
+- Kurz ptáka se natáčí proti větru jen v posledních metrech přistání (bez skutečného okruhu na přistání proti větru).
+- Murmurace se generuje jen na autoritě (singleplayer/server) a není v síťovém snímku; ladicí vrstva mapy pro M8.10
+  nepřibyla (pohyb se kontroluje okem / dalekohledem).
+- Loutky zvěře na klientu (MP) nedostávají `flee` / `listen` – jen základní pohyb.

@@ -47,11 +47,20 @@ Tabulka `SPECIES` (srnec, divočák, sele, zajíc, kůň); co druh neuvede, bere
 | `sight`, `hearing`, `flight`, `safe` | na kolik m vidí / slyší člověka, úniková vzdálenost, kde se uklidní |
 | `flee_speed`, `calm` | běžná rychlost útěku (m/s; plný trysk `gallop` jen zblízka / před autem), 0..1 jak si zvykne na nehybného člověka dál než `flight` |
 | `active`, `home_range`, `sounds` | hodiny aktivity [od, do, …], okrsek (m), zvuky z `priroda/nature_sfx.gd` |
+| `froude`, `froude_hyst` | M8.10: prahy Froudova čísla `Fr = v²/(g·L)` krok→klus, klus→cval, cval→trysk (L = výška ramene) a hystereze dolů (podíl) – s přepínačem `animal_gait` řídí chod místo `gaits` |
+| `spine`, `lean_k`, `surge_pitch` | M8.10: páteř [boční ohyb rad na rad/s, flexe ve cvalu – podíl délky], náklon do zatáčky, zvednutí předku při rozjezdu |
+| `head_stab`, `neck_reach`, `run_head_low` | M8.10: stabilizace hlavy (0..1), natažení krku při pastvě, nízká hlava v klusu/cvalu (divočák) |
+| `breath` | M8.10: dech v klidu [Hz, rozšíření boků]; po běhu rychlejší |
+| `ear_spring`, `ear_turn`, `ear_flop` | M8.10: uši jako pružina [Hz, útlum ζ], natočení ke zvuku (rad), plandání při pohupu (rad na m/s²) |
+| `tail_spring`, `tail_flop`, `tail_up` | M8.10: ocas jako pružina, plandání; jak vysoko zvedne ocas při útěku / rychlém běhu |
+| `rump_flare`, `pronk_tall` | M8.10: zrcátko, které se při útěku rozevře [rx, ry, zvětšení]; výška odrazových skoků ve vysoké trávě / obilí |
 
 Stavba modelu je v `quadruped_model.gd`, animace chodů v `quadruped_rig.gd` (tabulka `GAITS`: posuny
 fází nohou a podíl stojné fáze; `IK_W` váhy nápravy IK na články, `ik_max` max. náprsa, `ground_fn`
 funkce výšky terénu, `sit` posed na zadních), chování v `animal.gd`, kůň v `horse.gd` (`STAMINA_*`,
 ovládání). IK chodidel běží jen u zvířat do 110 m (LOD FULL), animace zvířat na 110–260 m jede ~10×/s.
+M8.10: páteř, dech a pružiny uší / ocasu jen do `QuadrupedRig.SECONDARY_R` (60 m) od kamery; IK čte rovinu terénu
+ze 3 vzorků jednou za `IK_RESAMPLE_S` (0,1 s). „Vysoká tráva“ pro skoky srnce: `Animal.TALL_VEG_MONTHS`.
 
 **Nový druh:** přidej položku do `SPECIES` (např. `"liska": {...}`) a do `Fauna.POPULATION` v
 `fauna.gd` (`"liska": [počet skupin, rozestup m]`). Do zoo ho přidáš v `tools/dev/zoo.gd` (seznam `defs`).
@@ -92,6 +101,13 @@ kind 0 = vršek koruny (`trees_near`), kind 1 = střecha / předmět (paprsek sh
 `Fauna.ridge_row(střed, poloměr, n)` dá řadu bidýlek 0,15–0,25 m od sebe podél hřebene (vlaštovky).
 Na střeše pták stojí na nohách (`Bird.perch_off` = 0,28 délky, na stromě 0,05 m); na bidýlku otáčí hlavou
 (`REST_LOOK`) a občas si probere peří. Hráč blíž než `SCARE_PERCH` → hejno přeletí na jiné bidýlko.
+
+**Let (M8.10, `flight_model.gd`):** `FlightModel.SPECIES` – hmotnost, plocha křídel, C_Lmax (→ pádová rychlost),
+klouzavost L/D, tah mávání, styl (`flap_glide`, `bound`, `soar`) a délky úseků mávání / klouzání. Konstanty nahoře:
+`FLARE_DECEL` (brzdění při přistání), `TAKEOFF_S/THRUST` (vzlet), `WIND_CAP` (do jaké míry vítr unáší),
+`SOAR_FLAP_*` (kdy káně zamává). Káně a termika: `BirdFlock.BUZZARD_THERMAL_R`, `BUZZARD_WEAK_LIFT`, `BUZZARD_CEIL`;
+boidy vran `BOID_*`. **Špačci** (`murmuration.gd`): měsíce, okno výšky slunce, počet (`MIN/MAX_BIRDS`), výška a
+bloudění oblaku, váhy boidů `W_*`, dravec `HAWK_*`, `SLICES` (za kolik snímků se přepočte celé hejno).
 
 ## Hmyz – `apiary.gd`, `ant_hill.gd`
 

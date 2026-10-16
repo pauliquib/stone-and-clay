@@ -110,6 +110,7 @@ var root_birds: Node3D
 var root_insects: Node3D
 var _transient: Array = []           # Herd-y vygenerované kvůli hráči
 var _transient_flocks: Array = []    # BirdFlock-y vygenerované kvůli hráči
+var murmuration: Murmuration = null  # M8.10: podzimní hejno špačků za soumraku (jen vzhled)
 var _scan_t := 3.0                   # první sken až po startu (hráč se zrovna objevuje)
 var _seed_i := 3000
 
@@ -677,6 +678,9 @@ func _make_herd(id: String, site: Vector3) -> Herd:
 # ------------------------------------------------------- setkání zvěře u hráče
 
 func _process(delta: float) -> void:
+	# M8.10: přepínač realismu „animal_gait“ → lokomoce zvěře 2 a letový model ptáků
+	QuadrupedRig.v2 = world == null or world.realism_on("animal_gait")
+	FlightModel.on = QuadrupedRig.v2
 	if not authority:
 		_puppet_gc(delta)
 		return
@@ -686,6 +690,7 @@ func _process(delta: float) -> void:
 	_scan_t = ENCOUNTER_T
 	if world == null:
 		return
+	murmuration = Murmuration.tick(self, murmuration)
 	_despawn_far()
 	if world.players.is_empty():
 		return
