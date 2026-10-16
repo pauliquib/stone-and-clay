@@ -51,6 +51,9 @@ func _ready() -> void:
 	_streams["arrow_hit"] = _noise(0.08, 0.8, 1100.0)
 	# M6.1 dron: spoušť fotoaparátu
 	_streams["shutter"] = _shutter()
+	# M8.18: práce u domů (Households) – sekačka, hrábě, lopata na sníh (NatureSfx.synth)
+	for nm in ["mower", "rake", "shovel"]:
+		_streams[nm] = NatureSfx.get_stream(nm)
 
 
 func play(name: String, pitch := 1.0, vol := 0.0) -> void:

@@ -26,6 +26,7 @@ Provedené úpravy se zapisují do sloupce „úpravy“.
 | ph-sky-hdr | `textures/sky.hdr` | HDRI obloha | Poly Haven (název a autora ověřit) | https://polyhaven.com/hdris | CC0 | před 2026-09 | možná zmenšeno | obloha, osvětlení |
 | cuzk-ortofoto | `textures/ortho_full.jpg`, `ortho_core.jpg` | Ortofoto ČR | ČÚZK | https://geoportal.cuzk.cz/ | CC-BY-4.0 | před 2026-09 | oříznuto, sesazeno | textura terénu, mapa |
 | vlastni-treegen | `textures/trees/listi.png`, `kura.png`, `impostor_barva.png`, `impostor_normala.png` | Atlasy listí, kůry a impostorů stromů (M8.8) | vlastní výroba (procedurálně) | `tools/treegen/` – nic staženo | CC0 | 2026-10-16 (vygenerováno) | žádné | generované stromy |
+| vlastni-zvuky-prirody | (žádný soubor – za běhu) | Hlasy ptáků, hmyzu, žab, šumění korun, sekačka, hrábě, lopata (M8.18) | vlastní výroba (procedurální syntéza `NatureSfx.synth`, data `data/zvuky_prirody.json`) | nic staženo, žádné nahrávky | CC0 | 2026-10-17 | žádné | zvuková krajina |
 
 Geodata (DMR 5G, ČÚZK), OSM (ODbL) a DIBAVOD nejsou „assety“ ve smyslu této složky – jejich uvedení je
 pevně v `Hud.CREDITS` (`scripts/hud.gd`) a v README → „Licence dat“.

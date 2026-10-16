@@ -653,3 +653,26 @@ Co změřit: `--perfscene=ves_poledne,30` se zapnutým / vypnutým „Život ves
 jen ~30 snímků za herní hodinu; okna = přepis textury ~300 texelů 1× za herní půlhodinu; vesničané doma bez fyziky =
 úspora), špička ≤ 1 ms; GPU ≈ 0 (jedno `texelFetch` na vrchol okna). Cíl kroku +≤ 0,3 ms. BT zůstává na 5 vesničanech
 (F3 → `village.bt_villagers`) – zapnout pro všechny až po měření `ves_poledne` s hodnotou 28.
+
+## M8.18 – Zvuková krajina a drobný život
+
+Pozn.: zvuky se syntetizují ve vlákně při startu (~2–3 s) – první vteřiny po načtení může být ticho. Bez hráče venku
+(interiér −20 dB, auto −12 dB) je krajina tlumená. Přepínač: Esc → Nastavení → Realismus → „Zvuková krajina a drobný život“.
+
+1. F2 → 10. 5., 4:45, jasno, teleport do lesa (scéna `les_rano_kveten`) → nejdřív kos, za 10–20 min červenka a drozd,
+   kolem východu (~5:20) sýkory, pěnkavy, budníček, hřivnáč; kukačka z dálky.
+2. 15. 1., 12:00 v lese → skoro ticho: občas sýkora, vrána, bubnování strakapouda; žádný kos.
+3. 20. 7., 21:30 na louce, 25 °C → rychlé cvrkání (~2,4 cvrknutí/s) a kobylky; F2 → teplota 15 °C → pomalejší (~1,2/s).
+4. 20. 4. ve 20:40 u rybníka (`rybnik_soumrak`) → skokani a ropuchy kvákají; komáří kňourání u vody.
+5. Soumrak u rybníka / v obci u lamp (duben–říjen, nad 8 °C, bez deště) → netopýři létají cikcak nad vodou a v obci.
+6. 25. 6. ve 22:30 na okraji lesa, teplo, bezvětří (`les_cerven_noc`) → blikající světlušky u země; puštík z lesa.
+7. Louka v červnu v poledne, jasno → motýli (bílí, oranžoví, žlutí, modří) nad loukou a bzučení louky; v dešti zmizí.
+8. Hustý les → vzdálené ptáky slyšet tlumeně (bez výšek); v údolí ozvěna. Smrčina syčí, bučina šustí (silnější vítr).
+9. Deník J → Pozorování přírody → „Nově uslyšeno: Kukačka…“, netopýr, světluška, motýl zapsané s datem (+XP Myslivost).
+10. Sobota v říjnu dopoledne v obci (`ves_sobota_rijen`) → sekačka zní jako motor (ne zpomalená pila), hrabání listí;
+    po sněžení odhazování sněhu lopatou. F3 → Příroda/Zvuková krajina → `Cvrčci – Dolbear` ovlivní rychlost cvrkání.
+
+Co změřit: `--perfscene=les_rano_kveten,30`, `--perfscene=rybnik_soumrak,30` a `--perfscene=les_cerven_noc,30`
+se zapnutou / vypnutou „Zvukovou krajinou“ – profily „soundscape“ a „small_life“. Očekávání: průměr +≤ 0,2 ms CPU
+(výběr zdrojů 2×/s ~0,3–0,8 ms jednou za 30 snímků, za snímek jen 16 hlasů a 5 prolnutí), GPU ≈ 0 (5 MultiMesh, ≤ 160
+instancí, unshaded). Syntéza zvuků běží ve vlákně (bez záseku hlavního vlákna). Taky `les_rano_mlha` (cíl +≤ 0,2 ms).
