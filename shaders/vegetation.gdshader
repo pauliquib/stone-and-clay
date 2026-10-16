@@ -49,6 +49,7 @@ void vertex() {
 		vec4 fm = texture(field_lut, vec2(fuv.x, 0.75));
 		float bare = clamp(fm.r * 1.3, 0.0, 1.0);          // rýhy = posečeno/zaoráno → strniště
 		grow = mix(grow, 0.06, bare);
+		grow *= 1.0 - fm.b;                                  // M8.12: zakrslé obilí (sucho, slabý vzrůst – Fields._short_of)
 		tint *= mix(vec3(1.0), fc.rgb * 1.7 + vec3(0.12), 0.8);
 	} else if (season_mode == 0) {
 		tint *= mix(vec3(1.3, 1.15, 0.75), vec3(1.0), grass_green);   // zima/sucho → sláma

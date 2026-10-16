@@ -611,6 +611,31 @@
   `micro_frost_y` → `terrain.gdshader` / `vegetation.gdshader` (lesk rosy, jinovatka pod mrazovou hranicí). Ladění:
   vrstvy mapy `teplota` (odchylka od Weather), `mlha`, `mraz`, F2 → Příroda – ladění → „Mikroklima (M8.9)“; měřicí
   scéna `kopec_inverze`. Uložení: klíč `micro`.
+- **Plodiny a zahrada podle růstového modelu (M8.12)**: `CropModel` (`scripts/eko/crop_model.gd`, statické funkce,
+  tabulka `data/plodiny.json` – zahradní brambory, mrkev, cibule, salát, rajčata, dýně, česnek, tabák, konopí; polní
+  ozimá pšenice, jarní ječmen, řepka, kukuřice, slunečnice, jetel = jen kalendář), přepínač Realismus `crops`.
+  Zjednodušený WOFOST / LUE: fáze podle GDD od výsevu (klíčí → roste → kvete → dozrává → zralé → přezrálé), biomasa
+  = RUE × PAR × (1 − e^(−k·LAI)) × min(stres vody, stres teploty) × světlo, LAI = SLA × listy (po odkvětu stárne),
+  stres vody z vlhkosti půdy (pod 0,35 × nárok, zamokření nad 0,9), mráz pod `mraz` (citlivé i přízemní
+  `Microclimate.frost_at`, sazenice rajčat hned po výsadbě), horko a stres při kvetení snižují potenciál výnosu, sucho
+  po odkvětu zrychlí dozrávání. Výnos = sklizňový index × biomasa × potenciál, měřený vůči **klimatickému normálu**
+  (`CropModel.clim` – stejný model s `Seasons.TEMP_MEAN`, Ångströmovým zářením a vlhkou půdou). Hodinové vstupy
+  `CropModel.DayAcc` (teplota, globální záření `Atmosphere.SkyModel.global_horizontal_irradiance_wm2`).
+  **Zahrada** (`Garden`): stav modelu v buňce (`cm`), denní krok z teploty v místě záhonu (`World.micro.temp_at`),
+  vlhkost = půdní buňka `SoilWater` + kyblík záhonu `bw` (zálivka `WATER_MM` + `SoilWater.add_water`, výpar
+  Hargreaves × pokryv), stín `sh` (paprsky ke slunci 9/12/15 h – stromy analyticky z `Fauna.trees_near`, budovy a terén
+  raycastem; jednou za den, jen u hráče), mráz hodinově (`eco_hour`), skleník +10 °C a bez deště. Výnos kusů = horní mez
+  × `YIELD_NORMAL_Q` × výnos/normál × kvalita (plevel, přezrálé, Zahradničení). **Pole** (`Fields`): stav plodiny
+  na každé pole (`cur` letos, `nxt` ozim na příští rok), denní krok v `eco_day` po kouscích (`EcoClock.slice`, 12 polí
+  za snímek), teplota s nočním posunem místa (`micro`), vlhkost ve středu pole; start / starý save = stav podle normálu
+  k dnešku. Barva = kalendář `Fields.CROPS` ve „fenologickém dni“ (den normálu se stejnou GDD) – v normálním roce
+  stejné jako dřív, po skutečné sklizni strniště, suchem žlutější; zakrslost → LUT řádek 1 kanál B → `vegetation.gdshader`
+  (nižší obilí). Osevní postup `crop_of` beze změny (determinismus s `tools/vegetation.py`). API: `Fields.crop_height_at(pos)`
+  (výška porostu m, levné – zvěř M8.10/M8.15), `field_info(id)`, `yield_ratio_of(id)` (výkup / statek), `journal_line()`
+  (deník J → Počasí). Fallback vypnuto: časovač růstových dnů (zahrada), kalendář (pole), výšky polí podle normálu.
+  `World.phenology` (M8.11) se nevolá – plodiny mají vlastní základ GDD (pšenice 0 °C, kukuřice 10 °C) z hodinových teplot
+  v místě. Uložení: buňky záhonu `cm`/`bw`/`sm`/`sh` v klíči `garden`, pole v `fields_eco`. Měřicí scéna `pole_pulnoc`.
+  F3 → Příroda/Plodiny a zahrada (379 parametrů, `scripts/dev/tune_m8_12.gd`).
 - **Fyzikální obloha, světlo a expozice (M8.5)**: `Atmosphere.SkyModel` (vnořená třída v `scripts/priroda/atmosphere.gd`)
   – zjednodušený Rayleigh + Mie + ozon model (à la Hillaire 2020 / Preetham, `00_PRINCIPY.md` kap. 8), čisté
   statické funkce volatelné odkudkoli (`Atmosphere.SkyModel.sun_illuminance_lux(elev, cloud, haze)`), ne jen

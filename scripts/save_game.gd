@@ -120,6 +120,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["soil_water"] = world.soil_water.to_dict()   # M8.7: vlhkost půdy, sníh, zásoby toků (base64, kompaktně)
 	if world.micro:
 		d["micro"] = world.micro.to_dict()             # M8.9: inverze, mlžná vrstva, rosa, noční minima (pár čísel)
+	if world.fields:
+		d["fields_eco"] = world.fields.to_dict()       # M8.12: stav plodin polí (růstový model) + roční shrnutí úrody
 	if world.fences:
 		d["fences"] = world.fences.to_dict()           # hráčem postavené úseky plotů (Fáze 7; procedurální se přegenerují)
 	if world.farm:
@@ -384,6 +386,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		world.soil_water.restore(d.get("soil_water", {}))     # M8.7: starý save bez klíče = rozběh z klimatu
 	if world.micro:
 		world.micro.restore(d.get("micro", {}))               # M8.9: starý save bez klíče = rozběh z dnešního počasí
+	if world.fields:
+		world.fields.restore(d.get("fields_eco", {}))         # M8.12: starý save bez klíče = pole podle normálu k dnešku
 	if world.fences:
 		world.fences.restore(d.get("fences", {}))            # starý save bez klíče = žádné hráčské ploty (Fáze 7)
 	if world.farm:

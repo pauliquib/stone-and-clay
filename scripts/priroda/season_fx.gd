@@ -17,6 +17,7 @@ var decor: TreeDecor
 var puddles: Puddles
 var _lut: ImageTexture
 var _jd := -1
+var _lut_gen := -1                     # M8.12: Fields.lut_gen – po denním kroku plodin polí přepočítat LUT hned
 var _t := 0.0
 
 
@@ -53,8 +54,10 @@ func _process_impl(delta: float) -> void:
 	var doy := clock.day_of_year()
 	var jd := clock.jd()
 	var snow: float = world.weather.snow_cover if world.weather else 0.0
-	if jd != _jd:
+	var fg: int = world.fields.lut_gen if world.fields != null else 0
+	if jd != _jd or fg != _lut_gen:
 		_jd = jd
+		_lut_gen = fg
 		_update_lut(doy, clock.year())
 	world.terrain.set_meadow_bloom(Seasons.bloom(doy) * (1.0 - clampf(snow * SNOW_HIDES_BLOOM, 0.0, 1.0)))
 	var pos := player.car.global_position if player.car else player.global_position

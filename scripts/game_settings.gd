@@ -29,6 +29,7 @@ const REALISM_ROWS: Array = [
 	["animal_gait", "Lokomoce zvířat a let ptáků", "Chody podle Froudova čísla s plynulými přechody, ohyb páteře, uši a ocas jako pružiny (uši ke zvuku), skoky srnce v obilí; ptáci mávají / kloužou / plachtí v termice, přistávají s brzděním, létají proti větru; podzimní hejna špačků (M8.10). Vypnuto = dřívější pohyb.", "~0,1–0,3 ms CPU"],
 	["soil_water", "Vodní bilance", "Vlhkost půdy, tání sněhu, odtok, potoky stoupají a kalní po bouřce, v suchu vysychají; bláto a louže podle místa (M8.7). Vypnuto = jedno globální mokro.", "~0,1 ms CPU"],
 	["treegen", "Generované stromy", "Tvar stromu podle druhu, věku a vitality (kužel smrku, kopule buku, bílá bříza), listí a kůra z atlasu, impostory v dálce (M8.8). Projeví se po novém načtení světa. Vypnuto = 6 původních modelů.", "≈ jako dřív (ověřit --perfscene)"],
+	["crops", "Plodiny podle počasí", "Zahrada a pole rostou podle sum teplot, vody v půdě a světla (stín): v suchu slabá úroda, mráz spálí rajčata, v teplém suchém létě se žne dřív; zálivka plní záhon (M8.12). Vypnuto = růstové dny a kalendář polí.", "~0,05 ms CPU"],
 	["micro", "Mikroklima", "Za jasné bezvětrné noci studený vzduch v údolích a kotlinách, ranní údolní mlha, rosa a jinovatka, teplé jižní svahy, chladný les, teplejší obec; HUD a tělo berou teplotu v místě (M8.9). Vypnuto = teplota všude stejná.", "~0,05 ms CPU, mlha ≈ 0 ms GPU"],
 ]
 

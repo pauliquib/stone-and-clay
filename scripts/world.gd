@@ -380,6 +380,7 @@ func build() -> void:
 	tree_eco.setup(self)
 	micro = Microclimate.new()               # M8.9: vrstva nad Weather (Site, TreeEco, SoilWater, WindField); krok přes eco_hour
 	micro.setup(self)
+	fields.setup_eco(self)                   # M8.12: plodiny polí podle růstového modelu (eco_hour / eco_day, Micro, SoilWater)
 
 	loading.emit("Vegetace…")
 	await _frames(1)

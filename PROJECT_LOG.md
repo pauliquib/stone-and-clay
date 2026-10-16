@@ -2403,3 +2403,43 @@ dopravy, ne o regresi.
 - Parametry „(stavba)“ v Voda a půda (oslunění, TWI, rozběh, povodí za mapou, soutoky) se projeví až po novém startu.
 - `DevTune.register` neumí vícerozměrné cíle ani „platí po restartu“ jako vlastnost řádku – zatím jen text v popisku.
 - Křivky ročních dob: den bodu jde posunout za sousední bod (interpolace pak přeskočí) – hlídat při ladění.
+
+## 2026-10-16 – M8.12 Plodiny a zahrada podle růstového modelu
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **`CropModel`** (`scripts/eko/crop_model.gd`, statické funkce + `DayAcc`): zjednodušený WOFOST / LUE – fáze podle GDD
+  se základem plodiny, biomasa = RUE × PAR × (1 − e^(−k·LAI)) × min(stres vody, teploty) × světlo, LAI ze SLA, stres vody
+  z `SoilWater` (sucho pod 0,35 × nárok, zamokření nad 0,9), mráz (vzduch, u citlivých i přízemní `Microclimate.frost_at`,
+  sazenice rajčat hned), horko a stres při kvetení → potenciál výnosu, sucho po odkvětu zrychlí dozrávání. Výnos vůči
+  klimatickému normálu (`clim`: stejný model se `Seasons.TEMP_MEAN`, Ångström, vlhká půda). Záření hodinově z
+  `Atmosphere.SkyModel.global_horizontal_irradiance_wm2` (M8.5), fallback Ångström.
+- **`data/plodiny.json`**: 9 zahradních + 6 polních plodin (GDD kalibrované na normál a kalendář barev polí – ozimá pšenice
+  dozraje ~204. den, ječmen ~194., kukuřice ~268.); hodnoty „odhad – ověřit“. Ověřeno offline portem modelu v Pythonu
+  (skript ve scratchpadu, necommitováno): brambory sucho (vlhkost 0,25) 19 % normálu vs. zalévané 100 %; pšenice v suchém
+  a teplejším roce dozraje o 3–5 týdnů dřív.
+- **Zahrada** (`garden.gd`, přepínač `crops`): stav modelu v buňce (`cm`), denní krok z teploty a záření v místě záhonu
+  (`World.micro`, `DayAcc` z `eco_hour`), kyblík záhonu `bw` (zálivka 15 mm + `SoilWater.add_water`, výpar Hargreaves ×
+  pokryv), stín stromů a budov `sh` (jednou za den, jen u hráče), mráz hodinově, skleník. Výnos = horní mez × 0,75 ×
+  výnos/normál × kvalita; prohlídka „Brambory kvetou, půda je suchá.“ + odhad úrody (přesnost podle Zahradničení).
+  Vypnuto = původní časovač (oba stavy se drží v kroku, přepnutí uprostřed sezóny nezpůsobí skok).
+- **Pole** (`fields.gd`): stav na každé pole (`cur`, `nxt` ozim), denní krok v `eco_day` po kouscích (`EcoClock.slice`,
+  12 polí/snímek), barva = kalendář ve „fenologickém dni“ + žloutnutí suchem, sklizeň po dozrání (ne za deště),
+  zakrslost → LUT řádek 1 kanál B → `vegetation.gdshader` (`grow *= 1 − b`). `crop_of` beze změny. API
+  **`Fields.crop_height_at(pos)`** (M8.10/M8.15), `field_info`, `yield_ratio_of` (výkup – zatím jen hodnota),
+  `journal_line` (deník J → Počasí „Letošní úroda: …“). `SeasonFx` přepočítá LUT po dokončení denního kroku (`lut_gen`).
+- Sdílené soubory (minimální hunky): `world.gd` (`fields.setup_eco`), `save_game.gd` (klíč `fields_eco`), `hud.gd`
+  (řádek úrody v deníku), `game_settings.gd` (řádek Realismus „Plodiny podle počasí“), `tests.gd` (scéna `pole_pulnoc`),
+  `season_fx.gd`, `shaders/vegetation.gdshader`.
+- **F3**: `scripts/dev/tune_m8_12.gd` – **379 parametrů** (Příroda/Plodiny a zahrada; ověřeno `DevTune.count` headless,
+  celkem 4 012): CropModel 25, Fields 9, Garden 39 (vč. vzorků stínu a mezí úrody), 15 plodin × parametry z JSON.
+- Kontrola překladu (`--check-only` všech změněných .gd) i `tools/shader_check.gd`: výstup prázdný.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist `docs/testy_M8.md` → M8.12) a měření `--perfscene=pole_pulnoc` / `pole_leto`.
+- `World.phenology` (M8.11) se nevolá – plodiny mají vlastní základ GDD z hodinových teplot v místě; po sloučení 8.11 lze
+  zvážit sdílení denního průměru.
+- Traktůrek (M1.6) a statek zatím nejezdí podle zralosti pole – k dispozici `Fields.field_info(id)` (`harv`) a
+  `yield_ratio_of(id)` pro výkup; napojení na cenu / práci je další krok.
+- Nové zahradní plodiny (okurka, fazole, jahody) nejsou – vyžadují předměty a semena v obchodě (ItemsDB).
+- Stín bere jen stromy z mapy (`Fauna.trees_near`), ne sazenice hráče (`PlantedTrees`).
+- Velký skok času (> 30 dní, jeden hrubý `eco_day`) pole dožene podle normálu (bez skutečného počasí).
