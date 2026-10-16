@@ -616,6 +616,29 @@
   letadla/paramotor/trike (`Aircraft.wind_at`), dron, kouř z komínů, čich zvěře; šum v korunách podle nárazu
   a lesa u kamery, padající listí v bouřce (max. 300 částic). Přepínač `wind` – vypnuto = stará sinusovka
   a `Weather.wind_vector()`. Ladicí vrstva mapy `vitr`, měřicí scéna `louka_vitr`.
+- **Generátor stromů (M8.8):** offline `tools/treegen/` (Python + numpy/scipy/Pillow, bez Blenderu, deterministický):
+  listnáče **space colonization** (Runions 2007) + pipe model tlouštěk, jehličnany **přeslenový růst** (přesleny +
+  mezipřeslenové větve, smrk kužel s „vějíři“ a závěsy, borovice vyvětvený kmen s deštníkem a štětkami); parametry
+  tvaru v `data/dreviny.json` → `tvary` (obálka koruny, nasazení, šířka, vodič, krok, tropismy, kroutivost, karta
+  listí, kůra, tuhost) + mapování druh → tvar (23 druhů → 8 tvarů: buk, dub, habr, bříza, olše, jabloň, smrk,
+  borovice). Varianty tvar × vitalita (nízká < 0,45 / vysoká) × věk (mladý < 30 let / dospělý) = 32; nízká vitalita
+  = kratší přírůstky, řidší koruna, odumřelé větve, kroucení, výš nasazená koruna. Mesh: zobecněné válce + karty
+  trsů listí, **barvy vrcholů podle 00_PRINCIPY kap. 4** (r ohebnost od kmene, g fáze větve 1. řádu, b třepetání,
+  a okluze v koruně), model výšky 1. LOD0 ≤ 4 200 / 3 000 tr (listnáč / jehličnan), LOD1 ~25 %, impostor 8 pohledů
+  (barva + normála + maska listí + zimní silueta) pečený splattingem. Výstup `data/tree_species_protos.bin` (DBT2)
+  a atlasy `assets/textures/trees/` (listí 4×2 dlaždice 512², kůra, impostory 128² × 8 × 32). Hra:
+  `scripts/vegetation/tree_gen.gd` (`TreeGen`, `MapLoader.tree_gen`) – `build_trees` s přepínačem `treegen` (čte se
+  při načtení světa: `GameSettings.realism_saved`) vybere variantu podle `tree_eco.bin` (druh, věk, vitalita; bez dat
+  z prototypu), výška × lerp(0,86; 1,04; vitalita), šířka podle modelu druhu (sx z ortofota jen ±25 %). Zblízka
+  `TreeLodStreamer` (`scripts/vegetation/tree_lod_streamer.gd`) staví MultiMeshe LOD0 / LOD1 jen pro buňky 128 m
+  kolem kamery (rozpočet 1 ms/snímek), přesné přepnutí po stromech dělá shader (pásmo vzdálenosti od hlavní kamery
+  + dither, `shaders/include/tree_gen.gdshaderinc`; LOD0 do 55 m, LOD1 do 170 m); dálka = jeden MultiMesh impostorů
+  na buňku 256 m (`shaders/tree_impostor.gdshader`, varianta v barvě instance) – výrazně méně uzlů než dřív.
+  `tree.gdshader`: atlasy listí a kůry (`use_atlas`, UV2.x = dlaždice), alfa listí s korekcí mipů, `cull_disabled`
+  (oboustranné karty), translucence, sezóna jako dřív. Index pro kácení beze změny tvaru (`near_mm` = [LOD1, LOD0],
+  `TreeManager._set_visible` umí pole; streamer skryje pokácené při stavbě buňky). Zasazené stromy (M2.5) berou
+  variantu podle druhu a velikosti (mladý → dospělý). Bez souboru / vypnuto = 6 prototypů DBT1 jako dřív.
+  Měřicí scény `les_leto` (nová), `les_rano_mlha`, `dron_200m`.
 
 ## Co ve hře je
 

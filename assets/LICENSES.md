@@ -25,6 +25,7 @@ Provedené úpravy se zapisují do sloupce „úpravy“.
 | ph-gravel_road | `textures/gravel_road_*_2k.jpg` | gravel_road (PBR, 2k) | Poly Haven (autora ověřit) | https://polyhaven.com/a/gravel_road | CC0 | před 2026-09 | žádné | polní a lesní cesty |
 | ph-sky-hdr | `textures/sky.hdr` | HDRI obloha | Poly Haven (název a autora ověřit) | https://polyhaven.com/hdris | CC0 | před 2026-09 | možná zmenšeno | obloha, osvětlení |
 | cuzk-ortofoto | `textures/ortho_full.jpg`, `ortho_core.jpg` | Ortofoto ČR | ČÚZK | https://geoportal.cuzk.cz/ | CC-BY-4.0 | před 2026-09 | oříznuto, sesazeno | textura terénu, mapa |
+| vlastni-treegen | `textures/trees/listi.png`, `kura.png`, `impostor_barva.png`, `impostor_normala.png` | Atlasy listí, kůry a impostorů stromů (M8.8) | vlastní výroba (procedurálně) | `tools/treegen/` – nic staženo | CC0 | 2026-10-16 (vygenerováno) | žádné | generované stromy |
 
 Geodata (DMR 5G, ČÚZK), OSM (ODbL) a DIBAVOD nejsou „assety“ ve smyslu této složky – jejich uvedení je
 pevně v `Hud.CREDITS` (`scripts/hud.gd`) a v README → „Licence dat“.

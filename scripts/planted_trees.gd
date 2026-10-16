@@ -74,6 +74,11 @@ const ECO_IDS := {"jablon": "jablon", "slivon": "svestka", "hrusen": "hrusen", "
 	"buk": "buk", "smrk": "smrk", "borovice": "borovice"}
 ## M8.3: růst zasazeného stromu × lerp(min, max, vitalita stanoviště) – na vhodném místě roste rychleji.
 const VIGOR_GROWTH := [0.6, 1.15]
+## M8.8: generované stromy (MapLoader.tree_gen) – klíč skupiny MultiMeshe = GEN_KEY_BASE + varianta; sazenice menší
+## než GEN_ADULT_SIZE dostane model „mladý“ (věk GEN_YOUNG_YEARS), větší „dospělý“.
+const GEN_KEY_BASE := 1000
+const GEN_ADULT_SIZE := 0.6
+const GEN_YOUNG_YEARS := 5.0
 const GUARD_COLOR := Color(0.75, 0.92, 0.75, 0.4)
 
 var world: World
@@ -600,6 +605,8 @@ func _notify_near(pos: Vector3, text: String) -> void:
 # ------------------------------------------------------------------ vzhled
 
 func _proto_mesh(p: int) -> Mesh:
+	if p >= GEN_KEY_BASE and MapLoader.tree_gen != null:     # M8.8: generovaná varianta (LOD0 bez pásma)
+		return MapLoader.tree_gen.full_mesh(p - GEN_KEY_BASE)
 	var sh: Array = MapLoader.shared_protos
 	if p >= 0 and p < sh.size():
 		return sh[p]
@@ -639,10 +646,18 @@ func _rebuild() -> void:
 		var pos: Vector3 = rec["pos"]
 		var basis := Basis(Vector3.UP, float(rec["rot"])) * Basis.from_scale(Vector3(sx, sy, sx))
 		var p := int(rec["proto"])
-		if not groups.has(p):
-			groups[p] = [[], []]
-		groups[p][0].append(Transform3D(basis, pos))
-		groups[p][1].append(_tint(rec))
+		var g_key := p
+		var tg := MapLoader.tree_gen
+		if tg != null:           # M8.8: model podle druhu a věku sazenice (mladý → dospělý s růstem)
+			var vg: float = rec.get("vig", -1.0)
+			var vi := tg.variant_for(String(ECO_IDS.get(String(rec["sp"]), "")), vg if vg >= 0.0 else TreeEco.FALLBACK_VIGOR,
+				GEN_YOUNG_YEARS if s < GEN_ADULT_SIZE else 100.0, p >= 3)
+			g_key = GEN_KEY_BASE + vi
+			basis = tg.instance_basis(float(rec["rot"]), sx, sy, vi)
+		if not groups.has(g_key):
+			groups[g_key] = [[], []]
+		groups[g_key][0].append(Transform3D(basis, pos))
+		groups[g_key][1].append(_tint(rec))
 		if sy >= COLLIDE_MIN_H:
 			var cs := CollisionShape3D.new()
 			var cyl := CylinderShape3D.new()

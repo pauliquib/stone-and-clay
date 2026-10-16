@@ -96,10 +96,11 @@ krocích: Esc → Nastavení → „Realismus (M8)…“. M8.1 (základ) jen zak
 | `species` | M8.3 | **Dřeviny a porosty** (`scripts/eko/tree_eco.gd`): cena dřeva podle druhu, „Prohlédnout strom“ u mapových stromů, ovoce jen na ovocných druzích, vitalita sazenic; vypnuto = staré chování |
 | `wind` | M8.4 | **Pole větru** (`scripts/eko/wind_field.gd`): nárazy běžící krajinou, závětří a hřebeny, ohyb stromů po úrovních, vlny přes obilí, padající listí v bouřce; létání, dron, kouř a čich zvěře podle větru v místě; vypnuto = stará sinusovka |
 | `gait` | M8.6 | **Pohyb člověka** (`scripts/gait.gd`): fázová chůze/běh, chodidla bez klouzání, náklon do svahu, náklad/únava/chlad → postoj; vypnuto = stará animace |
+| `treegen` | M8.8 | **Generované stromy** (`scripts/vegetation/tree_gen.gd`, data `tools/treegen/`): tvar podle druhu, věku a vitality (kužel smrku, deštník borovice, kopule buku, bílá bříza), listí a kůra z atlasu, LOD0/LOD1 zblízka + impostory v dálce; **projeví se po novém načtení světa**; vypnuto / bez `data/tree_species_protos.bin` = 6 původních modelů |
 | `site`, `species`, `wind`, `soil_water`, `treegen`, `micro`, `animal_gait`, `phenology`, `crops`, `terramech`, `ground_veg`, `habitat`, `thermo`, `village_life`, `soundscape` | M8.2–M8.18 | výchozí zapnuto; konkrétní popisek a cena v menu přibude s krokem, který klíč zavádí |
 
 Měření výkonu po krocích M8: `--perfscene=<jméno>[,sekund]` (`ves_poledne`, `les_rano_mlha`,
-`louka_vitr`, `udoli_noc`, `pole_leto`, `dron_200m`, `zapad_slunce`) teleportuje na pevnou scénu a změří
+`louka_vitr`, `udoli_noc`, `pole_leto`, `dron_200m`, `zapad_slunce`, `les_leto`) teleportuje na pevnou scénu a změří
 FPS/CPU/GPU stejně jako `--perf` → `user://perf/<jméno>.csv`. Pro pohodlné posílání výsledků použij
 `tools/launcher.sh --perfscene=ves_poledne` (viz tabulka nástrojů níž) – zapíše kompaktní log do
 `logs/` místo ručního přepisování čísel z konzole. F2 → „Příroda – ladění…“ nechá mapu (M) kreslit
@@ -127,6 +128,14 @@ podle druhu (buk ≠ smrk). E na kmen („Prohlédnout strom“) → „Buk lesn
 podrobnosti rostou s Dřevorubectvím). Ovoce v korunách jen na ovocných druzích, sazenice dostanou
 vitalitu podle stanoviště. Ladicí vrstvy `druhy`, `vitalita`. Bez `data/tree_eco.bin` fallback:
 druh podle prototypu stromu.
+
+**M8.8 Generátor stromů** (`tools/treegen/` → `data/tree_species_protos.bin` + atlasy `assets/textures/trees/`;
+ve hře `TreeGen` / `TreeLodStreamer` v `scripts/vegetation/`, přepínač `treegen`): 8 tvarů (buk, dub, habr, bříza,
+olše, jabloň, smrk, borovice; ostatní druhy z `dreviny.json` → `tvary.druhy` na nejbližší tvar) × 2 vitality × 2 věky.
+Listnáče rostou kolonizací prostoru, jehličnany po přeslenech; strom s nízkou vitalitou (mělká suchá půda na hřbetu)
+je nižší, řidší a křivější, v nivě vyšší a hustší. Zblízka LOD0 (do 55 m) a LOD1 (do 170 m) s plynulým prolnutím,
+dál impostory (8 pohledů, sezónní barvy, v zimě holé větve). Kácení a uložené pokácené stromy beze změny.
+Měřicí scéna `les_leto` (les v létě bez mlhy).
 
 **M8.7 Vodní bilance** (`World.soil_water`, `scripts/eko/soil_water.gd`, přepínač `soil_water` v Realismu):
 vlhkost půdy na mřížce 32 m (kyblík s AWC ze `Site`), tání sněhu, povrchový odtok (SCS-CN), výpar (Hargreaves),
@@ -178,6 +187,7 @@ Generované soubory a jejich nástroje (výstupy se commitují, kromě `data/*.b
 | `python3 tools/obce.py` | `data/obce.json` | po změně výběru/geometrie okolních obcí (5 fiktivních katastrů; vyžaduje `osmium`, `numpy`) |
 | `python3 tools/site.py` (M8.2) | `data/site.bin` (**není v gitu**) | po přegenerování `terrain_height.bin`/`water.json`/`surface.bin`/`landuse.bin` – mapa stanovišť (sklon, orientace, TWI, vzdálenost k vodě, HAND, TPI, expozice větru, oslunění, mrazové kotliny, půda); vyžaduje `numpy`, `scipy` |
 | `python3 tools/tree_species.py` (M8.3) | `data/tree_eco.bin` (**není v gitu**) | po `tools/site.py`, po změně `data/trees.bin` nebo `data/dreviny.json` – druh, věk, vitalita, dbh a porost každého stromu + mřížky zápoje / dominantního druhu; vypíše podíly druhů a kontrolu sever/jih/luh; vyžaduje `numpy`, `scipy`, `Pillow` |
+| `python3 tools/treegen/treegen.py [--preview] [--only=buk,smrk]` (M8.8) | `data/tree_species_protos.bin` (DBT2, ~5 MB, **v gitu** – vynuceně, `data/*.bin` je jinak ignorované) + `assets/textures/trees/*.png` (atlasy listí, kůry, impostorů; v gitu) | po změně `data/dreviny.json` → `tvary` (parametry tvaru, mapování druh → tvar) nebo kódu generátoru; ~70 s; `--preview` uloží náhledy LOD0 / LOD1 / impostor všech variant do `tools/out/treegen/` (bez Blenderu); vyžaduje `numpy`, `scipy`, `Pillow`. Po přegenerování otevřít projekt (nebo `godot --headless --import`), ať se atlasy znovu naimportují |
 | `tools/launcher.sh [parametry hry…]` (M8.1) | `logs/m8_perf_<datum_čas>.log` + `logs/latest.log` (**mimo git**) | kdy chceš spustit hru / `--perfscene=…` a poslat výsledek dál bez ručního přepisování konzole – spustí `run.sh`, zachytí výstup, zapíše kompaktní deduplikovaný log (`tools/launcher_log.py`); `--help` jen vypíše nápovědu |
 
 Binární data mapy (`data/*.bin`) se regenerují exportem z Blenderu přes `tools/export_map.py`
