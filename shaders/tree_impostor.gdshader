@@ -21,6 +21,7 @@ global uniform float autumn;
 global uniform float snow_cover;
 
 #include "res://shaders/include/tree_gen.gdshaderinc"
+#include "res://shaders/include/phenology.gdshaderinc"
 
 varying vec3 tint;
 varying vec2 tg_fade;
@@ -32,11 +33,30 @@ varying vec3 bb_right;
 varying vec3 bb_fwd;
 varying vec3 wpos;
 varying vec3 origin_w;
+// M8.11: fenologie druhu a místa jako v tree.gdshader (include/phenology)
+varying flat vec4 ph_st;
+varying flat vec3 ph_aut;
+varying flat vec3 ph_spr;
+varying flat vec4 ph_bl;
+varying flat vec2 ph_fl;
 
 void vertex() {
 	vec3 origin = MODEL_MATRIX[3].xyz;
 	origin_w = origin;
 	tint = INSTANCE_CUSTOM.rgb;
+	ph_st = vec4(foliage, autumn, 0.0, 0.0);
+	ph_aut = vec3(0.0);
+	ph_spr = vec3(0.28, 0.5, 0.12);
+	ph_bl = vec4(0.0);
+	ph_fl = vec2(0.0);
+	if (ph_valid(INSTANCE_CUSTOM.a)) {
+		ivec2 pc = ph_cell(INSTANCE_CUSTOM.a);
+		ph_st = ph_state(pc);
+		ph_aut = ph_info(pc, PH_COL_AUT).rgb;
+		ph_spr = ph_info(pc, PH_COL_SPR).rgb;
+		ph_bl = ph_info(pc, PH_COL_BLOOM);
+		ph_fl = vec2(1.0, ph_info(pc, PH_COL_FLAGS).r);
+	}
 	int vi = clamp(int(floor(COLOR.r * 255.0 + 0.5)), 0, 63);
 	vec4 ext = imp_ext[vi];
 	row = float(vi);
@@ -93,22 +113,35 @@ void fragment() {
 	if (leaf) {
 		c = mix(mix(base_color_conifer, base_color, decid), tint, instance_mix);
 		c *= mix(vec3(0.6, 0.7, 0.5), vec3(1.15), nz);
-		if (decid > 0.5) {
-			float th = tg_hash(floor(origin_w * 0.37) + 0.5);
+		bool dec = ph_fl.x > 0.5 ? ph_fl.y < 0.5 : decid > 0.5;   // M8.11: modřín opadává i jako jehličnan
+		float fol = ph_st.x;
+		float aut = ph_st.y;
+		float th = tg_hash(floor(origin_w * 0.37) + 0.5);
+		if (dec) {
 			float clump = tg_vnoise(wpos * 2.2 + th * 13.0);
-			if (clump * 0.85 + th * 0.15 > foliage * 1.05 - 0.02) {
+			bool flower = ph_bl.a > 0.5 && ph_st.z > 0.01 && tg_vnoise(wpos * 6.5 + th * 7.0) > 1.0 - 0.55 * ph_st.z;
+			if (clump * 0.85 + th * 0.15 > fol * 1.05 - 0.02 && !flower) {
 				if (nr.a < 0.5) {
 					discard;                        // bez listí a bez větve za ním
 				}
 				leaf = false;                       // holá větev (zimní silueta)
 				c = bark_winter * (0.8 + 0.3 * nz);
 			} else {
-				float a = clamp(autumn * 1.5 - th * 0.5 + (clump - 0.5) * 0.3, 0.0, 1.0);
+				float a = clamp(aut * 1.5 - th * 0.5 + (clump - 0.5) * 0.3, 0.0, 1.0);
 				vec3 ac = mix(vec3(0.78, 0.52, 0.07), vec3(0.62, 0.2, 0.05), smoothstep(0.35, 0.9, th + clump * 0.3));
-				ac = mix(ac, vec3(0.42, 0.28, 0.1), smoothstep(0.7, 1.0, a) * (1.0 - foliage) * 0.8);
+				if (ph_fl.x > 0.5) {
+					ac = ph_aut * (0.8 + 0.4 * th);
+				}
+				ac = mix(ac, vec3(0.42, 0.28, 0.1), smoothstep(0.7, 1.0, a) * (1.0 - fol) * 0.8);
 				c = mix(c, ac * (0.75 + 0.45 * nz), a);
-				c = mix(c, vec3(0.28, 0.5, 0.12) * (0.8 + 0.4 * nz), (1.0 - smoothstep(0.35, 1.0, foliage)) * (1.0 - autumn) * 0.7);
+				c = mix(c, ph_spr * (0.8 + 0.4 * nz), (1.0 - smoothstep(0.35, 1.0, fol)) * (1.0 - aut) * 0.7);
+				if (flower) {
+					c = ph_bl.rgb * (0.85 + 0.3 * nz);
+				}
 			}
+		} else if (ph_fl.x > 0.5 && ph_st.w > 0.01) {
+			float tip = smoothstep(0.45, 0.8, tg_vnoise(wpos * 3.1 + th * 5.0));
+			c = mix(c, ph_spr * (1.4 + 0.4 * nz), tip * ph_st.w * 0.6);
 		}
 		if (leaf) {
 			c *= col.r / TG_LEAF_MEAN;

@@ -272,7 +272,9 @@ func _activity() -> float:
 		a *= clampf((w.temp - ACT_TEMP_MIN) / ACT_TEMP_RANGE, 0.0, 1.0)
 		a *= 1.0 - smoothstep(ACT_RAIN_LO, ACT_RAIN_HI, w.rain)
 		a *= 1.0 - smoothstep(ACT_WIND_LO, ACT_WIND_HI, w.wind)
-	a *= clampf(Seasons.bloom(c.day_of_year()) * ACT_BLOOM_K + ACT_BLOOM_OFF, 0.0, 1.0)
+	var ph: Phenology = fauna.world.phenology if fauna.world != null else null
+	var bl := ph.bees_bloom(global_position) if ph != null else Seasons.bloom(c.day_of_year())   # M8.11: kvetoucí dřeviny okolí
+	a *= clampf(bl * ACT_BLOOM_K + ACT_BLOOM_OFF, 0.0, 1.0)
 	return a
 
 

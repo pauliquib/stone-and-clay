@@ -149,6 +149,7 @@ var airfield: Airfield           # M6.5: polní letiště – trávníková drá
 var trees: TreeManager           # stromy za běhu (M2.1): index instancí, pokácené stromy, pařezy
 var forestry: Forestry           # kácení a zpracování dřeva (M2.1): pád stromu, kmeny, špalky, zákon
 var tree_eco: TreeEco            # M8.3: druhy dřevin a porosty (data/tree_eco.bin + data/dreviny.json), fallback z prototypů
+var phenology: Phenology         # M8.11: fenologie druhů (GDD, rašení, květ, podzim, pozdní mráz) a růst stromů v letech
 var unreported := {}             # M4.4: id hráče → [{...}] činy, které nikdo neviděl (sdílený registr, viz `add_unreported`)
 var witness_sources: Array[Callable] = []   # M4.4/M4.6: další zdroje svědků (hajný, stráže) – `add_witness_source`
 var fire_mgr: FireManager        # oheň a topení (M2.2): ohniště, opékání, zákon u lesa, požár trávy, kamna doma
@@ -380,6 +381,8 @@ func build() -> void:
 	tree_eco.setup(self)
 	micro = Microclimate.new()               # M8.9: vrstva nad Weather (Site, TreeEco, SoilWater, WindField); krok přes eco_hour
 	micro.setup(self)
+	phenology = Phenology.new()              # M8.11: fenologie a růst (eco_hour / eco_day, tabulka pheno_lut pro shadery stromů)
+	phenology.setup(self)
 
 	loading.emit("Vegetace…")
 	await _frames(1)
@@ -3668,6 +3671,8 @@ func flight_bounds(pos: Vector3) -> Dictionary:
 func set_date(y: int, m: int, d: int) -> void:
 	clock.set_date(y, m, d)
 	weather.reset()
+	if phenology:
+		phenology.on_date_set()          # M8.11: rok se rozběhne k novému datu (dopředu o roky = růst)
 	refresh_season_items()
 	if village_events:
 		village_events.refresh()

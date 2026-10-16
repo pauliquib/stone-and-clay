@@ -238,13 +238,18 @@ func _rebuild_fruit(pos: Vector3, frac: float) -> void:
 		var kind := Fields._hash(src, 99) % FRUIT_COLORS.size()
 		var base: Color = FRUIT_COLORS[kind]
 		var eco := _eco()
+		var frac_t := frac
 		if eco != null:      # M8.3: barva plodů podle druhu (katalog dreviny.json)
-			var fr := eco.fruit_of(eco.species(src))
+			var sid := eco.species(src)
+			var fr := eco.fruit_of(sid)
 			if not fr.is_empty():
 				base = fr["barva"]
+			var ph: Phenology = world.phenology
+			if ph != null and ph.enabled():      # M8.11: pozdní mráz v době květu → méně ovoce (podle druhu a místa)
+				frac_t *= ph.crop_factor(sid, c)
 		for k in FRUIT_PER_TREE:
 			var hh := Fields._hash(src, k + 200)
-			if float(hh % 1000) / 1000.0 >= frac:
+			if float(hh % 1000) / 1000.0 >= frac_t:
 				continue
 			var cos_t := -0.3 + 1.3 * float((hh / 1000) % 1000) / 1000.0
 			var sin_t := sqrt(maxf(1.0 - cos_t * cos_t, 0.0))

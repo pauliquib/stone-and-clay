@@ -153,6 +153,15 @@ ve dne jižní svahy tepleji, les chladněji, obec o kousek tepleji. HUD a tělo
 píše „V údolí v noci mrzlo, na kopci ne“, rybníky zamrzají podle teploty v údolí, kouř z komínů se za inverze drží
 nízko. Ladicí vrstvy mapy `teplota`, `mlha`, `mraz` a F2 → Příroda – ladění → „Mikroklima“; měřicí scéna
 `--perfscene=kopec_inverze`. Bez nového offline nástroje (bere `site.bin`).
+
+**M8.11 Fenologie a růst stromů** (`World.phenology`, `scripts/eko/phenology.gd`, přepínač `phenology` v Realismu):
+každý druh raší, kvete a barví se podle sumy teplot letošního roku – bříza a vrba první, buk pak, dub a jasan poslední;
+na teplém jižním svahu dřív, v mrazové kotlině později, teplé jaro posune vše dopředu. Javor červený, bříza žlutá, buk
+měděný, dub hnědý a drží listí dlouho, modřín zlátne a jako jediný jehličnan opadává; ovocné stromy, třešně a akáty
+kvetou bíle / růžově v koruně. Pozdní mráz v době květu spálí květy a v září je méně jablek. Stromy každý rok
+povyrostou (Chapman–Richards, slabší přírůstek po suchém létě). Deník J → „Rok v přírodě“, F2 → Příroda – ladění →
+„Fenologický kalendář“ (odchylka roku ±K), vrstva mapy `fenologie`, měřicí scéna `--perfscene=les_jaro`. Prahy druhů
+v `data/dreviny.json` → `fenologie`. Bez nového offline nástroje.
 **M8.10 Lokomoce zvířat 2 a let ptáků** (přepínač `animal_gait`): zvěř, kůň i hospodářská zvířata mění chod podle
 Froudova čísla (krok → klus → cval plynule, s hysterezí), ohýbají páteř v zatáčce a ve cvalu, dýchají, uši a ocas
 dopruží za pohybem a uši se natočí za zvukem; vyplašený srnec rozevře bílé zrcátko a v obilí / vysoké trávě skáče.

@@ -458,3 +458,34 @@ před krokem.
    se objeví (Louže, stopy „Stopy – zapisují se od sněhu“). „Situace Jasno – vítr“ 2 → 15 při Jasnu → HUD „silný vítr“.
 6. Voda a půda: déšť (F2 → Počasí Déšť) + „Odtok – CN: orná půda, skupina C“ 85 → 98 → po herní hodině F2 → Příroda – ladění
    → Průtoky ukáže vyšší Q a kalnost; ↺ vrátí. Výchozí (vše) → vše zpět, nic zvýrazněné.
+
+## M8.11 – Fenologie a růst stromů v letech
+
+Pozn.: fáze se počítají jednou za herní den (`eco_day`) ze sumy teplot (GDD, základ 5 °C) – po F2 změně data se rok hned
+„rozběhne“ z klimatického normálu (+ odchylka roku). F2 → Příroda – ladění → „Fenologický kalendář (M8.11)“ ukazuje GDD,
+data rašení / květu / zbarvení letos a tlačítka „Odchylka roku ±K“ (teplé / studené jaro). Vrstva mapy `fenologie`.
+Barvy a olistění jsou v shaderu stromů (`pheno_lut`) – generované stromy (M8.8) i staré prototypy, zblízka i impostory.
+
+1. F2 → Datum 20. 4., les u chaty (`--perfscene=les_jaro` má 25. 4.) → břízy a vrby světle zelené, buky teprve raší,
+   duby a jasany holé; kalendář: bříza „raší 10.–15. 4.“, dub „GDD x/155“.
+2. F2 → 15. 10. → javory červenooranžové, břízy žluté (začínají opadávat), smrky zelené, modříny zlátnou.
+3. F2 → 10. 11. → modříny opadané (holé), duby ještě hnědé s listím, buky převážně opadané.
+4. F2 → kalendář → „Odchylka roku +5 K“, pak Datum 15. 4. → bříza i buk raší výrazně dřív než v bodě 1 (kalendář i les);
+   „Odchylka 0 K“ vrátí.
+5. Sad / zahrady (`--perfscene=zahrady_zari` místo) 28. 4. → jabloně a třešně s bílými / růžovými květy v koruně. Pak
+   F2 → Počasí → Teplota −4 °C přes noc (do 6:00), ráno teplotu na „podle klimatu“ → deník J → „ROK V PŘÍRODĚ“: „Pozdní mráz
+   … spálil květy (jabloně…) v údolí…“; kalendář ukáže mráz údolí / svah v %. V září (F2 → 15. 9.) méně jablek než bez mrazu.
+6. Údolní kotlina vs. jižní svah (vrstva `site_insol` / `site_cold`) koncem dubna → na teplém svahu rašení o pár dní napřed
+   (porovnat stejný druh dalekohledem X nebo vrstvou `fenologie`).
+7. Přeskočit Silvestr (F2 → 31. 12. 23:00, počkat do Nového roku, nebo F2 → Datum o 5 let dál) → za pár sekund jsou
+   stromy o kus vyšší (porovnat výšku stromu dalekohledem / „Prohlédnout strom“ – věk +N let); deník „Les … o N let starší“.
+8. Zasazená jabloň na vlhké louce (vrstva `vlhkost` modrá) → nezasychá i bez zálivky; v květu fenologie jako sad.
+9. Esc → Nastavení → Realismus → vypnout „Fenologie a růst stromů“ → všechny listnáče zase raší a barví se naráz (Seasons),
+   modřín se nebarví, květy v korunách zmizí; zapnout → zpět do herní hodiny.
+10. F5 → F9 zachová kalendář, mráz a roky růstu (klíč `phenology`); starý save se načte (rozběh roku z klimatu, bez růstu).
+    F3 → Příroda/Fenologie „Podzim – fotoperioda“ 2 → 8 v září → listí se do herní hodiny barví dřív.
+
+Co změřit: `--perfscene=les_jaro,30` a `--perfscene=les_leto,30` (s přepínačem „Fenologie“ zapnutým / vypnutým).
+Očekávání: CPU ≈ 0 ms za snímek (denní krok ~0,2 ms jednou za 48 s reálně, tabulka 16 × 32 texelů), GPU ≤ +0,1 ms
+(3 texelFetch na vrchol, pár ALU na fragment listí). Po Novém roce / načtení savu s růstem: přeškálování ~150 stromů
+za snímek přes `EcoClock.slice` (≤ 1 ms/snímek po dobu ~6 s) – změřit `--perfscene=les_leto` těsně po načtení savu.

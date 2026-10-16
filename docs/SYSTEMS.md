@@ -611,6 +611,30 @@
   `micro_frost_y` → `terrain.gdshader` / `vegetation.gdshader` (lesk rosy, jinovatka pod mrazovou hranicí). Ladění:
   vrstvy mapy `teplota` (odchylka od Weather), `mlha`, `mraz`, F2 → Příroda – ladění → „Mikroklima (M8.9)“; měřicí
   scéna `kopec_inverze`. Uložení: klíč `micro`.
+- **Fenologie a růst stromů (M8.11)**: `World.phenology` (`Phenology`, `scripts/eko/phenology.gd`), přepínač Realismus
+  `phenology`. Denní krok (`eco_day`) z průměrné teploty dne (`Weather.temp` po herních hodinách přes `eco_hour`; přeskočené
+  dny z normálu `Seasons.TEMP_MEAN` + `YEAR_ANOMALY_K`, vynucená teplota F2 se při dohánění bere): GDD (základ 5 °C od 1. 1.),
+  teplé dny, zimní chlad (dny < 5 °C od 1. 11.), podzimní chlad (K·den pod 12 °C od 1. 8.). Prahy druhů v `data/dreviny.json`
+  → `fenologie` (`rasi_gdd`, `plne_olisteni_gdd`, `kvete_gdd`, `zbarveni_den` + `zbarveni_chlad`, `opad_dni`, `chlad_dni`,
+  `zrani_gdd`, `stalezeleny`, `kvet_barva`; kalibrace na průměrná data fází pro střední Moravu přes normál – odhad, ověřit
+  v M8.19). Posun místa (K) ze `Site` (výška × `Microclimate.LAPSE_K_M`, oslunění svahu, mrazová kotlina): fáze = GDD +
+  posun × teplé dny (podzim: chlad − posun × chladné dny). Fáze jsou bezstavové funkce akumulátorů → `phase(sp, pos)` =
+  {foliage, autumn, bloom, fruit (zrání), frost_damage, flush}; stav navíc jen poškození mrazem (druh × 7 pásem posunu):
+  noc pod −1,7 °C v době květu / plůdků (minimum v údolí a na svahu z `Microclimate.temp_valley/ridge`). API (00_PRINCIPY
+  kap. 3): `gdd(year_day, base)`, `phase`, `foliage`, `autumn`, `bloom`, `fruit`, `frost_damage`, `crop_factor`,
+  `bloom_near(pos, r)`, `bees_bloom(pos)`, `shift_at`, `temp_mean_day`, `enabled`; statické `site_shift_k`, `instance_alpha`.
+  Fallback (vypnuto / bez katalogu): křivky `Seasons`, `pheno_on` = 0. **Vzhled:** `INSTANCE_CUSTOM.a` stromu = (druh × 8 +
+  pásmo posunu −3…+3 K + 0,5) / 256 (sestaví `TreeGen.build` / `MapLoader.build_trees` / `PlantedTrees`), globální uniformy
+  `pheno_on` + `pheno_lut` (16 × 32 RGBA8: sloupce 0–6 olistění / zbarvení / květ / přírůst jehličnanů, 8–10 barvy podzimu,
+  jara a květů, 11 stálezelený) – `shaders/include/phenology.gdshaderinc` v `tree.gdshader` i `tree_impostor.gdshader`
+  (modřín opadává, kvetoucí ovocné stromy mají bílé / růžové chomáče i bez listí). **Růst:** na Nový rok +1 rok, roční faktor
+  přírůstku = 1 − stres (letní sucho `SoilWater.drought_index`, pozdní mráz); `TreeEco.set_growth(roky, faktor)` → `height`,
+  `age`, `dbh` přičtou přírůstek Chapman–Richards od věku z dat; vzhled `TreeManager.regrow(i, k)` po kouscích přes
+  `EcoClock.slice` (impostor, LOD1/LOD0 a data `TreeLodStreamer`; kolize kmene beze změny). Napojení: `TreeDecor` a zasazené
+  stromy – ovoce × `crop_factor`; sazenice berou vláhu i z `SoilWater`; včely (`Apiary`) z `bees_bloom`. Deník J → „ROK V
+  PŘÍRODĚ“ (data fází letos, pozdní mráz, loni, růst lesa), F2 → Příroda – ladění → „Fenologický kalendář (M8.11)“ + odchylka
+  roku, vrstva mapy `fenologie`, F3 → Příroda/Fenologie a Růst stromů (`scripts/dev/tune_m8_11.gd`), měřicí scéna `les_jaro`.
+  Uložení: klíč `phenology` (akumulátory, teploty dnů letos, mráz, deník, roky růstu a stres po letech).
 - **Fyzikální obloha, světlo a expozice (M8.5)**: `Atmosphere.SkyModel` (vnořená třída v `scripts/priroda/atmosphere.gd`)
   – zjednodušený Rayleigh + Mie + ozon model (à la Hillaire 2020 / Preetham, `00_PRINCIPY.md` kap. 8), čisté
   statické funkce volatelné odkudkoli (`Atmosphere.SkyModel.sun_illuminance_lux(elev, cloud, haze)`), ne jen

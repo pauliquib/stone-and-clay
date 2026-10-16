@@ -814,6 +814,9 @@ func _journal_bbcode() -> String:
 	var nl = game.get("nature_log")
 	if nl:
 		s += nl.journal_text(player.id)
+	var phj = game.get("phenology")      # M8.11: rok v přírodě (rašení, květ, pozdní mráz, růst lesa)
+	if phj != null:
+		s += String(phj.journal_text())
 	s += "[b]STATISTIKA[/b]\nVypito celkem %.0f g alkoholu (%d nápojů), snědeno %d kcal, vykouřeno %d cigaret.\n" % [
 		b.total_alc_g, b.drinks, int(b.total_kcal), b.cigarettes_smoked]
 	s += "Hmotnost %.1f kg (BMI %.1f).  Peníze %d Kč." % [b.weight, b.bmi(), player.money]

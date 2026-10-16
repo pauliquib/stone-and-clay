@@ -105,6 +105,14 @@ autumn={
 "type": "float",
 "value": 0.0
 }
+pheno_on={
+"type": "float",
+"value": 0.0
+}
+pheno_lut={
+"type": "sampler2D",
+"value": ""
+}
 wind_strength={
 "type": "float",
 "value": 0.3

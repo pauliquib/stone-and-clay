@@ -69,6 +69,10 @@ var order: Array[String] = []           # pořadí druhů v katalogu
 var stands := 0
 
 var _rec := PackedByteArray()
+## M8.11 růst v letech (nastavuje `Phenology` na Nový rok / po načtení): stromy z mapy jsou o `grow_years` let starší
+## než v datech, přírůstek výšky podle Chapman–Richards × `grow_mult` (1 − průměrný roční stres ze sucha a mrazu).
+var grow_years := 0
+var grow_mult := 1.0
 var _sp_map := PackedInt32Array()       # index druhu v souboru → index v `order` (katalog se mohl změnit)
 var _grids := {}                        # kód → {x0, z0, cell, nx, nz, data: PackedByteArray}
 
@@ -208,12 +212,44 @@ func vigor(i: int) -> float:
 	return FALLBACK_VIGOR
 
 
-## Výška (m) – měření z trees.bin (u zasazených z růstu).
+## Výška (m) – měření z trees.bin (u zasazených z růstu) + růst v letech (M8.11).
 func height(i: int) -> float:
+	var h := base_height(i)
+	if grow_years > 0 and i >= 0 and i < TreeManager.DYN_BASE and h > 0.0:
+		h += _growth_inc(i)
+	return h
+
+
+## Výška podle dat (bez růstu v letech M8.11).
+func base_height(i: int) -> float:
 	if loaded and i >= 0 and i < count:
 		return _rec.decode_half(i * REC + 4)
 	var tm: TreeManager = world.trees if world != null else null
 	return tm.height_of(i) if tm != null and tm.has_tree(i) else 0.0
+
+
+## M8.11: nastaví roky růstu a faktor přírůstku (volá `Phenology`).
+func set_growth(years: int, mult: float) -> void:
+	grow_years = maxi(years, 0)
+	grow_mult = clampf(mult, 0.0, 1.5)
+
+
+## Přírůstek výšky (m) za `grow_years` let: rozdíl Chapman–Richards mezi věkem z dat a věkem + roky, × `grow_mult`.
+func _growth_inc(i: int) -> float:
+	var sp := species(i)
+	var vig := vigor(i)
+	var a0 := float(_rec.decode_u8(i * REC + 1)) if loaded and i < count else float(age_from_height(sp, base_height(i), vig))
+	return maxf(0.0, height_at_age(sp, a0 + float(grow_years), vig) - height_at_age(sp, a0, vig)) * grow_mult
+
+
+## Poměr dnešní výšky k výšce z dat (1 = beze změny) – měřítko vzhledu stromu (`TreeManager.regrow`).
+func growth_factor(i: int) -> float:
+	if grow_years <= 0:
+		return 1.0
+	var h0 := base_height(i)
+	if h0 <= 0.1:
+		return 1.0
+	return (h0 + _growth_inc(i)) / h0
 
 
 ## Věk v letech (u porostu jeden věk ± rozptyl; bez dat inverze Chapman–Richards z výšky).
@@ -222,14 +258,19 @@ func age(i: int) -> int:
 		var r := _planted_rec(i)
 		return maxi(1, int((float(r.get("age", 0.0)) * PlantedTrees.GROWTH_SPEEDUP) / 365.0) + 1) if not r.is_empty() else 0
 	if loaded and i >= 0 and i < count:
-		return _rec.decode_u8(i * REC + 1)
+		return _rec.decode_u8(i * REC + 1) + grow_years
 	return age_from_height(species(i), height(i), FALLBACK_VIGOR)
 
 
 ## Výčetní tloušťka (cm, ve 1,3 m).
 func dbh(i: int) -> float:
 	if loaded and i >= 0 and i < count:
-		return _rec.decode_half(i * REC + 6)
+		var d0 := _rec.decode_half(i * REC + 6)
+		if grow_years > 0:                    # M8.11: tloušťka roste s výškou (poměr podle Näslunda)
+			var sp := species(i)
+			var h0 := base_height(i)
+			d0 *= dbh_from_height(sp, height(i)) / maxf(dbh_from_height(sp, h0), 0.1)
+		return d0
 	return dbh_from_height(species(i), height(i), i >= TreeManager.DYN_BASE)
 
 

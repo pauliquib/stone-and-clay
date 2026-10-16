@@ -2134,6 +2134,8 @@ const PERF_SCENES := {
 		"weather": "jasno", "popis": "M8.3: zahrady u domu v září – ovoce v korunách jen na ovocných druzích (TreeDecor + TreeEco)"},
 	"les_leto": {"pos": Vector3(-383.0, 0.0, -1010.0), "yaw": PI, "date": [2026, 7, 15], "hour": 12.0,
 		"weather": "jasno", "popis": "M8.8: les u myslivecké chaty v létě bez mlhy – LOD0/LOD1 generovaných stromů zblízka, karty listí"},
+	"les_jaro": {"pos": Vector3(-383.0, 0.0, -1010.0), "yaw": PI, "date": [2026, 4, 25], "hour": 12.0,
+		"weather": "jasno", "popis": "M8.11: les u myslivecké chaty koncem dubna – strakatý les (fenologie druhů v shaderu, květy v korunách)"},
 	"pole_rijen_vecer": {"pos": Vector3(600.0, 0.0, 600.0), "yaw": 0.0, "date": [2026, 10, 12], "hour": 17.9,
 		"weather": "jasno", "popis": "M8.10: pole v říjnu za soumraku – zvěř vychází na pole, hejno špačků (murmurace), vrány táhnou na nocoviště"},
 }

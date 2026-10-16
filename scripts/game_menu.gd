@@ -303,6 +303,8 @@ func open_debug_layers() -> void:
 		opts.append(["Průtoky toků (M8.7)", _water_flows])
 	if world.micro != null:          # M8.9: stav mikroklimatu (inverze, mlha, mráz, rosa)
 		opts.append(["Mikroklima (M8.9)", _micro_info])
+	if world.phenology != null:      # M8.11: fenologický kalendář druhů
+		opts.append(["Fenologický kalendář (M8.11)", _pheno_info])
 	opts.append(["← Zpět", open_main])
 	_hud().open_menu("Příroda – ladění", "Vybraná vrstva se kreslí na mapě (M) místo podkladu – " +
 		"barevná mřížka po 16–64 m podle přiblížení. Každý krok M8 přidá svou vrstvu.", opts)
@@ -431,6 +433,21 @@ func _micro_info() -> void:
 	if jl != "":
 		t += "\n" + jl
 	_hud().open_menu("Mikroklima", t, [["Obnovit", _micro_info], ["← Zpět", open_debug_layers]])
+
+
+## M8.11: F2 → Příroda – ladění → Fenologický kalendář: druh → rašení / květ / zbarvení letos + odchylka roku (teplé jaro).
+func _pheno_info() -> void:
+	var ph: Phenology = world.phenology
+	var opts := [["Obnovit", _pheno_info]]
+	for k in [-3.0, 0.0, 3.0, 5.0]:
+		opts.append(["Odchylka roku %+.0f K (rozběh z klimatu)" % k, _pheno_anomaly.bind(k)])
+	opts.append(["← Zpět", open_debug_layers])
+	_hud().open_menu("Fenologický kalendář", ph.calendar_text(), opts)
+
+
+func _pheno_anomaly(k: float) -> void:
+	world.phenology.set_anomaly(k)
+	_pheno_info()
 
 
 ## M8.7: F2 → Příroda – ladění → Průtoky: Q, normál, hladina a kalnost hlavních toků + souhrn vodní bilance.

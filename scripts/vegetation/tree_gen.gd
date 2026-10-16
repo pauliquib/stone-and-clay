@@ -345,6 +345,9 @@ func build(parent: Node3D, skip: Dictionary, terrain: Terrain, mgr: TreeManager)
 	var streamer := TreeLodStreamer.new()
 	streamer.name = "StromyLOD"
 	streamer.setup(self, mgr)
+	var site: Site = mgr.world.site if mgr != null and mgr.world != null else null   # M8.11: posun fenologie podle místa
+	if mgr != null:
+		mgr.lod_streamer = streamer
 	var far_cells := {}       # fkey → [[xf], [custom], [color]]
 	var trunks := []
 	var meta := {}
@@ -369,7 +372,7 @@ func build(parent: Node3D, skip: Dictionary, terrain: Terrain, mgr: TreeManager)
 		var vi := variant_for(sp, vig, age, p >= 3)
 		var h := d[k + 5] * lerpf(VIGOR_H.x, VIGOR_H.y, vig)
 		var xf := Transform3D(instance_basis(d[k + 3], d[k + 4], h, vi), pos)
-		var col := Color(d[k + 7], d[k + 8], d[k + 9])
+		var col := Color(d[k + 7], d[k + 8], d[k + 9], Phenology.instance_alpha(sp, pos, site))   # M8.11: a = fenologický kód
 		trunks.append([pos, d[k + 4] * (0.09 if p < 3 else 0.07), d[k + 5] * (0.5 if p < 3 else 0.3)])
 		var fkey := Vector2i(floori(pos.x / MapLoader.TREE_FAR_CELL), floori(pos.z / MapLoader.TREE_FAR_CELL))
 		if not far_cells.has(fkey):
