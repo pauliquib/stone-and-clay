@@ -410,7 +410,7 @@ func _start_pass() -> void:
 	var wt: Weather = world.weather
 	var snow_now := wt.snow_cover if wt != null else 0.0
 	_p_winter = _p_month == 12 or _p_month <= 2 or snow_now > 0.3
-	_p_frost = wt != null and wt.temp < FROST_FROM_C
+	_p_frost = wt != null and _day_temp() < FROST_FROM_C
 	_p_mast = mast_store
 	_p_feeders.clear()
 	var hu: Hunter = world.hunter
@@ -668,7 +668,7 @@ func _pop_step(jd: int) -> void:
 	var days := clampi(jd - last_pop_jd, 0, 3660)
 	if days == 0:
 		return
-	var temp := world.weather.temp if world.weather != null else 5.0
+	var temp := _day_temp()
 	for k in days:
 		var dj := last_pop_jd + 1 + k
 		var dt := Clock.from_jdn(dj)
@@ -729,6 +729,15 @@ func _pop_step(jd: int) -> void:
 				p["n"] = n
 				p["young"] = minf(float(p["young"]), n)
 	last_pop_jd = jd
+
+
+## Průměrná teplota uplynulého dne (°C) – `Phenology.temp_mean_day` (jeden zdroj denního průměru, M8.19); bez fenologie
+## okamžitá `Weather.temp` (denní krok běží o půlnoci – dřív se tak bral noční okamžik místo průměru dne).
+func _day_temp() -> float:
+	var ph: Phenology = world.phenology
+	if ph != null and ph.enabled() and ph.cur_doy > 0:
+		return ph.temp_mean_day()
+	return world.weather.temp if world.weather != null else 5.0
 
 
 func _road_share(a: int) -> float:

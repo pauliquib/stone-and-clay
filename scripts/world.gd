@@ -3021,6 +3021,8 @@ func dialog_context(id: int, speaker: Node) -> Dictionary:
 	ctx["snowing"] = weather.is_snowing()
 	ctx["temp"] = weather.temp
 	var from: Vector3 = (speaker as Node3D).global_position
+	if micro != null:
+		ctx["temp"] = micro.temp_at(from)              # M8.19: teplota v místě rozhovoru (kotlina, svah), ne globální
 	var pls := {}
 	for k in places:
 		var pl: Place = places[k]

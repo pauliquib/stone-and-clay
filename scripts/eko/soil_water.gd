@@ -63,7 +63,7 @@ static var ET_SNOW_MM := 5.0           # „pod sněhem“ = víc než tolik mm 
 static var INSOL_MEAN := 5200.0        # MJ/m²/rok – průměr Site.insol (výpar svahu = insol / průměr) (stavba)
 static var DRAIN_FROM := 0.75          # od této vlhkosti (× AWC) voda pomalu prosakuje dál (polní kapacita)
 static var K_DRAIN_H := 0.006          # rychlost prosakování (1/h × propustnost)
-static var GW_FRAC := 0.35             # podíl prosáklé vody do podzemní (pomalé) nádrže toku (× 0,5 + propustnost)
+static var GW_FRAC := 0.6              # podíl prosáklé vody do podzemní (pomalé) nádrže toku (× 0,5 + propustnost); M8.19: 0,35 → 0,6
 static var GW_PERM_BASE := 0.5         # … ten „0,5 +“
 static var TWI_MED := 6.7              # medián TWI (site.bin) – rozběh: vlhčí údolnice (stavba)
 static var TWI_K := 0.06               # + vlhkost na 1 TWI nad mediánem (rozběh) (stavba)
@@ -131,11 +131,12 @@ static var PUDDLE_FROM := 0.8          # vlhkost, od které stojí v prohlubníc
 static var RUNOFF_PUDDLE := 2.0        # mm/h povrchového odtoku = plné louže
 
 # toky – lineární nádrže
-static var Q_SPEC := 4.0e-9            # m³/s na m² povodí (4 l/s/km² – normál průtoku)
+static var Q_SPEC := 3.0e-9            # m³/s na m² povodí (3 l/s/km² – normál průtoku Hané; M8.19: 4 → 3)
 static var MIN_AREA_M2 := 2.0e5        # nejmenší povodí (normál malých strouh)
 static var K_QUICK_H := {"river": 30.0, "canal": 20.0, "stream": 10.0, "ditch": 6.0, "drain": 6.0}
-## Podzemní (pomalá) nádrž – malé potoky se v suchu vyprázdní za 2–3 týdny, řeka drží měsíce.
-static var K_SLOW_H := {"river": 1500.0, "canal": 900.0, "stream": 300.0, "ditch": 150.0, "drain": 150.0}
+## Podzemní (pomalá) nádrž – recese základního odtoku: potok ~4 měsíce, řeka ~7 měsíců, strouha ~3 týdny
+## (M8.19: 300 h → 3 000 h u potoka – dřív potoky v normálním létě vysychaly na ~200 dní v roce).
+static var K_SLOW_H := {"river": 5000.0, "canal": 3000.0, "stream": 3000.0, "ditch": 500.0, "drain": 500.0}
 static var DEPTH_N := {"river": 0.6, "canal": 0.4, "stream": 0.25, "ditch": 0.15, "drain": 0.15}
 ## Povodí nad katastrem pro toky, které do mapy přitékají zvenku (začátek u okraje mřížky). (stavba)
 static var EXT_AREA_M2 := {"river": 6.0e7, "canal": 5.0e6, "stream": 3.0e6}
@@ -726,7 +727,7 @@ func _on_eco_hour(dt_h: float) -> void:
 		temp = Seasons.monthly(Seasons.TEMP_MEAN, doy)
 		cloud = CLIMATE_CLOUD
 	else:
-		p = wt.rain * Weather.RAIN_MM_H * dt_h
+		p = wt.precip_mm_h() * dt_h
 	if _acc_h <= 0.0:
 		_acc_event0 = _event_p
 	if temp < Weather.SNOW_BELOW:

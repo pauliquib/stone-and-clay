@@ -160,6 +160,8 @@ var _visits: PackedInt32Array = PackedInt32Array()      # dvojice [host, návšt
 var _events_today := 0
 var _events_jd := -1
 var _rng := RandomNumberGenerator.new()
+var _tell_rng := RandomNumberGenerator.new()   # vyprávění drbů (vlastní – neruší řadu simulace `_rng`, M8.19)
+var _tell_n := 0                         # pořadí dotazu na drb (seed vyprávění)
 var _near: PackedInt32Array = PackedInt32Array()        # domácnosti v doslechu hráče
 var _snd_next: PackedFloat32Array = PackedFloat32Array()
 var _near_t := 0.0
@@ -1288,10 +1290,15 @@ func gossip_line(per: Persona) -> String:
 		elif not bool(g["hub"]):
 			continue
 		cands.append(g)
-	if cands.is_empty() or randf() > TELL_P or (idx < 0 and randf() > SPREAD_HUB):
+	if cands.is_empty():
 		return ""
-	# novější přednostně (z posledních tří náhodně – vyprávění není simulace, randf smí)
-	var g: Dictionary = cands[cands.size() - 1 - randi() % mini(3, cands.size())]
+	# M8.19: deterministicky (00_PRINCIPY kap. 1.4) – seed z postavy, dne, čtvrthodiny a pořadí dotazu
+	_tell_n += 1
+	_tell_rng.seed = hash([String(per.profile.get("name", "")), jd, int(h * 4.0), _tell_n])
+	if _tell_rng.randf() > TELL_P or (idx < 0 and _tell_rng.randf() > SPREAD_HUB):
+		return ""
+	# novější přednostně (z posledních tří náhodně)
+	var g: Dictionary = cands[cands.size() - 1 - _tell_rng.randi() % mini(3, cands.size())]
 	return _with_when(String(g["text"]), jd - int(g["jd"]))
 
 

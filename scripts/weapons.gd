@@ -520,12 +520,15 @@ func _step_projectiles(dt: float) -> void:
 	var wind := Vector3.ZERO
 	if world.weather != null:
 		wind = world.weather.wind_vector()
+	var wf: WindField = world.wind_field          # M8.19: vítr v místě střely (závětří, výška, nárazy); vypnuto → Weather
 	var space := get_world_3d().direct_space_state
 	var ter: Terrain = world.terrain
 	for i in range(projectiles.size() - 1, -1, -1):
 		var pr: Dictionary = projectiles[i]
 		var spec: Dictionary = WEAPONS[String(pr["w"])]
 		var vel: Vector3 = pr["vel"]
+		if wf != null and world.weather != null:
+			wind = wf.wind_at(pr["pos"])
 		vel += (Vector3(0, -G, 0) + wind * float(spec["wind_k"]) - vel * float(spec["drag"])) * dt
 		var a: Vector3 = pr["pos"]
 		var b := a + vel * dt

@@ -2734,3 +2734,83 @@ dopravy, ne o regresi.
 - Šumění potoka zůstává z M8.7 (`LocalClient._brook`); vzdálený vlak / silnice ne (nejsou v datech).
 - Žluva a niva závisí na `Site.hand` – bez `data/site.bin` niva = 0 (žluva se neozve).
 - Popisek F3 `village.mow_pitch` (tune_m8_17) říká „zpomalená pila“ – sekačka už má vlastní zvuk (nesahal jsem do cizího tune).
+
+
+## M8.19A – start práce
+Zahájena kalibrace na realitu a konzistence API (subagent M8.19 část A).
+
+## 2026-10-17 – M8.19A Kalibrace a konzistence API
+
+### Hotovo (staticky ověřeno, kalibrační skript spuštěn – ruční test čeká)
+- **`tools/eco_calibrate.py`** (nový, offline, jen standardní knihovna, deterministický seed): replika klíčových rovnic
+  – náhrada herního počasí (`Weather` – Markovův řetězec situací, denní chod, déšť, mlha), GDD a fáze (`Phenology._calc`),
+  kyblík + SCS-CN + Hargreaves + nádrže toků (`SoilWater`), inverze a radiační mlha (`Microclimate._step`), Dolbear
+  (`Soundscape`), `CropModel.step_day`, `Habitat._pop_step` + semenné roky. Konstanty se **parsují z `.gd`** (`static var` /
+  `const`, víceřádková pole a slovníky) a z `data/dreviny.json`, `plodiny.json`, `zvuky_prirody.json`; normálový rok ze `Seasons`.
+  Tabulka zdrojů referencí v hlavičce (ČHMÚ fenologie / klima, ČHMÚ hydrologie, ČSÚ výnosy okresů Olomouc–Prostějov–Přerov,
+  myslivecká statistika – vše „orientačně, ověřit“). `--years`, `--seed`, `--hsi`, `--only`, `--set soubor.JMÉNO=hodnota`
+  (zkusmo bez úpravy kódu). Běh ~30 s.
+- **Hlavní nález:** herní počasí dávalo vodní bilanci **~11 900 mm srážek za rok** (normál 541 mm): `RAIN_MM_H` = 25 mm/h
+  při `rain` = 1 a situace „Déšť“ (0,4 = 10 mm/h) / „Přeháňky“ trvající hodiny, k tomu prší ~17 % hodin (~190 dní ≥ 1 mm,
+  normál 91). Následek: půda trvale nasycená, potoky průměrně 90× nad normálem, kalné celý rok (otevřený bod z M8.7).
+  Navíc stejná intenzita celý rok → zima 2× mokřejší a léto o třetinu sušší než normál.
+
+| Konstanta | Před → po | Proč (výpis kalibrace) |
+|---|---|---|
+| `Weather.RAIN_MM_H` | 25 → **2,5** mm/h | roční úhrn z počasí 11 945 → 579 mm (normál 541, ref 520–620) |
+| `Weather.WET_DAYS_REF` | 8 → **20** | prší ~8 % hodin (~690 h/rok), ~100 dní ≥ 1 mm (normál 91); dřív 1 460 h a ~190 dní |
+| `Weather.precip_mm_h()` (kód) | `rain × RAIN_MM_H` → `× rain_season_k(doy)` | sezónní poměr úhrnu na srážkový den z normálu (`PRECIP_MM / WET_DAYS`, leden 0,6 … červenec 1,5) – bez nové konstanty; `SoilWater` teď čte `wt.precip_mm_h()` (jeden výpočet mm/h) |
+| `SoilWater.Q_SPEC` | 4·10⁻⁹ → **3·10⁻⁹** (3 l/s/km²) | model dává ~2,7 l/s/km² (odtok 85 mm, součinitel 0,15) – normál Hané 2–4 |
+| `SoilWater.K_SLOW_H` | potok 300 → **3 000** h, řeka 1 500 → 5 000, náhon 900 → 3 000, strouha/meliorace 150 → 500 | potoky v normálním létě vysychaly ~200 dní/rok; teď 13 dní, minimum IX., poměr měsíců 7 |
+| `SoilWater.GW_FRAC` | 0,35 → **0,6** | víc základního odtoku (léto Q/normál 0,3–0,5 místo 0,00) |
+| `CropModel.WILT_M` | 0,12 → **0** | vlhkost = podíl AWC, AWC už je nad bodem vadnutí (dvojí odečet) – běžný rok dával ~50 % výnosu |
+| `CropModel.CLIM_MOIST` | 0,6 → **0,3** | normál hry (vůči němu „výnos vůči normálu“) = běžný rok; dřív běžný rok = 0,34–0,6 × normál |
+| `CropModel.CLIM_CLOUD` | 0,5 → **0,6** | = průměrná oblačnost herního počasí (0,58) |
+| `plodiny.json` slunečnice `rue` / `hi` | 2,8 / 0,35 → **1,8 / 0,25** | 6,4 t/ha → 2,5 t/ha (ČSÚ ~2,7); olejnina má nižší RUE v sušině |
+| `plodiny.json` kukuřice `mraz` | −1 → **−2** °C | vzrostný vrchol do 5 listů pod zemí – slabý mrazík ji nezničí |
+| `plodiny.json` brambory `voda` / `sucho_dni` | 1,1 / 14 → **1,0 / 21** | běžný rok 11,7 → 25,6 t/ha (ČSÚ ~30) |
+| `dreviny.json` jabloň / hrušeň / švestka / třešeň `rasi_gdd` (+ `plne_olisteni_gdd` o stejně) | 91/80/80/70 → **52/42/42/34** | rašení 17.–21. 4. místo 8.–13. 4. (ČHMÚ) – o 8–10 dní pozdě |
+| `dreviny.json` topol `kvete_gdd` | 29 → **8** | kvetení 6. 4. → 26. 3. (ref ~26. 3.) |
+| `Microclimate.DEP_K` | 3,5 → **7** K | radiační mlha v údolí 129 → 38 dní/rok (s mlhou situace Weather 74, ref dno údolí 45–75) |
+
+- **Výpis kalibrace v kostce (po úpravách, 10 let, seed 1991):** fenologie 22 ze 23 druhů v ±7 dnech u rašení, kvetení
+  i zbarvení (GDD>5 ročně 2 124, ref 1 900–2 100); voda: srážky 579 mm, výpar 442, odtok 85 mm (0,15), Q/normál 0,90,
+  nejvodnější II., nejsušší IX., kalná voda 27 dní, vyschlé koryto 13 dní; mikroklima: inverze ≥ 2 K 59 % nocí,
+  hřbet − kotlina 1,4 K průměrně a 5,1 K za jasných bezvětrných nocí; Dolbear −1 až −2 % (beze změny); výnosy běžného
+  roku pšenice 7,6 / ječmen 5,7 / řepka 3,1 / kukuřice 7,4 / slunečnice 2,5 t/ha / jetel 1. seč 4,4 / brambory 25,6
+  (ČSÚ 6,8 / 5,6 / 3,4 / 8,5 / 2,7 / ~4 / 30), běžný rok vůči normálu hry 0,90–1,11 (jetel 1,29), suchý rok 0,67–0,77 (brambory 0,39);
+  zvěř po 10 letech srnec 10,1 / prase 3,9–5,0 / zajíc 9,1 ks/100 ha (při HSI 0,45/0,35/0,4). Před úpravami: 18 položek
+  mimo toleranci, po: 2 (olše kvetení, jetel vůči normálu). Úplný výpis: `python3 tools/eco_calibrate.py`.
+- **Konzistence API (00_PRINCIPY kap. 3)** – projdeno `grep` přes `weather.temp / wetness / wind / wind_vector`:
+  - opraveno: `weapons.gd` balistika bere vítr v místě střely z `WindField.wind_at` (dřív globální `Weather.wind_vector`;
+    vypnuté pole větru vrací v `wind_at` totéž co dřív); `world.gd` kontext rozhovoru `ctx["temp"]` = `Microclimate.temp_at`
+    v místě mluvčího; `local_client.gd` varování „bude zima“ u noclehu = teplota v místě noclehu; `habitat.gd` postih
+    kotliny za mrazu a tvrdost zimy brala okamžitou `Weather.temp` o půlnoci → průměr dne z `Phenology.temp_mean_day()`
+    (jeden zdroj denního průměru; bez fenologie fallback jako dřív);
+  - dvojí výpočet mm/h srážek (`SoilWater` sám násobil `rain × RAIN_MM_H`) → jen `Weather.precip_mm_h()`;
+  - ponecháno vědomě (fallback nebo plošná hodnota): `Microclimate / WindField / SoilWater` (poskytovatelé a jejich
+    fallbacky), `soundscape / small_life / player / dron / aircraft / water` (lokální hodnota s fallbackem), `Phenology /
+    Fields / Meadows` (referenční teplota + posun místa), `atmosphere` (oblaka – vítr ve výšce), `world.gd` doma bez topení,
+    `studanka`, `thermals`, `vyhlasky`/`klesti` (`Weather.drought` už se blíží indexu ze `SoilWater` – jeden zdroj);
+  - deterministika `scripts/eko/`: jediné `randf()/randi()` bez seedu bylo vyprávění drbů (`Households.gossip_line`) →
+    vlastní `_tell_rng` se seedem z postavy, dne, čtvrthodiny a pořadí dotazu (neruší řadu simulace `_rng`).
+- DevTune registrace beze změny (výchozí hodnoty se berou z kódu / dat). Kontrola překladu změněných `.gd`: prázdná.
+
+### Otevřené body
+- Čeká na ruční posouzení výpisu (`docs/testy_M8.md` → M8.19A) a ruční test: herní déšť je teď **o polovinu řidší** (prší
+  ~8 % hodin) – ověřit, že to hráči nevadí; potoky a bláto po bouřce reagují slaběji (nejvyšší hodinová intenzita
+  ~3,5 mm/h – lijáky by chtěly nelineární `precip_mm_h` s novou laditelnou konstantou, nechávám na rozhodnutí).
+- Replika počasí nahrazuje `FastNoiseLite` hodnotovým FBM šumem a povodí jedinou směsnou buňkou (AWC 130 mm) – čísla jsou
+  orientační; stav ve hře ověřit F2 → Příroda – ladění (vlhkost, průtoky) po roce hry.
+- Olše kvete ve hře ~15. 3. (ref ~6. 3.) – s GDD základem 5 °C nejde dřív (`kvete_gdd` už je 1); vyžadovalo by základ
+  pro kvetení časných dřevin (nový parametr).
+- Jetel: běžný rok 1,29 × normál hry (konstantní `CLIM_MOIST` je jeden pro všechny plodiny); vlhký rok dává u obilí
+  1,25–1,34 × (ref 1,05–1,15) – normál je v modelu omezený vodou víc než ve skutečnosti (AWC 60 cm ornice, kořeny pšenice
+  na spraši sahají hlouběji – `tools/site.py`, mimo krok).
+- Dohánění dlouhých skoků (`SoilWater` > 24 h) rozkládá `PRECIP_MM` rovnoměrně do dnů → bez povrchového odtoku, potoky po
+  skoku nižší (normálový rok Q/normál 0,5) – kosmetické.
+- `SoilWater` dělí déšť / sníh podle globální `Weather.temp` (bez výškového gradientu ~0,7 K přes katastr), `Meadows` sčítá
+  teploty bez posunu místa, `fire_manager` / `world.gd` „doma bez topení“ berou venkovní globální teplotu – drobnosti.
+- `vegetation_manager.gd` (tráva) bere sílu větru z `Weather.wind_vector()`, ne z `WindField.speed()` – soubor patří M8.19B
+  (výkon), nesahal jsem.
+- Hustoty zvěře závisí na skutečném HSI mapy (skript předpokládá 0,45/0,35/0,4) – ověřit deníkem J → Zvěř v honitbách.

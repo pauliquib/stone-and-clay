@@ -587,7 +587,7 @@ func open_sleep_menu(spot: SleepSpot) -> void:
 		["Zdřímnout si (2 hodiny)", world.rest.bind(pid, 2.0, spot.kind)]]
 	if h >= 7.0 and h < 17.0:
 		opts.append(["Odpočívat do večera (18:00)", world.rest.bind(pid, 18.0 - h, spot.kind)])
-	var t := world.weather.temp
+	var t := world.micro.temp_at(spot.global_position) if world.micro != null else world.weather.temp   # M8.19: v místě noclehu
 	var text: String = SleepSpot.KINDS[spot.kind][2]
 	text += "\nJe %s, %s. Promile %s ‰." % [world.clock.text(), world.weather.describe(),
 		("%.2f" % player.body.promile()).replace(".", ",")]
