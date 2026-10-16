@@ -1,0 +1,98 @@
+{
+	"_popis": "M8.17 Život vesnice – potřeby a činnosti obyvatel (utility AI). Čte Households (scripts/eko/households.gd). Všechny hodnoty jsou herní odhad (DOPLNIT: ladit podle pocitu, F3 → Člověk/Život vesnice).",
+	"potreby": {
+		"_popis": "Růst potřeby za herní hodinu bdění (0 = klid, 1 = naléhavá). Spánek řídí denní rozvrh (vstávání / ulehání), ne užitek.",
+		"jidlo": 0.11,
+		"prace": 0.09,
+		"hygiena": 0.05,
+		"spolecnost": 0.045,
+		"odpocinek": 0.06
+	},
+	"cinnosti": {
+		"_popis": "potreby = kolik činnost za hodinu uspokojí (užitek = Σ potřeba × uspokojení + povinnost domu); kde: doma | dvur | zahrada | prace | pryc | hospoda | obchod | navsteva | ves; mistnost (svícení oken): kuchyn | obyvak | loznice | ostatni; hodiny [od, do) – mimo okno užitek 0; dny: vse | prac | vikend; role: senior | dospely | dite; mesice = násobek podle měsíce 1–12 (chybí = 1); venku = vadí počasí; hluk = zvuk u domu (chop / saw) a platí pro něj nedělní klid; anim = póza postavy s modelem na místě.",
+		"vareni": {"nazev": "vaří a jí", "potreby": {"jidlo": 0.9}, "kde": "doma", "mistnost": "kuchyn", "hodiny": [11.0, 13.5], "hodiny2": [17.0, 19.5], "role": ["senior", "dospely", "dite"]},
+		"prace": {"nazev": "v práci", "potreby": {"prace": 1.0}, "zaklad": 1.6, "kde": "prace", "hodiny": [6.5, 15.5], "dny": "prac", "role": ["dospely"]},
+		"skola": {"nazev": "ve škole", "potreby": {"prace": 1.0}, "zaklad": 1.6, "kde": "pryc", "hodiny": [7.5, 13.5], "dny": "prac", "role": ["dite"]},
+		"hygiena": {"nazev": "koupelna", "potreby": {"hygiena": 1.0}, "kde": "doma", "mistnost": "ostatni", "hodiny": [5.0, 23.5], "role": ["senior", "dospely", "dite"]},
+		"odpocinek": {"nazev": "odpočívá (televize, kniha)", "potreby": {"odpocinek": 0.8}, "kde": "doma", "mistnost": "obyvak", "hodiny": [8.0, 24.0], "role": ["senior", "dospely", "dite"], "zaklad": 0.12},
+		"hospoda": {"nazev": "v hospodě", "potreby": {"spolecnost": 0.9, "odpocinek": 0.3}, "kde": "hospoda", "hodiny": [16.0, 23.5], "role": ["senior", "dospely"], "misto": "hospoda", "povaha": {"veselak": 1.8, "mlady": 1.3, "plachy": 0.4, "prisny": 0.6, "bruclavy": 1.1}},
+		"navsteva": {"nazev": "na návštěvě", "potreby": {"spolecnost": 0.8}, "kde": "navsteva", "hodiny": [10.0, 19.0], "role": ["senior", "dospely", "dite"], "povaha": {"drbna": 1.7, "pratelsky": 1.3, "bruclavy": 0.5, "plachy": 0.5}, "dny_k": {"vikend": 1.5}},
+		"prochazka": {"nazev": "na procházce", "potreby": {"odpocinek": 0.5, "spolecnost": 0.3}, "kde": "ves", "hodiny": [8.0, 19.0], "role": ["senior", "dospely", "dite"], "venku": true, "povaha": {"moudry": 1.4, "plachy": 0.7}, "pes": 1.6},
+		"nakup": {"nazev": "nakupuje", "potreby": {"spolecnost": 0.2}, "kde": "obchod", "hodiny": [7.0, 17.5], "role": ["senior", "dospely"], "misto": "obchod", "povinnost": "nakup"},
+		"zahrada": {"nazev": "na zahradě", "potreby": {"odpocinek": 0.3}, "kde": "zahrada", "hodiny": [7.0, 19.5], "role": ["senior", "dospely"], "venku": true, "povinnost": "zahrada", "anim": "dig", "mesice": {"1": 0.0, "2": 0.0, "3": 0.6, "4": 1.3, "5": 1.4, "6": 1.1, "7": 1.0, "8": 1.0, "9": 1.1, "10": 0.6, "11": 0.1, "12": 0.0}},
+		"sekani": {"nazev": "seká trávu", "potreby": {}, "kde": "dvur", "hodiny": [9.0, 19.0], "role": ["dospely", "senior"], "venku": true, "povinnost": "sekani", "hluk": "saw", "hluk_druh": "sekacka", "povaha": {"prisny": 1.3, "veselak": 0.8}},
+		"drevo": {"nazev": "štípe dřevo", "potreby": {}, "kde": "dvur", "hodiny": [8.0, 18.0], "role": ["dospely", "senior"], "venku": true, "povinnost": "drevo", "hluk": "chop", "hluk_druh": "sekacka", "anim": "chop", "dny_k": {"vikend": 2.2}},
+		"listi": {"nazev": "hrabe listí", "potreby": {}, "kde": "zahrada", "hodiny": [9.0, 17.0], "role": ["dospely", "senior"], "venku": true, "povinnost": "listi", "anim": "dig", "dny_k": {"vikend": 1.6}},
+		"snih": {"nazev": "odhazuje sníh", "potreby": {}, "kde": "dvur", "hodiny": [5.5, 18.0], "role": ["dospely", "senior"], "venku": true, "povinnost": "snih", "anim": "dig"}
+	},
+	"pocasi": {
+		"_popis": "Násobky užitku venkovních činností: déšť (intenzita 1), sníh padá, mráz pod mez, vedro nad mez v poledne.",
+		"dest": 0.15,
+		"snezi": 0.35,
+		"mraz_c": -6.0,
+		"mraz": 0.5,
+		"vedro_c": 29.0,
+		"vedro": 0.45
+	},
+	"slozeni": {
+		"_popis": "Složení domácnosti bez postav s modelem: [id, váha, členové (role)].",
+		"varianty": [
+			["senior_sam", 0.18, ["senior"]],
+			["senior_par", 0.2, ["senior", "senior"]],
+			["par", 0.18, ["dospely", "dospely"]],
+			["rodina", 0.3, ["dospely", "dospely", "dite", "dite"]],
+			["rodina_1", 0.06, ["dospely", "dite"]],
+			["jednotlivec", 0.08, ["dospely"]]
+		]
+	},
+	"teplo": {
+		"_popis": "Zdroj tepla: váhy podle domu; senior a malý přízemní dům víc dřeva; bytový dům plyn.",
+		"drevo": 0.42,
+		"plyn": 0.42,
+		"elektrina": 0.16,
+		"senior_drevo": 0.2,
+		"maly_dum_drevo": 0.12
+	},
+	"vybava": {
+		"zahrada": 0.85,
+		"auto": 0.72,
+		"auto_senior": 0.4,
+		"pes": 0.38,
+		"slepice": 0.22
+	},
+	"jmena": {
+		"_popis": "Smyšlená příjmení (mužský tvar) a křestní jména pro „neviditelné“ obyvatele – žádná skutečná jména.",
+		"prijmeni": ["Kutílek", "Šuplíček", "Hrbáček", "Pecivál", "Rozmarýn", "Bodlák", "Šafránek", "Kmínek", "Knedlíček", "Brambůrek", "Povidlák", "Rohlíček", "Truhlík", "Lískovec", "Čimelka", "Brambořík", "Podkovák", "Hruštička", "Klepáček", "Ořešák", "Pantoflík", "Kopřivák", "Zelníček", "Bukvička", "Jahůdka", "Cibulák", "Kladívko", "Šimrák", "Pecivka", "Bábovka", "Trdlík", "Hrníček", "Švestkáč", "Okurek", "Kobližek", "Tvarůžek"],
+		"muz": ["Josef", "Jan", "Petr", "Pavel", "Jiří", "Karel", "Václav", "Miroslav", "Zdeněk", "Tomáš", "Lukáš", "Ondřej", "Jaroslav", "Milan", "Vojtěch", "Antonín"],
+		"zena": ["Marie", "Jana", "Eva", "Hana", "Anna", "Lenka", "Věra", "Alena", "Petra", "Lucie", "Jitka", "Zdeňka", "Ludmila", "Martina", "Kateřina", "Božena"]
+	},
+	"udalosti": {
+		"_popis": "Drby z událostí mezi domácnostmi. {a} / {b} = rodina (1. pád, např. Kutílkovi), {a2} / {b2} = 2. pád (Kutílkových), {a7} / {b7} = 7. pád (Kutílkovými), {kdy} = kdy se to stalo (doplní se při vyprávění), {mesic} = měsíc.",
+		"bez_dreva": ["{a} už zase nemají dřevo a je {mesic}. {kdy} si půjčovali kolečko od sousedů.", "U {a2} prý {kdy} topili starým nábytkem. Dřevo jim došlo, a je {mesic}!"],
+		"pomoc_snih": ["{kdy} ráno odházeli {b} sníh u {a2}. Zlatí lidi.", "U {a2} bylo {kdy} odhrnuto dřív, než vstali. To byli {b}, aby bylo jasno."],
+		"spor_hluk": ["{a} se {kdy} pohádali s {b7} kvůli sekačce. Prý sekali v poledne!", "{kdy} bylo slyšet přes půl vsi, jak {a} nadávají {b} na tu jejich sekačku."],
+		"spor_pes": ["{kdy} utekl {a2} pes a rozhrabal {b2} záhon. Mají spolu zase vojnu.", "Pes od {a2} {kdy} prý honil slepice u {b2}. To bude mrazivé sousedství."],
+		"pujcka": ["{a} si {kdy} půjčili od {b2} štípačku. Vrátí ji prý do jara.", "{kdy} jsem viděla, jak {b} nesou {a} pilu. Tak se má sousedit."],
+		"navsteva": ["U {a2} byli {kdy} na návštěvě {b}. Prý se pila slivovice až do večera.", "{b} {kdy} zase seděli u {a2}. To už je skoro rodina."],
+		"hospoda": ["{kdy} prý jeden od {a2} seděl v hospodě do zavíračky. Doma ho čekal výslech.", "{a} {kdy} v hospodě platili rundu. Že by vyhráli?"],
+		"zahrada": ["{a} mají letos zahradu jak ze škatulky. {kdy} tam ryli od rána.", "{kdy} jsem šla kolem {a2} – mají už všechno zrytý. Kde na to berou sílu?"]
+	},
+	"drby_hrac": {
+		"_popis": "Drby o činech hráče (World.emit_game_event). {kdo} = „ten/ta z č. p. …“, {kdy}, {co} = podle události.",
+		"hit_animal": ["{kdy} prý ten z {domov} srazil autem {co}. Snad aspoň zavolal myslivce.", "Slyšela jsem, že {kdy} ten z {domov} trefil {co}. Nejezdí moc rychle?"],
+		"hit_person": ["{kdy} prý ten z {domov} srazil autem člověka! Policie to řeší."],
+		"hunt_kill": ["Ten z {domov} prý {kdy} ulovil {co}. Kdo ho to naučil?"],
+		"fish_caught": ["Ten z {domov} prý {kdy} chytil rybu jak kráva. No… možná jak tele."],
+		"offense": ["{kdy} prý ten z {domov} {co}. Kam ten svět spěje…", "Nechci nic říkat, ale ten z {domov} prý {kdy} {co}."],
+		"jailed": ["Ten z {domov} prý {kdy} skončil v base. Já to říkala!"],
+		"passed_out": ["{kdy} prý našli toho z {domov} spát u cesty. Asi jedno pivo navíc."],
+		"favor_done": ["Ten z {domov} prý {kdy} pomohl {co}. Hodnej kluk, jen co je pravda."],
+		"snow_volunteer": ["{kdy} prý ten z {domov} odházel sníh u zastávky. Zadarmo!"],
+		"property_bought": ["Ten z {domov} si prý {kdy} něco koupil. Kde na to bere?"],
+		"job_hired": ["Ten z {domov} prý {kdy} začal dělat u {co}. Uvidíme, jak dlouho vydrží."],
+		"fire_report": ["{kdy} prý ten z {domov} volal hasiče. Hořelo, nebo jen kouřilo?"]
+	},
+	"zver_4p": {"srnec": "srnce", "srna": "srnu", "jelen": "jelena", "divocak": "divočáka", "prase": "divočáka", "zajic": "zajíce", "lis": "lišku", "liska": "lišku", "bazant": "bažanta", "jezek": "ježka", "kocka": "kočku", "pes": "psa", "kun": "koně", "danek": "daňka", "muflon": "muflona", "jezevec": "jezevce"},
+	"kdy": {"_popis": "Slova podle stáří události ve dnech (0, 1, 2, víc).", "0": "dneska", "1": "včera", "2": "předevčírem", "n": "před {n} dny"},
+	"mesice": ["leden", "únor", "březen", "duben", "květen", "červen", "červenec", "srpen", "září", "říjen", "listopad", "prosinec"]
+}

@@ -6,6 +6,10 @@
 ## Geometrie se skládá přes `MeshKit` do jednoho meshe na dlaždici 256 m (rámy, dveře, komíny) + druhého meshe
 ## se skly (shader `window_glass.gdshader`). Noční svícení řeší shader: jediný uniform `lit_frac` (podíl svítících
 ## oken) se přepočte jednou za herní půlhodinu – žádné uzly na okno, žádná přestavba meshe.
+## M8.17 Život vesnice: každé okno nese v UV2 index budovy a místnost (kuchyň / obývák / ložnice / ostatní);
+## textura `house_lit` (RGBA = místnosti, texel = budova) se plní z domácností (`Households.window_rooms`) –
+## svítí jen tam, kde někdo je (kuchyň ráno, obývák večer, ložnice před spaním). Budovy bez domácností a vypnutý
+## přepínač `village_life` = stará křivka `LIT_CURVE` (v textuře / uniform `lit_frac`).
 ## Okna jsou vždy neprůhledná (žádný průhled do interiérů, viz právní zásady obsahu).
 ##
 ## API pro další kroky:
@@ -53,6 +57,12 @@ const RULES := {
 const LIT_CURVE := [[0.0, 0.05], [2.0, 0.02], [4.5, 0.02], [5.5, 0.10], [6.5, 0.22], [7.5, 0.10], [8.5, 0.0],
 	[15.5, 0.0], [16.5, 0.06], [17.5, 0.30], [19.0, 0.50], [20.5, 0.55], [22.0, 0.35], [23.0, 0.15], [24.0, 0.05]]
 const LIGHT_CHECK_S := 1.0
+const LIT_TEX_W := 64                    # M8.17: šířka textury svícení budov (texel = budova)
+## M8.17: místnost okna podle náhodného čísla okna (COLOR.b): přízemí jednopodlažního domu [kuchyň, obývák, ložnice] meze,
+## přízemí patrového [kuchyň, obývák] (zbytek ostatní), patro = ložnice (zbytek ostatní).
+static var ROOM_SPLIT_1 := [0.3, 0.6, 0.85]
+static var ROOM_SPLIT_GROUND := [0.4, 0.85]
+static var ROOM_SPLIT_UPPER := 0.8
 
 const FRAME_COLORS := [Color(0.86, 0.86, 0.84), Color(0.30, 0.19, 0.11), Color(0.38, 0.39, 0.41)]
 const FRAME_ALPHA := [1.0, 0.6, 0.3]                     # ↔ větev v shaderu window_glass
@@ -72,6 +82,7 @@ class Tile extends RefCounted:
 	var gn := PackedVector3Array()
 	var gc := PackedColorArray()
 	var guv := PackedVector2Array()
+	var guv2 := PackedVector2Array()     # M8.17: (index budovy, místnost) pro texturu svícení
 
 
 var _world: World
@@ -87,6 +98,13 @@ var _chimneys: Array = []
 var _glass_mat: ShaderMaterial
 var _last_slot := -99999
 var _light_t := 0.0
+var _light_ids := PackedInt64Array()     # M8.17: index svícení → id budovy
+var _light_idx := {}                     # id budovy → index
+var _lit_img: Image
+var _lit_tex: ImageTexture
+var _lit_bytes := PackedByteArray()
+var _room_buf := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _hh_ver := -1
 var loaded := false
 
 
@@ -122,6 +140,7 @@ func setup(w: World) -> void:
 		if n % 60 == 0:
 			await get_tree().process_frame
 	_commit_tiles(tiles)
+	_make_lit_texture()
 	loaded = true
 	_update_lights(true)
 
@@ -336,9 +355,10 @@ func _build_one(b: Dictionary, tiles: Dictionary) -> void:
 			var e2: Dictionary = edges[int(c[0])]
 			var wh := rng.randf_range(float(rule["wh"][0]), float(rule["wh"][1]))
 			var ww := rng.randf_range(float(ww_r[0]), float(ww_r[1]))
-			_emit_window(tiles, b, e2, float(c[1]), float(rule["sill"]), 0, ww, wh, look, rng)
-			if rule.get("floors", false):
-				_emit_window(tiles, b, e2, float(c[1]), float(rule["sill"]) + FLOOR_H, 1, ww, wh, look, rng)
+			var two: bool = rule.get("floors", false)
+			_emit_window(tiles, b, e2, float(c[1]), float(rule["sill"]), 0, ww, wh, look, rng, two)
+			if two:
+				_emit_window(tiles, b, e2, float(c[1]), float(rule["sill"]) + FLOOR_H, 1, ww, wh, look, rng, two)
 
 	# komín
 	if rule.get("chimney", false):
@@ -422,7 +442,7 @@ func _frame_of(e: Dictionary) -> Array:
 
 
 func _emit_window(tiles: Dictionary, b: Dictionary, e: Dictionary, t: float, sill: float, floor_i: int,
-		ww: float, wh_in: float, look: Dictionary, rng: RandomNumberGenerator) -> void:
+		ww: float, wh_in: float, look: Dictionary, rng: RandomNumberGenerator, two := false) -> void:
 	var op: Vector2 = e["o"]
 	var up_: Vector2 = e["u"]
 	var p2 := op + up_ * t
@@ -460,10 +480,35 @@ func _emit_window(tiles: Dictionary, b: Dictionary, e: Dictionary, t: float, sil
 	var tl := gp - hu + hy
 	var tr := gp + hu + hy
 	var br := gp + hu - hy
-	_glass_quad(tile, bl, tl, tr, br, n3, col)
+	_glass_quad(tile, bl, tl, tr, br, n3, col, Vector2(float(_light_index(int(b["id"]))), float(_room_of(col.b, floor_i, two))))
 
 
-func _glass_quad(tile: Tile, bl: Vector3, tl: Vector3, tr: Vector3, br: Vector3, nrm: Vector3, col: Color) -> void:
+## M8.17: index budovy v textuře svícení (přidělí se při stavbě oken).
+func _light_index(id: int) -> int:
+	if _light_idx.has(id):
+		return _light_idx[id]
+	var i := _light_ids.size()
+	_light_ids.append(id)
+	_light_idx[id] = i
+	return i
+
+
+## M8.17: místnost okna (0 kuchyň, 1 obývák, 2 ložnice, 3 ostatní) – deterministicky z náhodného čísla okna.
+static func _room_of(r: float, floor_i: int, two: bool) -> int:
+	if floor_i > 0:
+		return 2 if r < ROOM_SPLIT_UPPER else 3
+	if two:
+		if r < float(ROOM_SPLIT_GROUND[0]):
+			return 0
+		return 1 if r < float(ROOM_SPLIT_GROUND[1]) else 3
+	for k in 3:
+		if r < float(ROOM_SPLIT_1[k]):
+			return k
+	return 3
+
+
+func _glass_quad(tile: Tile, bl: Vector3, tl: Vector3, tr: Vector3, br: Vector3, nrm: Vector3, col: Color,
+		uv2 := Vector2(-1.0, 0.0)) -> void:
 	# trojúhelníky ve směru hodinových ručiček při pohledu zvenku (jako MeshKit.quad)
 	tile.gv.append_array(PackedVector3Array([bl, tl, tr, bl, tr, br]))
 	tile.guv.append_array(PackedVector2Array([Vector2(0, 0), Vector2(0, 1), Vector2(1, 1), Vector2(0, 0),
@@ -471,6 +516,7 @@ func _glass_quad(tile: Tile, bl: Vector3, tl: Vector3, tr: Vector3, br: Vector3,
 	for _i in 6:
 		tile.gn.append(nrm)
 		tile.gc.append(col)
+		tile.guv2.append(uv2)
 
 
 func _emit_door(tiles: Dictionary, b: Dictionary, e: Dictionary, t: float, kind: String, rule: Dictionary,
@@ -581,6 +627,7 @@ func _commit_tiles(tiles: Dictionary) -> void:
 			arr[Mesh.ARRAY_NORMAL] = t.gn
 			arr[Mesh.ARRAY_COLOR] = t.gc
 			arr[Mesh.ARRAY_TEX_UV] = t.guv
+			arr[Mesh.ARRAY_TEX_UV2] = t.guv2
 			var m := ArrayMesh.new()
 			m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 			m.surface_set_material(0, _glass_mat)
@@ -596,9 +643,49 @@ func _update_lights(force: bool) -> void:
 		return
 	var clock: Clock = _world.clock
 	var slot := clock.day() * 48 + int(floor(clock.hour() * 2.0))
-	if slot == _last_slot and not force:
+	var hs: Households = _world.households
+	var house_on := hs != null and hs.enabled() and _lit_tex != null
+	var ver := hs.version if house_on else -1
+	if slot == _last_slot and ver == _hh_ver and not force:
 		return
 	_last_slot = slot
+	_hh_ver = ver
 	var dark := 1.0 - smoothstep(0.5, 1.0, clock.daylight())
 	_glass_mat.set_shader_parameter("lit_frac", lit_fraction(clock.hour()) * dark)
+	_glass_mat.set_shader_parameter("dark", dark)
+	_glass_mat.set_shader_parameter("house_mode", 1.0 if house_on else 0.0)
+	if house_on:
+		_fill_house_lights(hs, clock.hour())
 	_glass_mat.set_shader_parameter("slot", float(slot % 4096))
+
+
+## M8.17: textura svícení budov (RGBA8, texel = budova, kanály = místnosti).
+func _make_lit_texture() -> void:
+	var n := maxi(_light_ids.size(), 1)
+	var hgt := int(ceil(float(n) / float(LIT_TEX_W)))
+	_lit_bytes.resize(LIT_TEX_W * hgt * 4)
+	_lit_bytes.fill(0)
+	_lit_img = Image.create_from_data(LIT_TEX_W, hgt, false, Image.FORMAT_RGBA8, _lit_bytes)
+	_lit_tex = ImageTexture.create_from_image(_lit_img)
+	_glass_mat.set_shader_parameter("house_lit", _lit_tex)
+	_glass_mat.set_shader_parameter("house_w", LIT_TEX_W)
+
+
+## M8.17: naplní texturu svícení – domácnosti podle obsazenosti místností, ostatní budovy podle křivky `LIT_CURVE`.
+## Jednou za herní půlhodinu a po hodinovém kroku domácností (~300 budov, žádná práce za snímek).
+func _fill_house_lights(hs: Households, h: float) -> void:
+	var g := int(clampf(lit_fraction(h), 0.0, 1.0) * 255.0)
+	for i in _light_ids.size():
+		var o := i * 4
+		if hs.window_rooms(int(_light_ids[i]), h, _room_buf):
+			_lit_bytes[o] = int(_room_buf[0] * 255.0)
+			_lit_bytes[o + 1] = int(_room_buf[1] * 255.0)
+			_lit_bytes[o + 2] = int(_room_buf[2] * 255.0)
+			_lit_bytes[o + 3] = int(_room_buf[3] * 255.0)
+		else:
+			_lit_bytes[o] = g
+			_lit_bytes[o + 1] = g
+			_lit_bytes[o + 2] = g
+			_lit_bytes[o + 3] = g
+	_lit_img.set_data(LIT_TEX_W, _lit_img.get_height(), false, Image.FORMAT_RGBA8, _lit_bytes)
+	_lit_tex.update(_lit_img)

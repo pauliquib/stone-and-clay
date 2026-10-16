@@ -133,6 +133,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["wildlife"] = world.habitat.to_dict()        # M8.15: populace zvěře po honitbách, žaludy, škody prasat
 	if world.fields:
 		d["fields_eco"] = world.fields.to_dict()       # M8.12: stav plodin polí (růstový model) + roční shrnutí úrody
+	if world.households:
+		d["households"] = world.households.to_dict()   # M8.17: stav domů (dřevo, oheň), vztahy (změny proti seedu), paměť drbů
 	if world.fences:
 		d["fences"] = world.fences.to_dict()           # hráčem postavené úseky plotů (Fáze 7; procedurální se přegenerují)
 	if world.farm:
@@ -415,6 +417,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		world.habitat.restore(d.get("wildlife", {}))          # M8.15: starý save bez klíče = populace z kapacity stanovišť
 	if world.fields:
 		world.fields.restore(d.get("fields_eco", {}))         # M8.12: starý save bez klíče = pole podle normálu k dnešku
+	if world.households:
+		world.households.restore(d.get("households", {}))     # M8.17: starý save bez klíče = domácnosti podle seedu
 	if world.fences:
 		world.fences.restore(d.get("fences", {}))            # starý save bez klíče = žádné hráčské ploty (Fáze 7)
 	if world.farm:

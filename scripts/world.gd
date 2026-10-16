@@ -164,6 +164,7 @@ var npc_grow: NpcGrow            # M4.8 obsah pro dospělé: záhon zahrádkář
 var vyhlasky: Vyhlasky           # obecní vyhlášky (pálení, sucho, nedělní klid) a sušení čerstvých větví (M4.4 část B)
 var klesti: Klesti                # hromada klestí u domu (M4.4 část B): čerstvé větve schnou, suché se berou zpět
 var noise: NoiseRegistry                # M4.4 část B: hluk (motorová pila, hudba, výstřel) a noční / nedělní klid
+var households: Households       # M8.17: domácnosti, plán dne, okna a komíny podle obsazenosti, vztahy a drby (scripts/eko/households.gd)
 var garden: Garden             # zahrada u domu a pronajaté pole (M2.4): záhony, růst podle dnů, sklizeň
 var fences: FenceManager       # ploty a ohrady (Fáze 7): obvody výběhu, zahrady a pole + hráčské úseky
 var farm: Farm                   # hospodářská zvířata u usedlosti (M2.6): výběh, kurník, chlívek, přístřešek
@@ -504,6 +505,9 @@ func build() -> void:
 	noise = NoiseRegistry.new()
 	noise.setup(self)
 	apply_home(1)                 # M1.7: domov místního hráče (nová hra = nájemní byt) – před default_spawn a add_player
+	households = Households.new()  # M8.17: po Estate, vesničanech, místech, Microclimate, Phenology a hluku (plán dne přes eco_hour)
+	add_child(households)
+	households.setup(self)
 
 
 ## Spustí provoz (zaparkovaná a AI auta, hlídka) – až jsou ve světě hráči (auta se rozmístí kolem nich).
@@ -1741,6 +1745,8 @@ func emit_game_event(id: int, kind: String, data: Dictionary) -> void:
 		campaign.on_event(id, kind, data)   # M7.2: splněný úkol obecní údržby během kampaně = plnění přání obce
 	if computer:
 		computer.on_event(id, kind, data)   # M3.4: drby na webu obce, výzvy k zaplacení pokuty, upomínky e-mailem
+	if households:
+		households.on_event(id, kind, data) # M8.17: činy hráče → paměť drbů vesnice (šíří se sítí domácností)
 	# politics (M7.1) nemá on_event – popularita se čte na požádání z Reputation / Persona, viz Politics.popularity
 
 
@@ -2990,6 +2996,8 @@ func dialog_context(id: int, speaker: Node) -> Dictionary:
 	var mood := per.get_mood(id, clock.minutes)
 	ctx["mood"] = mood
 	ctx["met"] = per.met.has(id)
+	if households:
+		ctx["village_gossip"] = households.gossip_line(per)   # M8.17: skutečný drb, který postava zná ("" = nic)
 	ctx["rep"] = score
 	ctx["tier"] = rep.tier_key() if rep else "neutral"
 	ctx["tier_name"] = rep.tier_name() if rep else ""

@@ -624,3 +624,32 @@ přepínačem. Očekávání: průměr CPU +≤ 0,1 ms (dotazy zvěře jen při 
 ~10 s přepočtu po 32 buňkách za snímek (+≤ 0,4 ms v těch snímcích), po startu ~10 s statické mřížky (48 buněk, stromy
 v buňce, +≤ 1 ms). Cíl kroku +≤ 0,3 ms průměr. Paměť ≈ 1 MB (mřížka 64 m).
 
+## M8.17 – Život vesnice: domácnosti, potřeby, vztahy, drby
+
+Pozn.: plán domácností se počítá jednou za herní hodinu (po kouscích, 8 domácností za snímek) – po skoku času (F2 → Datum /
+čas) chvíli trvá, než se okna a komíny srovnají. F2 → Příroda – ladění → **Domácnosti** ukáže nejbližší domy (kdo bydlí, co
+dělá, potřeby, dřevo, síla kouře, poslední drb), vrstva mapy **`obyvatele`**: žlutá vzhůru doma, modrá spí, zelená práce
+u domu, červená nikdo doma, šedá neobydlený dům.
+
+1. F2 → leden, 6:00 → 7:00 (jasno) na návsi → mezi 6:00 a 7:00 se v domech rozsvěcují kuchyně (ložnice krátce po probuzení),
+   komínů kouří víc a hustěji (ranní přiložení); prázdné domy zůstanou tmavé.
+2. 23:30 → svítí jen pár oken (ložnice před spaním, „noční sovy“), komíny slabě / jen některé.
+3. Sobota v říjnu dopoledne → u několika domů je slyšet štípání (sekera), vesničan s modelem stojí na dvoře a štípe;
+   Domácnosti → „štípe dřevo“, „hrabe listí“.
+4. Neděle v létě dopoledne → sekačka nikde (nedělní klid), v sobotu ano (zvuk pily s nízkým tónem u domů).
+5. Srazit srnce autem (M2.9) → za 1–2 herní dny vesničan na druhém konci obce na E řekne „Včera prý ten z č. p. … srazil
+   autem srnce…“ (napřed to vědí sousedé místa, pak hospoda).
+6. Domácnosti → vybraný dům: členové s rolí, prací, činností, vstáváním / ulehání a potřebami; dřevo v prms a kouř.
+7. Sníh (F2 → Sněžení + posun o den) → u osamělého seniora odklizeno a drb „odházeli … sníh u …“.
+8. Klepání na dům v noci / ve dne → otevře obyvatel z domácnosti, když je doma (v práci nikdo neotvírá); F5 → F9 →
+   zásoba dřeva, drby a změněné vztahy zůstanou (klíč `households`); starý save se načte (domácnosti podle seedu).
+9. Esc → Nastavení → Realismus → vypnout „Život vesnice“ → okna a komíny jako dřív podle pravděpodobnosti, vesničané
+   vyjdou z domů a procházejí se; zapnout → do hodiny zase podle plánu.
+10. F3 → Člověk/Život vesnice: „Rozvrh – vstávání seniora“ 6,1 → 9 → ráno se seniorské kuchyně rozsvítí později; ↺ vrátí.
+
+Co změřit: `--perfscene=ves_poledne,30` se zapnutým / vypnutým „Život vesnice“ (profil „villager“ a celkové ms procesu),
+`--perfscene=ves_rano_zima,30` (v 7:00 proběhne hodinový krok domácností – špička snímku) a `--perfscene=ves_sobota_rijen,30`
+(zvuky, vesničané na dvorech). Očekávání: průměr +≤ 0,1 ms CPU (hodinový krok ~220 domácností po 8 za snímek ≈ 0,3–0,6 ms
+jen ~30 snímků za herní hodinu; okna = přepis textury ~300 texelů 1× za herní půlhodinu; vesničané doma bez fyziky =
+úspora), špička ≤ 1 ms; GPU ≈ 0 (jedno `texelFetch` na vrchol okna). Cíl kroku +≤ 0,3 ms. BT zůstává na 5 vesničanech
+(F3 → `village.bt_villagers`) – zapnout pro všechny až po měření `ves_poledne` s hodnotou 28.

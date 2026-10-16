@@ -3,6 +3,8 @@
 //   R = náhodné číslo okna (svítí, když R + kolísání < lit_frac), G = variace (teplota světla, výška záclony),
 //   B = druhé náhodné číslo (kolísání po půlhodinách), A = barva rámu / příček (1 bílá, ~0.6 hnědá, ~0.3 šedá).
 // `lit_frac` a `slot` nastavuje BuildingDetails jednou za herní půlhodinu – žádné uzly na okno, žádná přestavba meshe.
+// M8.17: UV2 = (index budovy, místnost 0 kuchyň / 1 obývák / 2 ložnice / 3 ostatní); při `house_mode` 1 se podíl
+// svítících oken čte z textury `house_lit` (texel = budova, RGBA = místnosti; plní ji Households přes BuildingDetails).
 shader_type spatial;
 render_mode cull_back, specular_schlick_ggx;
 
@@ -12,13 +14,25 @@ uniform vec3 glass_color : source_color = vec3(0.035, 0.045, 0.06);
 uniform vec3 curtain_color : source_color = vec3(0.86, 0.82, 0.72);
 uniform vec3 lit_color : source_color = vec3(1.0, 0.72, 0.38);
 uniform float lit_energy = 2.4;
+uniform sampler2D house_lit : filter_nearest;
+uniform float house_mode = 0.0;
+uniform float dark = 1.0;
+uniform int house_w = 64;
 
 varying flat float v_lit;
 varying flat vec4 v_prop;
 
 void vertex() {
 	float jitter = fract(sin((COLOR.b + slot * 0.137) * 91.7) * 43758.5453) - 0.5;
-	v_lit = step(COLOR.r + jitter * 0.12, lit_frac);
+	float frac = lit_frac;
+	if (house_mode > 0.5 && UV2.x >= 0.0) {
+		int idx = int(UV2.x + 0.5);
+		vec4 l = texelFetch(house_lit, ivec2(idx % house_w, idx / house_w), 0);
+		int room = int(UV2.y + 0.5);
+		float f = room == 0 ? l.r : (room == 1 ? l.g : (room == 2 ? l.b : l.a));
+		frac = f * dark;
+	}
+	v_lit = step(COLOR.r + jitter * 0.12, frac);
 	v_prop = COLOR;
 }
 

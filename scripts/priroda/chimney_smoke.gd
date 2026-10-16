@@ -5,6 +5,11 @@
 ## kouřícím přiřadí emitor z poolu (max. `POOL` GPUParticles3D). Síla, barva, vítr, mlha a déšť se nastavují
 ## podle tabulky `SmokeRules` níže. Bez `World.building_details` (chybí data/buildings.json) nedělá nic.
 ##
+## M8.17 Život vesnice: kde jsou simulované domácnosti (`World.households`), rozhoduje o kouři **dům** – zdroj tepla
+## (kamna na dřevo, plynový kotel, elektřina), potřeba tepla z teploty u domu (Microclimate), kdo je doma a ráno
+## přiložení → silnější kouř (`Households.chimney_heat`); neobydlený dům nekouří. Pravděpodobnost `p(T)` zůstává
+## jen pro budovy bez domácností (veřejné, domov hráče) a při vypnutém přepínači `village_life`.
+##
 ## Úpravy: tabulka `SmokeRules` (prahy teploty, denní chod, vítr, mlha).
 class_name ChimneySmoke
 extends Node3D
@@ -37,6 +42,9 @@ static var INV_TO_H := 10.0            # … do (h)
 static var INV_LIFE_K := 1.4           # při inverzi kouř vydrží déle (×)
 static var RAIN_LIFE_K := 0.4          # déšť zkracuje život kouře (× déšť)
 static var WIND_LIFE_K := 0.4          # vichr zkracuje život kouře
+## M8.17: kouř z domácností – od této síly ohně komín kouří; síla ohně škáluje hustotu a velikost kouře
+static var HOUSE_MIN_HEAT := 0.06
+static var HOUSE_HEAT_K := 0.8         # váha síly ohně v hustotě (0 = jako dřív podle teploty)
 
 var world: World
 var player: Player
@@ -115,22 +123,35 @@ func _refresh() -> void:
 	var p := minf(heat_probability(w.temp) * day_factor(hour), 1.0)
 	# kouřící komíny v dosahu, nejbližší první; komín domova kouří vždy, když se doma topí v kamnech (M2.2)
 	var forced_id := world.home_chimney_id()
+	var hs: Households = world.households if world.households != null and world.households.enabled() else null
 	var cands: Array = []
-	if p > 0.0 or forced_id > 0:
+	if p > 0.0 or forced_id > 0 or hs != null:
 		for c in bd.chimneys_near(center, NEAR_R):
 			var cp: Vector3 = c["pos"]
-			if (forced_id > 0 and int(c["id"]) == forced_id) or (p > 0.0 and roll(int(c["id"]), cp, jd) < p):
+			var cid := int(c["id"])
+			var heat := -1.0
+			if hs != null and cid != forced_id:
+				heat = hs.chimney_heat(cid, hour)      # M8.17: −1 = budova bez domácnosti → stará pravděpodobnost
+			var on := false
+			if heat >= 0.0:
+				on = heat >= HOUSE_MIN_HEAT
+			else:
+				on = (forced_id > 0 and cid == forced_id) or (p > 0.0 and roll(cid, cp, jd) < p)
+				heat = -1.0
+			if on:
 				var dx := cp.x - center.x
 				var dz := cp.z - center.z
-				cands.append([dx * dx + dz * dz, cp])
+				cands.append([dx * dx + dz * dz, cp, heat])
 	cands.sort_custom(func(a, b): return a[0] < b[0])
 	if cands.size() > POOL:
 		cands.resize(POOL)
 	# emitory, které už na svém komíně stojí, si ho nechají
 	var spare: Array = []
 	var wanted: Array = []
+	var heats: Array = []
 	for c in cands:
 		wanted.append(c[1])
+		heats.append(c[2])
 	for s in _slots:
 		var k: Vector3 = s["key"]
 		var idx := -1
@@ -139,12 +160,15 @@ func _refresh() -> void:
 				idx = i
 				break
 		if idx >= 0 and s["node"].visible:
+			s["heat"] = heats[idx]
 			wanted.remove_at(idx)
+			heats.remove_at(idx)
 			s["keep"] = true
 		else:
 			s["keep"] = false
 			spare.append(s)
-	for pos in wanted:
+	for wi in wanted.size():
+		var pos: Vector3 = wanted[wi]
 		var s: Dictionary
 		if not spare.is_empty():
 			s = spare.pop_back()
@@ -153,6 +177,7 @@ func _refresh() -> void:
 		else:
 			break
 		s["key"] = pos
+		s["heat"] = heats[wi]
 		s["node"].global_position = pos
 		s["keep"] = true
 	var active := 0
@@ -183,6 +208,10 @@ func _apply(s: Dictionary, w: Weather, hour: float, clock: Clock) -> void:
 	var t_loc := mc.temp_at(s["key"]) if mc != null else w.temp
 	var frost := clampf((16.0 - t_loc) / 21.0, 0.0, 1.0)         # 0 v teple … 1 při −5 °C
 	var strength := 0.25 + 0.75 * frost
+	var heat := float(s.get("heat", -1.0))
+	if heat >= 0.0:
+		# M8.17: síla ohně v kamnech domu (ráno přiloženo → hustší a tmavší kouř, plynový kotel jen slabá vlečka)
+		strength = lerpf(strength, clampf(0.15 + heat, 0.15, 1.2), HOUSE_HEAT_K)
 	var gale: float = SmokeRules["gale"]
 	var windy := clampf((w.wind - gale) / gale, 0.0, 1.0)
 	var inversion: bool = w.fog > float(SmokeRules["fog_inversion"]) or (

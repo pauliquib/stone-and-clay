@@ -2644,3 +2644,47 @@ dopravy, ne o regresi.
   setkání u hráče; ptáci v Habitatu nejsou (jen hejna jako dřív).
 - Rozrytí je jen decal (MultiMesh), ne deformační mapa M8.13; úkol „pomoz se škodami“ jen háček (událost) a drb.
 - Hustoty a míry populace jsou odhad (ověřit pro ČR) → kalibrace v M8.19.
+## 2026-10-16 – M8.17 Život vesnice: domácnosti, potřeby, vztahy, drby
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou překladu – ruční test čeká)
+- **Domácnosti** `scripts/eko/households.gd` (`Households`, Node, `World.households`, přepínač realismu `village_life`,
+  řádek v Esc → Nastavení → Realismus): deterministicky z `Estate` (seed = id budovy) – rodinné domy (`INHABITED` 0,7),
+  byty bytového domu (0,85), dům dědy; členové = postavy s modelem (domov `Estate.pick_customer_house(v._seed, 700)` jako
+  BT) + neviditelní obyvatelé (složení z dat, smyšlená příjmení), zdroj tepla, zahrada, auto, pes, slepice; sousedé,
+  příbuzní, vztahy (seed + vývoj). Dům hráče (`Estate.homes`) se nesimuluje (okna / komín jako dřív).
+- **Plán dne** (`World.eco_hour` → `EcoClock.slice`, 8 domácností / snímek, nic za snímek): rozvrh spánku + utility AI
+  podle `data/potreby.json` (potřeby jídlo / práce / hygiena / společnost / odpočinek, povinnosti nákup / zahrada / sekání
+  podle `Phenology.gdd` / dřevo / listí / sníh, okna hodin, počasí, měsíc, povaha, víkend, nedělní klid přes
+  `NoiseRegistry.offense_for`). Vesničané s modelem (mimo 5 BT): `Villager.set_plan` → `move_to` (dvůr, zahrada, práce,
+  hospoda, obchod, návštěva, doma → schovaný v domě bez fyziky, `_enter_house`), za bublinou přesun na cíl; oblékání
+  podle teploty u domu (`Villager.dress_level`, háček z M8.16). `Villager.BT_VILLAGERS` → `static var` (F3).
+- **Dům jako stav:** okna (`BuildingDetails`: UV2 = budova + místnost, textura `house_lit` RGBA = kuchyň / obývák / ložnice /
+  ostatní, `shaders/window_glass.gdshader` `house_mode`; plní `Households.window_rooms` 1× za herní půlhodinu a po hodinovém
+  kroku), komíny (`ChimneySmoke` bere `Households.chimney_heat` – kamna, ranní přiložení, noční dohořívání u části domů,
+  plyn = vlečka, prázdné domy nekouří; bez domácnosti stará pravděpodobnost), zvuky štípání / sekačky do 140 m
+  (`World.sound`), klepání a obyvatel uvnitř (`InteriorStreamer.resident_of` → `home_state` / `resident_persona`).
+- **Drby:** události domácností (bez dřeva v topné sezóně, pomoc se sněhem u seniora, spor kvůli sekačce / psovi, půjčka,
+  návštěva, hospoda, zahrada) a činy hráče (`World.emit_game_event` → `Households.on_event`: srážka zvěře / člověka, lov,
+  přestupek, vězení, ryba, prosba, sníh, koupě, práce, hasiči; svědci do 120 m, jinak hospoda) → paměť (40, 21 dní) →
+  šíření po hodinách (hospoda, návštěvy, ulice / obchod) → `World.dialog_context` `village_gossip` → `Dialog.rumor`
+  („Včera prý…“). Popularita M7 jen čtena (nic se nemění).
+- **API (00_PRINCIPY kap. 3):** zavedeno `World.households` (`window_rooms`, `chimney_heat`, `home_state`, `resident_persona`,
+  `gossip_line`, `on_event`, `relation`, `debug_layer`, `debug_text`); použito `World.eco_hour/eco_day`, `EcoClock.slice`,
+  `World.micro.temp_at`, `World.phenology.gdd`, `World.noise`, `Villager.move_to`, `World.realism_on("village_life")`.
+- **Ladění:** F2 → Příroda – ladění → Domácnosti, vrstva mapy `obyvatele`; F3 → `scripts/dev/tune_m8_17.gd`: **218 parametrů**
+  (Člověk/Život vesnice 106, Člověk/Život vesnice – činnosti 112; ověřeno `DevTune.count` headless skriptem).
+- **Ukládání:** klíč `households` (stav domů, změny vztahů proti seedu, drby s mapou znalostí podle klíčů „eid:byt“);
+  starý save bez klíče = seed.
+- Měřicí scény `ves_rano_zima`, `ves_sobota_rijen` (`Tests.PERF_SCENES`); checklist `docs/testy_M8.md` → M8.17.
+- Kontrola překladu (kap. 6) i `tools/shader_check.gd`: výstup prázdný.
+
+### Otevřené body
+- Čeká na ruční test a měření uživatele (`--perfscene=ves_poledne,30` zap./vyp. „Život vesnice“, `ves_rano_zima`,
+  `ves_sobota_rijen`; cíl +≤ 0,3 ms CPU).
+- **BT pro všechny postavy nezapnut** (výkon neměřen): `BT_VILLAGERS` zůstává 5, ostatní 23 vede plán domácnosti;
+  po měření lze v F3 `village.bt_villagers` = 28 (platí po novém načtení světa).
+- Sekačka nemá vlastní zvuk (zpomalená „saw“), hrabání listí a odhazování sněhu jsou bez zvuku a bez rekvizit;
+  neviditelní obyvatelé se venku neukazují (jen okna, komín, zvuk, drby).
+- Bytový dům startu se losuje při každém startu světa (`Estate._pick_start`) – domácnosti bytů se mapují podle klíčů,
+  při jiném losu se drby z bytů ztratí (ne chyba savu).
+- Vesničan s BT se do domu neschovává (strom zatím neví o domácnosti); „zaseknutý u dveří“ zajde dovnitř do 5 m.

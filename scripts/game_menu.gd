@@ -287,7 +287,8 @@ func open_nature() -> void:
 ## M8.1: F2 → Příroda – ladění – vybere barevnou mřížku pro mapu M (`World.debug_layers`), ať
 ## se model (stanoviště, vlhkost, teplota, vítr, druhy…) jde zkontrolovat okem bez debuggeru.
 ## Popisek vrstvy: `DEBUG_LAYER_LABELS` (M8.1 jen „realism_off“; další kroky M8 svůj klíč doplní).
-const DEBUG_LAYER_LABELS := {"realism_off": "Ukázka (prázdná vrstva, M8.1)"}
+const DEBUG_LAYER_LABELS := {"realism_off": "Ukázka (prázdná vrstva, M8.1)",
+	"obyvatele": "Obyvatelé – kdo je doma (M8.17: žlutá vzhůru, modrá spí, zelená práce u domu, červená pryč, šedá prázdný dům)"}
 
 
 func open_debug_layers() -> void:
@@ -307,6 +308,8 @@ func open_debug_layers() -> void:
 		opts.append(["Fenologický kalendář (M8.11)", _pheno_info])
 	if world.habitat != null:        # M8.15: populace zvěře po honitbách, semenný rok
 		opts.append(["Populace zvěře (M8.15)", _habitat_info])
+	if world.households != null:     # M8.17: domácnosti u hráče – kdo bydlí, co dělá, potřeby, dřevo, komín, drby
+		opts.append(["Domácnosti (M8.17)", _households_info])
 	opts.append(["← Zpět", open_main])
 	_hud().open_menu("Příroda – ladění", "Vybraná vrstva se kreslí na mapě (M) místo podkladu – " +
 		"barevná mřížka po 16–64 m podle přiblížení. Každý krok M8 přidá svou vrstvu.", opts)
@@ -449,6 +452,12 @@ func _micro_info() -> void:
 	if jl != "":
 		t += "\n" + jl
 	_hud().open_menu("Mikroklima", t, [["Obnovit", _micro_info], ["← Zpět", open_debug_layers]])
+
+
+## M8.17: F2 → Příroda – ladění → Domácnosti: nejbližší domy (kdo bydlí, co dělá, potřeby, dřevo, komín) a poslední drb.
+func _households_info() -> void:
+	var p: Vector3 = _hud().player.global_position if _hud().player else Vector3.ZERO
+	_hud().open_menu("Domácnosti", world.households.debug_text(p, 5), [["Obnovit", _households_info], ["← Zpět", open_debug_layers]])
 
 
 ## M8.11: F2 → Příroda – ladění → Fenologický kalendář: druh → rašení / květ / zbarvení letos + odchylka roku (teplé jaro).

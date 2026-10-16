@@ -215,6 +215,14 @@ krátké zatmění), **pád z výšky** podle rychlosti dopadu (2 m bolest a kul
 bezvědomí; sníh a hluboká voda tlumí). HUD řádek stavu jen když je co hlásit (zima, horko, žízeň, ospalost,
 zranění), deník J → **Zdraví** větami, čísla jádra jen F2 → Hráč. F3 → Člověk / Tělo – teplo a energie (126
 parametrů). Měřicí scéna `zima_telo`.
+**M8.17 Život vesnice** (`Households`, přepínač `village_life` v Realismu, data `data/potreby.json`): obydlené domy mají
+**domácnosti** (28 postav s modelem + „neviditelní“ obyvatelé jen jako data) s plánem dne podle potřeb, sezóny, počasí
+a povahy – ráno v zimě se rozsvěcují kuchyně a začne kouřit víc komínů, v noci svítí jen pár oken, prázdné domy jsou tmavé;
+o víkendu na podzim se u domů štípe dřevo (slyšet), v létě seká tráva (v neděli ne), sníh se odhazuje, osamělému seniorovi
+pomůže soused. Vesničané chodí do práce, do hospody, na návštěvy a domů (doma zmizí uvnitř), oblékají se podle teploty.
+Sousedské vztahy a **drby z událostí** (i tvých činů) se šíří od hospody a vesničan je řekne na E („Včera prý ten z č. p. …
+srazil srnce…“). F2 → Příroda – ladění → Domácnosti, vrstva mapy `obyvatele`; F3 → Člověk/Život vesnice. Měřicí scény
+`ves_rano_zima`, `ves_sobota_rijen`.
 
 ### Menu pro vývojáře (F3, M8.D)
 
