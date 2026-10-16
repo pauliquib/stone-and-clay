@@ -143,6 +143,7 @@ var fields: Fields               # pole a louky (data/landuse.bin) – barvy pol
 var vegetation: VegetationManager   # Fáze 9: trsy, kopřivy, keře, obilné řádky, plevel (data/vegetation.bin)
 var village_events: VillageEvents   # svátky a události v obci (výzdoba, průvod, oheň, ohňostroj)
 var hunter: Hunter               # myslivec, krmelce, posed, sběr uhynulé zvěře, včelař
+var habitat: Habitat             # M8.15: stanoviště a populace zvěře (scripts/eko/habitat.gd), vrstvy „habitat_srnec/prase“
 var paddock: Paddock             # výběh pro koně u usedlosti (Estate.lot_id; ohrada, žlab, napáječka)
 var bazaar: Bazaar               # bazar vozidel u silnice (M1.6): nabídka na týden, koupě, výkup
 var airfield: Airfield           # M6.5: polní letiště – trávníková dráha, větrný rukáv, hangár triku
@@ -466,6 +467,10 @@ func build() -> void:
 	hunter.name = "Myslivost"
 	add_child(hunter)
 	hunter.setup(self)
+	habitat = Habitat.new()          # M8.15: po Fauně a krmelcích (mřížka po kouscích přes EcoClock.slice, populace eco_day)
+	habitat.setup(self)
+	debug_layers["habitat_srnec"] = Callable(habitat, "debug_srnec")
+	debug_layers["habitat_prase"] = Callable(habitat, "debug_prase")
 	bazaar = Bazaar.new()
 	bazaar.name = "Bazar"
 	add_child(bazaar)
@@ -3037,6 +3042,8 @@ func dialog_context(id: int, speaker: Node) -> Dictionary:
 	ctx["quest_offers"] = offers
 	if rep and clock.minutes - rep.last_offense_min < 3.0 * 1440.0:
 		ctx["last_offense"] = rep.last_offense_text
+	if habitat:                   # M8.15: drb o zvěři („prasata zas rozryla louku u lesa“, semenný rok)
+		ctx["wildlife"] = habitat.rumor()
 	_talk_context(ctx, id, p)
 	return ctx
 

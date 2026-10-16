@@ -189,6 +189,17 @@ tráva a obilí se rozhrnují kolem hráče, koně, kol auta, vesničanů i zvě
 opakovaně, zůstane pěšina (prošlapaná hlína, nižší řidší tráva), bez chůze za pár týdnů zaroste. Ladicí vrstvy mapy
 `louky`, `pesiny`, měřicí scéna `--perfscene=louka_cerven`, parametry F3 → Příroda/Louky a podrost a Příroda/Vítr –
 ohyb vegetace (162 parametrů, `scripts/dev/tune_m8_14.gd`).
+**M8.15 Ekologie a populace zvěře** (`Habitat` v `scripts/eko/habitat.gd`, `World.habitat`, přepínač `habitat`
+v Realismu): mřížka stanovišť 64 m se skóre krytu (houštiny a mladé porosty z `TreeEco`, jehličnany v zimě, vysoké
+obilí a kukuřice z modelu plodin, tráva luk), potravy (louky a ozimy, okus, žaludy a bukvice podle fenologie dubu a buku,
+kukuřice v mléčné zralosti, krmelce v zimě, sníh ubírá) a klidu (zástavba, silnice, nedávná střelba) pro srnce, prase
+a zajíce. Srnci ve dne leží v houštinách, za soumraku vycházejí na pole a louky u lesa, v zimě v závětří a u krmelců,
+za mrazu ne v kotlinách; prasata v semenném roce (1× za 3–6 let) v bučinách a doubravách, jindy v kukuřici. Populace po
+4 honitbách (logistický růst s kapacitou z HSI, srnčata V–VI, selata III–V, zimní úmrtnost, plán myslivců, lov hráče,
+auta) určuje, kolik zvěře se u hráče objeví. Prasata ryjí louky u lesa (tmavá místa), vesničané o tom drbou, myslivci
+při škodách vnadí černou pod posedem. Deník J → odhad stavu zvěře (přesnost podle Myslivosti) a semenný rok; F2 →
+Příroda – ladění → „Populace zvěře“ (tabulka, vynutit semenný rok), vrstvy mapy `habitat_srnec`, `habitat_prase`;
+měřicí scéna `--perfscene=zver_pulnoc`; F3 → Zvěř/Stanoviště, Zvěř/Populace a škody (168 parametrů, `scripts/dev/tune_m8_15.gd`).
 **M8.10 Lokomoce zvířat 2 a let ptáků** (přepínač `animal_gait`): zvěř, kůň i hospodářská zvířata mění chod podle
 Froudova čísla (krok → klus → cval plynule, s hysterezí), ohýbají páteř v zatáčce a ve cvalu, dýchají, uši a ocas
 dopruží za pohybem a uši se natočí za zvukem; vyplašený srnec rozevře bílé zrcátko a v obilí / vysoké trávě skáče.

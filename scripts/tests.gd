@@ -2147,6 +2147,8 @@ const PERF_SCENES := {
 		"weather": "jasno", "popis": "M8.12: pole a zahrada těsně před půlnocí – denní krok plodin (255 polí po kouscích, záhony, stín) proběhne během měření"},
 	"louka_cerven": {"pos": Vector3(900.0, 0.0, -500.0), "yaw": 0.5, "date": [2026, 6, 25], "hour": 11.0,
 		"weather": "jasno", "popis": "M8.14: otevřená louka koncem června – po první seči (nízká tráva, řádky sena / balíky), interaktivní tráva (projít se vysokou trávou), prof. „groundveg“"},
+	"zver_pulnoc": {"pos": Vector3(-383.0, 0.0, -1010.0), "yaw": PI, "date": [2026, 10, 12], "hour": 23.85,
+		"weather": "jasno", "popis": "M8.15: les u chaty v říjnu před půlnocí – denní přepočet stanovišť zvěře (mřížka 64 m po kouscích) a krok populací"},
 	"pole_blato": {"pos": Vector3(600.0, 0.0, 600.0), "yaw": 0.0, "date": [2026, 10, 20], "hour": 12.0,
 		"weather": "dest", "popis": "M8.13: pole v říjnu v dešti – terramechanika a koleje (sednout do auta / traktoru a jet po poli; profil „car“)"},
 }

@@ -346,6 +346,10 @@ static func rumor(ctx: Dictionary) -> String:
 	var off: String = ctx.get("last_offense", "")
 	if off != "":
 		out.append("Víš, co se o tobě povídá? Že prý %s. Stydět by ses měl." % off)
+	var wl: String = ctx.get("wildlife", "")      # M8.15: škody prasat, semenný rok (Habitat.rumor)
+	if wl != "":
+		out.append(wl)
+		out.append(wl)
 	var qo: Array = ctx.get("quest_offers", [])
 	if not qo.is_empty():
 		out.append("%s prý něco potřebuje." % qo[randi() % qo.size()])

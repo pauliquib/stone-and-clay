@@ -10,7 +10,8 @@
 ##
 ## Zvěř u krmelce: v zimě (`FEEDER_MONTHS` / sníh nad `FEEDER_SNOW` / krmelec naplněný úkolem) se `home`
 ## srnčích skupin z okruhu `FEEDER_R` přesune ke krmelci a vůdce skupiny za soumraku a v noci (od `FEED_FROM`
-## do `FEED_TO` h) k němu sám zamíří. Mimo sezónu se původní `home` vrátí.
+## do `FEED_TO` h) k němu sám zamíří. Mimo sezónu se původní `home` vrátí. M8.15: dělají-li prasata škody
+## (`Habitat.bait_active`), myslivci vnadí černou u prvního krmelce (pod posedem) – tlupy z okruhu tam v noci chodí.
 class_name Hunter
 extends Node3D
 
@@ -286,15 +287,20 @@ func refresh() -> void:
 ## Přepočte `home` skupin podle krmelců; není-li `home_only`, vůdce za soumraku a v noci ke krmelci i zamíří.
 func _feeder_tick(home_only := false) -> void:
 	var night := clock.hour() >= FEED_FROM or clock.hour() < FEED_TO
+	# M8.15: při škodách od prasat (`Habitat.bait_active`) myslivci vnadí černou u krmelce pod posedem (noční čekaná)
+	var bait := world.habitat != null and world.habitat.bait_active()
 	for herd in fauna.herds:
 		var lead := (herd as Herd).get_leader() as Animal
-		if lead == null or not (lead.species in FEED_SPECIES):
+		if lead == null:
+			continue
+		var baited := bait and lead.species == "divocak"
+		if not (lead.species in FEED_SPECIES) and not baited:
 			continue
 		var bi := -1
 		var bd := FEEDER_R
 		for i in feeders.size():
 			var d := feeders[i].distance_to((herd as Herd).home)
-			if d < bd and feeder_active(i):
+			if d < bd and (feeder_active(i) or (baited and i == 0)):
 				bd = d
 				bi = i
 		for m in (herd as Herd).members:

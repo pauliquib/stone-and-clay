@@ -184,7 +184,7 @@
   `tail_spring`), uši se natáčí ke zdroji zvuku (`Animal` → `rig.listen_yaw` z hrozby / výstřelu), ocas při útěku
   nahoru, srnci se rozevře bílé zrcátko (`rump_flare`, geometrie v síti ocasu), divočák běží s nízkou hlavou,
   zajíc se v kličkách víc naklání (`lean_k`), srnec skáče odrazovými skoky výš a častěji ve vysoké trávě / obilí
-  (`Animal.TALL_VEG_MONTHS` z `Fields.class_at` – hrubě do M8.12). Detail (páteř, dech, pružiny) jen do 60 m od
+  (od M8.15 skutečná výška porostu `Fields.crop_height_at` / tráva `Habitat.grass_height_at`, `Animal.TALL_VEG_MIN_M`; bez modelu `TALL_VEG_MONTHS`). Detail (páteř, dech, pružiny) jen do 60 m od
   kamery; `animate()` nealokuje, IK chodidel čte rovinu terénu ze 3 vzorků 10× za s. **Ptáci**
   (`fauna/flight_model.gd` `FlightModel`, jeden na `Bird`): pádová rychlost z hmotnosti, plochy křídel a C_Lmax,
   odpor ∝ v² s klouzavostí druhu, styly „flap_glide“ (vrána, vlaštovka), „bound“ (kos) a „soar“ (káně); vítr
@@ -737,6 +737,32 @@
   (deník J → Počasí). Fallback vypnuto: časovač růstových dnů (zahrada), kalendář (pole), výšky polí podle normálu.
   `World.phenology` (M8.11) se nevolá – plodiny mají vlastní základ GDD (pšenice 0 °C, kukuřice 10 °C) z hodinových teplot
   v místě. Uložení: buňky záhonu `cm`/`bw`/`sm`/`sh` v klíči `garden`, pole v `fields_eco`. Měřicí scéna `pole_pulnoc`.
+- **Ekologie a populace zvěře (M8.15)**: `World.habitat` (`Habitat`, `scripts/eko/habitat.gd`), přepínač Realismus
+  `habitat`. Index vhodnosti stanoviště (HSI) na mřížce 64 m přes terén. **Statické vrstvy** (po startu přes `EcoClock.slice`,
+  48 buněk za snímek): les / okraj / zástavba / silnice (`Fauna.forest_at/score/settle_at/road_at`), stromy v okruhu 40 m
+  (`TreeManager.ids_near` + `TreeEco.species/age` – houština = podíl mladých ≤ 25 let × hustota, podíl dubu a buku,
+  jehličnany), `Site` (vzdálenost k vodě, expozice větru, zimní oslunění → závětří, mrazová kotlina), `Fields.class_at` /
+  `field_at`, honitba = kvadrant mřížky (4). **Denní vrstvy** (`eco_day`, 32 buněk za snímek): pro srnce, prase, zajíce
+  `d_rest` (kryt × klid × zimní závětří − kotlina za mrazu) a `d_feed` (louky po měsících, plodiny `CROP_GREEN/GRAIN/STUBBLE`
+  podle `Fields.field_info` – fáze `CropModel.ST_FILL` = zrno, výška `crop_height_at`; okus; žaludy `mast_store`; rytí
+  podle `SoilWater.moisture_at`; krmelce `Hunter.feeder_active` v zimě; sníh `SoilWater.snow_at`), HSI = průměr. Tráva
+  luk z `World.meadows` (M8.14, je-li – `height_at`/`grass_height_at`), jinak `GRASS_H_MONTH`. **Semenné roky:**
+  deterministická posloupnost (mezera 3–6 let), úroda × zralost plodů `Phenology.fruit` (dub, buk) → `mast_store`, přes
+  zimu ubývá. **Populace** (`pop[honitba][druh]`, `eco_day`, i dohánění skoků času): K = Σ HSI × 0,41 ha × `DENS_MAX`/100,
+  pulz rození v okně `BIRTH_DOY` × (1 − n/K) (prase × loňské žaludy), úmrtnost základní + nad kapacitou + zimní (sníh,
+  mráz; krmelec / žaludy ulehčí) + auta (silnice v honitbě) + plán myslivců (`CULL_QUOTA` v měsících lovu, u prasat
+  × hustota); `on_death` z `Hunting.on_animal_died` (lov) a `Animal.knock` (auto). **Napojení:** vůdce skupiny
+  (`Animal._follow_or_idle`) mimo aktivitu jde do `best_nearby(…, "rest")` a leží, jen když `rest_at ≥ HAB_REST_OK`;
+  při aktivitě s pastvou pod `HAB_FEED_OK` jde do `best_nearby(…, "feed")` v okrsku; změna účelu = `note_trail` (ochoz).
+  `Fauna` vybírá druh setkání `pick_weight` (hustota × vhodnost), šanci skupiny `spawn_roll` (očekávané skupiny v 220 m
+  z hustoty, deterministicky pro buňku / den / 2 h) a místo podle `suitability`. Okus sazenic `PlantedTrees._deer_near` +
+  `browse_pressure`. Škody: rozrytí louky u lesa (`rooted`, vizuál MultiMesh ve `Fauna._update_rooting`), kukuřice →
+  `damage` → drb (`rumor()` → `World.dialog_context["wildlife"]` → `Dialog.rumor`), událost `wildlife_damage` (háček M7.3),
+  vnadění prasat u krmelce pod posedem (`Hunter._feeder_tick`, `bait_active`), respekt zemědělců za legální úlovek prasete.
+  Výstupy: `journal_text(pid)` (deník J, přesnost podle Myslivosti), `population_text()` (F2), vrstvy `habitat_srnec/prase`.
+  Fallback: `active()` = false (vypnuto / mřížka se staví) → staré stanoviště `Fauna.score` a pevné okrsky. Uložení klíč
+  `wildlife` (populace, žaludy, vynucený semenný rok, škody, rozrytá místa); starý save → populace z kapacity. Ladění F3
+  `scripts/dev/tune_m8_15.gd` (168). Měřicí scéna `zver_pulnoc`.
   F3 → Příroda/Plodiny a zahrada (379 parametrů, `scripts/dev/tune_m8_12.gd`).
 - **Fyzikální obloha, světlo a expozice (M8.5)**: `Atmosphere.SkyModel` (vnořená třída v `scripts/priroda/atmosphere.gd`)
   – zjednodušený Rayleigh + Mie + ozon model (à la Hillaire 2020 / Preetham, `00_PRINCIPY.md` kap. 8), čisté

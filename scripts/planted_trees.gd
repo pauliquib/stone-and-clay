@@ -523,6 +523,10 @@ func _process(delta: float) -> void:
 func _deer_near(pos: Vector3) -> bool:
 	if world.fauna == null:
 		return false
+	# M8.15: tlak okusu z populace srnců v honitbě a vhodnosti místa (`Habitat`), nejen ze srnců spawnutých poblíž
+	var bp: float = world.habitat.browse_pressure(pos) if world.habitat != null else -1.0
+	if bp >= 0.0 and randf() < bp:
+		return true
 	for a in world.fauna.animals:
 		if is_instance_valid(a) and a.species == "srnec" and not a.dead and (a as Node3D).global_position.distance_to(pos) < BROWSE_R:
 			return true
