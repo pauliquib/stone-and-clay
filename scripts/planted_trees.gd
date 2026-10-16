@@ -69,11 +69,14 @@ static var SPECIES := {
 		"protos": [3, 5], "leaf": Color(0.06, 0.14, 0.06), "fruit_color": Color.WHITE},
 	"borovice": {"name": "Borovice", "item": "sazenice_borovice", "fruit": "", "years": 6.0, "h": 15.0, "sx": 3.4,
 		"protos": [4], "leaf": Color(0.07, 0.16, 0.06), "fruit_color": Color.WHITE},
+	# M8.14: náletová bříza (sukcese neposekaných luk – Meadows); hráč ji nesází (není v SPECIES_ORDER)
+	"briza": {"name": "Bříza", "item": "", "fruit": "", "years": 5.0, "h": 16.0, "sx": 3.6,
+		"protos": [0, 1, 2], "leaf": Color(0.24, 0.40, 0.12), "fruit_color": Color.WHITE},
 }
 const SPECIES_ORDER := ["jablon", "slivon", "hrusen", "tresen", "dub", "buk", "smrk", "borovice"]
 ## M8.3: sazenice → id druhu v katalogu `data/dreviny.json` (`TreeEco`).
 const ECO_IDS := {"jablon": "jablon", "slivon": "svestka", "hrusen": "hrusen", "tresen": "tresen", "dub": "dub_letni",
-	"buk": "buk", "smrk": "smrk", "borovice": "borovice"}
+	"buk": "buk", "smrk": "smrk", "borovice": "borovice", "briza": "briza"}
 ## M8.3: růst zasazeného stromu × lerp(min, max, vitalita stanoviště) – na vhodném místě roste rychleji.
 static var VIGOR_GROWTH := [0.6, 1.15]
 ## M8.8: generované stromy (MapLoader.tree_gen) – klíč skupiny MultiMeshe = GEN_KEY_BASE + varianta; sazenice menší

@@ -150,6 +150,8 @@ var trees: TreeManager           # stromy za běhu (M2.1): index instancí, pok�
 var forestry: Forestry           # kácení a zpracování dřeva (M2.1): pád stromu, kmeny, špalky, zákon
 var tree_eco: TreeEco            # M8.3: druhy dřevin a porosty (data/tree_eco.bin + data/dreviny.json), fallback z prototypů
 var phenology: Phenology         # M8.11: fenologie druhů (GDD, rašení, květ, podzim, pozdní mráz) a růst stromů v letech
+var meadows: Meadows             # M8.14: louky – výška porostu, seč, pastva, sukcese (eco_day; meadow_h pro shader trávy)
+var footpaths: Footpaths         # M8.14: pěšiny z opakované chůze (trvalá mapa opotřebení, path_tex)
 var unreported := {}             # M4.4: id hráče → [{...}] činy, které nikdo neviděl (sdílený registr, viz `add_unreported`)
 var witness_sources: Array[Callable] = []   # M4.4/M4.6: další zdroje svědků (hajný, stráže) – `add_witness_source`
 var fire_mgr: FireManager        # oheň a topení (M2.2): ohniště, opékání, zákon u lesa, požár trávy, kamna doma
@@ -441,6 +443,13 @@ func build() -> void:
 	thermals.name = "Termika"
 	add_child(thermals)
 	thermals.setup(self)
+	meadows = Meadows.new()            # M8.14: louky, seč, sukcese (po Fields, Site, SoilWater, Fauna – zástavba; nálet přes trees.planted)
+	meadows.setup(self)
+	footpaths = Footpaths.new()        # M8.14: pěšiny (vlastní vzorkování chodců, globální path_tex)
+	add_child(footpaths)
+	footpaths.setup(self)
+	debug_layers["louky"] = Callable(meadows, "debug_color")
+	debug_layers["pesiny"] = Callable(footpaths, "debug_color")
 	village_events = VillageEvents.new()
 	village_events.name = "Udalosti"
 	add_child(village_events)
@@ -3679,6 +3688,8 @@ func set_date(y: int, m: int, d: int) -> void:
 	weather.reset()
 	if phenology:
 		phenology.on_date_set()          # M8.11: rok se rozběhne k novému datu (dopředu o roky = růst)
+	if meadows:
+		meadows.on_date_set()            # M8.14: louky k novému datu (seč podle plánu, roky bez seče, nálet)
 	refresh_season_items()
 	if village_events:
 		village_events.refresh()

@@ -178,6 +178,17 @@ Koleje a stopy bot / kopyt jsou v deformační mapě (0,25 m/px) a terén je kre
 déšť je zarovná, v suchu vydrží dny. Chodec a kůň v blátě zpomalí a kloužou podle bláta v místě, bota čvachtá, ruční
 vozík s úzkými koly jde těžko. Ladicí vrstva mapy `unosnost`, měřicí scéna `--perfscene=pole_blato`, parametry F3 →
 Vozidla/Terén a bláto (133 parametrů celkem, `scripts/dev/tune_m8_13.gd`).
+**M8.14 Přízemní vegetace – louky, seč, sukcese, interaktivní tráva** (`scripts/eko/meadows.gd` `World.meadows`,
+`scripts/eko/footpaths.gd` `World.footpaths`, `scripts/vegetation/ground_veg_fx.gd`, přepínač `ground_veg` v Realismu):
+louka v nivě je vlhká s pcháčem a kohoutkem, na jižní stráni suchá se šalvějí a mateřídouškou, u dvorů ruderální
+s kopřivami; pod bukem holá hrabanka, pod smrkem jehličí, mech a borůvčí, v dubohabřině na jaře sasanky a dymnivky,
+v olšině u potoka devětsil (data `tools/vegetation.py --eco`). Sedláci sečou louky 2× ročně (polovina června, srpen),
+u obce 3×: posekaná louka je nízká a zelenější, leží na ní řádky sena a pak balíky, květy kvetou jen na neposekaných
+a za měsíc tráva doroste. Neposekaná louka za 2 roky zarůstá trnkami a šípky, za 5 let náletem bříz a borovic. Vysoká
+tráva a obilí se rozhrnují kolem hráče, koně, kol auta, vesničanů i zvěře a za nimi se ~30 s narovnávají; kudy se chodí
+opakovaně, zůstane pěšina (prošlapaná hlína, nižší řidší tráva), bez chůze za pár týdnů zaroste. Ladicí vrstvy mapy
+`louky`, `pesiny`, měřicí scéna `--perfscene=louka_cerven`, parametry F3 → Příroda/Louky a podrost a Příroda/Vítr –
+ohyb vegetace (162 parametrů, `scripts/dev/tune_m8_14.gd`).
 **M8.10 Lokomoce zvířat 2 a let ptáků** (přepínač `animal_gait`): zvěř, kůň i hospodářská zvířata mění chod podle
 Froudova čísla (krok → klus → cval plynule, s hysterezí), ohýbají páteř v zatáčce a ve cvalu, dýchají, uši a ocas
 dopruží za pohybem a uši se natočí za zvukem; vyplašený srnec rozevře bílé zrcátko a v obilí / vysoké trávě skáče.
@@ -241,8 +252,8 @@ Generované soubory a jejich nástroje (výstupy se commitují, kromě `data/*.b
 
 | nástroj | výstup | kdy spustit |
 |---|---|---|
-| `python3 tools/vegetation.py [--year=RRRR]` | `data/vegetation.bin` (**není v gitu** – `data/*.bin` je v `.gitignore`, vygenerovat ručně) | po přegenerování `surface.bin`/`landuse.bin`/`trees.bin` a na přelomu roku (plodiny polí se odvozují z `Fields.crop_of` pro aktuální rok) |
-| `godot --headless --path . --script tools/gen_vegetation_meshes.gd` | `assets/models/vegetation/*.res` | po změně tvarů low-poly rostlin |
+| `python3 tools/vegetation.py [--eco] [--year=RRRR] [--data=adresář]` | `data/vegetation.bin` (**není v gitu** – `data/*.bin` je v `.gitignore`, vygenerovat ručně); s `--eco` formát `VEG2` s typy podle stanoviště (M8.14 – vlhká / suchá louka, lesní podrost podle dřeviny), bez něj `VEG1` jako dřív | po přegenerování `surface.bin`/`landuse.bin`/`trees.bin` a na přelomu roku (plodiny polí se odvozují z `Fields.crop_of` pro aktuální rok); `--eco` navíc po `tools/site.py` a `tools/tree_species.py` – **pro M8.14 spustit jednou s `--eco`** |
+| `godot --headless --path . --script tools/gen_vegetation_meshes.gd` | `assets/models/vegetation/*.res` (M8.14: i typy přízemní vegetace z `GroundVegMeshes` – bez `.res` je hra postaví sama) | po změně tvarů low-poly rostlin |
 | `godot --headless --path . --script tools/gen_villager_bt.gd` | `ai/villager_routine.tres` | po změně struktury behavior stromu (vyžaduje načtený LimboAI GDExtension); `.tres` je zatím upravený ručně shodně s generátorem |
 | `python3 tools/gen_hospoda_map.py` | `data/maps/hospoda.map` | po změně mapy hospody (editovatelná i v TrenchBroomu) |
 | `python3 tools/gen_interior_textures.py` | `assets/textures/interiors/*.png` | po změně vzhledu interiérových textur (vyžaduje Pillow) |

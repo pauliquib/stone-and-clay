@@ -141,3 +141,131 @@ wind_hier={
 "type": "float",
 "value": 1.0
 }
+wind_k_f_ref={
+"type": "float",
+"value": 400.0
+}
+wind_k_gust={
+"type": "float",
+"value": 0.6
+}
+wind_k_trunk={
+"type": "float",
+"value": 0.045
+}
+wind_k_trunk_calm={
+"type": "float",
+"value": 0.004
+}
+wind_k_sway={
+"type": "float",
+"value": 0.35
+}
+wind_k_freq={
+"type": "float",
+"value": 5.0
+}
+wind_k_side={
+"type": "float",
+"value": 0.006
+}
+wind_k_side_calm={
+"type": "float",
+"value": 0.0015
+}
+wind_k_branch={
+"type": "float",
+"value": 0.12
+}
+wind_k_branch_calm={
+"type": "float",
+"value": 0.012
+}
+wind_k_leaf={
+"type": "float",
+"value": 0.025
+}
+wind_k_leaf_calm={
+"type": "float",
+"value": 0.004
+}
+wind_k_grass={
+"type": "float",
+"value": 0.55
+}
+wind_k_grass_calm={
+"type": "float",
+"value": 0.04
+}
+wind_k_grass_gust={
+"type": "float",
+"value": 0.7
+}
+wind_k_grass_fmax={
+"type": "float",
+"value": 1.6
+}
+wind_k_flutter0={
+"type": "float",
+"value": 0.03
+}
+wind_k_flutter={
+"type": "float",
+"value": 0.06
+}
+wind_k_wave_len={
+"type": "float",
+"value": 7.0
+}
+wind_k_wave_speed={
+"type": "float",
+"value": 0.7
+}
+trample_n={
+"type": "float",
+"value": 0.0
+}
+trample_bend={
+"type": "float",
+"value": 0.9
+}
+trample_range={
+"type": "float",
+"value": 40.0
+}
+meadow_k={
+"type": "float",
+"value": 1.0
+}
+path_k={
+"type": "float",
+"value": 1.0
+}
+path_size={
+"type": "float",
+"value": 0.0
+}
+trample_src={
+"type": "sampler2D",
+"value": ""
+}
+meadow_h={
+"type": "sampler2D",
+"value": ""
+}
+path_tex={
+"type": "sampler2D",
+"value": ""
+}
+meadow_origin={
+"type": "vec2",
+"value": Vector2(0, 0)
+}
+meadow_size={
+"type": "vec2",
+"value": Vector2(0, 0)
+}
+path_origin={
+"type": "vec2",
+"value": Vector2(0, 0)
+}

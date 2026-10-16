@@ -1705,9 +1705,10 @@ static func vegetation_test(g: Node) -> void:
 	check.call("data/vegetation.bin existuje", FileAccess.file_exists(VegetationManager.PATH))
 	var b := FileAccess.get_file_as_bytes(VegetationManager.PATH)
 	var magic_ok := b.size() >= VegetationManager.HEADER \
-		and b.slice(0, 4).get_string_from_ascii() == "VEG1"
+		and b.slice(0, 4).get_string_from_ascii() in ["VEG1", "VEG2"]      # M8.14: VEG2 = tools/vegetation.py --eco
+	var eco := magic_ok and b.slice(0, 4).get_string_from_ascii() == "VEG2"
 	var n_rec := b.decode_s32(8) if magic_ok else -1
-	check.call("hlavička VEG1 a délka souhlasí (%d záznamů)" % n_rec,
+	check.call("hlavička VEG1/VEG2 a délka souhlasí (%d záznamů)" % n_rec,
 		magic_ok and b.size() == VegetationManager.HEADER + n_rec * VegetationManager.RECORD)
 	check.call("manager soubor načetl", vm.loaded)
 	if not vm.loaded:
@@ -1719,12 +1720,14 @@ static func vegetation_test(g: Node) -> void:
 	# --- počty per typ (tam, kde data dávají: všechny typy v našich datech mají instance)
 	var per_type := true
 	var rep := []
-	for t in range(VegetationManager.VegType.size()):
+	# M8.14: typy 7–14 jen ve VEG2 (--eco), šípek (15) jen sukcese v GroundVegFx
+	var n_types := VegetationManager.VegType.ROSEHIP if eco else VegetationManager.VegType.HERB_WET
+	for t in range(n_types):
 		var c := vm.instance_count(t)
 		rep.append("%d" % c)
 		if c <= 0:
 			per_type = false
-	check.call("všech %d typů má instance (%s)" % [VegetationManager.VegType.size(), "/".join(rep)], per_type)
+	check.call("všech %d typů má instance (%s)" % [n_types, "/".join(rep)], per_type)
 
 	# --- multimeshe naplněné (každý chunk: mesh + instance_count > 0, barvy instancí)
 	var mm_ok := true
@@ -2142,6 +2145,8 @@ const PERF_SCENES := {
 		"weather": "jasno", "popis": "M8.10: pole v říjnu za soumraku – zvěř vychází na pole, hejno špačků (murmurace), vrány táhnou na nocoviště"},
 	"pole_pulnoc": {"pos": Vector3(600.0, 0.0, 600.0), "yaw": 0.0, "date": [2026, 7, 15], "hour": 23.85,
 		"weather": "jasno", "popis": "M8.12: pole a zahrada těsně před půlnocí – denní krok plodin (255 polí po kouscích, záhony, stín) proběhne během měření"},
+	"louka_cerven": {"pos": Vector3(900.0, 0.0, -500.0), "yaw": 0.5, "date": [2026, 6, 25], "hour": 11.0,
+		"weather": "jasno", "popis": "M8.14: otevřená louka koncem června – po první seči (nízká tráva, řádky sena / balíky), interaktivní tráva (projít se vysokou trávou), prof. „groundveg“"},
 	"pole_blato": {"pos": Vector3(600.0, 0.0, 600.0), "yaw": 0.0, "date": [2026, 10, 20], "hour": 12.0,
 		"weather": "dest", "popis": "M8.13: pole v říjnu v dešti – terramechanika a koleje (sednout do auta / traktoru a jet po poli; profil „car“)"},
 }

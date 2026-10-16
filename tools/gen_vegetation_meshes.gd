@@ -3,6 +3,9 @@
 ## UV.y = poměrná výška vrcholu (0 u země, 1 na špičce) – shader `shaders/vegetation.gdshader`
 ## podle ní ohýbá rostlinu větrem. Albedo v barvách vrcholů.
 ##
+## M8.14: navíc modely přízemní vegetace z `GroundVegMeshes` (herb_wet, herb_dry, fern, bilberry, moss, spring_flowers,
+## litter, butterbur, rosehip) – barvy vrcholů podle 00_PRINCIPY kap. 4; bez .res je hra postaví sama.
+##
 ## Spuštění:  godot --headless --path . --script tools/gen_vegetation_meshes.gd
 ## Po změně tvarů znovu spustit a .res commitnout (reprodukovatelnost).
 extends SceneTree
@@ -28,6 +31,13 @@ func _init() -> void:
 	_wheat()
 	_weed()
 	_garden_veg()
+	# M8.14: nové typy přízemní vegetace (barvy vrcholů podle 00_PRINCIPY kap. 4 – stavba v GroundVegMeshes, stejný
+	# kód má hra jako fallback, když .res chybí)
+	for id in GroundVegMeshes.IDS:
+		var m := GroundVegMeshes.build(String(id))
+		var err := ResourceSaver.save(m, OUT + String(id) + ".res")
+		print("  %s.res (M8.14): %d tris → %s" % [id, m.surface_get_array_index_len(0) / 3 if m.get_surface_count() > 0 else 0,
+			error_string(err)])
 	print("gen_vegetation_meshes: hotovo → %s" % OUT)
 	quit(0)
 

@@ -121,6 +121,10 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["soil_water"] = world.soil_water.to_dict()   # M8.7: vlhkost půdy, sníh, zásoby toků (base64, kompaktně)
 	if world.ruts:
 		d["ruts"] = world.ruts.to_dict()               # M8.13: koleje v blátě (jen dlaždice se stopami, ZSTD + base64, ≤ 2 MB)
+	if world.meadows:
+		d["meadows"] = world.meadows.to_dict()         # M8.14: louky – výška, den seče, roky bez seče (ZSTD + base64)
+	if world.footpaths:
+		d["footpaths"] = world.footpaths.to_dict()     # M8.14: pěšiny (dlaždice opotřebení, ZSTD + base64, ≤ 768 kB)
 	if world.micro:
 		d["micro"] = world.micro.to_dict()             # M8.9: inverze, mlžná vrstva, rosa, noční minima (pár čísel)
 	if world.phenology:
@@ -397,6 +401,10 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		world.soil_water.restore(d.get("soil_water", {}))     # M8.7: starý save bez klíče = rozběh z klimatu
 	if world.ruts:
 		world.ruts.restore(d.get("ruts", {}))                 # M8.13: starý save bez klíče = žádné koleje
+	if world.meadows:
+		world.meadows.restore(d.get("meadows", {}))           # M8.14: starý save bez klíče = louky podle data
+	if world.footpaths:
+		world.footpaths.restore(d.get("footpaths", {}))       # M8.14: starý save bez klíče = žádné pěšiny
 	if world.micro:
 		world.micro.restore(d.get("micro", {}))               # M8.9: starý save bez klíče = rozběh z dnešního počasí
 	if world.phenology:

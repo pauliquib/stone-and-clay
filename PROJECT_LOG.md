@@ -2557,3 +2557,52 @@ dopravy, ne o regresi.
   vesničanů na teplotě nezávisí) → háček pro M8.17 (stín v horku taky).
 - Časové měřítko: tepelná kapacita 60 Wh/K je fyzikální (herní hodina = 2 min) – pokud bude zima / žízeň / ospalost
   příliš rychlá, ladit v F3 (`body.thermo.heat_cap_wh_k`, `drowsy_from_h`, `thirst_full_l`) a přenést v M8.19.
+
+## 2026-10-16 – M8.14 Přízemní vegetace: louky podle stanoviště, seč, sukcese, interaktivní tráva
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu a shaderů – ruční test čeká)
+- **Typy porostu offline** (`tools/vegetation.py --eco` → `VEG2`; bez přepínače `VEG1` ověřeně bajt po bajtu stejný, nový
+  `--data=` pro vstupy, `--help`): typ louky ze `site.bin` (vlhká / suchá / ruderální / mezofilní), lesní podrost podle
+  `DOMI` + `CANO` z `tree_eco.bin`. Nové typy 7–14 `HERB_WET`, `HERB_DRY`, `FERN`, `BILBERRY`, `MOSS`, `SPRING_FLOWERS`,
+  `LITTER` (buk rezavá hrabanka / smrk jehličí přes tint), `BUTTERBUR`; staré typy × stanoviště (pod bukem líska a kopřivy
+  ×0,1–0,15, ruderální a luh víc kopřiv, na vlhké / suché louce méně trávy). Ověřeno na datech uživatele: 77 847 instancí
+  (≤ 117 000 = MAX_CAP + 30 %), louky 4 m: mezofilní 176 742, vlhká 70 178, suchá 13 831, ruderální 21 216; les: buk
+  53 968, smrk/jedle 108 422, listnaté 59 689, luh 19 626 buněk. Prahy suché louky upraveny podle dat (půdy v katastru
+  54–110 cm, svahy do ~14°): oslunění z ≥ 0,5 a (půda < 60 cm / svah > 8° / ranker).
+- **Modely** `GroundVegMeshes` (`scripts/vegetation/ground_veg_meshes.gd`, 9 modelů vč. šípku, 4–50 tris) s barvami vrcholů
+  podle 00_PRINCIPY kap. 4 (r ohebnost, g fáze, b list, a okluze), albedo z uniformů; `tools/gen_vegetation_meshes.gd`
+  je ukládá do `.res`, bez nich je hra postaví sama (generátor jsem nespouštěl – `.res` nejsou potřeba).
+- **`VegetationManager`**: čte VEG1 i VEG2, `VEG_CONFIG` nových typů (barvy, sezóna 3 = jarní efemér, 4 = stálé),
+  `REACT` (reakce na seč / pěšiny / sešlapání), `mesh_of`, `material_for`; vytváří klienta `GroundVegFx`.
+- **`Meadows`** (`scripts/eko/meadows.gd`, `World.meadows`): mřížka 16 m, růst podle GDD × vláha × nasycení, seč po
+  parcelách (seno 2×, u obce 3×, ostatní 1×, opuštěné parcely), pastva (výběh, ohrada statku), roky bez seče → keře
+  (2+), nálet bříz / borovic přes `PlantedTrees.plant` (5+; nový druh `briza` v `PlantedTrees.SPECIES`), hrubý krok po
+  skoku času (`on_date_set` z `World.set_date`), obecní údržba seče přes `mow_at`, `MeadowFlowers` nekvetou na posekané
+  louce; save klíč `meadows`, vrstva mapy `louky`.
+- **`Footpaths`** (`scripts/eko/footpaths.gd`, `World.footpaths`): opotřebení 1 m/px v dlaždicích 64 m, vlastní
+  vzorkování chodců (hráč, `bots_root`, zvěř), zarůstání exp(−d/9), kruhový buffer → globál `path_tex`; terén
+  (`terrain.gdshader`) kreslí prošlapanou hlínu, tráva nižší a řidší; save klíč `footpaths`, vrstva `pesiny`, `wear_at`.
+- **Interaktivní tráva** `GroundVegFx` (`scripts/vegetation/ground_veg_fx.gd`): 48 zdrojů (živé + stopa s relaxací 30 s)
+  v textuře `trample_src`, shader `shaders/include/ground_veg.gdshaderinc` (`gv_trample`, `gv_meadow_rel`, `gv_path_wear`);
+  místo rastru 512² zdroje v malé textuře (rozhodnutí uživatele: pozice jako globální parametr, výkon). Keře sukcese a
+  seno (řádky → balíky) v MultiMeshích kolem hráče.
+- **Vítr (otevřený bod M8.D2c)**: síla ohybu v `wind.gdshaderinc` = 20 globálních parametrů `wind_k_*` (`project.godot`
+  se stejnými výchozími čísly, ověřeno skriptem proti `WIND_GLOBALS`), F3 → Příroda/Vítr – ohyb vegetace.
+- **Menu F3**: `scripts/dev/tune_m8_14.gd` – **162 parametrů** (Příroda/Louky a podrost 142, Příroda/Vítr – ohyb vegetace
+  20), 0 odlišných od kódu; `bend_k` nových typů registruje automaticky `tune_priroda.gd` (smyčka přes `VEG_CONFIG`).
+- Přepínač Realismu `ground_veg` (řádek v `GameSettings.REALISM_ROWS`), měřicí scéna `louka_cerven`, test vegetace
+  přijímá VEG2. Sdílené soubory jen malé hunky: `world.gd`, `save_game.gd`, `game_settings.gd`, `tests.gd`,
+  `planted_trees.gd`, `prace/udrzba.gd`, `project.godot`, `terrain.gdshader`.
+- Kontrola překladu (kap. 6) všech změněných a nových `.gd` + závislých: prázdná. `tools/shader_check.gd` mobile i
+  forward_plus: prázdný.
+
+### Otevřené body
+- Čeká na ruční test uživatele (`docs/testy_M8.md` → M8.14); uživatel jednou spustí `python3 tools/vegetation.py --eco`.
+- Změřit `--perfscene=louka_vitr,30`, `pole_leto,30` (zapnuto / vypnuto) a `louka_cerven,30` – cíl GPU +≤ 0,6 ms,
+  CPU +≤ 0,3 ms (profil „groundveg“).
+- Seno jako předmět (sebrat / naložit, krmení koně a farmy hodnotou) a sušení – jen vizuál řádků a balíků.
+- Seč hráčem mimo zóny obecní údržby (kosa / sekačka kdekoli) – `Meadows.mow_at` je připravené, akce chybí.
+- Pole ponechané ladem → plevel → louka (sukcese polí) – neřešeno; NPC sekáči jako postavy na louce – seč je jen stav.
+- Typ louky se počítá za běhu (`Meadows`) i offline (`vegetation.py`) stejnými prahy – při ladění v F3 se vzhled
+  (instance) nezmění, dokud se znovu nespustí nástroj.
+- Zvěř šlape pěšiny jen do 150 m od hráče; stezky zvěře z M8.15 mohou číst `Footpaths.wear_at`.

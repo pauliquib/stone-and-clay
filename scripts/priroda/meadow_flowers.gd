@@ -4,7 +4,7 @@
 ## (stabilní poloha při přestavbě), nerostou na silnicích a cestách (maska podle grafu silnic) ani v zástavbě.
 ## Na zem přidávají i barevné tečky v terénním shaderu (`meadow_bloom`) – zdálky.
 ## Přestavba běží po kouscích přes několik snímků (FRAME_BUDGET_US) a do MultiMesh se zapíše najednou
-## jedním bufferem – pohyb hráče tak nezpůsobí záseky. `detail` (Nastavení → Grafika) zmenší okruh, 0 = bez květů.
+## jedním bufferem – pohyb hráče tak nezpůsobí záseky. M8.14: na posekané louce (`Meadows.rel_at`) květy nejsou. `detail` (Nastavení → Grafika) zmenší okruh, 0 = bez květů.
 class_name MeadowFlowers
 extends Node3D
 
@@ -129,6 +129,8 @@ func _rebuild(pos: Vector3, doy: float, bloom: float) -> void:
 				continue
 			if cls == 2 and world.fauna and world.fauna.settle_at(x, z) > SETTLE_MAX:
 				continue
+			if cls == 2 and world.meadows != null and world.meadows.rel_at(x, z) < Meadows.FLOWER_MIN_REL:
+				continue                     # M8.14: posekaná / spasená louka nekvete (dorůstá)
 			var h2 := Fields._hash(cx * 31 + 7, cz * 17 + 3)
 			var pick := float(h2 % 1000) / 1000.0
 			var ci := 0
