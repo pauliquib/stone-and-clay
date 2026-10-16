@@ -18,29 +18,29 @@
 class_name Paramotor
 extends Aircraft
 
-const RUN_ACC := 4.5               # m/s² zrychlení rozběhu po nohou (W)
-const RUN_MIN_V := 4.2             # m/s – min. rozběh / čelní vítr pro naplnění křídla
-const RUN_MAX_V := 7.5             # m/s – strop rychlosti rozběhu nohama
-const INFLATE_T := 1.6             # s – doba zvedání křídla nad hlavu
-const CROSS_MAX := 3.5             # m/s – max. boční složka větru pro čisté nahození
-const WIND_SAFE := 8.0             # m/s – silnější vítr křídlo vytrhne (pád)
-const FUMBLE_LOCK := 1.6           # s blokáda po vytržení křídla větrem
+static var RUN_ACC := 4.5               # m/s² zrychlení rozběhu po nohou (W)
+static var RUN_MIN_V := 4.2             # m/s – min. rozběh / čelní vítr pro naplnění křídla
+static var RUN_MAX_V := 7.5             # m/s – strop rychlosti rozběhu nohama
+static var INFLATE_T := 1.6             # s – doba zvedání křídla nad hlavu
+static var CROSS_MAX := 3.5             # m/s – max. boční složka větru pro čisté nahození
+static var WIND_SAFE := 8.0             # m/s – silnější vítr křídlo vytrhne (pád)
+static var FUMBLE_LOCK := 1.6           # s blokáda po vytržení křídla větrem
 const SHIFT_WARN_CD := 3.0         # s mezi varováními „plyn až s křídlem nad hlavou“
-const BRAKE_CD := 0.5              # přídavný odpor obou brzd naplno (S)
-const SIDE_BRAKE_CD := 0.18        # přídavný odpor jednostranné brzdy (A/D)
-const EARS_CD := 0.25              # „uši“ (Ctrl) – přídavný odpor → rychlejší klesání
+static var BRAKE_CD := 0.5              # přídavný odpor obou brzd naplno (S)
+static var SIDE_BRAKE_CD := 0.18        # přídavný odpor jednostranné brzdy (A/D)
+static var EARS_CD := 0.25              # „uši“ (Ctrl) – přídavný odpor → rychlejší klesání
 const EARS_SINK := 0.8             # m/s přídavné klesání při „uších“ (přes odpor, laditelné)
-const TRIM_V := 1.0                # m/s bonus k v_max na povolených trimrech (Mezerník)
-const COLLAPSE_TURB := 1.1         # m/s² turbulence, od které hrozí zavření křídla
-const COLLAPSE_P := 0.06           # šance zavření za s nad práhem (× přebytek turbulence)
-const COLLAPSE_MIN := 1.0          # s min. délka částečného zavření
-const COLLAPSE_MAX := 3.0          # s max. délka
-const COLLAPSE_LIFT := 0.45        # násobek vztlaku při zavření
-const COLLAPSE_BANK := 0.8         # rad – propad na stranu při zavření
-const RECOVER_K := 2.5             # násobitel zotavení opačnou brzdou
-const SINK_STALL_T := 0.7          # s hlubokého tahu obou brzd → propad (stall křídla)
-const FLARE_AGL := 1.6             # m – okno pro vyrovnání přistání oběma brzdami
-const FLARE_BRAKE := 0.7           # potřebný tah obou brzd pro flare
+static var TRIM_V := 1.0                # m/s bonus k v_max na povolených trimrech (Mezerník)
+static var COLLAPSE_TURB := 1.1         # m/s² turbulence, od které hrozí zavření křídla
+static var COLLAPSE_P := 0.06           # šance zavření za s nad práhem (× přebytek turbulence)
+static var COLLAPSE_MIN := 1.0          # s min. délka částečného zavření
+static var COLLAPSE_MAX := 3.0          # s max. délka
+static var COLLAPSE_LIFT := 0.45        # násobek vztlaku při zavření
+static var COLLAPSE_BANK := 0.8         # rad – propad na stranu při zavření
+static var RECOVER_K := 2.5             # násobitel zotavení opačnou brzdou
+static var SINK_STALL_T := 0.7          # s hlubokého tahu obou brzd → propad (stall křídla)
+static var FLARE_AGL := 1.6             # m – okno pro vyrovnání přistání oběma brzdami
+static var FLARE_BRAKE := 0.7           # potřebný tah obou brzd pro flare
 const WING_H := 7.4                # m – vrchol oblouku křídla nad zemí (vis) při visu / letu
 const RISER := Vector3(0.3, 2.0, 0.05)   # karabiny riserů (vis) = čep kyvadla křídla
 const WING_R := 6.0                # m – poloměr oblouku křídla (čelní pohled)
@@ -48,9 +48,20 @@ const WING_ARC := 0.9              # rad – půlúhel oblouku (rozpětí ~9,4 m
 const WING_CHORD := 2.6            # m – hloubka uprostřed
 const WING_TIP_CHORD := 1.3        # m – hloubka na konci
 const WING_CELLS := 14             # barevných komor
-const PG_LAW_TICK := 4.0           # s – perioda kontroly přestupků
-const PG_LOW_ALT := 150.0          # m AGL – minimum nad obcí / „šumový“ limit
-const PG_PERSON_R := 35.0          # m – osoba pod paramotorem (nad shromážděním)
+static var PG_LAW_TICK := 4.0           # s – perioda kontroly přestupků
+static var PG_LOW_ALT := 150.0          # m AGL – minimum nad obcí / „šumový“ limit
+static var PG_PERSON_R := 35.0          # m – osoba pod paramotorem (nad shromážděním)
+# M8.D2a: čísla dřív zapsaná přímo ve vzorcích (stejné hodnoty) – laditelné z menu F3 (`tune_letani.gd`)
+static var TRIMS_RATE := 0.8            # 1/s – jak rychle se trimry povolí / dotáhnou
+static var BRAKE_ELEV := 0.55           # obě brzdy zvedají nos (podíl zatažení)
+static var BRAKE_THR_CUT := 0.3         # obě brzdy ve vzduchu ubírají plyn o tolik
+static var DEEP_BRAKE := 0.85           # hluboký tah obou brzd (→ propad) od
+static var RUN_BRAKE_K := 0.5           # brzdění při běhu (Mezerník) – podíl brzdy letounu
+static var DEFLATE_K := 1.2             # křídlo padá o tolik rychleji, než se zvedá
+static var FUMBLE_DMG := 4.0            # % poškození při vytržení křídla větrem
+static var FUMBLE_HURT := 8.0           # zranění při vytržení křídla větrem
+static var FLARE_HARD_V := 2.2          # m/s – flare s pozdním vyrovnáním = tvrdé doskočení nad
+static var FLARE_HURT_K := 9.0          # zranění na 1 m/s nad tvrdým doskočením
 
 ## Fáze přípravy: „laid“ = křídlo rozložené na zemi (bez pilota), „carried“ = pilot
 ## navlečený, křídlo za zády na zemi, „wing_up“ = křídlo nahozené nad hlavou.
@@ -96,23 +107,23 @@ func _delayed_input(dt: float) -> Array:
 		_brake_r = clampf(-pilot_input.steer, 0.0, 1.0)         # D = pravá brzda
 		_brake_both = clampf(pilot_input.brake, 0.0, 1.0)       # S = obě brzdy
 		_ears = pilot_input.crouch                               # Ctrl = „uši“
-		_trims = move_toward(_trims, 1.0 if pilot_input.jump else 0.0, dt * 0.8)
+		_trims = move_toward(_trims, 1.0 if pilot_input.jump else 0.0, dt * TRIMS_RATE)
 		steer = -pilot_input.steer                               # A → náklon vlevo (jako letoun)
-		elev = _brake_both * 0.55                                # brzdy mírně zvedají nos (pak stall)
+		elev = _brake_both * BRAKE_ELEV                          # brzdy mírně zvedají nos (pak stall)
 		if on_ground:
 			thr = (pilot_input.throttle if pg_state == "wing_up" else 0.0)
 			if _sprint_in():
 				thr = 1.0 if pg_state == "wing_up" else 0.0
 		else:
 			thr = maxf(pilot_input.throttle, 1.0 if _sprint_in() else 0.0)
-			thr = clampf(thr - _brake_both * 0.3, 0.0, 1.0)
+			thr = clampf(thr - _brake_both * BRAKE_THR_CUT, 0.0, 1.0)
 	else:
 		_brake_l = 0.0
 		_brake_r = 0.0
 		_brake_both = 0.0
 		_trims = 0.0
 		_ears = false
-	var delay := clampf(body_state.promile() * DRUNK_DELAY, 0.0, 0.45) if body_state else 0.0
+	var delay := clampf(body_state.promile() * DRUNK_DELAY, 0.0, DRUNK_DELAY_MAX) if body_state else 0.0
 	_hist.append([_life_t, [thr, steer, elev]])
 	while _hist.size() > 1 and _life_t - float(_hist[1][0]) >= delay:
 		_hist.pop_front()
@@ -137,7 +148,7 @@ func _pg_tick(dt: float) -> void:
 		return
 	_was_flying = true
 	# hluboký tah obou brzd → propad (stall se řeší aerodynamikou přes elev)
-	if _brake_both > 0.85:
+	if _brake_both > DEEP_BRAKE:
 		_sink_t += dt
 		if _sink_t > SINK_STALL_T and _collapse_t <= 0.0:
 			_start_collapse("Hluboký tah – křídlo propadlo")
@@ -204,7 +215,7 @@ func _on_ground(xf: Transform3D, gy: float,
 	var run_in := clampf(pilot_input.throttle, 0.0, 1.0) if pilot_input else 0.0   # W = nohy
 	var a := run_in * RUN_ACC * maxf(1.0 - v_ground / RUN_MAX_V, 0.0) - MU_GRASS * G - G * slope * 0.5
 	if elev_in > 0.0:                                            # Mezerník na zemi = zabrždění
-		a -= BRAKE_DECEL * 0.5
+		a -= BRAKE_DECEL * RUN_BRAKE_K
 	if wing_up:
 		a += (_thrust(float(ae["va"])) - float(ae["drag"])) / m   # tah vrtule pomáhá doběhnout
 	elif _sprint_in():
@@ -252,14 +263,14 @@ func _update_inflate(dt: float, wind: Vector3, v_ground: float) -> void:
 		if _inflate > 0.4 and not _infl_warned:
 			_infl_warned = true
 			_notify("Křídlo spadlo na stranu – nedostatečný rozběh nebo boční vítr. Znovu a čelem proti větru!", 3.5)
-		_inflate = maxf(_inflate - dt * 1.2 / INFLATE_T, 0.0)
+		_inflate = maxf(_inflate - dt * DEFLATE_K / INFLATE_T, 0.0)
 
 
 ## Vytržení křídla silným větrem (vléčení, pád).
 func _fumble_wind(msg: String) -> void:
-	dmg = minf(dmg + 4.0, 99.0)
+	dmg = minf(dmg + FUMBLE_DMG, 99.0)
 	if body_state:
-		body_state.hurt(8.0, "vítr vytrhl křídlo")
+		body_state.hurt(FUMBLE_HURT, "vítr vytrhl křídlo")
 	world.play_sfx(owner_id, "thud", 0.9, -2.0)
 	_notify(msg, 4.5)
 	_lock_t = _life_t + FUMBLE_LOCK
@@ -301,9 +312,9 @@ func _flare_ok() -> bool:
 func _flare_land(impact: float) -> void:
 	pg_state = "carried"                                     # křídlo po doskočení padá za záda
 	_inflate = 0.0
-	if impact > 2.2:
+	if impact > FLARE_HARD_V:
 		if body_state:
-			body_state.hurt((impact - 2.2) * 9.0, "špatné doskočení parametru")
+			body_state.hurt((impact - FLARE_HARD_V) * FLARE_HURT_K, "špatné doskočení parametru")
 		_notify("Pozdní flare – tvrdé doskočení (%.1f m/s)." % impact, 3.0)
 		world.play_sfx(owner_id, "land", 0.8, -2.0)
 	else:

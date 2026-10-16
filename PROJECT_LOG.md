@@ -2221,3 +2221,40 @@ dopravy, ne o regresi.
 - Exportovaná hra: `res://config.json` musí být v exportním filtru (`*.json`), `export_presets.cfg` zatím není.
 - Kamera vozidel, zvuky, světla a stěrače nejsou registrované (nejsou „fyzika světa“); gravitace hráče patří do
   Člověk (M8.D2b), počasí / vítr / mikroklima do Příroda (M8.D2c) – povrchy a přilnavost už jsou ve Svět.
+
+## 2026-10-16 – M8.D2a Menu pro vývojáře: kategorie Létání
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu – ruční test čeká)
+- **Registrace** `scripts/dev/tune_letani.gd` (tabulky řádků jako `tune_vozidla.gd`), **256 parametrů**:
+  Společné 68 · Letadlo 16 · Paramotor 50 (16 stroje + 34) · Rogalo a trike 23 (16 stroje + 6 + dráha letiště) ·
+  Dron 73 (57 + 2 × 8 modelu) · Termika 26. Id: `aircraft.*`, `aircraft.<model>.<klíč>`, `paramotor.*`, `trike.*`,
+  `airfield.rwy_half`, `drone.*`, `drone.<model>.<klíč>`, `thermal.*`.
+- **`Aircraft`** (`scripts/flight/aircraft.gd`): konstanty chování → `static var` (vzduch, gravitace letového modelu,
+  vztlak po přetažení, turbulence, tvrdé přistání / havárie, valivý odpor, brzda, řízení, auto-trim, tah, pilot, palivo,
+  opilost, přestupky) + 37 čísel vytažených ze vzorců se stejnou hodnotou (odezva plynu, profil větru, závětří a frekvence
+  turbulence, dojezd vraku, meze auto-trimu, sklon terénu, zatáčení a srovnání na zemi, rotace a odlepení, mokrá tráva,
+  zotavení z přetažení, strop CL, meze pitch / bank, poškození a zranění při přistání a nárazu, perioda kontroly).
+  `SPECS` → `static var` (spec stroje je tentýž slovník → změna platí hned). `_on_tune` obnoví hmotnost tělesa.
+- **`Paramotor`**: rozběh, nahazování, vítr, brzdy, uši, trimry, zavírání křídla, flare, přestupky → `static var`
+  + 10 čísel ze vzorců (rychlost trimrů, brzdy → nos / plyn, hluboký tah, brzdění při běhu, padání křídla, vytržení,
+  tvrdý flare). **`Trike`**: páka plynu, valivý odpor, přestupky, hmotnost spolujezdce (dřív 80 ve vzorci).
+  **`Airfield.RWY_HALF`** (přistání „na dráze“).
+- **`Drone`** (`scripts/dron.gd`): všech 21 konstant → `static var` + 36 čísel ze vzorců (páčka ovladače, nárazy větru,
+  vzlet, unášení větrem po režimech, návrat domů, přistání, sebrání, XP, perioda signálu, nad lidmi, zástavba a soukromí,
+  plašení zvěře, ťuknutí, náraz do člověka, uložení spadlého). `DroneModel.MODELS` → `static var` (hmotnost, rychlosti,
+  stoupání, baterie, dosahy signálu, citlivost na vítr obou modelů); `_on_tune` obnoví hmotnost tělesa.
+- **`Thermals`**: konstanty → `static var`, rozsahy [min, max] jako typovaná pole (`Array[float]` / `Array[int]`, registr
+  zapisuje po prvcích) + 5 čísel ze vzorců (útlum k okraji dne, klesání v prstenci, slábnutí ke stropu, práh bouřky,
+  unášení větrem). Ladicí pevná bublina `DEBUG_R` je v menu.
+- Chování ve výchozím stavu beze změny (stejné hodnoty, za snímek se čte jen `static var` / `spec`, registr ne).
+  Ověřeno offline skriptem (`DevTune.ensure()`, `count` po podskupinách, 0 hodnot odlišných od kódu, zápis do cílů
+  a `reset_group("Létání")`). Kontrola překladu (kap. 6) všech změněných `.gd` prázdná.
+
+### Otevřené body
+- Čeká na ruční test uživatele (`docs/testy_M8.md` → M8.D2a).
+- Hranice letu `World.FLY_LIMIT_M`, `FLY_WARN_M`, `FLY_PUSH_MS`, `FLY_CEIL_AGL`, `FLY_CEIL_PUSH` jsou ve `world.gd`
+  (mimo rozsah D2a) – zaregistrovat později (převést na `static var` + řádky v `tune_letani.gd`).
+- `Paramotor.EARS_SINK` se nikde nečte (uši působí jen přes `EARS_CD`) – neregistrováno; buď použít, nebo smazat.
+- Rozměry kolize stroje (kvádr) a nová plná nádrž se po změně `gear_h` / `tank_l` projeví až u nově postaveného stroje.
+- Neregistrováno záměrně: kamera, zvuk, vario HUD (`FlightHud`), hlášky a jejich prodlevy, bubliny spolujezdce,
+  odměny (přátelství, pověst), geometrie letiště a modelů.

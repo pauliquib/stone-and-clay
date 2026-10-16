@@ -9,7 +9,8 @@ extends RefCounted
 ## (design ~30/38 min letu → herně škálované; mráz a sport zkracují), `range`/`range_nlos` = dosah
 ## řídicího signálu volný / za překážkou (m), `wind_k` = jak moc dron strhuje větrem (0.4..1.2),
 ## `needs_a1a3` = vyžaduje osvědčení A1/A3 (nad 250 g), `repair` = cena opravy po nehodě (Kč).
-const MODELS := {
+## M8.D2a: `static var` (dřív const) – menu F3 ladí hodnoty živě (`Drone.spec` je stejný slovník).
+static var MODELS := {
 	"dron": {"name": "Dron Ptáček Mini", "kg": 0.249, "spd": 15.0, "sport": 19.0, "climb": 5.0,
 		"batt": 720.0, "range": 1500.0, "range_nlos": 400.0, "wind_k": 1.0, "repair": 1500,
 		"size": 0.13, "needs_a1a3": false, "col": Color(0.82, 0.83, 0.88)},

@@ -397,3 +397,16 @@ parametrů). Ostatní kategorie (Létání, Člověk, Činnosti, Příroda, Zvě
 Co změřit: `tools/launcher.sh --perfscene=…` (scéna s provozem) proti baseline – kategorie `car` beze změny
 (konstanty auta jsou teď členy sdíleného objektu `Car.TUNES` a `static var` – čtení za snímek ~stejné, registr se za
 snímek nečte); s otevřeným menu F3 jen cena UI.
+
+### M8.D2a – Létání
+
+1. F3 → Létání: podskupiny Společné, Letadlo, Paramotor, Rogalo a trike, Dron, Termika (počty 68 / 16 / 50 / 23 / 73 / 26);
+   nic není zvýrazněné jako změněné (výchozí = kód).
+2. Letadlo (F2 → Létání → testovací letoun): Létání → Letadlo „Motor – statický tah“ 760 → 1500 → rozjezd kratší a stoupá
+   rychleji; Společné „Řízení – rychlost náklonu“ 2 → 0,5 → A/D reaguje líně; ↺ vrátí výchozí.
+3. Paramotor: „Nahození – potřebný čelní proud“ 4,2 → 2 → křídlo se zvedne i při pomalém rozběhu; „Zavření křídla – od
+   turbulence“ 1,1 → 0,1 → za letu se křídlo zavírá často. Trike: „Hmotnost – spolujezdec“ / „Motor – statický tah“ znát na stoupání.
+4. Dron: „Let – rychlost“ (model) 15 → 30 → letí 2× rychleji; „Vítr – unášení v letu“ 0,6 → 2 → ve větru silně ujíždí;
+   „Baterie – výdrž“ 720 → 60 → brzy varování a návrat domů.
+5. Termika: „Ladění – pevná bublina nad hráčem“ 0 → 150 (léto, jasno) → paramotor / letadlo nad hráčem stoupá (vario pípá);
+   „Bublina – nejsilnější stoupání v ose“ 3 → 6 → stoupá rychleji. Výchozí (skupina) vše vrátí, konzole bez chyb.

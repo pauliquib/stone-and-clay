@@ -15,11 +15,12 @@
 class_name Trike
 extends Aircraft
 
-const THR_RATE := 0.55             # 1/s – rychlost pojezdu páky plynu (Shift/Ctrl)
-const MU_TRIKE := 0.06             # valivý odpor tříkolky na trávě (rozjezd delší)
-const UL_LAW_TICK := 4.0           # s – perioda kontroly přestupků
-const UL_LOW_ALT := 150.0          # m AGL – minimum nad obcí
-const UL_PERSON_R := 35.0          # m – osoba pod strojem (nad shromážděním)
+static var THR_RATE := 0.55             # 1/s – rychlost pojezdu páky plynu (Shift/Ctrl)
+static var MU_TRIKE := 0.06             # valivý odpor tříkolky na trávě (rozjezd delší)
+static var UL_LAW_TICK := 4.0           # s – perioda kontroly přestupků
+static var UL_LOW_ALT := 150.0          # m AGL – minimum nad obcí
+static var UL_PERSON_R := 35.0          # m – osoba pod strojem (nad shromážděním)
+static var PAX_KG := 80.0               # kg – spolujezdec (M8.D2a: dřív číslo ve vzorci)
 const LAND_HINT_AGL := 30.0        # m AGL – pod tím se ukazuje přistávací nápověda
 const PAX_TALK_MIN := 14.0         # s – min. odstup bublin spolujezdce
 const PAX_TALK_MAX := 30.0         # s – max. odstup
@@ -83,7 +84,7 @@ func _delayed_input(dt: float) -> Array:
 		_lever = 0.0
 	_ul_tick(dt)
 	var thr := _lever
-	var delay := clampf(body_state.promile() * DRUNK_DELAY, 0.0, 0.45) if body_state else 0.0
+	var delay := clampf(body_state.promile() * DRUNK_DELAY, 0.0, DRUNK_DELAY_MAX) if body_state else 0.0
 	_hist.append([_life_t, [thr, steer, elev]])
 	while _hist.size() > 1 and _life_t - float(_hist[1][0]) >= delay:
 		_hist.pop_front()
@@ -127,7 +128,7 @@ func controls_hint() -> String:
 
 ## Celková vzletová hmotnost navíc o spolujezdce (~80 kg).
 func total_kg() -> float:
-	return super.total_kg() + (80.0 if _pax != null else 0.0)
+	return super.total_kg() + (PAX_KG if _pax != null else 0.0)
 
 
 # ------------------------------------------------------------------ stavy pilota a spolujezdec

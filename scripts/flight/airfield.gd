@@ -13,7 +13,7 @@ const RWY_A := Vector2(-440.0, 240.0)       # práh dráhy (start), x/z v herní
 const RWY_HEADING := 30.0                    # směr dráhy v herních stupních (0 = −Z)
 const RWY_LEN := 260.0                       # m – délka posekaného pásu
 const RWY_W := 16.0                          # m – šířka pásu
-const RWY_HALF := 16.0                       # m – jak daleko od osy se počítá „na dráze“
+static var RWY_HALF := 16.0                  # m – jak daleko od osy se počítá „na dráze“
 const HANGAR_SIDE := 26.0                    # m – odsazení hangáru od osy dráhy (vlevo od startu)
 const SOCK_SIDE := 18.0                      # m – větrný rukáv vedle prahu A
 const SOCK_H := 5.0                          # m – stožár rukávu
