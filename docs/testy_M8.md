@@ -369,6 +369,33 @@ očekávání **+≤ 0,3 ms CPU** celkem (rig nově nealokuje a IK vzorkuje ter�
 hejno ten den neobjeví, posunout datum o den): `murmuration` **≤ 0,3 ms** průměr (¼ hejna za snímek, max. 400 ptáků,
 1 draw call), GPU +≤ 0,2 ms. Pro srovnání totéž s vypnutým „Lokomoce zvířat a let ptáků“.
 
+## M8.16 – Tělo 2: tepelná bilance, žízeň, spánek, pád
+
+Pozn.: čísla jádra ukazuje jen F2 → Hráč (první řádek: jádro, bilance W, MET, voda, bdění, vítr na těle); HUD píše jen
+slova (zima, horko, žízeň, ospalost, zranění). F2 → Hráč → „Napojit, vyspat, zahřát a vyléčit pád“ vrací tělo do normálu.
+
+1. Leden −5 °C, bunda (Wardrobe), F2 → Náklad → pytel 25 kg na rameno: chůze do kopce → F2 bilance kladná, zima se
+   neobjeví; stát 30 herních min (~1 min) bez hnutí na posedu / u lesa → jádro klesá, HUD „zima“, deník „prochladneš…“.
+2. Promoknout v dešti (bez pláštěnky) a stát ve větru → prochladneš o hodně rychleji než suchý (deník: „Jsi promoklý
+   a fouká – … za půl hodiny“); u ohně / kamen se rychle zahřeješ a uschneš.
+3. Červenec 30 °C, jasno, sekat / štípat dřevo → po chvíli „žízeň“ a „horko“; v lese (stín) méně. Napít se ze studánky
+   nebo sklenice vody z dřezu doma → žízeň zmizí.
+4. Pět piv v horku → žízeň neklesne jako po vodě, s panáky roste (deník: „pivo ani kořalka žízeň neuhasí“).
+5. ~20 herních h bez spánku → HUD „ospalost“; jízda autem → občas krátké zatmění (mikrospánek); kafe ospalost ubere,
+   spánek ji smaže.
+6. Seskok z ~2 m → jen záblesk bolesti a krátké kulhání (bez sprintu); ze střechy ~5 m → zranění, ležení, kulhání
+   několik herních hodin; to samé do závěje (sníh) nebo do hluboké vody → méně / nic. Pád z ~12 m → nemocnice.
+7. Deník J → oddíl „ZDRAVÍ“ – srozumitelné věty, bez čísel.
+8. F5 → F9 → jádro, žízeň, ospalost i kulhání zůstanou; starý save se načte (napitý, vyspalý).
+9. Esc → Nastavení → Realismus → vypnout „Tělo: teplo, žízeň, spánek“ → staré prochladnutí podle pocitové teploty,
+   žádná žízeň / ospalost, pád jako dřív (zranění až nad 6 m).
+10. F3 → Člověk / Tělo – teplo a energie (126 parametrů): např. „Teplo – efektivní tepelná kapacita“ ×0,5 → zima
+    i horko přicházejí 2× rychleji.
+
+Co změřit: `tools/launcher.sh --perfscene=zima_telo,30` (prof. klíč „body_thermo“) a pro srovnání s vypnutým přepínačem
+„Tělo“. Očekávání: CPU ≈ +0,01–0,02 ms průměrně (bilance 4×/s reálně, v kroku 1 dotaz na vlhkost mikroklimatu, zápoj
+korun a výška slunce, žádné alokace); GPU beze změny (mikrospánek jen využije stávající zatmění v `DrunkFx`).
+
 ## M8.D – Menu pro vývojáře
 
 Část M8.D1: registr `DevTune`, menu F3, Režim vývojáře, Uložit / Export a kategorie **Svět** + **Vozidla** (~520

@@ -395,9 +395,11 @@ func _type_label(t: String) -> String:
 
 
 func open_player() -> void:
-	_hud().open_menu("Hráč", "", [
+	var pl: Player = world.players.get(pid)
+	_hud().open_menu("Hráč", pl.body.debug_text() if pl != null else "", [       # M8.16: čísla jádra jen tady
 		hdr("Stav a peníze"),
 		["Vystřízlivět (0,00 ‰)", world.cheat.bind(pid, "sober")],
+		["Napojit, vyspat, zahřát a vyléčit pád (M8.16)", _body_reset_m816],
 		["Uzdravit a doplnit výdrž", world.cheat.bind(pid, "heal")],
 		["+5 000 Kč", world.cheat.bind(pid, "money")],
 		["Počítač: +5 000 Kč na účet, balíky doručit hned (M3.4)", world.cheat.bind(pid, "ucet")],
@@ -454,3 +456,19 @@ func _pheno_anomaly(k: float) -> void:
 func _water_flows() -> void:
 	_hud().open_menu("Průtoky toků", world.soil_water.flows_text(),
 		[["Obnovit", _water_flows], ["← Zpět", open_debug_layers]])
+
+
+## M8.16: F2 → Hráč – tělo do výchozího stavu (voda, spánkový dluh, teplota jádra, kulhání).
+func _body_reset_m816() -> void:
+	var pl: Player = world.players.get(pid)
+	if pl == null:
+		return
+	pl.body.hydration = 0.0
+	pl.body.sleep_debt = 0.0
+	pl.body.t_core = BodyState.T_CORE_NORMAL
+	pl.body.cold = 0.0
+	pl.body.overheat = 0.0
+	pl.body.wetness = 0.0
+	pl.body.limp_h = 0.0
+	pl.body.pain = 0.0
+	open_player()

@@ -149,6 +149,140 @@ static var PASSOUT_K := 0.9                # šance okna za hodinu na ‰ nad pr
 static var PASSOUT_CAFFEINE_K := 0.5       # × šance s kofeinem
 static var PASSOUT_CD_H := 1.0             # h – nejkratší rozestup oken
 
+## M8.16 Tělo 2: tepelná bilance (přepínač realismu „thermo“; vypnuto = stará pravidla „pocitové teploty“ výše).
+## Model (00_PRINCIPY kap. 8, zjednodušeně ISO 7730 / Fanger, Gagge): S = M − C(konvekce+záření přes oděv v clo)
+## − E(dech, pocení, odpar z mokrého oděvu) + slunce + oheň − vedení do země; S / tepelná kapacita = změna teploty jádra.
+## Kůže sleduje jádro (vazokonstrikce), pod 36,8 °C třes, nad 37,1 °C pocení (omezené vlhkostí vzduchu a oděvem).
+## Vítr se počítá jen jednou – vlastní konvekce z `Microclimate.wind_speed_at` (ne `wind_chill_at`). Krok 4×/s reálně.
+## Laditelné v F3 → Člověk / Tělo – teplo a energie (`scripts/dev/tune_m8_16.gd`).
+static var THERMO_STEP_S := 0.25           # s reálného času mezi kroky bilance (4×/s)
+static var THERMO_MAX_DT_H := 0.02         # h – nejdelší vnitřní krok (spánek / přeskok času se dělí)
+static var BODY_AREA_M2 := 1.9             # povrch těla (DuBois, 82 kg / 180 cm)
+static var MET_W_M2 := 58.2                # 1 MET = 58,2 W/m²
+static var HEAT_CAP_WH_K := 60.0           # Wh/K – efektivní tepelná kapacita (jádro + část slupky)
+static var T_CORE_NORMAL := 37.0
+static var T_CORE_MIN := 30.0
+static var T_CORE_MAX := 41.5
+static var T_SKIN_NEUTRAL := 33.7          # °C – kůže při jádru 37 °C
+static var VASO_K := 4.0                   # °C kůže na °C jádra (vazokonstrikce / vazodilatace)
+static var T_SKIN_MIN := 26.0
+static var T_SKIN_MAX := 36.0
+static var SHIVER_FROM := 36.8             # °C jádra – začíná třes
+static var SHIVER_W_K := 250.0             # W na °C pod prahem
+static var SHIVER_MAX_W := 350.0
+static var SWEAT_FROM := 37.1              # °C jádra – začíná pocení
+static var SWEAT_W_K := 400.0              # W odparu na °C nad prahem (požadavek)
+static var EVAP_CLO_K := 0.021             # m²·kPa/W výparného odporu na 1 clo (Lewisův vztah, i_m ≈ 0,45)
+static var LEWIS_K := 16.5                 # K/kPa – Lewisův poměr
+static var INSENSIBLE_W := 15.0            # W – neznatelný odpar kůží
+static var CLO_PER_INSUL := 1.5            # clo na 1,0 herní izolace (`INSUL_BASE` 0,4 = triko + džíny ≈ 0,6 clo)
+static var SLEEP_CLO := 2.5                # clo v posteli / ve spacáku
+static var WET_CLO_LOSS := 0.65            # mokré oblečení ztrácí tolik izolace (×wetness)
+static var VENT_FROM := 37.2               # °C jádra – hráč se „rozepne“ (izolace klesá)
+static var VENT_RANGE := 0.8               # °C – rozsah, ve kterém se rozepne naplno
+static var VENT_MAX := 0.5                 # nejvýš tolik izolace ubere rozepnutí
+static var WIND_BODY_K := 0.7              # vítr ve výšce těla / vítr v 10 m (logaritmický profil)
+static var WALK_AIR_K := 0.6               # podíl rychlosti chůze, který působí jako vítr
+static var AIR_MIN_MS := 0.1               # m/s – volná konvekce v bezvětří
+static var WIND_CLO_K := 0.04              # stlačení izolace větrem na m/s (bez větruodolné vrstvy)
+static var WIND_CLO_MAX := 0.5             # nejvýš tolik izolace vítr ubere
+static var HC_BASE := 3.0                  # W/m²K – přestup tepla konvekcí v klidu
+static var HC_WIND_K := 8.3                # W/m²K na √(m/s)
+static var HR_W_M2K := 4.7                 # W/m²K – sálání (lineárně)
+static var FCL_K := 0.15                   # zvětšení povrchu oděvem na 1 clo
+static var WATER_HC := 200.0               # W/m²K navíc při úplném ponoření (voda odvádí teplo ~25× víc)
+static var IMMERSE_DEPTH := 1.3            # m – hloubka, ve které je tělo ponořené celé
+static var SUN_AREA_M2 := 0.35             # efektivní plocha osvětlená sluncem
+static var SUN_ABSORB := 0.7               # pohltivost oděvu / kůže
+static var CANOPY_SHADE := 0.85            # stín plného zápoje korun
+static var NIGHT_SKY_W := 40.0             # W – ztráta sáláním do jasné noční oblohy
+static var FIRE_W := 400.0                 # W – teplo od ohně / kamen při heat = 1
+static var ROOF_WARM_K := 0.25             # pod střechou venku (zastávka, kůlna) se vzduch přiblíží tolik k `shelter_min`
+static var COND_SIT_M2 := 0.15             # m² – styk se zemí v podřepu / vkleče
+static var COND_LIE_M2 := 0.5              # m² – vleže
+static var COND_R_BASE := 0.05             # m²K/W – odpor styku bez oděvu
+static var COND_SNOW_K := 1.5              # sníh / mokrá zem vede víc
+static var RESP_LAT_K := 0.0173            # dýchání – latentní ztráta (ISO 7730)
+static var RESP_LAT_PA := 5.87             # kPa
+static var RESP_CONV_K := 0.0014           # dýchání – citelná ztráta
+static var RESP_T := 34.0                  # °C vydechovaného vzduchu
+static var WET_EVAP_W := 60.0              # W – odpar z plně mokrého oděvu při sytostním deficitu 1 kPa
+# --- metabolismus podle činnosti (MET)
+static var MET_SLEEP := 0.9
+static var MET_STAND := 1.2
+static var MET_SEATED := 1.3               # v autě, v letadle
+static var MET_HORSE := 2.2                # jízda na koni
+static var MET_WALK_BASE := 1.5            # chůze: základ + k × rychlost (1,4 m/s ≈ 3,5 MET)
+static var MET_WALK_PER_MS := 1.4
+static var MET_MOVE_V := 0.3               # m/s – od této rychlosti se počítá chůze
+static var MET_RUN := 8.0                  # běh (sprint)
+static var MET_RUN_V := 4.5                # m/s – od této rychlosti běh
+static var MET_SWIM := 7.0
+static var MET_CLIMB_PER_MS := 25.0        # MET na m/s stoupání (82 kg × g × v / účinnost 0,25)
+static var MET_DESCENT_K := 0.3            # z kopce se ušetří jen část
+static var MET_LOAD_PER_KG := 0.05         # MET na kg nákladu při chůzi (20–50 kg → +1–2,5)
+static var MET_LOAD_STAND_K := 0.3         # podíl při stání
+static var MET_MAX := 12.0
+## MET podle pózy činnosti (`Humanoid.action` / anim z `Actions.DEFS`) – nahradí stání, pokud je vyšší.
+static var ACTION_MET := {"chop": 6.0, "dig": 5.0, "kneel": 2.0, "pour": 2.5, "cast": 2.0, "aim": 1.5}
+# --- mapování teploty jádra na stav (API `cold` / `overheat` zůstává)
+static var COLD_CORE_FROM := 36.5          # °C jádra – od kdy roste prochladnutí
+static var COLD_CORE_FULL := 35.0          # °C – plné prochladnutí (podchlazení)
+static var HEAT_CORE_FROM := 37.6          # °C – od kdy roste přehřátí
+static var HEAT_CORE_FULL := 39.0          # °C – plné přehřátí
+# --- voda v těle (hydration = litry vůči optimu; záporně = deficit)
+static var LATENT_WH_L := 680.0            # Wh na litr odpařené vody
+static var SWEAT_DRIP_K := 1.3             # vyprodukovaný pot / odpařený pot
+static var SWEAT_WET_PER_L := 0.6          # neodpařený pot (l) promáčí oděv o tolik
+static var URINE_L_H := 0.055              # l/h – moč při normální hydrataci
+static var URINE_HYDR_L := 1.0             # l – ledviny šetří při deficitu (lineárně)
+static var URINE_MIN_K := 0.3
+static var HYDR_MAX_L := 0.5               # přebytek nad optimum se vyloučí
+static var HYDR_MIN_L := -5.0
+static var THIRST_FROM_L := 0.5            # l deficitu – začíná žízeň
+static var THIRST_FULL_L := 2.5            # l (~3 % hmotnosti) – silná žízeň / dehydratace
+static var DIURESIS_L_G := 0.01            # l moči navíc na 1 g odbouraného alkoholu (pivo hydratuje méně, kořalka odvodní)
+static var FOOD_WATER_L_KCAL := 0.0004     # l vody z jídla na kcal
+static var STAM_THIRST_K := 0.25           # ztráta max. výdrže při plné žízni
+static var DRAIN_THIRST_K := 0.4           # zrychlení únavy při plné žízni
+static var HEADACHE_FROM := 0.6            # žízeň, od které bolí hlava (mírný efekt obrazu)
+static var HEADACHE_FX := 0.12             # efekt obrazu (jako opilost) při plné dehydrataci
+static var DEHYDR_HP_H := 2.0              # zdraví za hodinu při plné dehydrataci
+static var STREAM_NAUSEA_CHANCE := 0.08    # šance nevolnosti po vodě z potoka
+static var STREAM_NAUSEA := 0.35
+# --- spánek a ospalost
+static var SLEEP_DEBT_RATE := 1.0          # h dluhu za hodinu bdění
+static var SLEEP_RECOVER := 2.0            # h dluhu smazaných hodinou spánku
+static var SLEEP_DEBT_MAX := 48.0
+static var DROWSY_FROM_H := 16.0           # h bdění – začíná ospalost
+static var DROWSY_FULL_H := 30.0           # h – plná ospalost
+static var CAFFEINE_AWAKE_K := 0.6         # kofein (1,0) ubere tolik ospalosti
+static var DROWSY_FX := 0.3                # ospalost (1,0) = tolik „opilosti“ (reakce, efekt obrazu)
+static var STAM_DROWSY_K := 0.15
+static var MICROSLEEP_FROM := 0.5          # ospalost, od které hrozí mikrospánek
+static var MICROSLEEP_PER_H := 4.0         # mikrospánků za herní hodinu při plné ospalosti
+static var MICROSLEEP_S := 1.2             # s reálného času – zatmění obrazu
+# --- pád z výšky (rychlost dopadu přepočtená z výšky pádu: v = √(2·g·h))
+static var FALL_G := 9.81
+static var FALL_PAIN_V := 6.0              # m/s (≈ 2 m) – bolest a krátké kulhání
+static var FALL_INJURY_V := 9.0            # m/s (≈ 4 m) – zranění
+static var FALL_SEVERE_V := 13.0           # m/s (≈ 9 m) – vážné zranění
+static var FALL_KO_V := 15.0               # m/s (≈ 11,5 m) – bezvědomí (probuzení v nemocnici)
+static var FALL_PAIN_HP_V := 2.0           # zdraví na m/s nad prahem bolesti
+static var FALL_INJ_HP := 10.0             # zdraví při zranění
+static var FALL_INJ_HP_V := 6.0            # + na m/s nad prahem zranění
+static var FALL_SEVERE_HP := 45.0
+static var FALL_DOWN_INJ_S := 2.5          # s ležení po zranění
+static var FALL_DOWN_SEVERE_S := 6.0
+static var LIMP_H_PER_V := 0.5             # h kulhání na m/s nad prahem bolesti
+static var LIMP_INJ_H := 6.0               # h kulhání po zranění
+static var LIMP_MAX_H := 48.0
+static var LIMP_WALK_K := 0.7              # rychlost chůze při kulhání
+static var PAIN_DECAY := 0.3               # /h – ústup bolesti
+static var SOFT_SNOW_K := 0.35             # sníh (snow_cover 1) pohltí tolik rychlosti dopadu
+static var SOFT_WATER_K := 0.7             # hluboká voda pohltí tolik
+static var SOFT_WATER_DEPTH := 1.2         # m – voda „hluboká“ pro dopad
+
 var weight := 82.0                 # kg
 var stomach_alc := 0.0             # g ethanolu v žaludku
 var body_alc := 0.0                # g ethanolu v těle (krev + tkáně)
@@ -175,6 +309,22 @@ var cold := 0.0                    # prochladnutí těla 0..1 (vítr + mráz + m
 var insulation := INSUL_BASE       # tepelná izolace oblečení (součet `insul`, max INSUL_MAX; M2.3)
 var waterproof := 0.0              # nepromokavost oblečení 0..1 (váženě trup + bunda, hlava, nohy + boty)
 var overheat := 0.0                # přehřátí v létě v zimním oblečení 0..1 (menší výdrž)
+# --- M8.16 (ukládá se: t_core, hydration, sleep_debt, limp_h, pain)
+var thermo := true                 # přepínač realismu „thermo“ (obnovuje se 4×/s z `World.realism_on`)
+var t_core := 37.0                 # °C – teplota jádra
+var hydration := 0.0               # l vůči optimu (záporně = deficit → žízeň)
+var sleep_debt := 0.0              # h bdění „nesplacené“ spánkem
+var limp_h := 0.0                  # h kulhání po pádu
+var pain := 0.0                    # 0..1 bolest po pádu (ubývá)
+var _thermo_acc_h := 0.0
+var _heat_w := 0.0                 # W – poslední bilance (deník: „prochladneš za…“)
+var _met := 1.2                    # poslední MET (F2 / deník)
+var _wind_body := 0.0              # m/s – poslední vítr na těle (deník)
+var _thirst := 0.0                 # 0..1 (odvozeno 4×/s)
+var _drowsy := 0.0                 # 0..1
+var _fatigue_fx := 0.0             # „opilost“ z ospalosti a bolesti hlavy
+var _microsleep_s := 0.0
+var _limp_on := false
 
 var _prev_promile := 0.0
 var _rise := 0.0                   # ‰/h, vyhlazené
@@ -225,6 +375,8 @@ func drunk_level() -> float:
 	var d := smoothstep(DRUNK_FROM, DRUNK_FULL, promile())
 	if nicotine > NICOTINE_FOCUS_MIN:
 		d *= NICOTINE_FOCUS_K      # nikotin krátkodobě "zaostří"
+	if thermo and _fatigue_fx > d:
+		d = _fatigue_fx            # M8.16: ospalost / bolest hlava z dehydratace – reakce a obraz jako mírná opilost
 	return d
 
 
@@ -273,6 +425,8 @@ func speed_mult() -> float:
 
 func stamina_max() -> float:
 	var m := 1.0 - minf(tar * STAM_TAR_K, STAM_TAR_MAX) - cold * STAM_COLD_K - overheat * OVERHEAT_STAMINA
+	if thermo:
+		m -= _thirst * STAM_THIRST_K + _drowsy * STAM_DROWSY_K     # M8.16
 	var b := bmi()
 	if b > STAM_BMI_FROM:
 		m -= (b - STAM_BMI_FROM) * STAM_BMI_K
@@ -280,7 +434,8 @@ func stamina_max() -> float:
 
 
 func stamina_drain_mult() -> float:
-	return 1.0 + maxf(bmi() - DRAIN_BMI_FROM, 0.0) * DRAIN_BMI_K + minf(tar * DRAIN_TAR_K, DRAIN_TAR_MAX) + cold * DRAIN_COLD_K + overheat * DRAIN_HEAT_K
+	return 1.0 + maxf(bmi() - DRAIN_BMI_FROM, 0.0) * DRAIN_BMI_K + minf(tar * DRAIN_TAR_K, DRAIN_TAR_MAX) + cold * DRAIN_COLD_K + overheat * DRAIN_HEAT_K \
+		+ (_thirst * DRAIN_THIRST_K if thermo else 0.0)
 
 
 func jump_mult() -> float:
@@ -302,6 +457,7 @@ func drink(id: String, ml: float) -> float:
 	var info := Consumables.info(id)
 	var kcal := float(info.get("kcal", 0)) * ml / float(info.get("ml", ml))
 	_add_energy(kcal * DRINK_KCAL_K)             # sacharidy; kcal z ethanolu se připíšou při odbourání
+	_add_water(Consumables.water_l(id, ml))      # M8.16: voda z nápoje (alkohol pak odvodní při odbourání)
 	if info.get("caffeine", 0.0) > 0.0:
 		caffeine = minf(caffeine + info["caffeine"], CAFFEINE_MAX)
 	if g > 0.0:
@@ -325,6 +481,7 @@ func eat(id: String) -> void:
 	stomach_kcal += kcal
 	total_kcal += kcal
 	_add_energy(kcal)
+	_add_water(kcal * FOOD_WATER_L_KCAL)         # M8.16: voda z jídla
 	# přejedení v opilosti
 	if stomach_kcal > OVEREAT_KCAL and promile() > OVEREAT_PROMILE:
 		nausea += OVEREAT_NAUSEA
@@ -416,21 +573,34 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 			wetness = maxf(wetness - dry_base * HEAT_DRY_K * env_heat * dt_h, 0.0)
 	else:
 		wetness = maxf(wetness - dry_base * (1.0 + HEAT_DRY_K * env_heat) * dt_h, 0.0)
-	# pocitová teplota: vítr a mokrý oděv ochlazují; uvnitř / pod střechou je teplo, u ohně teplo navíc
-	var feels := env_temp - env_wind * (WINDCHILL_K + wetness * WINDCHILL_WET_K) - wetness * WET_CHILL_C + env_heat * HEAT_WARM_C
-	if env_in:
-		feels = maxf(feels, shelter_c)
-	var comfort := COLD_COMFORT - (clampf(insulation, 0.0, INSUL_MAX) - INSUL_BASE) * INSUL_COMFORT_C   # teplé oblečení posune pohodlí dolů
-	var chlad := comfort - feels
-	if chlad > 0.0:
-		cold = minf(cold + chlad * CHILL_RATE * dt_h, 1.0)
-	else:
-		cold = maxf(cold + chlad * WARM_RATE * dt_h, 0.0)
-	# přehřátí: silné oblečení za horka venku
-	if not env_in and env_temp > OVERHEAT_TEMP and insulation > OVERHEAT_INSUL:
-		overheat = minf(overheat + (env_temp - OVERHEAT_TEMP) * (insulation - OVERHEAT_INSUL) * OVERHEAT_RATE * dt_h, 1.0)
-	else:
-		overheat = maxf(overheat - OVERHEAT_DECAY * dt_h, 0.0)
+	# M8.16: tepelná bilance (4×/s reálně, ve spánku / při přeskoku času každý krok); vypnuto = stará pravidla
+	_thermo_acc_h += dt_h
+	if _microsleep_s > 0.0:
+		_microsleep_s -= dt_h * 3600.0 / maxf(Clock.TIME_SCALE, 0.001)
+	if sleeping or _thermo_acc_h >= THERMO_STEP_S * Clock.TIME_SCALE / 3600.0:
+		var acc := _thermo_acc_h
+		_thermo_acc_h = 0.0
+		_refresh_thermo_switch()
+		if thermo:
+			var __t0 := Tests.prof_t0()
+			_thermo_step(acc, sleeping, env_in, env_temp, env_wind, env_heat, shelter_c)
+			Tests.prof_add("body_thermo", __t0)
+	if not thermo:
+		# pocitová teplota: vítr a mokrý oděv ochlazují; uvnitř / pod střechou je teplo, u ohně teplo navíc
+		var feels := env_temp - env_wind * (WINDCHILL_K + wetness * WINDCHILL_WET_K) - wetness * WET_CHILL_C + env_heat * HEAT_WARM_C
+		if env_in:
+			feels = maxf(feels, shelter_c)
+		var comfort := COLD_COMFORT - (clampf(insulation, 0.0, INSUL_MAX) - INSUL_BASE) * INSUL_COMFORT_C   # teplé oblečení posune pohodlí dolů
+		var chlad := comfort - feels
+		if chlad > 0.0:
+			cold = minf(cold + chlad * CHILL_RATE * dt_h, 1.0)
+		else:
+			cold = maxf(cold + chlad * WARM_RATE * dt_h, 0.0)
+		# přehřátí: silné oblečení za horka venku
+		if not env_in and env_temp > OVERHEAT_TEMP and insulation > OVERHEAT_INSUL:
+			overheat = minf(overheat + (env_temp - OVERHEAT_TEMP) * (insulation - OVERHEAT_INSUL) * OVERHEAT_RATE * dt_h, 1.0)
+		else:
+			overheat = maxf(overheat - OVERHEAT_DECAY * dt_h, 0.0)
 	if not sleeping and cold > COLD_HURT_FROM:
 		hurt((cold - COLD_HURT_FROM) * COLD_HURT_K * dt_h, "prochladnutí")
 	var ff := food_factor()
@@ -445,6 +615,7 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 	var elim := cap * body_alc / (body_alc + ELIM_KM) * dt_h
 	elim = minf(elim, body_alc)
 	body_alc -= elim
+	hydration = maxf(hydration - elim * DIURESIS_L_G, HYDR_MIN_L)   # M8.16: alkohol zvyšuje diurézu
 	_add_energy((elim + absorbed * first_pass) * ETHANOL_KCAL_G)
 	# --- trávení
 	stomach_kcal = maxf(stomach_kcal - DIGEST_KCAL_H * dt_h, 0.0)
@@ -502,3 +673,330 @@ func _step(dt_h: float, activity_kcal_h: float, sleeping: bool, env := {}) -> vo
 		if _rng.randf() < chance:
 			_passout_cool = PASSOUT_CD_H
 			passed_out.emit()
+
+
+# ------------------------------------------------------------------ M8.16 Tělo 2: teplo, voda, spánek, pád
+
+## Přepínač realismu „thermo“ (World.realism_on) – bez světa (testy, NPC) zůstává zapnuto.
+func _refresh_thermo_switch() -> void:
+	var p := get_parent() as Player
+	if p == null:
+		return
+	var w := p.get_parent() as World
+	if w != null:
+		var on := w.realism_on("thermo")
+		if on != thermo:
+			thermo = on
+			if not on:
+				_set_limp(p, false)
+				_fatigue_fx = 0.0
+
+
+## Nasycený tlak vodní páry (kPa, Magnus–Tetens).
+static func _psat_kpa(t: float) -> float:
+	return 0.6108 * exp(17.27 * t / (t + 237.3))
+
+
+## Jeden krok bilance za `dt_h` herních hodin (dělí se na vnitřní kroky ≤ THERMO_MAX_DT_H). Prostředí: `env`
+## od `Player._update_body` (teplota z `Microclimate.temp_at`, vítr z `wind_speed_at`, déšť, střecha, oheň);
+## činnost, náklad, slunce, stín, vlhkost a sníh si krok dočte z hráče a světa (4×/s, žádné alokace).
+func _thermo_step(dt_h: float, sleeping: bool, env_in: bool, t_air: float, wind10: float, heat: float,
+		shelter_c: float) -> void:
+	var p := get_parent() as Player
+	var w: World = null
+	if p != null:
+		w = p.get_parent() as World
+	var full_in := sleeping or p == null or p.inside != "" or p.car != null or p.aircraft != null
+	if env_in:
+		if full_in:
+			t_air = maxf(t_air, shelter_c)
+		elif shelter_c > t_air:
+			t_air += (shelter_c - t_air) * ROOF_WARM_K    # střecha venku: jen závětří a trochu tepla
+	# --- metabolismus (MET) podle činnosti
+	var met := MET_SLEEP if sleeping else MET_STAND
+	var hs := 0.0
+	var immerse := 0.0
+	var contact := 0.0
+	if p != null and not sleeping:
+		hs = Vector2(p.velocity.x, p.velocity.z).length()
+		if p.car != null or p.aircraft != null:
+			met = MET_SEATED
+			hs = 0.0
+		elif p.horse != null:
+			met = MET_HORSE
+		elif p.wade > Player.SWIM_DEPTH:
+			met = MET_SWIM
+		else:
+			var load_kg := p.carried_kg()
+			if w != null and w.cargo != null:
+				load_kg += w.cargo.carried_kg(p.id)
+			if hs > MET_MOVE_V:
+				met = MET_RUN if hs > MET_RUN_V else MET_WALK_BASE + MET_WALK_PER_MS * hs
+				met += load_kg * MET_LOAD_PER_KG
+				if p.is_on_floor():
+					var vy := p.velocity.y
+					met += vy * MET_CLIMB_PER_MS * (1.0 if vy > 0.0 else MET_DESCENT_K)
+			else:
+				met += load_kg * MET_LOAD_PER_KG * MET_LOAD_STAND_K
+			if p.visual != null:
+				met = maxf(met, float(ACTION_MET.get(p.visual.action, 0.0)))
+			if p.fallen > 0.0:
+				contact = COND_LIE_M2
+			elif p._crouching or (p.visual != null and p.visual.action == "kneel"):
+				contact = COND_SIT_M2
+		immerse = clampf(p.wade / IMMERSE_DEPTH, 0.0, 1.0)
+	met = clampf(met, MET_SLEEP, MET_MAX)
+	_met = met
+	# --- prostředí dočtené ze světa (jen venku)
+	var rh := 0.7
+	var ghi := 0.0
+	var night_sky := 0.0
+	var snow := 0.0
+	if w != null and p != null:
+		if w.micro != null:
+			rh = w.micro.humidity_at(p.global_position)
+		if w.weather != null:
+			snow = w.weather.snow_cover
+		if not env_in and w.clock != null and w.weather != null:
+			var elev := w.clock.sun_elevation()
+			if elev > 0.0:
+				ghi = Atmosphere.SkyModel.global_horizontal_irradiance_wm2(elev, w.weather.cloud,
+					clampf(w.weather.fog, 0.0, 1.0))
+				if w.tree_eco != null:
+					ghi *= 1.0 - w.tree_eco.canopy_at(p.global_position.x, p.global_position.z) * CANOPY_SHADE
+			else:
+				night_sky = 1.0 - clampf(w.weather.cloud, 0.0, 1.0)
+	if full_in:
+		contact = 0.0
+	# --- oblečení v clo (mokré a větrem stlačené izoluje hůř; nepromokavá vrstva = větruodolná)
+	var clo0 := SLEEP_CLO if sleeping else clampf(insulation, 0.0, INSUL_MAX) * CLO_PER_INSUL
+	var v_air := wind10 * WIND_BODY_K + hs * WALK_AIR_K + AIR_MIN_MS
+	_wind_body = v_air
+	var hc := HC_BASE + HC_WIND_K * sqrt(v_air) + WATER_HC * immerse
+	var pa := rh * _psat_kpa(t_air)
+	var vpd := clampf(_psat_kpa(t_air) - pa, 0.1, 2.0)
+	var t_ground := minf(t_air, 0.0) if snow > 0.3 else t_air
+	var area := BODY_AREA_M2
+	var n := maxi(int(ceil(dt_h / THERMO_MAX_DT_H)), 1)
+	var h := dt_h / n
+	var water_l := 0.0
+	var wet_add := 0.0
+	var q := 0.0
+	for i in n:
+		var clo := clo0 * (1.0 - wetness * WET_CLO_LOSS)
+		if not sleeping:
+			clo *= 1.0 - clampf((t_core - VENT_FROM) / VENT_RANGE, 0.0, 1.0) * VENT_MAX
+		clo *= 1.0 - minf(WIND_CLO_K * minf(v_air, 15.0), WIND_CLO_MAX) * (1.0 - clampf(waterproof, 0.0, 1.0))
+		var fcl := 1.0 + FCL_K * clo
+		var r := clo * 0.155 + 1.0 / (fcl * (hc + HR_W_M2K))
+		var t_sk := clampf(T_SKIN_NEUTRAL + (t_core - T_CORE_NORMAL) * VASO_K, T_SKIN_MIN, T_SKIN_MAX)
+		var m := met * MET_W_M2 * area + minf(maxf(SHIVER_FROM - t_core, 0.0) * SHIVER_W_K, SHIVER_MAX_W)
+		var c := area * (t_sk - t_air) / r
+		var resp_lat := RESP_LAT_K * m * maxf(RESP_LAT_PA - pa, 0.0)
+		var resp := resp_lat + RESP_CONV_K * m * (RESP_T - t_air)
+		var e_req := maxf(t_core - SWEAT_FROM, 0.0) * SWEAT_W_K
+		var e_max := area * maxf(_psat_kpa(t_sk) - pa, 0.2) / (EVAP_CLO_K * clo + 1.0 / (LEWIS_K * fcl * hc))
+		var e_sw := minf(e_req, e_max)
+		var e_wet := WET_EVAP_W * wetness * vpd * (1.0 + 0.3 * sqrt(v_air))
+		var cond := 0.0
+		if contact > 0.0:
+			cond = contact * (t_sk - t_ground) / (clo * 0.155 + COND_R_BASE)
+			if snow > 0.3 or wetness > 0.5:
+				cond *= COND_SNOW_K
+		q = m - c - resp - e_sw - e_wet - INSENSIBLE_W - cond + ghi * SUN_AREA_M2 * SUN_ABSORB \
+			+ heat * FIRE_W - night_sky * NIGHT_SKY_W
+		t_core = clampf(t_core + q / HEAT_CAP_WH_K * h, T_CORE_MIN, T_CORE_MAX)
+		water_l += (e_sw * SWEAT_DRIP_K + resp_lat + INSENSIBLE_W) / LATENT_WH_L * h
+		if e_req > e_max:
+			wet_add += (e_req - e_max) / LATENT_WH_L * h * SWEAT_WET_PER_L
+	_heat_w = q
+	wetness = minf(wetness + wet_add, 1.0)
+	# --- stav pro ostatní systémy (API `cold` / `overheat` beze změny)
+	cold = clampf((COLD_CORE_FROM - t_core) / (COLD_CORE_FROM - COLD_CORE_FULL), 0.0, 1.0)
+	overheat = clampf((t_core - HEAT_CORE_FROM) / (HEAT_CORE_FULL - HEAT_CORE_FROM), 0.0, 1.0)
+	# --- voda v těle
+	var urine := URINE_L_H * clampf(1.0 + hydration / URINE_HYDR_L, URINE_MIN_K, 2.0) * dt_h
+	hydration = clampf(hydration - water_l - urine, HYDR_MIN_L, HYDR_MAX_L)
+	_thirst = clampf((-hydration - THIRST_FROM_L) / (THIRST_FULL_L - THIRST_FROM_L), 0.0, 1.0)
+	if _thirst >= 1.0 and not sleeping:
+		hurt(DEHYDR_HP_H * dt_h, "dehydratace")
+	# --- spánek
+	if sleeping:
+		sleep_debt = maxf(sleep_debt - SLEEP_RECOVER * dt_h, 0.0)
+	else:
+		sleep_debt = minf(sleep_debt + SLEEP_DEBT_RATE * dt_h, SLEEP_DEBT_MAX)
+	_drowsy = smoothstep(DROWSY_FROM_H, DROWSY_FULL_H, sleep_debt) * (1.0 - clampf(caffeine, 0.0, 1.0) * CAFFEINE_AWAKE_K)
+	_fatigue_fx = maxf(_drowsy * DROWSY_FX, smoothstep(HEADACHE_FROM, 1.0, _thirst) * HEADACHE_FX)
+	if not sleeping and _drowsy > MICROSLEEP_FROM and _microsleep_s <= 0.0:
+		var ch := MICROSLEEP_PER_H * (_drowsy - MICROSLEEP_FROM) / (1.0 - MICROSLEEP_FROM) * dt_h
+		if _rng.randf() < ch:
+			_microsleep_s = MICROSLEEP_S
+	# --- zranění pádem: kulhání a bolest ubývají
+	limp_h = maxf(limp_h - dt_h, 0.0)
+	pain = maxf(pain - PAIN_DECAY * dt_h, 0.0)
+	if p != null:
+		_set_limp(p, limp_h > 0.0)
+
+
+func _set_limp(p: Player, on: bool) -> void:
+	if on == _limp_on:
+		return
+	_limp_on = on
+	if on:
+		p.set_speed_mod("zraneni_pad", {"walk_k": LIMP_WALK_K, "no_sprint": true})
+	else:
+		p.clear_speed_mod("zraneni_pad")
+
+
+func _add_water(l: float) -> void:
+	hydration = clampf(hydration + l, HYDR_MIN_L, HYDR_MAX_L)
+
+
+## Napít se vody ze zdroje (studánka, kohoutek, potok). `source` „potok“ = malé riziko nevolnosti.
+func drink_water(ml: float, source := "") -> void:
+	_add_water(ml / 1000.0)
+	if source == "potok" and _rng.randf() < STREAM_NAUSEA_CHANCE:
+		nausea = minf(nausea + STREAM_NAUSEA, 1.0)
+
+
+## 0..1 – mikrospánek právě teď (zatmění obrazu v `DrunkFx`).
+func microsleep_fx() -> float:
+	return 1.0 if thermo and _microsleep_s > 0.0 else 0.0
+
+
+func thirst() -> float:
+	return _thirst if thermo else 0.0
+
+
+func drowsiness() -> float:
+	return _drowsy if thermo else 0.0
+
+
+## Dopad z výšky `drop_m` (m): rychlost dopadu v = √(2·g·h), sníh (`snow` 0..1) a hluboká voda (`wade_m`) ji tlumí.
+## Vrací sekundy ležení (> 0 = zranění), 0 = jen bolest a kulhání, −1 = nic.
+func fall_landing(drop_m: float, snow: float, wade_m: float) -> float:
+	if drop_m <= 0.0:
+		return -1.0
+	var v := sqrt(2.0 * FALL_G * drop_m)
+	v *= 1.0 - clampf(snow, 0.0, 1.0) * SOFT_SNOW_K
+	v *= 1.0 - clampf(wade_m / SOFT_WATER_DEPTH, 0.0, 1.0) * SOFT_WATER_K
+	if v < FALL_PAIN_V:
+		return -1.0
+	pain = minf(pain + clampf((v - FALL_PAIN_V) / (FALL_SEVERE_V - FALL_PAIN_V), 0.2, 1.0), 1.0)
+	if v < FALL_INJURY_V:
+		limp_h = minf(limp_h + (v - FALL_PAIN_V) * LIMP_H_PER_V, LIMP_MAX_H)
+		_set_limp_now()
+		hurt((v - FALL_PAIN_V) * FALL_PAIN_HP_V, "pád z výšky")
+		return 0.0
+	limp_h = minf(limp_h + LIMP_INJ_H + (v - FALL_INJURY_V) * LIMP_H_PER_V, LIMP_MAX_H)
+	_set_limp_now()
+	if v >= FALL_KO_V:
+		hurt(health, "pád z výšky")              # bezvědomí → probuzení v nemocnici (knocked_out)
+		return FALL_DOWN_SEVERE_S
+	if v >= FALL_SEVERE_V:
+		hurt(FALL_SEVERE_HP, "pád z výšky")
+		return FALL_DOWN_SEVERE_S
+	hurt(FALL_INJ_HP + (v - FALL_INJURY_V) * FALL_INJ_HP_V, "pád z výšky")
+	return FALL_DOWN_INJ_S
+
+
+func _set_limp_now() -> void:
+	var p := get_parent() as Player
+	if p != null:
+		_set_limp(p, limp_h > 0.0)
+
+
+## Starý save bez `t_core`: jádro odvozené z uloženého prochladnutí (ať se stav po načtení neskokově nezmění).
+func core_from_cold() -> void:
+	if cold > 0.0:
+		t_core = COLD_CORE_FROM - cold * (COLD_CORE_FROM - COLD_CORE_FULL)
+	else:
+		t_core = T_CORE_NORMAL
+
+
+## Krátký stav pro HUD (prázdný = není co hlásit). Čísla jádra se na HUD neukazují (jen F2 ladění).
+func status_text() -> String:
+	if not thermo:
+		return ""
+	var s := ""
+	if cold > 0.25:
+		s += " · zima" if cold < 0.6 else " · silná zima"
+	if overheat > 0.25:
+		s += " · horko" if overheat < 0.6 else " · hrozí úpal"
+	if _thirst > 0.05:
+		s += " · žízeň" if _thirst < 0.6 else " · silná žízeň"
+	if _drowsy > 0.1:
+		s += " · ospalost" if _drowsy < 0.6 else " · padáš únavou"
+	if limp_h > 0.0:
+		s += " · zranění (kulháš)"
+	elif pain > 0.2:
+		s += " · bolest"
+	return s.substr(3)
+
+
+## Oddíl deníku J → Zdraví: srozumitelné věty místo čísel.
+func journal_health() -> String:
+	if not thermo:
+		return ""
+	var s := "[b]ZDRAVÍ[/b]\n"
+	var lines := 0
+	var cooling := _heat_w < -20.0 and t_core > COLD_CORE_FULL
+	if cooling:
+		var hrs := (t_core - COLD_CORE_FULL) / (-_heat_w / HEAT_CAP_WH_K)
+		var when := ""
+		if hrs < 0.25:
+			when = "za chvíli"
+		elif hrs < 0.75:
+			when = "za půl hodiny"
+		elif hrs < 1.5:
+			when = "za hodinu"
+		elif hrs < 4.0:
+			when = "za pár hodin"
+		if when != "":
+			var why := "Je ti zima"
+			if wetness > 0.4 and _wind_body > 2.0:
+				why = "Jsi promoklý a fouká"
+			elif wetness > 0.4:
+				why = "Jsi promoklý"
+			elif _wind_body > 3.0:
+				why = "Fouká"
+			elif _met < 1.6:
+				why = "Stojíš bez hnutí"
+			s += "%s – v tomhle oblečení prochladneš %s.\n" % [why, when]
+			lines += 1
+	if cold > 0.6:
+		s += "Jsi podchlazený a třeseš se. Hned do tepla, k ohni nebo se převleč do suchého.\n"
+		lines += 1
+	elif cold > 0.25 and not cooling:
+		s += "Je ti zima, ale už se zahříváš.\n"
+		lines += 1
+	if overheat > 0.5:
+		s += "Je ti horko k padnutí – zpomal, svlékni bundu, napij se a jdi do stínu.\n"
+		lines += 1
+	elif overheat > 0.2:
+		s += "Potíš se, je ti horko.\n"
+		lines += 1
+	if _thirst > 0.6:
+		s += "Máš velkou žízeň a bolí tě hlava. Napij se vody – pivo ani kořalka žízeň neuhasí.\n"
+		lines += 1
+	elif _thirst > 0.05:
+		s += "Máš žízeň.\n"
+		lines += 1
+	if _drowsy > 0.6:
+		s += "Padáš únavou – za volantem hrozí mikrospánek. Vyspi se (kafe pomůže jen na chvíli).\n"
+		lines += 1
+	elif _drowsy > 0.1:
+		s += "Jsi ospalý.\n"
+		lines += 1
+	if limp_h > 0.0:
+		s += "Po pádu kulháš a bolí tě to (ještě asi %d h).\n" % maxi(int(ceil(limp_h)), 1)
+		lines += 1
+	if lines == 0:
+		s += "Cítíš se dobře.\n"
+	return s + "\n"
+
+
+## Ladicí řádek (F2 → Hráč): čísla jádra a bilance.
+func debug_text() -> String:
+	return "Jádro %.2f °C · bilance %+.0f W · %.1f MET · voda %+.2f l · bdění %.1f h · vítr na těle %.1f m/s" % [
+		t_core, _heat_w, _met, hydration, sleep_debt, _wind_body]

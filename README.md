@@ -184,6 +184,15 @@ dopruží za pohybem a uši se natočí za zvukem; vyplašený srnec rozevře b�
 Ptáci létají podle zjednodušené aerodynamiky (`FlightModel`): vrána mává a klouže, kos vlní, káně krouží bez mávání
 v termice (`Thermals`, tam kde paraglide), proti větru letí pomaleji, přistávají s brzděním. V září–listopadu
 za soumraku se nad poli vlní hejna špačků (murmurace, až 400 ptáků). Měřicí scéna `pole_rijen_vecer`.
+**M8.16 Tělo 2** (`BodyState`, přepínač `thermo` v Realismu): jedna **tepelná bilance** místo pocitové teploty –
+námaha hřeje (MET: stání 1,2, chůze 2,5–4 podle rychlosti a stoupání, náklad, sekání 6, běh 8), vítr, mokré oblečení
+(ztrácí až 65 % izolace v clo), voda a sezení na sněhu chladí, slunce (ne ve stínu lesa) a oheň hřejí; teplota jádra
+→ prochladnutí / přehřátí (API beze změny). **Žízeň** (pocení, dech; pivo hydratuje méně, kořalka odvodní; voda
+ze studánky a z dřezu doma zdarma), **ospalost** po ~16 h bdění (kafe pomůže na chvíli, za volantem mikrospánek –
+krátké zatmění), **pád z výšky** podle rychlosti dopadu (2 m bolest a kulhání, 4 m zranění, 9 m vážné, ~12 m
+bezvědomí; sníh a hluboká voda tlumí). HUD řádek stavu jen když je co hlásit (zima, horko, žízeň, ospalost,
+zranění), deník J → **Zdraví** větami, čísla jádra jen F2 → Hráč. F3 → Člověk / Tělo – teplo a energie (126
+parametrů). Měřicí scéna `zima_telo`.
 
 ### Menu pro vývojáře (F3, M8.D)
 

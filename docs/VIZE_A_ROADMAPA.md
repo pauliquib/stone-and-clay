@@ -565,7 +565,7 @@ Start: `prompts/roadmapa/M8_realismus/00_START_M8.md` (orchestrátor, 8 vln), sp
 - [x] **M8.13 Terramechanika** – zaboření, zapadlé auto, trvalé koleje a stopy.
 - [ ] **M8.14 Přízemní vegetace** – louky podle stanoviště, podrost podle druhu, seč a seno, sukcese, interaktivní tráva a pěšiny.
 - [ ] **M8.15 Ekologie zvěře** – stanoviště, denní a roční cyklus, populace, semenné roky, škody.
-- [ ] **M8.16 Tělo 2** – tepelná bilance (MET, clo, vítr, mokro, slunce), žízeň, spánkový dluh, zranění pádem.
+- [x] **M8.16 Tělo 2** – tepelná bilance (MET, clo, vítr, mokro, slunce), žízeň, spánkový dluh, zranění pádem.
 - [ ] **M8.17 Život vesnice** – domácnosti, potřeby, okna a komíny podle obsazenosti, vztahy a drby mezi obyvateli.
 - [ ] **M8.18 Zvuková krajina** – ptačí chorál, cvrčci (Dolbear), žáby, netopýři, světlušky, útlum lesem a ozvěna.
 - [ ] **M8.19 Kalibrace a uzavření** – srovnání s reálnými daty, výkon na GTX 1050, předvolby, dokumentace.

@@ -56,7 +56,8 @@ func _process(delta: float) -> void:
 	var dvis := smoothstep(DOUBLE_FROM, DOUBLE_FULL, p)
 	var bl := smoothstep(BLUR_FROM, BLUR_FULL, p)
 	var tun := smoothstep(TUNNEL_FROM, TUNNEL_FULL, p) * TUNNEL_MAX
-	var active := d > 0.01 or _hurt > 0.0 or blackout > 0.0 or body.nausea > 0.2
+	var ms := body.microsleep_fx()          # M8.16: mikrospánek = krátké zatmění
+	var active := d > 0.01 or _hurt > 0.0 or blackout > 0.0 or body.nausea > 0.2 or ms > 0.0
 	_rect.visible = active
 	if not active:
 		return
@@ -64,7 +65,7 @@ func _process(delta: float) -> void:
 	_mat.set_shader_parameter("double_vision", dvis)
 	_mat.set_shader_parameter("blur", bl)
 	_mat.set_shader_parameter("tunnel", tun)
-	_mat.set_shader_parameter("blackout", clampf(blackout, 0.0, 1.0))
+	_mat.set_shader_parameter("blackout", clampf(maxf(blackout, ms), 0.0, 1.0))
 	_mat.set_shader_parameter("nausea", clampf((body.nausea - NAUSEA_FX_FROM) / (1.0 - NAUSEA_FX_FROM), 0.0, 1.0))
 	_mat.set_shader_parameter("hurt", _hurt)
 	_mat.set_shader_parameter("time_s", _t)

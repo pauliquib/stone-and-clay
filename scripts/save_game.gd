@@ -21,7 +21,8 @@ const SLOT_NAMES := {"rychly": "Rychlé uložení (F5)", "auto": "Automaticky (p
 	"2": "Pozice 2", "3": "Pozice 3"}
 const BODY_KEYS := ["weight", "stomach_alc", "body_alc", "stomach_kcal", "nicotine", "tar", "craving", "ever_smoked",
 	"caffeine", "nausea", "health", "alive", "total_alc_g", "total_kcal", "cigarettes_smoked", "drinks",
-	"wetness", "cold", "addiction", "_smoke_rate", "thc", "psilo"]
+	"wetness", "cold", "addiction", "_smoke_rate", "thc", "psilo",
+	"t_core", "hydration", "sleep_debt", "limp_h", "pain"]     # M8.16
 
 
 static func path(slot: String) -> String:
@@ -309,6 +310,10 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	p.body._smoke_rate = 0.0
 	p.body.thc = 0.0              # M4.8: starý save bez klíče = bez látek
 	p.body.psilo = 0.0
+	p.body.hydration = 0.0        # M8.16: starý save = napitý, vyspalý, bez zranění
+	p.body.sleep_debt = 0.0
+	p.body.limp_h = 0.0
+	p.body.pain = 0.0
 	for k in bd:
 		if not k in BODY_KEYS:
 			continue
@@ -316,6 +321,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 			TYPE_INT: p.body.set(k, int(bd[k]))
 			TYPE_BOOL: p.body.set(k, bool(bd[k]))
 			_: p.body.set(k, float(bd[k]))
+	if not bd.has("t_core"):
+		p.body.core_from_cold()       # M8.16: jádro z uloženého prochladnutí
 	# --- vozidla: základní (podle pořadí a modelu – vozidla přistavená z menu F2 se neukládají znovu) a koupená
 	# v bazaru (M1.6; stávající se odstraní a vytvoří se znovu z uložených záznamů)
 	var vs: Array = d.get("vehicles", [])

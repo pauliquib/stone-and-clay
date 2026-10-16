@@ -194,7 +194,9 @@ func _drink(id: int) -> void:
 	if frozen():
 		world.notify(id, "show_message", ["Studánka je zamrzlá, voda neteče.", 3.0])
 		return
-	# žízeň zatím v BodyState není (viz otevřené body) – jen chuť a zpráva
+	var p: Player = world.players.get(id)
+	if p != null:
+		p.body.drink_water(400.0, "studanka")      # M8.16: žízeň – voda zdarma
 	world.notify(id, "show_message", ["Studená a čistá voda z pramene. Osvěží.", 3.0])
 
 

@@ -820,6 +820,7 @@ func _journal_bbcode() -> String:
 	var phj = game.get("phenology")      # M8.11: rok v přírodě (rašení, květ, pozdní mráz, růst lesa)
 	if phj != null:
 		s += String(phj.journal_text())
+	s += b.journal_health()                  # M8.16: oddíl „Zdraví“ (věty, žádná čísla jádra)
 	s += "[b]STATISTIKA[/b]\nVypito celkem %.0f g alkoholu (%d nápojů), snědeno %d kcal, vykouřeno %d cigaret.\n" % [
 		b.total_alc_g, b.drinks, int(b.total_kcal), b.cigarettes_smoked]
 	s += "Hmotnost %.1f kg (BMI %.1f).  Peníze %d Kč." % [b.weight, b.bmi(), player.money]
@@ -1415,6 +1416,9 @@ func _process_impl(delta: float) -> void:
 		extra += "\nOblečení promočené %d %%" % int(b.wetness * 100.0)
 	if b.cold > 0.1:
 		extra += "\nProchladnutí %d %%" % int(b.cold * 100.0)
+	var bst := b.status_text()             # M8.16: zima / horko / žízeň / ospalost / zranění – jen když je co hlásit
+	if bst != "":
+		extra += "\n" + bst
 	extra += "\nPeníze: %d Kč" % player.money
 	var hh: Horse = player.horse
 	if hh == null and game.fauna:

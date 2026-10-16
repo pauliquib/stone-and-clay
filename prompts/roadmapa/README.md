@@ -149,7 +149,7 @@ voda, vítr, světlo, mikroklima → stromy, rostliny, plodiny, zvěř → člov
 | [x] | M8.13 Terramechanika: bláto, zaboření, koleje | [`M8_realismus/13_terramechanika.md`](M8_realismus/13_terramechanika.md) | M8.7 |
 | [ ] | M8.14 Přízemní vegetace, seč, sukcese, interaktivní tráva | [`M8_realismus/14_prizemni_vegetace_louky_sukcese.md`](M8_realismus/14_prizemni_vegetace_louky_sukcese.md) | M8.2–M8.4, M8.7 |
 | [ ] | M8.15 Ekologie a populace zvěře | [`M8_realismus/15_ekologie_zvere.md`](M8_realismus/15_ekologie_zvere.md) | M8.2, M8.3, M8.11 |
-| [ ] | M8.16 Tělo 2: tepelná a energetická bilance, žízeň, pád | [`M8_realismus/16_telo_tepelna_a_energeticka_bilance.md`](M8_realismus/16_telo_tepelna_a_energeticka_bilance.md) | M8.9 |
+| [x] | M8.16 Tělo 2: tepelná a energetická bilance, žízeň, pád | [`M8_realismus/16_telo_tepelna_a_energeticka_bilance.md`](M8_realismus/16_telo_tepelna_a_energeticka_bilance.md) | M8.9 |
 | [ ] | M8.17 Život vesnice: domácnosti, potřeby, vztahy, drby | [`M8_realismus/17_zivot_vesnice.md`](M8_realismus/17_zivot_vesnice.md) | M8.1 |
 | [ ] | M8.18 Zvuková krajina a drobný život | [`M8_realismus/18_zvukova_krajina_a_drobny_zivot.md`](M8_realismus/18_zvukova_krajina_a_drobny_zivot.md) | M8.9, M8.11, M8.15 |
 | [ ] | M8.19 Kalibrace na realitu, výkon, uzavření | [`M8_realismus/19_kalibrace_vykon_uzavreni.md`](M8_realismus/19_kalibrace_vykon_uzavreni.md) | M8.1–M8.18 + měření uživatele |

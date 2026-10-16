@@ -2524,3 +2524,36 @@ dopravy, ne o regresi.
 - Zablácené boty (barva v `humanoid`) – volitelné, nehotovo. Stopy zvěře v blátě (srnec, divočák) – nehotovo, jen hráč a kůň.
 - Měřicí scéna `pole_blato` neposadí hráče do auta automaticky – jízdu dělá uživatel ručně.
 - Kalibrace půd je odhad z literatury → doladit v F3 podle pocitu (M8.19).
+## 2026-10-16 – M8.16 Tělo 2: tepelná a energetická bilance, žízeň, spánek, pád
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou překladu – ruční test čeká)
+- **Tepelná bilance** (`scripts/body_state.gd`, `_thermo_step`, přepínač `thermo`, stará pravidla jako fallback): MET podle
+  činnosti (rychlost, stoupání z `velocity.y`, náklad z `Player.carried_kg` + `Cargo`, póza `Humanoid.action` → tabulka
+  `ACTION_MET`, auto / kůň / plavání, spánek), konvekce s větrem (`Microclimate.wind_speed_at`, vítr jen jednou – ne
+  `wind_chill_at`) přes oděv v clo (`izolace × 1,5`, mokré −65 %, vítr stlačuje bez nepromokavé vrstvy, „rozepnutí“ při
+  přehřátí), odpar (dech, pocení omezené vlhkostí `Microclimate.humidity_at` a oděvem, mokrý oděv), záření (slunce
+  `Atmosphere.SkyModel.global_horizontal_irradiance_wm2` × stín `TreeEco.canopy_at`, jasná noční obloha), oheň, vedení
+  do země / sněhu vkleče a vleže, ponoření ve vodě. `t_core` → `cold` / `overheat` (API beze změny). Krok 4×/s reálně
+  (akumulátor), žádné alokace; kalibrace offline simulací (−5 °C v bundě: do kopce s nákladem jádro 37,6 °C, stání
+  36,2 °C; mokrý ve větru 8 m/s při 5 °C podchlazení za ~½ h, suchý ne).
+- **Voda v těle**: `hydration` (l), pot / dech / moč, `Consumables.water_l` (nápoj bez alkoholu, volitelný klíč `hydr`),
+  diuréza z odbouraného alkoholu (pivo hydratuje ~½ vody, panák odvodní), voda z jídla, `drink_water(ml, zdroj)` –
+  studánka (`studanka.gd`) zdarma, dřez doma už dává vodu; žízeň snižuje výdrž, nad 0,6 bolest hlavy (mírná „opilost“).
+- **Spánek**: `sleep_debt` → ospalost (16–30 h, kofein ubere), mikrospánek = krátké zatmění (`drunk_fx.gd`).
+- **Pád z výšky**: `BodyState.fall_landing` (v = √(2gh), sníh a hluboká voda tlumí) → bolest a kulhání
+  (`Player.set_speed_mod("zraneni_pad")`), zranění, vážné, bezvědomí (nemocnice). `player.gd`: hunk v dopadu + `_land_m816`.
+- **HUD / deník / F2**: řádek stavu jen když je co hlásit, deník J → „ZDRAVÍ“ (věty), F2 → Hráč: čísla jádra a „Napojit,
+  vyspat, zahřát a vyléčit pád“. Realismus → „Tělo: teplo, žízeň, spánek“ (`game_settings.gd`).
+- **Ukládání**: `BODY_KEYS` + `t_core`, `hydration`, `sleep_debt`, `limp_h`, `pain`; starý save → jádro z `cold`.
+- **F3**: `scripts/dev/tune_m8_16.gd`, skupina „Člověk/Tělo – teplo a energie“ – **126 parametrů** (120 `static var` +
+  6 MET póz). Celkem po M8.D + M8.16: 3 759.
+- Měřicí scéna `zima_telo` (`tests.gd`), prof. klíč `body_thermo`. Doc: `docs/SYSTEMS.md`, README, `docs/testy_M8.md`.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M8.md` → M8.16) a měření `--perfscene=zima_telo`.
+- Pití z potoka nemá akci (API `drink_water(ml, "potok")` je připravené); seno jako měkký dopad se nerozpozná.
+- Větruodolnost = nepromokavost oděvu (vlastní klíč `windproof` v katalogu by šel doplnit).
+- Mikrospánek za volantem jen zatmí obraz (řízení se samo nestrhne); NPC se podle teploty neoblékají (ověřeno – oblečení
+  vesničanů na teplotě nezávisí) → háček pro M8.17 (stín v horku taky).
+- Časové měřítko: tepelná kapacita 60 Wh/K je fyzikální (herní hodina = 2 min) – pokud bude zima / žízeň / ospalost
+  příliš rychlá, ladit v F3 (`body.thermo.heat_cap_wh_k`, `drowsy_from_h`, `thirst_full_l`) a přenést v M8.19.
