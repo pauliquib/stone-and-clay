@@ -685,6 +685,18 @@
   `TreeManager._set_visible` umí pole; streamer skryje pokácené při stavbě buňky). Zasazené stromy (M2.5) berou
   variantu podle druhu a velikosti (mladý → dospělý). Bez souboru / vypnuto = 6 prototypů DBT1 jako dřív.
   Měřicí scény `les_leto` (nová), `les_rano_mlha`, `dron_200m`.
+- **Menu pro vývojáře – živé ladění parametrů (M8.D)**: statický registr `DevTune` (`scripts/dev_tune.gd`: `register`,
+  `tune(cíl, vlastnost, id, skupina, popisek, min, max, krok, nápověda, jednotka)`, `link`, `value`, `set_value`, `reset`,
+  `reset_group`, `reset_all`, `is_changed`, `save_user`, `export_root`, `load_all`, signál `hub().changed`) a menu `DevMenu`
+  (`scripts/dev_menu.gd`, F3 jen s `GameSettings.dev_mode` – Esc → Nastavení → Vývoj; `LocalClient.dev_menu`, psaní do polí
+  nepouští vstup do hry – `typing`). Registrace po kategoriích v `scripts/dev/tune_<kategorie>.gd` (registr je najde sám).
+  M8.D1: **Svět** (`tune_svet.gd` – gravitace prostoru, `Car.VEH_G`, `Engine.physics_ticks_per_second` / `max_physics_steps`
+  / `time_scale`, `Clock.TIME_SCALE`, `EcoClock.SLICE_BUDGET_US` / `MAX_CATCHUP_DAYS`, `Weather.SURF_GRIP` a `GRIP_*`) a
+  **Vozidla** (`tune_vozidla.gd` – sdílené fyzikální parametry druhu `Car.Tune` v `Car.TUNES` pro auto / traktor / motorku /
+  kolo: pružení, motor, převodovka, brzdy, přilnavost a přenos zatížení, řízení, náklon, šlapání; vlastnosti modelů
+  v laditelné kopii `CarModel.live_spec(id)` – hmotnost, moment, otáčky, převody, odpor, rejd, těžiště, náklon; AI řidič
+  a společné nárazy / srážky / opilý řidič jako `Car` static var; ruční vozík `HandCart` a tažení `Cargo`). Hodnoty:
+  kód → `res://config.json` (Export, jen odlišné, seřazené) → `user://ladeni.cfg` (Uložit). Za snímek se registr nečte.
 
 ## Co ve hře je
 

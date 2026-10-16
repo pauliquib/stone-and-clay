@@ -49,12 +49,13 @@ const RAIN_MM_H := 25.0                # rain = 1 odpovídá lijáku 25 mm/h
 
 ## Přilnavost povrchu podle počasí – jediná tabulka, čte ji auto (pneu), chodec (podrážky) i kůň
 ## (kopyta); každý ji u sebe zjemní svým podílem klouzavosti. Hodnoty = násobek suchého asfaltu.
-const SURF_GRIP := {"asfalt": 1.0, "sterk": 0.78, "teren": 0.68}
-const GRIP_WET := 0.7                  # mokrá vozovka (wetness = 1)
-const GRIP_SNOW := 0.35                # uježděný sníh (snow_cover = 1)
-const GRIP_ICE := 0.15                 # náledí (wetness pod nulou)
-const GRIP_MUD := 0.5                  # rozmočená hlína na terénu (wetness = 1)
-const ICE_WET := 0.25                  # kolik wetness stačí k náledí
+## M8.D: laditelné (F3 → Svět → Povrchy a přilnavost, `scripts/dev/tune_svet.gd`) – `static var`, výchozí beze změny.
+static var SURF_GRIP := {"asfalt": 1.0, "sterk": 0.78, "teren": 0.68}
+static var GRIP_WET := 0.7             # mokrá vozovka (wetness = 1)
+static var GRIP_SNOW := 0.35           # uježděný sníh (snow_cover = 1)
+static var GRIP_ICE := 0.15            # náledí (wetness pod nulou)
+static var GRIP_MUD := 0.5             # rozmočená hlína na terénu (wetness = 1)
+static var ICE_WET := 0.25             # kolik wetness stačí k náledí
 
 var clock: Clock
 var north_deg := 78.37
@@ -82,7 +83,7 @@ var drought := 0.0                     # sucho 0..1 (roste bez deště, za horka
 ## Null nebo vypnutý přepínač Realismus → dnešní globální chování (`wetness`, počítadlo sucha).
 var soil_water: SoilWater = null
 const DROUGHT_TAU_H := 24.0            # M8.7: jak rychle se `drought` přiblíží indexu z vodní bilance
-const MUD_STERK := 0.6                 # M8.7: polní / štěrková cesta bere bláto z okolní půdy jen z části
+static var MUD_STERK := 0.6            # M8.7: polní / štěrková cesta bere bláto z okolní půdy jen z části (M8.D: laditelné)
 
 ## Autorita nad počasím: true = simuluje se tady (singleplayer, server). Klient v multiplayeru ji vypne
 ## (`authority = false`): počasí si nevyvíjí samo (ani náhodné blesky), jen plynule doháhá stav ze serveru

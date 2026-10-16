@@ -341,6 +341,8 @@ func _show_settings() -> void:
 	_check("Ukazovat FPS", settings.show_fps, func(on): settings.show_fps = on)
 	_header("Realismus")
 	_button("Realismus (M8)…", _show_realism)
+	_header("Vývoj")
+	_check("Režim vývojáře – F3 otevře ladění parametrů (fyzika, algoritmy)", settings.dev_mode, _set_dev_mode)
 	_button("← Zpět", _back)
 	_focus_first()
 
@@ -459,6 +461,14 @@ func _slider(text: String, lo: float, hi: float, step: float, val: float, setter
 		setter.call(x)
 		show_val.call(x)
 		settings.apply(client))
+
+
+## M8.D: Režim vývojáře – F3 (menu `DevMenu`) a řádek v nápovědě F1 jen se zapnutým režimem.
+func _set_dev_mode(on: bool) -> void:
+	settings.dev_mode = on
+	client.hud.set_dev_help(on)
+	if not on and client.dev_menu != null:
+		client.dev_menu.close()
 
 
 ## M4.8: přepnutí „Efekty obrazu“ – DrunkFx hned přestane (nebo začne) kreslit.

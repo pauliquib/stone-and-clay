@@ -23,6 +23,7 @@ var chimney_smoke: ChimneySmoke   # kouř z komínů podle teploty (M1.3)
 var season_fx: SeasonFx           # pole podle kalendáře, květy v trávě, ovoce a padané listí
 var game_menu: GameMenu          # F2 – roční období, čas, počasí, vozidla, teleport
 var pause_menu: PauseMenu        # Esc – pauza, uložit / načíst, nastavení, ovládání, ukončit
+var dev_menu: DevMenu            # M8.D: F3 – ladění parametrů (jen v Režimu vývojáře)
 var radio_view: RadioView        # E u rádia – přiblížení a točení knoflíky
 var settings := GameSettings.new()
 var beacon: Node3D
@@ -89,6 +90,11 @@ func attach(p: Player) -> void:
 	pause_menu = PauseMenu.new(self)
 	pause_menu.name = "Pauza"
 	add_child(pause_menu)
+	if dev_menu == null:               # M8.D: menu pro vývojáře (F3 jen v Režimu vývojáře)
+		dev_menu = DevMenu.new(self)
+		dev_menu.name = "MenuVyvojare"
+		add_child(dev_menu)
+	hud.set_dev_help(settings.dev_mode)
 	season_fx = SeasonFx.new()
 	season_fx.name = "Sezona"
 	add_child(season_fx)
@@ -292,8 +298,8 @@ func _physics_process(_delta: float) -> void:
 	if player == null:
 		return
 	var inp := player.input
-	if hud.chat_open:
-		# píše se – klávesy WASD / mezerník nesmí řídit postavu, auto ani koně
+	if hud.chat_open or (dev_menu != null and dev_menu.typing):
+		# píše se (chat, hledání / číslo v menu F3) – klávesy WASD / mezerník nesmí řídit postavu, auto ani koně
 		inp.move = Vector2.ZERO
 		inp.throttle = 0.0
 		inp.brake = 0.0
@@ -305,7 +311,8 @@ func _physics_process(_delta: float) -> void:
 		inp.reel = false
 		inp.aim = false
 		player.scope_on = false
-		world.cancel_action(pid)
+		if hud.chat_open:
+			world.cancel_action(pid)
 		return
 	inp.move = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	inp.throttle = Input.get_action_strength("move_forward")

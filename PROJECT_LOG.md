@@ -2158,3 +2158,66 @@ dopravy, ne o regresi.
 - Murmurace se generuje jen na autoritě (singleplayer/server) a není v síťovém snímku; ladicí vrstva mapy pro M8.10
   nepřibyla (pohyb se kontroluje okem / dalekohledem).
 - Loutky zvěře na klientu (MP) nedostávají `flee` / `listen` – jen základní pohyb.
+
+## 2026-10-16 – M8.D1 Menu pro vývojáře (F3): registr DevTune, Svět a Vozidla
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu – ruční test čeká)
+- **Registr `DevTune`** (`scripts/dev_tune.gd`, statický, singleton `hub()` jen kvůli signálu `changed(id, value)`):
+  `register(id, skupina, popisek, výchozí, min, max, krok, nápověda, jednotka) -> hodnota`,
+  `tune(cíl, vlastnost, id, skupina, popisek, min, max, krok, nápověda, jednotka)` (výchozí = současná hodnota cíle
+  – skript se `static var`, objekt, Dictionary, Array; registr do cíle zapisuje při startu i změně), `link`, `value`,
+  `set_value`, `reset`, `reset_group`, `reset_all`, `is_changed`, `differs_from_code`, `info`, `ids`, `groups`, `count`,
+  `save_user` (`user://ladeni.cfg`, jen odlišné od výchozích, neznámé klíče zachová), `export_root` (`res://config.json`,
+  v exportované hře vedle spustitelného souboru; jen odlišné od kódu, seřazené, `{"verze": 1, "parametry": {…}}`),
+  `load_all`, `warn_unknown`. Pořadí: kód → config.json → ladeni.cfg (`--…test` / `--shot` ladeni.cfg ignorují).
+  Registrace: `scripts/dev/tune_<kategorie>.gd` (`static func register_all()`, volitelně `static func on_changed`) –
+  registr je najde sám (`DevTune.ensure()` z `Main._ready` před stavbou světa), žádný centrální seznam → M8.D2 a–d
+  pracují souběžně každý ve svém souboru. Typy: float/int = posuvník + pole, bool = zaškrtávátko, Array popisků = volba.
+- **Menu `DevMenu`** (`scripts/dev_menu.gd`, F3 – jen `GameSettings.dev_mode`, Esc → Nastavení → Vývoj → „Režim vývojáře“,
+  ukládá se do `nastaveni.cfg [vyvojar] rezim`): vlevo strom kategorie → podskupiny (s počty), vpravo řádky (popisek
+  s tooltipem nápověda / id / výchozí, posuvník, číselné pole s jednotkou – i mimo rozsah posuvníku, ↺), změněné řádky
+  oranžově, hledání (název, id, skupina, nápověda; nejvýš 300 řádků), dole Uložit / Exportovat do config.json /
+  Výchozí (skupina) / Výchozí (vše) – potvrzení Ano/Ne v liště, odkaz na F2 → Příroda – ladění. Hra běží, myš patří
+  menu, psaní do polí zastaví vstup do hry (`DevMenu.typing` → `LocalClient._physics_process`, Enter vrátí řízení).
+  F1 ukazuje řádek F3 jen v Režimu vývojáře (`Hud.set_dev_help`). Zavřené menu = `set_process(false)`.
+- **Svět** (`scripts/dev/tune_svet.gd`, 17): Fyzika 5 (gravitace prostoru 20 m/s² – PhysicsServer, `Car.VEH_G` 9,81,
+  `physics_ticks_per_second`, `max_physics_steps_per_frame`, `Engine.time_scale` – na engine se sahá jen při změně),
+  Čas 1 (`Clock.TIME_SCALE`), Eko-takt 2 (`EcoClock.SLICE_BUDGET_US`, `MAX_CATCHUP_DAYS`), Povrchy a přilnavost 9
+  (`Weather.SURF_GRIP` asfalt/štěrk/terén, `GRIP_WET/SNOW/ICE/MUD`, `ICE_WET`, `MUD_STERK`).
+- **Vozidla** (`scripts/dev/tune_vozidla.gd`, 502): Auto 45 · Traktor 61 (45 + 16 modelu) · Motorka 69 · Kolo 46 ·
+  Auto – modely 113 · Motorka – modely 85 · AI řidič 37 · Společné 23 · Ruční vozík 23. **Celkem 519 parametrů.**
+  - `car.gd`: všechna „magická čísla“ fyziky převedena na sdílený objekt druhu `Car.Tune` (`Car.TUNES` car / tractor /
+    moto / bike, auto drží `tn`): pružení (tuhost a tlumení – dřív `@export suspension_*`, klidová délka, zdvih, odskok,
+    stropy sil, jednostopé násobky), karoserie (těžiště, útlum, tření, odraz, valivý odpor), motor (volnoběh, momentová
+    křivka, omezovač, sledování otáček, účinnost, ztráta výkonu poškozením, brzdění motorem), spojka, automat (řazení,
+    kickdown, prodlevy, zpátečka), brzdy (zpomalení, ruční, držení), přilnavost (tření pneu, přenos zatížení motorky),
+    řízení (rejd ve stání, mez, rychlost volantu, zpátečka), náklon (vyvažování, gyro, stojánek, mez atan(µ), camber,
+    vizuální náklon, náklad), šlapání. Výchozí hodnoty = původní čísla (kolo brzdy 7,5, jednostopá těžiště bez posunu).
+  - AI řidič a společné: `const AI_*` → `static var` + 25 nových (horizont plánování, boční zrychlení, objíždění, P
+    regulátor, zaseknutí, dohled na překážku…); nárazy, srážka s člověkem, převrácení, opilý řidič jako `Car` static var.
+  - Modely: `CarModel.live_spec(id)` – laditelná hluboká kopie `MODELS[id]` sdílená všemi kusy (MODELS zůstává katalog);
+    hmotnost, moment, max. otáčky, stálý převod, každý stupeň, vzdušný odpor, přilnavost, výška těžiště, tuhost, rejd
+    (3 klíče), stabilita, náklon (jen motorky s `lean_max`), šlapání kola, `ai_vmax` traktoru. Chybějící klíč se doplní
+    hodnotou, kterou by `Car` vzal z `spec.get(…)` (beze změny chování).
+  - Jednorázová nastavení tělesa (hmotnost, `gravity_scale`, těžiště, útlum, materiál, pružení kol) → `Car._apply_tune`
+    při stavbě a v `_on_tune` (signál `DevTune.changed`, filtr podle druhu / modelu). `_max_steer_at` je teď jediný
+    vzorec rejdu i pro hráče (dřív zkopírovaný v `_powertrain` / `_pedal_force`, stejná čísla).
+  - Ruční vozík: `HandCart` konstanty chování → `static var` (+ útlum otáčení, tření podložky, těžiště, rušení skluzu,
+    stabilizace) s `_apply_tune` / `_on_tune`; tažení v `Cargo` (`GRIP_LOST_R`, rychlost chůze s vozíkem, do kopce,
+    výdrž) → `static var`.
+- Ověřeno offline skriptem v scratchpadu (`godot --headless -s`, bez hry): počty po podskupinách, zápis do cílů,
+  reset, export + opětovné načtení `config.json` (soubor poté smazán). Kontrola překladu (kap. 6) prázdná.
+- Dokumentace: `docs/DEV.md` → „Menu pro vývojáře (F3) – jak zaregistrovat parametr“ (konvence pro M8.D2 a další vlny),
+  README (F3, oddíl Menu pro vývojáře), `docs/SYSTEMS.md`, `docs/testy_M8.md` → „M8.D – Menu pro vývojáře“.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M8.md` → M8.D). Řádek M8.D v `prompts/roadmapa/README.md`
+  zůstává neodškrtnutý – odškrtne se po M8.D2 (Létání, Člověk + Činnosti, Příroda, Zvěř).
+- Za snímek se teď čte `tn.<x>` (člen sdíleného objektu) a `static var` místo vložené konstanty – cena by měla být
+  zanedbatelná (~µs na auto), ověřit `--perfscene` s provozem (kategorie `car`).
+- `ladeni.cfg` platí i s vypnutým Režimem vývojáře (Režim jen odemyká menu). Kdyby to vadilo, „Výchozí (vše)“ + Uložit.
+- Změna klidové délky pružení za jízdy nemění polohu uchycení kol (ta se počítá jen při stavbě vozidla).
+- Celoobrazovková vrstva menu blokuje kliknutí do nabídky HUD (E) pod ní – při otevřeném F3 nejde klikat do rozhovoru.
+- Exportovaná hra: `res://config.json` musí být v exportním filtru (`*.json`), `export_presets.cfg` zatím není.
+- Kamera vozidel, zvuky, světla a stěrače nejsou registrované (nejsou „fyzika světa“); gravitace hráče patří do
+  Člověk (M8.D2b), počasí / vítr / mikroklima do Příroda (M8.D2c) – povrchy a přilnavost už jsou ve Svět.

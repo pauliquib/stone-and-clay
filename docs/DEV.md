@@ -223,6 +223,58 @@ Laditelné konstanty hráče a řemesel (bez spouštění): třes obrazu `Player
 `BodyState.ADDICTION_*` / `CRAVING_*`, modifikátory rychlosti `Player.speed_mods` (`set_speed_mod` / `clear_speed_mod`;
 zdroje `Cargo.MOD_OWN`, `Cargo.MOD_CART`, `Hunting.MOD_CARRY`, `Quests` Krmivo). Cigarety se prodávají jen v Potravinách.
 
+## Menu pro vývojáře (F3) – jak zaregistrovat parametr (M8.D)
+
+Registr `DevTune` (`scripts/dev_tune.gd`, **statický** – žádná instance ve `World`), menu `DevMenu` (`scripts/dev_menu.gd`,
+F3 jen se zapnutým Režimem vývojáře). Každý krok M8 (a M8.D2) registruje **všechny** konstanty, které ovlivňují chování
+jeho systému (fyzika, simulace, AI, animace, časování); ne technické (buffery, indexy, cesty) ani offline data.
+
+**1. Kam registraci dát (souběžná práce bez kolizí).** Jeden soubor na kategorii / agenta:
+`scripts/dev/tune_<kategorie>.gd` (`tune_letani.gd`, `tune_clovek.gd`, `tune_cinnosti.gd`, `tune_priroda.gd`, `tune_zver.gd`)
+bez `class_name`, `extends RefCounted`, se `static func register_all() -> void`. Registr všechny `scripts/dev/tune_*.gd`
+najde sám (abecedně) – **žádný centrální seznam**, nikdo nesahá do cizího souboru ani do `dev_tune.gd` / `dev_menu.gd`.
+Volitelně `static func on_changed(id: String, value: Variant)` – registr ji připojí na `DevTune.changed` sám (pro hodnoty,
+které se jen „nastaví“, např. `Engine.*`, `PhysicsServer3D`). Vzor: `scripts/dev/tune_svet.gd` (malý), `tune_vozidla.gd` (tabulky).
+
+**2. Převod konstanty – výchozí hodnota zůstává v kódu systému.** `const X := 4.2` → `static var X := 4.2` (čte se dál
+jako `Trida.X`, užití se nemění) a v registraci `DevTune.tune(Trida, "X", …)` – registr vezme **současnou** hodnotu jako
+výchozí a při startu i každé změně do proměnné zapíše novou. Konstanty použité v `const` výrazech / velikostech polí nech být.
+Cíl `tune` může být: skript (`static var`), objekt (instance, sdílený „Tune“ objekt – vzor `Car.Tune` / `Car.TUNES`),
+`Dictionary` (klíč – vzor `Weather.SURF_GRIP`, `CarModel.live_spec(id)`), `Array` (index – převody `gears`).
+Čísla zapsaná přímo ve vzorci napřed vytáhni do `static var` / do sdíleného objektu se stejnou hodnotou.
+
+```gdscript
+# scripts/priroda/wind_field.gd
+static var GUST_STRENGTH := 0.6          # dřív const – výchozí hodnota zůstává tady
+
+# scripts/dev/tune_priroda.gd
+extends RefCounted
+static func register_all() -> void:
+	DevTune.tune(WindField, "GUST_STRENGTH", "wind.gust_strength", "Příroda/Vítr", "Nárazy – síla",
+		0.0, 2.0, 0.01, "Poměr nárazu k průměrnému větru.", "×")
+	# volba: DevTune.register("sky.mode", "Příroda/Obloha a světlo", "Režim", ["Ruční", "Fyzikální", 1])
+```
+
+**3. Konvence.** `id` = `<systém>.<parametr>` malými písmeny, anglicky podle kódu (`car.brake_decel`, `wind.gust_strength`,
+`micro.inversion_max_c`, `model.<id>.<klíč>`); **jedno id = jedno místo registrace** (druhá registrace stejného id jen
+přidá další cíl). Skupina `"Kategorie/Podskupina"` – kategorie přesně `DevTune.CATEGORIES` (Svět, Vozidla, Létání, Člověk,
+Činnosti, Příroda, Zvěř), podskupiny podle zadání M8.D kap. 3.3 (dvě úrovně, nic hlubšího). Popisek česky a začíná
+oblastí („Brzdy – …“, „Nárazy – …“), ať hledání najde souvislosti napříč skupinami; jednotka zvlášť (`"m/s²"`, `"×"`).
+Typ podle výchozí hodnoty: `float` / `int` = posuvník + pole, `bool` = zaškrtávátko, `Array` popisků (+ int výchozí
+index) = volba. Rozsah posuvníku zhruba 0–3× výchozí (pole dovolí zadat i víc).
+
+**4. Bez ceny za snímek.** Registr se **nikdy nečte za snímek** (`DevTune.value()` jen při stavbě / v handleru). Za snímek
+čti vlastní proměnnou, do které `tune` zapisuje (static var, člen sdíleného objektu). Co se nastavuje jen jednou
+(hmotnost tělesa, `angular_damp`, tuhost kol, materiál) obnov v handleru: `DevTune.hub().changed.connect(_on_tune)` v `_ready`
+instance (vzor `Car._on_tune` / `_apply_tune`, `HandCart._on_tune`) – filtruj podle prefixu id. Engine / PhysicsServer
+nastavuj jen při změně (`DevTune.differs_from_code(id)` při startu). Vypnutý Režim vývojáře = menu se nestaví, registr
+nedělá nic.
+
+**5. Soubory hodnot.** Pořadí: kód → `res://config.json` (`{"verze": 1, "parametry": {…}}`, jen odlišné od kódu, seřazené;
+Export v menu; při kalibraci M8.19 se hodnoty přenesou do kódu a soubor vyprázdní) → `user://ladeni.cfg` (Uložit v menu;
+`--…test` a `--shot` ho ignorují). Neznámé klíče se ignorují s varováním při prvním otevření menu (`warn_unknown`).
+Ověření bez hry: `godot --headless --path . -s <skript>` s `DevTune.ensure()` a `DevTune.count("Kategorie/Podskupina")`.
+
 ## Architektura (příprava na multiplayer)
 
 | Skript | Za co odpovídá |

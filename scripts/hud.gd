@@ -58,6 +58,7 @@ var _msg: Label
 var _msg_t := 0.0
 var _help: PanelContainer
 var _help_t := 14.0
+var _help_label: Label             # M8.D: text nápovědy (řádek F3 jen v Režimu vývojáře – set_dev_help)
 var _map: Control
 var _map_view: Control            # podklad + značky mapy (M) – vlastní kreslení s přiblížením
 var _map_img: Texture2D           # podklad mapy: ortofoto nebo třídy povrchu (World.map_texture)
@@ -380,6 +381,7 @@ func _ready() -> void:
 	_help.offset_right = -20
 	_help.offset_bottom = -170
 	var ht := _label(_help, "", 15)
+	_help_label = ht
 	ht.text = "OVLÁDÁNÍ\n" \
 		+ "WASD – chůze / řízení       myš – rozhlížení\n" \
 		+ "Shift – sprint              Mezerník – skok / ruční brzda\n" \
@@ -925,6 +927,16 @@ func _set_menu_mode(on: bool) -> void:
 	menu_open = on
 	player.controls_locked = on
 	_update_mouse_mode()
+
+
+## M8.D: v Režimu vývojáře nápověda F1 zmíní F3 (menu pro vývojáře); bez režimu se o něm nemluví.
+func set_dev_help(on: bool) -> void:
+	if _help_label == null:
+		return
+	const BASE := "F1 – nápověda   F2 – herní menu   Esc – pauza a nabídka\n"
+	const DEV := "F3 – menu pro vývojáře (ladění parametrů)\n"
+	var t := _help_label.text.replace(BASE + DEV, BASE)
+	_help_label.text = t.replace(BASE, BASE + DEV) if on else t
 
 
 ## Kurzor je viditelný u nabídek, rozhovoru i otevřené mapy (M); jinak zůstává zachycený.

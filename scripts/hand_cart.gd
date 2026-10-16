@@ -7,17 +7,26 @@
 class_name HandCart
 extends RigidBody3D
 
-const EMPTY_KG := 25.0
-const CAPACITY_KG := 200.0              # nosnost korby (kg)
+## M8.D: chování vozíku je laditelné (F3 → Vozidla → Ruční vozík, `scripts/dev/tune_vozidla.gd`) – `static var`
+## místo `const`, výchozí hodnoty beze změny; útlumy, tření a těžiště se po změně v menu dopíší (`_apply_tune`).
+static var EMPTY_KG := 25.0
+static var CAPACITY_KG := 200.0         # nosnost korby (kg)
 const HANDLE_LOCAL := Vector3(0.0, 0.85, -1.45)   # madlo na konci oje (vozík jede oj napřed = −Z)
 const BED_TOP := 0.5                    # výška podlahy korby (m)
 const BED_CENTER_Z := 0.2
 const BED_SIZE := Vector3(0.8, 0.28, 1.2)        # šířka × výška bočnic × délka
-const HOLD_DIST := 0.8                  # vzdálenost madla od hráče při tažení (m)
-const PULL_ACC := 14.0                  # pružina: zrychlení (m/s²) na 1 m vzdálenosti od cíle
-const PULL_DAMP := 4.0
-const PULL_MAX_ACC := 12.0
-const FREE_DAMP := 0.9                  # útlum pusteného vozíku (na svahu ujede pomalu, na rovině zastaví)
+static var HOLD_DIST := 0.8             # vzdálenost madla od hráče při tažení (m)
+static var PULL_ACC := 14.0             # pružina: zrychlení (m/s²) na 1 m vzdálenosti od cíle
+static var PULL_DAMP := 4.0
+static var PULL_MAX_ACC := 12.0
+static var CLOSE_DAMP := 1.5            # blíž než HOLD_DIST: jen tlumení (× PULL_DAMP)
+static var FREE_DAMP := 0.9             # útlum pusteného vozíku (na svahu ujede pomalu, na rovině zastaví)
+static var ANG_DAMP := 3.0              # útlum otáčení
+static var SKID_FRICTION := 0.04        # tření kluzné podložky (místo kol)
+static var COM_Y := 0.35                # výška těžiště (m)
+static var SIDE_GRIP := 14.0            # jak rychle kola ruší boční skluz (1/s)
+static var ROLL_KP := 10.0              # proti překlopení na bok: tuhost
+static var ROLL_KD := 3.0               # a tlumení
 const WHEEL_R := 0.25
 const COL_BODY := Color(0.6, 0.2, 0.1)
 const COL_WOOD := Color(0.55, 0.4, 0.22)
@@ -46,17 +55,15 @@ func _ready() -> void:
 	collision_layer = 8                                  # jako rekvizity: auta ho vidí jako překážku (Car.ai_blocker)
 	collision_mask = 1 | 2 | 4 | 8 | 16
 	mass = EMPTY_KG
-	linear_damp = FREE_DAMP
-	angular_damp = 3.0
 	can_sleep = true
 	custom_integrator = false
 	contact_monitor = false
 	var pm := PhysicsMaterial.new()
-	pm.friction = 0.04
 	pm.bounce = 0.0
 	physics_material_override = pm
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
-	center_of_mass = Vector3(0, 0.35, 0.2)
+	_apply_tune()
+	DevTune.hub().changed.connect(_on_tune)
 	# kolize: nízká kluzná podložka + korba (aby hráč a auta vozík neprošli)
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
@@ -138,6 +145,21 @@ static func _cyl_mesh(r: float, h: float) -> CylinderMesh:
 
 
 ## Madlo ve světě.
+## M8.D: útlumy, tření podložky a těžiště z laditelných hodnot (při stavbě a po změně v menu F3, ne za snímek).
+func _apply_tune() -> void:
+	linear_damp = FREE_DAMP
+	angular_damp = ANG_DAMP
+	if physics_material_override != null:
+		physics_material_override.friction = SKID_FRICTION
+	center_of_mass = Vector3(0, COM_Y, 0.2)
+	mass = total_kg()
+
+
+func _on_tune(id: String, _v: Variant) -> void:
+	if id.begins_with("cart."):
+		_apply_tune()
+
+
 func handle_world() -> Vector3:
 	return global_transform * HANDLE_LOCAL
 
@@ -242,12 +264,12 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var right := xf.basis.x
 	right.y = 0.0
 	right = right.normalized() if right.length() > 0.01 else Vector3.RIGHT
-	v -= right * right.dot(v) * minf(1.0, 14.0 * dt)
+	v -= right * right.dot(v) * minf(1.0, SIDE_GRIP * dt)
 	state.linear_velocity = v
 	# vozík se nepřeklopí na bok (stabilizace klopení kolem podélné osy)
 	var fwd := -xf.basis.z
 	var err := xf.basis.y.cross(Vector3.UP).dot(fwd)
-	state.apply_torque(fwd * (err * 10.0 - state.angular_velocity.dot(fwd) * 3.0) * mass)
+	state.apply_torque(fwd * (err * ROLL_KP - state.angular_velocity.dot(fwd) * ROLL_KD) * mass)
 	# táhnutí: pružina mezi madlem a bodem u hráče
 	if gripped_by != 0 and puller != null and is_instance_valid(puller):
 		var h := xf * HANDLE_LOCAL
@@ -258,7 +280,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		var rel := Vector3(v.x - puller.velocity.x, 0.0, v.z - puller.velocity.z)
 		var acc := dir * maxf(dist - HOLD_DIST, 0.0) * PULL_ACC - rel * PULL_DAMP
 		if dist < HOLD_DIST:
-			acc = -rel * PULL_DAMP * 1.5
+			acc = -rel * PULL_DAMP * CLOSE_DAMP
 		if acc.length() > PULL_MAX_ACC:
 			acc = acc.normalized() * PULL_MAX_ACC
 		state.apply_force(acc * mass, h - xf.origin)
