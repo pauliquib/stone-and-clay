@@ -2118,6 +2118,8 @@ const PERF_SCENES := {
 		"weather": "jasno", "popis": "náves v poledne, jasno – běžná hustota NPC a dopravy"},
 	"les_rano_mlha": {"pos": Vector3(-383.0, 0.0, -1010.0), "yaw": PI, "date": [2026, 10, 5], "hour": 6.5,
 		"weather": "mlha", "popis": "les u myslivecké chaty, ráno v mlze – hodně stromů a mlhy"},
+	"zima_telo": {"pos": Vector3(-383.0, 0.0, -1010.0), "yaw": PI, "date": [2026, 1, 20], "hour": 10.0,
+		"weather": "snih", "popis": "M8.16: les u chaty v lednu, sněžení a vítr – tepelná bilance těla (prof. „body_thermo“)"},
 	"louka_vitr": {"pos": Vector3(900.0, 0.0, -500.0), "yaw": 0.5, "date": [2026, 5, 1], "hour": 14.0,
 		"weather": "bourka", "popis": "otevřená louka, silný vítr a bouřka – pole větru, ohyb vegetace"},
 	"udoli_noc": {"pos": Vector3(-700.0, 0.0, 300.0), "yaw": 1.0, "date": [2026, 1, 20], "hour": 2.0,

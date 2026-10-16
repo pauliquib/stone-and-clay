@@ -26,3 +26,12 @@ static func is_alcohol(id: String) -> bool:
 
 static func fmt_price(kc: int) -> String:
 	return "%d Kč" % kc
+
+
+## M8.16: litry vody, které nápoj tělu dodá hned (bez alkoholu; ten pak odvodní při odbourání – `BodyState.DIURESIS_L_G`).
+## Volitelný klíč katalogu `hydr` (násobek, výchozí 1) – např. silná káva méně.
+static func water_l(id: String, ml: float) -> float:
+	var info: Dictionary = ItemsDB.ITEMS.get(id, {})
+	if info.is_empty():
+		return 0.0
+	return ml / 1000.0 * (1.0 - float(info.get("abv", 0.0)) / 100.0) * float(info.get("hydr", 1.0))

@@ -8,6 +8,21 @@
 - **Fyziologie** (`body_state.gd`): Widmark se vstřebáváním ze žaludku; jídlo zpomaluje vstřebávání
   a urychluje odbourání (~0,15 ‰/h), kalorie → hmotnost/BMI, nikotin a chuť na cigaretu, nevolnost
   → zvracení, nad 3 ‰ otrava a „okno“. Opilost zhoršuje chůzi i řízení (zpoždění, kmitání, mikrospánek).
+  **M8.16 Tělo 2 (přepínač `thermo`):** tepelná bilance `S = M − C − E + slunce + oheň − vedení` (W) krokem 4×/s
+  (`BodyState._thermo_step`, ve spánku / přeskoku času po ≤ 0,02 h): M z MET činnosti (rychlost, stoupání z `velocity.y`,
+  náklad `Player.carried_kg` + `Cargo`, póza `Humanoid.action` → `ACTION_MET`, auto / kůň / plavání) + třes; C přes oděv
+  `clo = izolace × 1,5` (mokro −65 %, vítr stlačuje bez nepromokavé vrstvy, přehřátý hráč se „rozepne“), konvekce
+  `hc = 3 + 8,3·√v` z `Microclimate.wind_speed_at` (vítr jen jednou – ne `wind_chill_at`) + rychlost chůze, ponoření
+  ve vodě; E = dech + pocení (omezené vlhkostí `Microclimate.humidity_at` a oděvem) + odpar z mokrého oděvu; slunce
+  `Atmosphere.SkyModel.global_horizontal_irradiance_wm2` × (1 − zápoj `TreeEco.canopy_at`), noční obloha, oheň (`heat`),
+  vedení do země vkleče / vleže (sníh víc). `t_core` (37 °C) → `cold` (36,5 → 35 °C) a `overheat` (37,6 → 39 °C) – API
+  pro ostatní systémy beze změny. Voda `hydration` (l): pot + dech + moč, nápoje `Consumables.water_l` (bez alkoholu),
+  diuréza 10 ml/g odbouraného alkoholu, jídlo 0,4 ml/kcal, `drink_water(ml, zdroj)` (studánka; potok s rizikem
+  nevolnosti) → `thirst()` snižuje výdrž, nad 0,6 bolest hlavy. `sleep_debt` (h) → `drowsiness()` (16–30 h, kofein
+  ubere), mikrospánek `microsleep_fx()` → zatmění v `DrunkFx`; ospalost a bolest hlavy přidávají mírnou „opilost“
+  (`drunk_level`). Pád: `fall_landing(výška, sníh, brod)` s v = √(2gh) → bolest / kulhání (`Player.set_speed_mod
+  ("zraneni_pad")`) / zranění / bezvědomí. Ukládá se `t_core`, `hydration`, `sleep_debt`, `limp_h`, `pain`
+  (`SaveGame.BODY_KEYS`, starý save: jádro z `cold`). HUD `status_text()`, deník `journal_health()`, F2 `debug_text()`.
 - **Místa** (`place.gd`, otevírací doby): hospoda 10–2, Potraviny 6–21, pálenice 8–22, vinný sklep 12–24,
   úřad 7–17, Myslivecká chata a domov nonstop. Doma: spánek do 7:00, lednička, kafe, oprava auta.
 - **Doprava** (`traffic.gd`, `car.gd`): 5 AI aut jezdí pravým pruhem, brzdí před zatáčkami a před

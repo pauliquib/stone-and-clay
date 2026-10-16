@@ -1384,7 +1384,9 @@ func _physics_process_impl(delta: float) -> void:
 		visual.land(impact)
 		landed.emit(impact)
 		# zranění jen podle skutečné výšky pádu (běžný skok ani seskok z bedny nebolí)
-		if drop > SAFE_FALL_HEIGHT:
+		if body.thermo and _land_m816(drop):      # M8.16: zranění podle rychlosti dopadu (sníh / voda tlumí)
+			pass
+		elif not body.thermo and drop > SAFE_FALL_HEIGHT:
 			body.hurt((drop - SAFE_FALL_HEIGHT) * FALL_HURT_PER_M, "pád z výšky")
 			fall(FALL_DOWN_S + (drop - SAFE_FALL_HEIGHT) * FALL_DOWN_PER_M, "tvrdý dopad")
 		elif p > DRUNK_LAND_PROMILE and drop > DRUNK_LAND_DROP and randf() < (p - DRUNK_LAND_BASE) * DRUNK_LAND_K:
@@ -1681,3 +1683,11 @@ func _process_impl(delta: float) -> void:
 		visual.visible = true
 	if scope > 0.5:
 		visual.visible = false
+
+
+## M8.16: dopad z výšky přes `BodyState.fall_landing` (bolest a kulhání / zranění / bezvědomí). true = něco se stalo.
+func _land_m816(drop: float) -> bool:
+	var down := body.fall_landing(drop, weather.snow_cover if weather != null else 0.0, wade)
+	if down > 0.0:
+		fall(down, "pád z výšky")
+	return down >= 0.0
