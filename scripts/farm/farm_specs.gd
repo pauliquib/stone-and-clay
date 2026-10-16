@@ -14,7 +14,8 @@
 class_name FarmSpecs
 extends RefCounted
 
-const DATA := {
+## M8.D2d: `static var` – hlad, žízeň, růst a produkty ladí menu pro vývojáře (F3 → Zvěř/Hospodářská zvířata).
+static var DATA := {
 	"slepice": {
 		"name": "Slepice", "name_m": "Kohout", "model": "bird", "shelter": "kurnik",
 		"price_young": 120, "price_adult": 250, "grow_days": 60,
@@ -59,7 +60,7 @@ const DATA := {
 }
 ## Pořadí v nabídce (cedule u výběhu).
 const ORDER := ["slepice", "kralik", "prase", "koza", "ovce", "krava"]
-const YOUNG_SCALE := 0.4      # vizuální měřítko mláděte (roste lineárně do 1.0 v `grow_days`)
+static var YOUNG_SCALE := 0.4      # vizuální měřítko mláděte (roste lineárně do 1.0 v `grow_days`)
 
 
 static func info(species: String) -> Dictionary:

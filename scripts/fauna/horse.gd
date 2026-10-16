@@ -20,33 +20,79 @@ class_name Horse
 extends CharacterBody3D
 
 const GAIT_NAMES := ["stojí", "krok", "klus", "cval", "trysk"]
-const GRAVITY := 20.0
-const STAMINA_GALLOP := 1.0 / 40.0   # za s v trysku
-const STAMINA_CANTER := 1.0 / 160.0
-const STAMINA_REST := 1.0 / 45.0
-const HORSE_SLIP := 0.8              # podíl klouzavosti povrchu, který pocítí kopyto (1 = jako kolo)
+## M8.D2d: konstanty chování koně jsou `static var` – ladí je menu pro vývojáře (F3 → Zvěř/Hospodářská zvířata,
+## `scripts/dev/tune_zver.gd`); výchozí hodnoty zůstávají tady.
+static var GRAVITY := 20.0
+static var STAMINA_GALLOP := 1.0 / 40.0   # za s v trysku
+static var STAMINA_CANTER := 1.0 / 160.0
+static var STAMINA_REST := 1.0 / 45.0
+static var HORSE_SLIP := 0.8         # podíl klouzavosti povrchu, který pocítí kopyto (1 = jako kolo)
 const REMOTE_SPEED_K := 1.25         # server: nejvyšší uvěřitelná rychlost hlášená klientem = cval × tolik
 const REMOTE_TELEPORT := 20.0        # server: skok polohy o víc než tolik m mezi dvěma stavy = odmítnout
 const REMOTE_SLACK := 1.0            # server: rezerva k ujeté dráze za dt (m; jitter, kolize)
-const STARTLE_R := 1400.0            # do této vzdálenosti blesku se kůň hromu poleká (m)
+static var STARTLE_R := 1400.0       # do této vzdálenosti blesku se kůň hromu poleká (m)
 # ---- péče a přivolání (krok Příroda 04) – laditelné
-const WHISTLE_R := 300.0             # do této vzdálenosti kůň hvízdnutí (G) uslyší (m)
-const CALL_TRAB_D := 20.0            # dál než tolik m od hráče kůň klusá, dál než CALL_CANTER_D cválá
-const CALL_CANTER_D := 80.0
-const CALL_STOP_D := 3.0             # přiklusá až na tuto vzdálenost a otočí se k hráči
-const CALL_MAX_S := 120.0            # po tolika s přivolání vzdá (zaseklý za překážkou)
-const FED_DECAY := 1.0 / 1800.0      # ubývání sytosti za s reálného času (prázdný za ~30 min)
-const WATER_DECAY := 1.0 / 1200.0    # ubývání napojení (prázdný za ~20 min)
-const NEEDY_BELOW := 0.15            # hladový / žíznivý kůň nejde do trysku a hůř odpočívá
-const REGEN_FED_K := 0.8             # výdrž se obnovuje ×(1 + K × sytost)
-const NEEDY_REGEN := 0.6             # násobek obnovy výdrže u hladového / žíznivého koně
-const FEED_AMOUNT := 0.5             # kolik sytosti přidá jedno nakrmení
-const WATER_AMOUNT := 0.6            # … a napojení
-const GROOM_BONUS_S := 240.0         # jak dlouho po vyčesání platí bonus k obnově výdrže (s)
-const GROOM_REGEN := 1.25            # … o kolik rychleji
-const DRUNK_SLOW := 0.5              # jezdec nad tolik ‰: kůň sám zpomalí (nejvýš klus)
-const DRUNK_REFUSE := 1.5            # jezdec nad tolik ‰: kůň nevyjde
-const DRUNK_FALL_K := 0.012          # šance pádu za s v klusu × promile²
+static var WHISTLE_R := 300.0        # do této vzdálenosti kůň hvízdnutí (G) uslyší (m)
+static var CALL_TRAB_D := 20.0       # dál než tolik m od hráče kůň klusá, dál než CALL_CANTER_D cválá
+static var CALL_CANTER_D := 80.0
+static var CALL_STOP_D := 3.0        # přiklusá až na tuto vzdálenost a otočí se k hráči
+static var CALL_MAX_S := 120.0       # po tolika s přivolání vzdá (zaseklý za překážkou)
+static var FED_DECAY := 1.0 / 1800.0 # ubývání sytosti za s reálného času (prázdný za ~30 min)
+static var WATER_DECAY := 1.0 / 1200.0   # ubývání napojení (prázdný za ~20 min)
+static var NEEDY_BELOW := 0.15       # hladový / žíznivý kůň nejde do trysku a hůř odpočívá
+static var REGEN_FED_K := 0.8        # výdrž se obnovuje ×(1 + K × sytost)
+static var NEEDY_REGEN := 0.6        # násobek obnovy výdrže u hladového / žíznivého koně
+static var FEED_AMOUNT := 0.5        # kolik sytosti přidá jedno nakrmení
+static var WATER_AMOUNT := 0.6       # … a napojení
+static var GROOM_BONUS_S := 240.0    # jak dlouho po vyčesání platí bonus k obnově výdrže (s)
+static var GROOM_REGEN := 1.25       # … o kolik rychleji
+static var DRUNK_SLOW := 0.5         # jezdec nad tolik ‰: kůň sám zpomalí (nejvýš klus)
+static var DRUNK_REFUSE := 1.5       # jezdec nad tolik ‰: kůň nevyjde
+static var DRUNK_FALL_K := 0.012     # šance pádu za s v klusu × promile²
+## --- M8.D2d: čísla dřív zapsaná přímo ve vzorcích (stejné hodnoty)
+static var GAIT_V_K := [0.92, 0.9, 0.92, 0.9]   # rychlost chodu pod jezdcem = horní mez chodu druhu × tohle (krok, klus, cval, trysk)
+static var SPOT_TURN := 1.1          # rad/s – otáčení na místě (pod 0,3 m/s)
+static var SLOPE_SLOW_FROM := 0.5    # do kopce zpomalí od podílu největšího svahu
+static var REFUSE_S := 3.0           # s – odmítnutí příliš prudkého svahu se opakuje nejdřív po
+static var SLIP_SLOW := 0.55         # na úplném kluzku nerozjede víc než chod × tohle
+static var REST_STAND_K := 1.6       # ve stoje se výdrž obnovuje × tohle
+static var SPRINT_MIN_STAMINA := 0.15   # pobídka do trysku jen s výdrží nad tolik
+static var EXHAUST := 0.02           # výdrž pod tolik → z trysku do cvalu
+static var EXHAUST_RESET := 0.4      # hláška o vyčerpání znovu až po obnově nad tolik
+static var BACK_DELAY := 0.35        # s držení S na místě, než kůň couvá
+static var BACK_SPEED := 0.9         # m/s couvání
+static var DRUNK_WOBBLE := 0.25      # opilý jezdec: rozkmit otěží × opilost
+static var JUMP_MIN_V := 2.5         # m/s – skok jde od klusu a této rychlosti
+static var JUMP_H_ADD := 0.15        # m – skok = výška druhu + tohle
+static var DRIFT_GRIP := 0.85        # boční smyk na kluzku pod touto přilnavostí …
+static var DRIFT_K := 0.8            # … síla smyku
+static var SPOOK_DECAY := 5.0        # m/s² – doznívání úskoku z polekání
+static var SPOOK_S := 3.5            # s – polekaný kůň drží hlavu nahoře
+static var SPOOK_V := [2.5, 4.0]     # m/s – úskok stranou (od–do)
+static var SOUND_SPEED := 343.0      # m/s – zpoždění hromu za bleskem
+static var CRASH_V := 6.0            # m/s – náraz do překážky rychleji = prudké zastavení
+static var CRASH_STOP := 0.7         # podíl rychlosti, který náraz ubere
+static var FALL_V := 9.0             # m/s – jezdec spadne při nárazu rychleji než tohle …
+static var FALL_DRUNK_V := 6.0       # … opilý jezdec už od tohoto
+static var FALL_THROW := 0.5         # odhození jezdce (× rychlost)
+static var FALL_DMG_K := 1.2         # zranění = rychlost × tohle
+static var IDLE_EVERY := [15.0, 45.0]   # s – kůň bez jezdce popojde jednou za (od–do)
+static var IDLE_STEP := [1.0, 6.0]   # m – kam popojde od místa, kde ho nechali
+static var IDLE_WALK_K := 0.8        # popochází krokem × tohle
+static var CALL_WAIT_S := 5.0        # s – přivolaný kůň počká u hráče, pak se pase
+static var CALL_CANTER_STAMINA := 0.2   # přivolaný kůň cválá jen s výdrží nad tolik
+static var GRAZE_BLEND := 2.5        # 1/s – sklopení hlavy k pastvě
+static var RIDER_ALERT := 0.3        # s jezdcem drží hlavu výš (pozornost)
+static var AIR_V := 5.0              # m/s svislé rychlosti = plně ve skoku
+# póza jezdce (sed, vysedání v klusu, předklon)
+static var LEAN_WALK := 0.12         # rad – předklon jezdce v kroku
+static var LEAN_TROT := 0.2
+static var LEAN_CANTER := 0.3
+static var LEAN_GALLOP := 0.55
+static var POST_TROT := 0.07         # m – vysedání v klusu
+static var POST_CANTER := 0.03       # m – ve cvalu sed nad sedlem …
+static var POST_CANTER_SWING := 0.02 # m – … a houpání
+static var POST_GALLOP := 0.1        # m – lehký sed v trysku
 
 var spec: Dictionary
 var fauna: Fauna
@@ -64,6 +110,7 @@ var tether := Vector3.ZERO           # kde se pase bez jezdce
 var state := "graze"
 
 var _gait_v: Array = []
+var _tune_gen := -1                  # M8.D2d: `AnimalSpecs.tune_gen` při posledním `_calc_gait_v`
 var _prev_sprint := false
 var _prev_brake := false
 var _back_t := 0.0
@@ -118,10 +165,16 @@ func setup(f: Fauna, pos: Vector3, yaw_: float, owner: int, seed_: int) -> void:
 	position = pos + Vector3(0, 0.1, 0)
 	tether = pos
 	yaw = yaw_
-	var g: Dictionary = spec["gaits"]
-	_gait_v = [0.0, g["walk"] * 0.92, g["trot"] * 0.9, g["canter"] * 0.92, g["gallop"] * 0.9]
+	_calc_gait_v()
 	rig = QuadrupedModel.build(spec, {"male": false, "tint": 1.0})
 	rig.name = "Model"
+
+
+## Rychlosti chodů pod jezdcem z druhu (`AnimalSpecs`) – znovu po změně v menu F3 (`AnimalSpecs.tune_gen`).
+func _calc_gait_v() -> void:
+	_tune_gen = AnimalSpecs.tune_gen
+	var g: Dictionary = spec["gaits"]
+	_gait_v = [0.0, g["walk"] * GAIT_V_K[0], g["trot"] * GAIT_V_K[1], g["canter"] * GAIT_V_K[2], g["gallop"] * GAIT_V_K[3]]
 
 
 func _ready() -> void:
@@ -246,6 +299,8 @@ func _physics_process(delta: float) -> void:
 	if not authority:
 		_puppet_process(delta)
 		return
+	if _tune_gen != AnimalSpecs.tune_gen:
+		_calc_gait_v()
 	var want := 0.0
 	var steer := 0.0
 	if rider:
@@ -260,7 +315,7 @@ func _physics_process(delta: float) -> void:
 	var v := absf(speed)
 	var turn_max := minf(float(spec["turn"]), float(spec["lat_acc"]) / maxf(v, 0.5))
 	if v < 0.3:
-		turn_max = 1.1
+		turn_max = SPOT_TURN
 	var dyaw := clampf(steer, -1.0, 1.0) * turn_max * delta
 	yaw = wrapf(yaw + dyaw, -PI, PI)
 	_yaw_rate = dyaw / maxf(delta, 0.001)
@@ -272,10 +327,10 @@ func _physics_process(delta: float) -> void:
 	var h1 := t.height_at(global_position.x + fwd.x * L * signf(want + 0.001), global_position.z + fwd.z * L * signf(want + 0.001))
 	_slope = atan2(h1 - h0, L) * signf(want + 0.001)
 	var max_s := deg_to_rad(float(spec["max_slope"]))
-	if want > 0.0 and _slope > max_s * 0.5:
-		want *= clampf(1.0 - (_slope - max_s * 0.5) / (max_s * 0.5), 0.0, 1.0)
+	if want > 0.0 and _slope > max_s * SLOPE_SLOW_FROM:
+		want *= clampf(1.0 - (_slope - max_s * SLOPE_SLOW_FROM) / (max_s * (1.0 - SLOPE_SLOW_FROM)), 0.0, 1.0)
 		if _slope > max_s and _refuse_t <= 0.0 and rider:
-			_refuse_t = 3.0
+			_refuse_t = REFUSE_S
 			_play_voice("snort")
 			fauna.world.notify(rider.id, "show_message", ["Kůň odmítá jít do tak prudkého svahu.", 2.0])
 	_refuse_t -= delta
@@ -285,7 +340,7 @@ func _physics_process(delta: float) -> void:
 		_surf_t = 0.3
 		_surf = _surface_under()
 	var grip := _hoof_grip()
-	want *= lerpf(1.0, 0.55, 1.0 - grip)        # na kluzkém podkladu nerozjede plný chod
+	want *= lerpf(1.0, SLIP_SLOW, 1.0 - grip)        # na kluzkém podkladu nerozjede plný chod
 	# --- rychlost (zrychlení / brzdění podle hmotnosti; na kluzku horší)
 	var acc: float = spec["accel"] if absf(want) > absf(speed) and signf(want) == signf(speed + want * 0.01) else spec["brake"]
 	acc *= grip
@@ -310,7 +365,7 @@ func _physics_process(delta: float) -> void:
 	elif level == 3 and v > _gait_v[2]:
 		stamina -= STAMINA_CANTER * delta
 	elif v < _gait_v[2] + 0.2:
-		stamina += STAMINA_REST * delta * (1.6 if v < 0.3 else 1.0) * regen_mul()
+		stamina += STAMINA_REST * delta * (REST_STAND_K if v < 0.3 else 1.0) * regen_mul()
 	stamina = clampf(stamina, 0.0, 1.0)
 	# --- pohyb
 	var vy := velocity.y
@@ -318,15 +373,15 @@ func _physics_process(delta: float) -> void:
 		vy = -0.8
 	else:
 		vy -= GRAVITY * delta
-	if rider and rider.input.jump_pressed and is_on_floor() and level >= 2 and v > 2.5:
-		vy = sqrt(2.0 * GRAVITY * (float(spec["jump"]) + 0.15))
+	if rider and rider.input.jump_pressed and is_on_floor() and level >= 2 and v > JUMP_MIN_V:
+		vy = sqrt(2.0 * GRAVITY * (float(spec["jump"]) + JUMP_H_ADD))
 		_play_voice("snort")
 	var pre_speed := speed
 	# boční smyk: ve zatáčce na kluzkém povrchu kůň uhne ven ze zatáčky; plus škobrtnutí z polekání
 	var drift := 0.0
-	if grip < 0.85 and absf(_yaw_rate) > 0.05 and v > 1.5:
-		drift = _yaw_rate * v * (1.0 - grip) * 0.8
-	_spook_v = _spook_v.move_toward(Vector3.ZERO, delta * 5.0)
+	if grip < DRIFT_GRIP and absf(_yaw_rate) > 0.05 and v > 1.5:
+		drift = _yaw_rate * v * (1.0 - grip) * DRIFT_K
+	_spook_v = _spook_v.move_toward(Vector3.ZERO, delta * SPOOK_DECAY)
 	velocity = fwd * speed + fwd.cross(Vector3.UP) * drift + _spook_v + Vector3(0, vy, 0)
 	move_and_slide()
 	# náraz do překážky
@@ -334,9 +389,9 @@ func _physics_process(delta: float) -> void:
 		var c := get_slide_collision(i)
 		var n := c.get_normal()
 		if absf(n.y) < 0.5 and -n.dot(fwd) > 0.6:
-			if absf(pre_speed) > 6.0:
+			if absf(pre_speed) > CRASH_V:
 				_crash(absf(pre_speed))
-			speed = move_toward(speed, 0.0, absf(speed) * 0.7)
+			speed = move_toward(speed, 0.0, absf(speed) * CRASH_STOP)
 			break
 	var gy := t.height_at(global_position.x, global_position.z)
 	if global_position.y < gy - 1.5:
@@ -438,16 +493,16 @@ func _on_lightning(pos: Vector3) -> void:
 	var d := global_position.distance_to(pos)
 	if d > STARTLE_R:
 		return
-	var delay := d / 343.0
+	var delay := d / SOUND_SPEED
 	if _startle < 0.0 or delay < _startle:
 		_startle = delay
 
 
 ## Polekání hromem: kůň vrhne hlavou, ožeká a skočí stranou; s jezdcem zpomalí.
 func _do_startle() -> void:
-	_spooked = 3.5
+	_spooked = SPOOK_S
 	var side := Vector3(sin(yaw), 0, cos(yaw)).cross(Vector3.UP) * (1.0 if rng.randf() < 0.5 else -1.0)
-	_spook_v = side * rng.randf_range(2.5, 4.0)
+	_spook_v = side * rng.randf_range(SPOOK_V[0], SPOOK_V[1])
 	speed = minf(speed, _gait_v[2])
 	level = mini(level, 2)
 	_play_voice("neigh")
@@ -471,13 +526,13 @@ func _rider_input(delta: float) -> Array:
 	if fwd_on and level == 0:
 		level = 1
 	if sprint_edge and level >= 1:
-		level = mini(level + 1, 4 if stamina > 0.15 else 3)
+		level = mini(level + 1, 4 if stamina > SPRINT_MIN_STAMINA else 3)
 	if brake_edge:
 		level = maxi(level - 1, 0)
 	# omezení chodu: hladový / vyčerpaný kůň nejde do trysku, s opilým jezdcem jen klus, nad 1,5 ‰ vůbec
 	var pm_r := rider.body.promile()
 	var cap := 4
-	if stamina <= 0.15 or is_needy():
+	if stamina <= SPRINT_MIN_STAMINA or is_needy():
 		cap = 3
 	if pm_r > DRUNK_SLOW:
 		cap = 2
@@ -492,12 +547,12 @@ func _rider_input(delta: float) -> Array:
 		_drunk_msg_t = 8.0
 		fauna.world.notify(rider.id, "show_message", ["Kůň cítí, že jsi pod vlivem – sám zpomalil.", 2.5])
 	level = mini(level, cap)
-	if stamina <= 0.02 and level == 4:
+	if stamina <= EXHAUST and level == 4:
 		level = 3
 		if not _exhaust_msg:
 			_exhaust_msg = true
 			fauna.world.notify(rider.id, "show_message", ["Kůň je vyčerpaný – nech ho vydechnout v kroku.", 3.0])
-	if stamina > 0.4:
+	if stamina > EXHAUST_RESET:
 		_exhaust_msg = false
 	var want := 0.0
 	if fwd_on and level > 0:
@@ -507,11 +562,11 @@ func _rider_input(delta: float) -> Array:
 	# couvání: drž S na místě
 	if brake_on and level == 0 and absf(speed) < 0.4:
 		_back_t += delta
-		if _back_t > 0.35:
-			want = -0.9
+		if _back_t > BACK_DELAY:
+			want = -BACK_SPEED
 	else:
 		_back_t = 0.0
-	var steer := inp.steer + sin(Time.get_ticks_msec() * 0.0013) * 0.25 * drunk
+	var steer := inp.steer + sin(Time.get_ticks_msec() * 0.0013) * DRUNK_WOBBLE * drunk
 	return [want, steer]
 
 
@@ -522,20 +577,20 @@ func _idle_ai(delta: float) -> Array:
 	_idle_t -= delta
 	if _target == Vector3.INF:
 		if _idle_t <= 0.0:
-			_idle_t = rng.randf_range(15.0, 45.0)
+			_idle_t = rng.randf_range(IDLE_EVERY[0], IDLE_EVERY[1])
 			var a := rng.randf() * TAU
-			_target = tether + Vector3(cos(a), 0, sin(a)) * rng.randf_range(1.0, 6.0)
+			_target = tether + Vector3(cos(a), 0, sin(a)) * rng.randf_range(IDLE_STEP[0], IDLE_STEP[1])
 		state = "graze"
 		return [0.0, 0.0]
 	var to := _target - global_position
 	to.y = 0.0
 	if to.length() < 0.8 or _idle_t < -20.0:
 		_target = Vector3.INF
-		_idle_t = rng.randf_range(15.0, 45.0)
+		_idle_t = rng.randf_range(IDLE_EVERY[0], IDLE_EVERY[1])
 		return [0.0, 0.0]
 	state = "move"
 	var diff := wrapf(atan2(to.x, to.z) - yaw, -PI, PI)
-	return [_gait_v[1] * 0.8 * clampf(cos(diff), 0.0, 1.0), clampf(diff * 2.0, -1.0, 1.0)]
+	return [_gait_v[1] * IDLE_WALK_K * clampf(cos(diff), 0.0, 1.0), clampf(diff * 2.0, -1.0, 1.0)]
 
 
 func _crash(v: float) -> void:
@@ -544,11 +599,11 @@ func _crash(v: float) -> void:
 		return
 	var r := rider
 	fauna.world.notify(r.id, "show_message", ["Kůň prudce zastavil před překážkou!", 2.0])
-	if v > 9.0 or r.body.drunk_level() > 0.5 and v > 6.0:
+	if v > FALL_V or r.body.drunk_level() > 0.5 and v > FALL_DRUNK_V:
 		fauna.world.dismount_horse(r.id)
-		r.velocity = Vector3(sin(yaw), 0.4, cos(yaw)) * v * 0.5
+		r.velocity = Vector3(sin(yaw), 0.4, cos(yaw)) * v * FALL_THROW
 		r.fall(3.0, "spadl jsi z koně")
-		r.body.hurt(v * 1.2, "pád z koně")
+		r.body.hurt(v * FALL_DMG_K, "pád z koně")
 
 
 ## Srážka s autem (volá Car): jezdec spadne, kůň se lekne.
@@ -646,14 +701,14 @@ func _call_ai(delta: float) -> Array:
 		level = 0
 		_call_stop_t += delta
 		state = "idle"
-		if _call_stop_t > 5.0:
+		if _call_stop_t > CALL_WAIT_S:
 			_caller = null
 			tether = global_position
 			_idle_t = 6.0
 		return [0.0, clampf(diff * 2.0, -1.0, 1.0)]
 	# chod podle vzdálenosti (hladový kůň nejde cvalem)
 	var gi := 1
-	if d > CALL_CANTER_D and not is_needy() and stamina > 0.2:
+	if d > CALL_CANTER_D and not is_needy() and stamina > CALL_CANTER_STAMINA:
 		gi = 3
 	elif d > CALL_TRAB_D:
 		gi = 2
@@ -692,15 +747,15 @@ func _process(delta: float) -> void:
 	var f := Engine.get_physics_interpolation_fraction()
 	var xf := _prev_xf.interpolate_with(_cur_xf, f)
 	rig.global_transform = xf
-	var k := 1.0 - exp(-delta * 2.5)
+	var k := 1.0 - exp(-delta * GRAZE_BLEND)
 	_graze = lerpf(_graze, 1.0 if rider == null and state == "graze" else 0.0, k)
 	rig.speed = speed
 	rig.turn_rate = _yaw_rate
 	rig.slope = _slope
 	rig.graze = _graze
 	_spooked = maxf(_spooked - delta, 0.0)
-	rig.alert = maxf(0.3 if rider else 0.0, _spooked / 3.5)   # polekaný kůň vrhne hlavou
-	rig.airborne = clampf(absf(velocity.y) / 5.0, 0.0, 1.0) if not is_on_floor() else 0.0
+	rig.alert = maxf(RIDER_ALERT if rider else 0.0, _spooked / SPOOK_S)   # polekaný kůň vrhne hlavou
+	rig.airborne = clampf(absf(velocity.y) / AIR_V, 0.0, 1.0) if not is_on_floor() else 0.0
 	rig.animate(delta)
 	if rider:
 		_rider_pose()
@@ -715,17 +770,17 @@ func _rider_pose() -> void:
 	var st: Vector3 = geo_ride["stirrup"]
 	var hands: Vector3 = geo_ride["hands"]
 	var post := 0.0
-	var lean := 0.12
+	var lean := LEAN_WALK
 	match rig.gait:
 		"trot":
-			post = maxf(sin(rig.phase * TAU * 2.0), 0.0) * 0.07
-			lean = 0.2
+			post = maxf(sin(rig.phase * TAU * 2.0), 0.0) * POST_TROT
+			lean = LEAN_TROT
 		"canter":
-			post = 0.03 + sin(rig.phase * TAU) * 0.02
-			lean = 0.3
+			post = POST_CANTER + sin(rig.phase * TAU) * POST_CANTER_SWING
+			lean = LEAN_CANTER
 		"gallop":
-			post = 0.1
-			lean = 0.55
+			post = POST_GALLOP
+			lean = LEAN_GALLOP
 	var hips := 0.5
 	vis.position = Vector3(0, -hips + 0.02 + post, -0.02)
 	# kyčle jsou roztažené kolem hřbetu → IK nohou v rovině odkloněné o úhel `spread`

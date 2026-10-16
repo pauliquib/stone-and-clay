@@ -32,11 +32,15 @@ extends Node3D
 
 signal footfall(leg: int)            # dopad kopyta (zvuk) – 0 LP, 1 PP, 2 LZ, 3 PZ
 
+## M8.D2d: všechny konstanty pohybu jsou `static var` – ladí je menu pro vývojáře (F3 → Zvěř/Pohyb a rig,
+## `scripts/dev/tune_zver.gd`); výchozí hodnoty zůstávají tady. Změna druhových hodnot (`AnimalSpecs.live_spec`)
+## zvedne `AnimalSpecs.tune_gen` → rig si data druhu znovu připraví (`_prep`).
+
 ## váhy IK nápravy na články nohy (stehno / holeň / spěnka)
-const IK_W := [0.45, 0.9, 0.7]
+static var IK_W := [0.45, 0.9, 0.7]
 
 ## posuny fází nohou [LP, PP, LZ, PZ] a podíl stojné fáze
-const GAITS := {
+static var GAITS := {
 	"walk": {"off": [0.25, 0.75, 0.0, 0.5], "duty": 0.64, "k": 0.85},
 	"trot": {"off": [0.0, 0.5, 0.5, 0.0], "duty": 0.46, "k": 1.2},
 	"canter": {"off": [0.3, 0.55, 0.0, 0.3], "duty": 0.38, "k": 1.3},
@@ -46,19 +50,120 @@ const GAITS := {
 const GAIT_ORDER := ["walk", "trot", "canter", "gallop"]   # index 3 = spec "gallop_kind" (gallop / bound)
 
 ## --- M8.10 laditelné konstanty (druhové hodnoty jsou v AnimalSpecs)
-const G := 9.8
-const SECONDARY_R := 60.0            # m od kamery – do té vzdálenosti páteř, dech a pružiny uší / ocasu
-const LOD_CHECK_S := 0.5             # jak často se přepočítá `detail` podle kamery
-const IK_RESAMPLE_S := 0.1           # jak často se znovu změří rovina terénu pod zvířetem (3 vzorky)
-const GAIT_BLEND := 6.0              # 1/s – prolínání posunů fází, střídy a kmitočtu mezi chody
-const STYLE_BLEND := 4.0             # 1/s – prolínání stylu pohupu (krok/klus ↔ cval)
-const BEND_MAX := 0.35               # rad – největší boční ohyb páteře
-const FLEX_PHASE := 0.8              # fáze cyklu s největší flexí (nohy pod tělem, před dopadem zadních)
-const SURGE_MAX := 0.12              # rad – strop zvednutí předku při rozjezdu
-const SPRING_DT := 0.02              # s – nejdelší krok integrace pružin (stabilita při delším snímku)
-const PUFF_UP := 0.6                 # 1/s – jak rychle se zadýchá při běhu (rychlost > PUFF_SPEED)
-const PUFF_DOWN := 0.04              # 1/s – jak rychle se vydýchá
-const PUFF_SPEED := 3.0              # m/s
+static var G := 9.8
+static var SECONDARY_R := 60.0       # m od kamery – do té vzdálenosti páteř, dech a pružiny uší / ocasu
+static var LOD_CHECK_S := 0.5        # jak často se přepočítá `detail` podle kamery
+static var IK_RESAMPLE_S := 0.1      # jak často se znovu změří rovina terénu pod zvířetem (3 vzorky)
+static var GAIT_BLEND := 6.0         # 1/s – prolínání posunů fází, střídy a kmitočtu mezi chody
+static var STYLE_BLEND := 4.0        # 1/s – prolínání stylu pohupu (krok/klus ↔ cval)
+static var BEND_MAX := 0.35          # rad – největší boční ohyb páteře
+static var FLEX_PHASE := 0.8         # fáze cyklu s největší flexí (nohy pod tělem, před dopadem zadních)
+static var SURGE_MAX := 0.12         # rad – strop zvednutí předku při rozjezdu
+static var SPRING_DT := 0.02         # s – nejdelší krok integrace pružin (stabilita při delším snímku)
+static var PUFF_UP := 0.6            # 1/s – jak rychle se zadýchá při běhu (rychlost > PUFF_SPEED)
+static var PUFF_DOWN := 0.04         # 1/s – jak rychle se vydýchá
+static var PUFF_SPEED := 3.0         # m/s
+
+## --- M8.D2d: čísla dřív zapsaná přímo ve vzorcích (stejné hodnoty)
+# chody a kmitočet
+static var OLD_HYST_UP := 1.08       # starý výběr chodu (v2 vypnuto): nahoru až nad hranici × tohle
+static var OLD_HYST_DN := 0.92       # … dolů až pod předchozí hranici × tohle
+static var OLD_LEAN_K := 0.5         # starý pohyb: náklon do zatáčky
+static var FREQ_LO := 0.85           # kmitočet kroků na dolní hranici rychlosti chodu (násobek)
+static var FREQ_HI := 1.15           # … na horní hranici
+static var MOVE_BLEND := 4.0         # 1/s – náběh / doběh pohybu nohou
+static var AMP_MAX := 0.8            # rad – největší rozkmit nohy
+static var LIFT_BASE := 0.55         # zvednutí nohy při přenosu (podíl ohnutí) ve stání
+static var LIFT_PER_V := 0.06        # … + tolik na m/s
+static var LIFT_MAX := 1.0           # … nejvýš
+static var ROCK_BASE := 0.06         # rad – houpání trupu ve cvalu
+static var ROCK_BOUND := 0.13        # rad – houpání trupu ve skocích (zajíc)
+static var ROCK_PHASE := 1.2         # rad – fázový posun houpání vůči kroku
+static var TROT_BOB_K := 0.3         # pohup v klusu × (1 + tohle)
+static var CANTER_BOB_K := 1.6       # pohup ve cvalu (násobek „bob“)
+# přešlapování na místě
+static var TURN_STEP_V := 0.08       # m/s – pod touto rychlostí se při otáčení přešlapuje
+static var TURN_STEP_RATE := 0.3     # rad/s – od takového otáčení
+static var TURN_STEP_K := 0.7        # rychlost přešlapování = otáčení × tohle (m/s na rad/s)
+static var TURN_STEP_MIN := 0.2      # m/s
+static var TURN_STEP_MAX := 1.0      # m/s
+# brzdění, rozjezd, skok
+static var BRAKE_DECEL := 9.0        # m/s² – zpomalení, při kterém se trup naplno vykloní
+static var BRAKE_FROM_V := 5.0       # m/s – plné vyklonění až z této rychlosti
+static var BRAKE_BLEND := 5.0        # 1/s
+static var BRAKE_PITCH := 0.13       # rad – předek nahoru při plném brzdění
+static var BRAKE_FRONT_S := 0.18     # rad – přední nohy se postaví proti
+static var BRAKE_HIND_S := 0.45      # rad – zadní se podstrčí pod tělo
+static var ACC_BLEND := 4.0          # 1/s – vyhlazení podélného zrychlení (rozjezd)
+static var AIR_PITCH_K := 0.8        # ve skoku trup sleduje dráhu (podíl úhlu dráhy)
+static var AIR_FOLD := 0.85          # ohnutí nohou ve vzduchu
+# lehání, sed, přikrčení
+static var LIE_FRONT_END := 0.6      # lehá předními v okně 0 … tohle
+static var LIE_HIND_START := 0.4     # zadními v okně tohle … 1
+static var RISE_LATE_START := 0.55   # vstávání: druhá dvojice nohou od tohoto podílu
+static var RISE_EARLY_END := 0.6     # vstávání předními (kůň): zadní do tohoto podílu
+static var SIT_PITCH := -0.82        # rad – sed na zadních: trup skoro svisle
+static var SIT_PITCH_W := 0.85       # váha sklonu v sedu
+static var SIT_LIFT := 0.06          # zvednutí trupu v sedu (podíl výšky ramene)
+static var SIT_BACK := 0.12          # posun trupu dozadu v sedu (podíl délky)
+static var SIT_FOLD := 0.85          # přední nohy v sedu (ohnutí)
+static var SIT_NECK := 0.55          # rad – krk v sedu vyrovná vztyčený trup
+static var CROUCH_H := 0.55          # přikrčení: výška trupu mezi stojem a lehem (podíl)
+static var CROUCH_FOLD := 0.6        # přikrčení: ohnutí nohou
+static var CROUCH_NECK := 0.4        # rad
+static var DEAD_ROLL := 1.45         # rad – uhynulé leží na boku
+static var DEAD_NECK := 0.35         # rad
+# páteř a dech
+static var BEND_BLEND := 5.0         # 1/s
+static var BEND_V_MIN := 0.3         # ohyb páteře × clamp(tohle + v × BEND_V_K, tohle, BEND_V_MAX)
+static var BEND_V_K := 0.25
+static var BEND_V_MAX := 1.5
+static var BEND_BODY := 0.3          # podíl ohybu, o který se natočí trup
+static var BEND_NECK := 0.9          # podíl ohybu do krku
+static var BEND_TAIL := 1.0          # podíl ohybu do ocasu
+static var ACC_Y_BLEND := 10.0       # 1/s – vyhlazení svislého zrychlení trupu (budí pružiny)
+static var BREATH_MAX_V := 0.6       # m/s – dýchá viditelně jen pomaleji
+static var PUFF_RATE_K := 1.8        # zadýchaný: kmitočet dechu × (1 + puff × tohle)
+static var PUFF_AMP_K := 1.0         # zadýchaný: rozšíření boků × (1 + puff × tohle)
+static var BREATH_Y := 0.5           # dech: podíl rozšíření do výšky
+# IK chodidel a dopady
+static var IK_BLEND := 9.0           # 1/s – vyhlazení nápravy IK
+static var FOOTFALL_MIN_V := 0.3     # m/s – zvuk / stopa dopadu až od této rychlosti
+# krk a hlava
+static var NOD_AMP := 0.05           # rad – kývání hlavou v kroku
+static var NOD_ROCK := 1.2           # kývání ve cvalu (podíl houpání)
+static var NOD_HEAD := 0.5           # podíl kývání do hlavy
+static var ROOT_HZ := 7.0            # rad/s – rytí: kývání rypákem
+static var ROOT_AMP := 0.12          # rad
+static var ALERT_NECK := 0.22        # rad – pozornost: krk nahoru
+static var ALERT_HEAD := 0.12        # rad
+static var GRAZE_HEAD := 0.25        # rad – pastva: hlava dolů
+static var LIE_NECK := 0.35          # vleže krk × tohle
+static var LIE_NECK_W := 0.5
+static var LOOK_MAX := 1.2           # rad – nejvíc otočená hlava
+static var LOOK_NECK := 0.55         # podíl otočení do krku
+static var LOOK_HEAD := 0.4          # podíl otočení do hlavy
+# uši
+static var EAR_TWITCH_EVERY := [1.5, 6.0]   # s – škubnutí uchem jednou za (od–do)
+static var EAR_TWITCH := 0.35        # rad
+static var EAR_TWITCH_DECAY := 2.5   # rad/s
+static var LISTEN_BLEND := 4.0       # 1/s
+static var LISTEN_EAR := 0.2         # rad – poslouchá: uši dopředu
+static var EAR_SIDE_K := 0.25        # ucho na straně zvuku se natočí víc o tento podíl
+static var ALERT_EAR := 0.35         # rad – pozornost: uši nastražené
+static var CROUCH_EAR := 1.1         # rad – přikrčený: uši přitisknuté
+static var CROUCH_EAR_Z := 0.6       # přikrčený: uši k hlavě (podíl)
+static var SPRING_CLAMP := 1.2       # rad – pružina uší / ocasu nejvýš tak daleko od cíle
+# ocas
+static var TAIL_HZ := 2.0            # rad/s švihání ocasem
+static var TAIL_HZ_V := 0.3          # … + tolik na m/s
+static var TAIL_UP_FROM := 3.0       # m/s – ocas nahoru od této rychlosti
+static var TAIL_UP_RANGE := 5.0      # m/s – naplno o tolik rychleji
+static var TAIL_BOB := 0.05          # rad – pomalé pohupování ocasu
+static var TAIL_SWISH := 0.25        # rad – švihání do stran
+static var TAIL_SWISH_UP := 0.7      # vztyčený ocas švihá o tento podíl méně
+static var FLEE_BLEND := 4.0         # 1/s – náběh útěku (ocas, zrcátko)
+static var FLARE_BLEND := 5.0        # 1/s – rozevření zrcátka
 
 ## Zapnutí M8.10 (přepínač realismu „animal_gait“; nastavuje Fauna z `World.realism_on`). Vypnuto = starý pohyb
 ## (výběr chodu podle rychlosti z `gaits`, bez pružin a páteře); výkonové úpravy platí vždy.
@@ -121,7 +226,8 @@ var _rng := RandomNumberGenerator.new()
 
 # --- M8.10 předpočítaná data (bez alokací v animate)
 var _prepped := false
-var _gi := 0                         # index chodu v GAIT_ORDER
+var _prep_gen := -1                  # M8.D2d: `AnimalSpecs.tune_gen` při posledním `_prep` (změna v menu F3 → znovu)
+var _gi := 0                        # index chodu v GAIT_ORDER
 var _fast := "gallop"
 var _goff := PackedFloat32Array([0.25, 0.75, 0.0, 0.5])
 var _gduty := 0.64
@@ -203,6 +309,8 @@ func _ready() -> void:
 ## Jednou při první animaci: data nohou, uší a druhové konstanty do Packed polí / proměnných.
 func _prep() -> void:
 	_prepped = true
+	_prep_gen = AnimalSpecs.tune_gen
+	_spr_live = false
 	_fast = String(spec.get("gallop_kind", "gallop"))
 	var g: Dictionary = spec["gaits"]
 	_s_lim[0] = float(g["walk"])
@@ -304,9 +412,9 @@ func _pick_gait_speed(v: float) -> int:
 			want = i
 			break
 	# hystereze ±8 %
-	if want > _gi and _gi < 3 and v < _s_lim[_gi] * 1.08:
+	if want > _gi and _gi < 3 and v < _s_lim[_gi] * OLD_HYST_UP:
 		want = _gi
-	elif want < _gi and _gi > 0 and v > _s_lim[_gi - 1] * 0.92:
+	elif want < _gi and _gi > 0 and v > _s_lim[_gi - 1] * OLD_HYST_DN:
 		want = _gi
 	return want
 
@@ -366,14 +474,14 @@ func _spring(i: int, target: float, force: float, w: float, z: float, dt: float)
 	for _s in n:
 		v += (-w * w * (x - target) - 2.0 * z * w * v + force) * h
 		x += v * h
-	x = clampf(x, target - 1.2, target + 1.2)
+	x = clampf(x, target - SPRING_CLAMP, target + SPRING_CLAMP)
 	_spr[i] = x
 	_spr[i + 1] = v
 	return x
 
 
 func animate(delta: float) -> void:
-	if not _prepped:
+	if not _prepped or _prep_gen != AnimalSpecs.tune_gen:
 		_prep()
 	_t += delta
 	_check_detail(delta)
@@ -393,12 +501,12 @@ func animate(delta: float) -> void:
 		_k = lerpf(_k, _gk, k)
 		_trot_w = lerpf(_trot_w, 1.0 if _gi == 1 else 0.0, ks)
 		_style = lerpf(_style, 1.0 if _gi >= 2 else 0.0, ks)
-		_rock_a = lerpf(_rock_a, 0.13 if gait == "bound" else 0.06, ks)
+		_rock_a = lerpf(_rock_a, ROCK_BOUND if gait == "bound" else ROCK_BASE, ks)
 	else:
 		_k = _gk
 		_trot_w = 1.0 if _gi == 1 else 0.0
 		_style = 1.0 if _gi >= 2 else 0.0
-		_rock_a = 0.13 if gait == "bound" else 0.06
+		_rock_a = ROCK_BOUND if gait == "bound" else ROCK_BASE
 	# rychlostní rozsah současného chodu (pro kmitočet uvnitř chodu)
 	var lo := 0.0
 	var hi := 0.0
@@ -410,90 +518,90 @@ func animate(delta: float) -> void:
 		hi = _s_lim[_gi]
 	# přešlapování: při otáčení na místě (bez jízdy vpřed) nohy kráčí mírným krokem
 	var vv := v
-	var turning_in_place := v < 0.08 and absf(turn_rate) > 0.3 and lie < 0.5 and dead < 0.5
+	var turning_in_place := v < TURN_STEP_V and absf(turn_rate) > TURN_STEP_RATE and lie < 0.5 and dead < 0.5
 	if turning_in_place:
-		vv = clampf(absf(turn_rate) * 0.7, 0.2, 1.0)
+		vv = clampf(absf(turn_rate) * TURN_STEP_K, TURN_STEP_MIN, TURN_STEP_MAX)
 	var frac := clampf((vv - lo) / maxf(hi - lo, 0.01), 0.0, 1.0)
-	var freq: float = _k * sqrt(9.8 / maxf(shoulder_h, 0.1)) / PI * _step_k * lerpf(0.85, 1.15, frac)
+	var freq: float = _k * sqrt(G / maxf(shoulder_h, 0.1)) / PI * _step_k * lerpf(FREQ_LO, FREQ_HI, frac)
 	var prev := phase
 	if vv > 0.02:
 		phase = fposmod(phase + freq * delta * (signf(speed) if v > 0.02 else signf(turn_rate)), 1.0)
-	_move_w = move_toward(_move_w, 1.0 if vv > 0.05 else 0.0, delta * 4.0)
+	_move_w = move_toward(_move_w, 1.0 if vv > 0.05 else 0.0, delta * MOVE_BLEND)
 	var stride := vv / maxf(freq, 0.1)
-	var amp := clampf(atan(stride * _duty * 0.5 / maxf(shoulder_h, 0.1)), 0.0, 0.8) * _move_w
-	var lift := clampf(0.55 + vv * 0.06, 0.55, 1.0) * _move_w
+	var amp := clampf(atan(stride * _duty * 0.5 / maxf(shoulder_h, 0.1)), 0.0, AMP_MAX) * _move_w
+	var lift := clampf(LIFT_BASE + vv * LIFT_PER_V, LIFT_BASE, LIFT_MAX) * _move_w
 	# prudké brzdění ze rychlého chodu: trup se vykloní, zadní nohy podstrčí pod tělo
 	var acc := (v - _prev_v) / maxf(delta, 0.001)
 	var decel := maxf(-acc, 0.0)
-	_brake = lerpf(_brake, clampf(decel / 9.0, 0.0, 1.0) * clampf(_prev_v / 5.0, 0.0, 1.0), minf(delta * 5.0, 1.0))
+	_brake = lerpf(_brake, clampf(decel / BRAKE_DECEL, 0.0, 1.0) * clampf(_prev_v / BRAKE_FROM_V, 0.0, 1.0), minf(delta * BRAKE_BLEND, 1.0))
 	_prev_v = v
-	_acc_s = lerpf(_acc_s, acc, minf(delta * 4.0, 1.0))
+	_acc_s = lerpf(_acc_s, acc, minf(delta * ACC_BLEND, 1.0))
 	# lehání a vstávání po dvojicích nohou: lehá předními; vstává předními (kůň) nebo zadními
 	var rising := lie < _lie_prev - 0.002
 	_lie_prev = lie
 	var fr0 := 0.0                  # okno lehnutí předních (lehá předními jako první)
-	var fr1 := 0.6
-	var hr0 := 0.4
+	var fr1 := LIE_FRONT_END
+	var hr0 := LIE_HIND_START
 	var hr1 := 1.0
 	if rising:
 		if _rise_ff:
-			fr0 = 0.55
+			fr0 = RISE_LATE_START
 			fr1 = 1.0
 			hr0 = 0.0
-			hr1 = 0.6
+			hr1 = RISE_EARLY_END
 		else:
-			hr0 = 0.55
+			hr0 = RISE_LATE_START
 			hr1 = 1.0
 	for i in 4:
 		_leg_lie[i] = smoothstep(fr0, fr1, lie) if i < 2 else smoothstep(hr0, hr1, lie)
 
 	# --- trup (pohup krok/klus ↔ houpání cvalu se prolíná)
 	var bob := _bob
-	var dy_wt := -bob * cos(phase * TAU * 2.0) * _move_w * (1.0 + 0.3 * _trot_w)
-	var dy_c := bob * 1.6 * sin(phase * TAU) * _move_w
-	var rock := _rock_a * sin(phase * TAU + 1.2) * _move_w * _style
+	var dy_wt := -bob * cos(phase * TAU * 2.0) * _move_w * (1.0 + TROT_BOB_K * _trot_w)
+	var dy_c := bob * CANTER_BOB_K * sin(phase * TAU) * _move_w
+	var rock := _rock_a * sin(phase * TAU + ROCK_PHASE) * _move_w * _style
 	var dy := lerpf(dy_wt, dy_c, _style)
-	var roll := -atan(speed * turn_rate / 9.8) * (_lean_k if v2 else 0.5)
+	var roll := -atan(speed * turn_rate / G) * (_lean_k if v2 else OLD_LEAN_K)
 	var pitch := -slope + rock
 	var lw := maxf(lie, dead)
 	var sit_w := sit * (1.0 - lw)
-	pitch -= _brake * 0.13                      # brzdění: předek nahoru
+	pitch -= _brake * BRAKE_PITCH                      # brzdění: předek nahoru
 	if full:
 		pitch -= clampf(_acc_s * _surge, 0.0, SURGE_MAX) * (1.0 - lw)   # rozjezd: předek nahoru
 		if airborne > 0.05:
 			# ve skoku trup sleduje dráhu: nahoru čenichem vzhůru, dolů předkem dolů
-			pitch = lerpf(pitch, -atan2(vy, maxf(v, 1.0)) * 0.8, airborne)
-	pitch = lerpf(pitch, -0.82, sit_w * 0.85)   # sed na zadních: trup skoro svisle
+			pitch = lerpf(pitch, -atan2(vy, maxf(v, 1.0)) * AIR_PITCH_K, airborne)
+	pitch = lerpf(pitch, SIT_PITCH, sit_w * SIT_PITCH_W)   # sed na zadních: trup skoro svisle
 	var y := body_y + dy
 	y = lerpf(y, lie_y, lw)
-	y = lerpf(y, lerpf(body_y, lie_y, 0.55), crouch * (1.0 - lw))
-	y += sit_w * shoulder_h * 0.06
+	y = lerpf(y, lerpf(body_y, lie_y, CROUCH_H), crouch * (1.0 - lw))
+	y += sit_w * shoulder_h * SIT_LIFT
 	# páteř: boční ohyb do zatáčky a flexe/extenze ve cvalu
-	var kb := 1.0 - exp(-delta * 5.0)
+	var kb := 1.0 - exp(-delta * BEND_BLEND)
 	if full:
-		var want_b := clampf(turn_rate * _spine_lat * clampf(0.3 + v * 0.25, 0.3, 1.5), -BEND_MAX, BEND_MAX)
+		var want_b := clampf(turn_rate * _spine_lat * clampf(BEND_V_MIN + v * BEND_V_K, BEND_V_MIN, BEND_V_MAX), -BEND_MAX, BEND_MAX)
 		_bend = lerpf(_bend, want_b * (1.0 - lw), kb)
 		_flex = _spine_flex * _style * _move_w * cos(TAU * (phase - FLEX_PHASE)) * (1.0 - lw)
 	else:
 		_bend = lerpf(_bend, 0.0, kb)
 		_flex = 0.0
 	body.position.y = y
-	body.position.z = -sit_w * _L * 0.12
-	body.rotation = Vector3(lerpf(pitch, 0.0, lw), _bend * 0.3, lerpf(roll, 1.45, dead))
+	body.position.z = -sit_w * _L * SIT_BACK
+	body.rotation = Vector3(lerpf(pitch, 0.0, lw), _bend * BEND_BODY, lerpf(roll, DEAD_ROLL, dead))
 	# svislé zrychlení trupu (budí pružiny uší a ocasu)
 	if full:
 		var dt := maxf(delta, 0.001)
 		var vy_b := (y - _prev_y) / dt
-		_acc_y = lerpf(_acc_y, (vy_b - _vel_y) / dt, minf(delta * 10.0, 1.0))
+		_acc_y = lerpf(_acc_y, (vy_b - _vel_y) / dt, minf(delta * ACC_Y_BLEND, 1.0))
 		_vel_y = vy_b
 	_prev_y = y
 	# dech: boky se rozšiřují (jen síť trupu, ne nohy); po běhu rychleji
 	_puff = move_toward(_puff, 1.0 if v > PUFF_SPEED else 0.0, delta * (PUFF_UP if v > PUFF_SPEED else PUFF_DOWN))
 	if _torso:
-		if full and v < 0.6 and dead < 0.5:
-			_breath_p = fmod(_breath_p + delta * _breath_hz * (1.0 + _puff * 1.8) * TAU, TAU)
-			var br := sin(_breath_p) * _breath_amp * (1.0 + _puff)
-			_torso.scale = Vector3(1.0 + br, 1.0 + br * 0.5, 1.0)
+		if full and v < BREATH_MAX_V and dead < 0.5:
+			_breath_p = fmod(_breath_p + delta * _breath_hz * (1.0 + _puff * PUFF_RATE_K) * TAU, TAU)
+			var br := sin(_breath_p) * _breath_amp * (1.0 + _puff * PUFF_AMP_K)
+			_torso.scale = Vector3(1.0 + br, 1.0 + br * BREATH_Y, 1.0)
 			_torso_scaled = true
 		elif _torso_scaled:
 			_torso.scale = Vector3.ONE
@@ -525,18 +633,18 @@ func animate(delta: float) -> void:
 			s = amp * (-1.0 + 2.0 * smoothstep(0.0, 1.0, t))
 			f = sin(PI * t) * lift
 		# dopad (konec přenosu) → zvuk kopyta
-		if _move_w > 0.5 and v > 0.3:
+		if _move_w > 0.5 and v > FOOTFALL_MIN_V:
 			var pp := fposmod(prev + _off[i], 1.0)
 			if pp > p and speed > 0.0:
 				footfall.emit(i)
-		f = maxf(f, airborne * 0.85)
-		f = lerpf(f, 0.6, crouch * (1.0 - lw))
+		f = maxf(f, airborne * AIR_FOLD)
+		f = lerpf(f, CROUCH_FOLD, crouch * (1.0 - lw))
 		var front := _lfront[i] == 1
 		# brzdění: přední se postaví proti, zadní podstrčí dopředu pod tělo
-		s += _brake * (0.18 if front else 0.45)
+		s += _brake * (BRAKE_FRONT_S if front else BRAKE_HIND_S)
 		# sed na zadních: přední zvednuté v nohavicích, zadní pod tělem
 		if sit_w > 0.0:
-			f = maxf(f, sit_w * 0.85)
+			f = maxf(f, sit_w * SIT_FOLD)
 		var b3 := i * 3
 		var a0 := _lrest[b3] + _lfold[b3] * f + s
 		var a1 := _lrest[b3 + 1] + _lfold[b3 + 1] * f
@@ -563,7 +671,7 @@ func animate(delta: float) -> void:
 			var foot_w := to_global(Vector3(jp.x, bpy + jp.y - vert, jz + bpz + horiz))
 			var gy := _gh + _ggx * (foot_w.x - _gp.x) + _ggz * (foot_w.z - _gp.z)
 			ik_t = clampf((gy - foot_w.y) * ik_w, -ik_max, ik_max)
-		_ik[i] = lerpf(_ik[i], ik_t, minf(delta * 9.0, 1.0))
+		_ik[i] = lerpf(_ik[i], ik_t, minf(delta * IK_BLEND, 1.0))
 		var ikv := _ik[i]
 		if absf(ikv) > 0.002:
 			var w0: float = IK_W[0]
@@ -579,16 +687,16 @@ func animate(delta: float) -> void:
 		_lnodes[b3 + 2].rotation.x = -(a2 - a1)
 
 	# --- krk a hlava
-	var nod_wt := cos(phase * TAU * 2.0 + 0.6) * 0.05 * _move_w
-	var nod := lerpf(nod_wt, -rock * 1.2, _style)
+	var nod_wt := cos(phase * TAU * 2.0 + 0.6) * NOD_AMP * _move_w
+	var nod := lerpf(nod_wt, -rock * NOD_ROCK, _style)
 	if rooting and graze > 0.5:
-		nod += sin(_t * 7.0) * 0.12
-	var neck_pitch := -neck_angle + graze * _graze_a - alert * 0.22 + nod
-	neck_pitch = lerpf(neck_pitch, -neck_angle * 0.35, lie * 0.5)
-	neck_pitch = lerpf(neck_pitch, 0.35, dead)
-	neck_pitch += crouch * 0.4
-	neck_pitch += sit_w * 0.55                     # v sedu krk vyrovná vztyčený trup
-	var look := clampf(look_yaw, -1.2, 1.2)
+		nod += sin(_t * ROOT_HZ) * ROOT_AMP
+	var neck_pitch := -neck_angle + graze * _graze_a - alert * ALERT_NECK + nod
+	neck_pitch = lerpf(neck_pitch, -neck_angle * LIE_NECK, lie * LIE_NECK_W)
+	neck_pitch = lerpf(neck_pitch, DEAD_NECK, dead)
+	neck_pitch += crouch * CROUCH_NECK
+	neck_pitch += sit_w * SIT_NECK                     # v sedu krk vyrovná vztyčený trup
+	var look := clampf(look_yaw, -LOOK_MAX, LOOK_MAX)
 	if full:
 		# divočák běží s nízkou hlavou; hlava drží sklon, i když se trup houpe; krk se při pastvě natáhne
 		var run := clampf((v - _v_up[0]) / maxf(_v_up[1] - _v_up[0], 0.1), 0.0, 1.0)
@@ -597,16 +705,16 @@ func animate(delta: float) -> void:
 		head.position.z = _neck_len * (1.0 + _neck_reach * graze)
 	elif head.position.z != _neck_len:
 		head.position.z = _neck_len
-	neck.rotation = Vector3(neck_pitch, look * 0.55 * (1.0 - graze) + _bend * 0.9, 0.0)
-	head.rotation = Vector3(head_tilt - graze * 0.25 - alert * 0.12 - nod * 0.5, look * 0.4, 0.0)
+	neck.rotation = Vector3(neck_pitch, look * LOOK_NECK * (1.0 - graze) + _bend * BEND_NECK, 0.0)
+	head.rotation = Vector3(head_tilt - graze * GRAZE_HEAD - alert * ALERT_HEAD - nod * NOD_HEAD, look * LOOK_HEAD, 0.0)
 
 	# --- uši (škubnutí, nastražení, přitisknutí; M8.10 pružiny a natočení ke zvuku)
 	_ear_t -= delta
 	if _ear_t <= 0.0:
-		_ear_t = _rng.randf_range(1.5, 6.0)
-		_ear_twitch = 0.35
-	_ear_twitch = move_toward(_ear_twitch, 0.0, delta * 2.5)
-	_listen_w = lerpf(_listen_w, clampf(listen, 0.0, 1.0), minf(delta * 4.0, 1.0))
+		_ear_t = _rng.randf_range(EAR_TWITCH_EVERY[0], EAR_TWITCH_EVERY[1])
+		_ear_twitch = EAR_TWITCH
+	_ear_twitch = move_toward(_ear_twitch, 0.0, delta * EAR_TWITCH_DECAY)
+	_listen_w = lerpf(_listen_w, clampf(listen, 0.0, 1.0), minf(delta * LISTEN_BLEND, 1.0))
 	var head_yaw := look * 0.95 + _bend * 0.9
 	var ear_dir := clampf(wrapf(listen_yaw - head_yaw, -PI, PI), -_ear_turn, _ear_turn) * _listen_w
 	if full and not _spr_live:
@@ -622,13 +730,13 @@ func animate(delta: float) -> void:
 		var sd := _ear_side[e]
 		var base := _ear_rest[e]
 		# +x = špička ucha dopředu (nastražené), −x = dozadu (přitisknuté)
-		var tx := base.x + alert * 0.35 - crouch * 1.1 - _ear_twitch * (1.0 if sd > 0 else 0.0)
-		var ez := base.z * (1.0 - crouch * 0.6)
+		var tx := base.x + alert * ALERT_EAR - crouch * CROUCH_EAR - _ear_twitch * (1.0 if sd > 0 else 0.0)
+		var ez := base.z * (1.0 - crouch * CROUCH_EAR_Z)
 		if full:
 			# ucho na straně zdroje se natočí víc, druhé méně (každé má vlastní pružinu)
-			var side_k := 1.0 + 0.25 * signf(ear_dir) * sd
+			var side_k := 1.0 + EAR_SIDE_K * signf(ear_dir) * sd
 			var ty := base.y + ear_dir * side_k * (1.0 - crouch)
-			tx += _listen_w * 0.2 * (1.0 - crouch)
+			tx += _listen_w * LISTEN_EAR * (1.0 - crouch)
 			var ex := _spring(e * 4, tx, -_acc_y * _ear_flop * _ear_w * _ear_w, _ear_w, _ear_z, delta)
 			var ey := _spring(e * 4 + 2, ty, 0.0, _ear_w, _ear_z, delta)
 			ears[e].rotation = Vector3(ex, ey, ez)
@@ -637,20 +745,20 @@ func animate(delta: float) -> void:
 
 	# --- ocas (švihání, při útěku nahoru; M8.10 pružina, zrcátko)
 	if tail:
-		_tail_t += delta * (2.0 + v * 0.3)
-		_flee_w = lerpf(_flee_w, clampf(flee, 0.0, 1.0), minf(delta * 4.0, 1.0))
-		var up := clampf((v - 3.0) / 5.0, 0.0, 1.0) * _tail_up
+		_tail_t += delta * (TAIL_HZ + v * TAIL_HZ_V)
+		_flee_w = lerpf(_flee_w, clampf(flee, 0.0, 1.0), minf(delta * FLEE_BLEND, 1.0))
+		var up := clampf((v - TAIL_UP_FROM) / TAIL_UP_RANGE, 0.0, 1.0) * _tail_up
 		if v2:
 			up = maxf(up, _flee_w * _tail_up)
-		var tx := _tail_rest.x + up + sin(_tail_t * 0.7) * 0.05
-		var ty := sin(_tail_t) * 0.25 * (1.0 - minf(up, 1.0) * 0.7)
+		var tx := _tail_rest.x + up + sin(_tail_t * 0.7) * TAIL_BOB
+		var ty := sin(_tail_t) * TAIL_SWISH * (1.0 - minf(up, 1.0) * TAIL_SWISH_UP)
 		if full:
-			ty -= _bend * 1.0
+			ty -= _bend * BEND_TAIL
 			tail.rotation = Vector3(_spring(8, tx, _acc_y * _tail_flop * _tail_w * _tail_w, _tail_w, _tail_z, delta),
 				_spring(10, ty, 0.0, _tail_w, _tail_z, delta), 0.0)
 		else:
 			tail.rotation = Vector3(tx, ty, 0.0)
 		if _flare_s > 1.0:
-			_flare = lerpf(_flare, _flee_w if v2 else 0.0, minf(delta * 5.0, 1.0))
+			_flare = lerpf(_flare, _flee_w if v2 else 0.0, minf(delta * FLARE_BLEND, 1.0))
 			var fs := lerpf(1.0, _flare_s, _flare)
 			tail.scale = Vector3(fs, fs, 1.0)

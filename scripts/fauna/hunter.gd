@@ -17,24 +17,28 @@ extends Node3D
 # ---- krmelce a posed
 const FEEDERS := 2                   # počet krmelců kolem chaty
 const FEEDER_DIST := [80.0, 380.0]   # jak daleko od chaty (m) se hledá místo
-const FEEDER_R := 600.0              # zvěř z tohoto okruhu se v zimě táhne ke krmelci (m)
+## M8.D2d: chování u krmelců a vyzvednutí zvěře ladí menu pro vývojáře (F3 → Zvěř/Ostatní).
+static var FEEDER_R := 600.0         # zvěř z tohoto okruhu se v zimě táhne ke krmelci (m)
 const FEEDER_MONTHS := [12, 1, 2]
-const FEEDER_SNOW := 0.3             # nebo když leží aspoň tolik sněhu
-const FEEDER_FULL_H := 72.0          # krmelec naplněný úkolem táhne zvěř tolik herních hodin i mimo zimu
-const FEED_FROM := 16.0              # zvěř se ke krmelci vydává od této hodiny …
-const FEED_TO := 8.0                 # … do této
+static var FEEDER_SNOW := 0.3        # nebo když leží aspoň tolik sněhu
+static var FEEDER_FULL_H := 72.0     # krmelec naplněný úkolem táhne zvěř tolik herních hodin i mimo zimu
+static var FEED_FROM := 16.0         # zvěř se ke krmelci vydává od této hodiny …
+static var FEED_TO := 8.0            # … do této
 const FEED_SPECIES := ["srnec"]
-const FEEDER_TICK := 15.0            # jak často (s) se přepočítává shromažďování zvěře
+static var FEEDER_TICK := 15.0       # jak často (s) se přepočítává shromažďování zvěře
+static var FEEDER_HOME_SPREAD := 6.0 # m – domov skupiny u krmelce s rozptylem do tolika
+static var FEEDER_GO_R := 18.0       # m – vůdce dál od krmelce za soumraku vyrazí ke krmelci
+static var FEEDER_GO_SPREAD := 7.0   # m – cíl u krmelce s rozptylem do tolika
 const STAND_DIST := [50.0, 95.0]     # posed stojí tak daleko od prvního krmelce (m)
 # ---- vyzvednutí uhynulé zvěře
-const PICKUP_WAIT_S := 45.0          # po nahlášení myslivec dorazí za tolik s reálného času
-const PICKUP_FROM_D := 60.0          # … a přichází z takové vzdálenosti (od chaty)
-const PICKUP_LOAD_S := 3.5
-const PICKUP_QUIET_D := 120.0        # dál než tolik od hráče se zvíře odveze bez procházky (nikdo nevidí)
-const WALK_SPEED := 1.7
+static var PICKUP_WAIT_S := 45.0     # po nahlášení myslivec dorazí za tolik s reálného času
+static var PICKUP_FROM_D := 60.0     # … a přichází z takové vzdálenosti (od chaty)
+static var PICKUP_LOAD_S := 3.5
+static var PICKUP_QUIET_D := 120.0   # dál než tolik od hráče se zvíře odveze bez procházky (nikdo nevidí)
+static var WALK_SPEED := 1.7
 # ---- parůžky, včelař
 const ANTLER_R := 350.0              # parůžky se hledají tak daleko od chaty (m)
-const SMOKE_S := 5.0                 # okuřování úlů
+static var SMOKE_S := 5.0            # okuřování úlů
 const BEEKEEPER_NAME := "Včelař Vilém"
 const BEEKEEPER_MONTHS := [4, 9]     # včelař pracuje od dubna do září …
 const BEEKEEPER_HOURS := [7.0, 19.0] # … přes den
@@ -301,11 +305,11 @@ func _feeder_tick(home_only := false) -> void:
 			if bi < 0:
 				m.home = m.get_meta("home0")                    # mimo sezónu se skupina vrací domů
 			else:
-				m.home = feeders[bi] + Vector3(rng.randf_range(-6.0, 6.0), 0.0, rng.randf_range(-6.0, 6.0))
+				m.home = feeders[bi] + Vector3(rng.randf_range(-FEEDER_HOME_SPREAD, FEEDER_HOME_SPREAD), 0.0, rng.randf_range(-FEEDER_HOME_SPREAD, FEEDER_HOME_SPREAD))
 		if home_only or bi < 0 or not night or lead.dead or (herd as Herd).alarmed() or lead.threat != null:
 			continue
-		if lead.state in ["graze", "move"] and lead.global_position.distance_to(feeders[bi]) > 18.0:
-			lead.target = feeders[bi] + Vector3(rng.randf_range(-7.0, 7.0), 0.0, rng.randf_range(-7.0, 7.0))
+		if lead.state in ["graze", "move"] and lead.global_position.distance_to(feeders[bi]) > FEEDER_GO_R:
+			lead.target = feeders[bi] + Vector3(rng.randf_range(-FEEDER_GO_SPREAD, FEEDER_GO_SPREAD), 0.0, rng.randf_range(-FEEDER_GO_SPREAD, FEEDER_GO_SPREAD))
 			lead.state = "move"
 			lead.state_t = 0.0
 

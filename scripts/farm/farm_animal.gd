@@ -9,11 +9,16 @@
 class_name FarmAnimal
 extends Node3D
 
-const WANDER_SPEED := 0.7           # m/s – klidná chůze po výběhu
-const TURN_RATE := 1.6              # rad/s
-const ESCAPE_CHECK_S := 6.0
-const ESCAPE_CHANCE := 0.12         # na kontrolu, jen když je zvíře blízko otevřené branky
-const ESCAPE_ROAM_R := 14.0         # jak daleko od branky se zatoulané zvíře drží
+## M8.D2d: pohyb po výběhu ladí menu pro vývojáře (F3 → Zvěř/Hospodářská zvířata).
+static var WANDER_SPEED := 0.7      # m/s – klidná chůze po výběhu
+static var TURN_RATE := 1.6         # rad/s
+static var ESCAPE_CHECK_S := 6.0
+static var ESCAPE_CHANCE := 0.12    # na kontrolu, jen když je zvíře blízko otevřené branky
+static var ESCAPE_ROAM_R := 14.0    # jak daleko od branky se zatoulané zvíře drží
+static var ESCAPE_GATE_R := 4.0     # m – uteče jen blíž k otevřené brance než tohle
+static var ACCEL := 1.2             # m/s² – rozchod a zastavení
+static var WAIT := [3.0, 12.0]      # s – postojí, než si vybere další místo (od–do)
+static var ARRIVE_R := 0.4          # m – místo dosaženo
 
 var farm: Farm
 var uid := 0                        # pořadové číslo v rámci farmy (ukládání, nabídky)
@@ -136,7 +141,7 @@ func _process(delta: float) -> void:
 	_escape_t -= delta
 	if _escape_t <= 0.0:
 		_escape_t = ESCAPE_CHECK_S
-		if farm.pen.gate_open and not escaped and global_position.distance_to(farm.pen.gate_world()) < 4.0 and _rng.randf() < ESCAPE_CHANCE:
+		if farm.pen.gate_open and not escaped and global_position.distance_to(farm.pen.gate_world()) < ESCAPE_GATE_R and _rng.randf() < ESCAPE_CHANCE:
 			escaped = true
 			_target = Vector3.INF
 			global_position = farm.pen.gate_out()
@@ -167,15 +172,15 @@ func _wander(delta: float) -> void:
 		var to := _target - global_position
 		to.y = 0.0
 		var d := to.length()
-		if d < 0.4:
+		if d < ARRIVE_R:
 			_target = Vector3.INF
-			_wait_t = _rng.randf_range(3.0, 12.0)
+			_wait_t = _rng.randf_range(WAIT[0], WAIT[1])
 		else:
 			var want_yaw := atan2(to.x, to.z)
 			var diff := wrapf(want_yaw - _yaw, -PI, PI)
 			_yaw = wrapf(_yaw + clampf(diff, -TURN_RATE * delta, TURN_RATE * delta), -PI, PI)
 			want_speed = WANDER_SPEED * clampf(cos(diff), 0.15, 1.0)
-	_speed = move_toward(_speed, want_speed, 1.2 * delta)
+	_speed = move_toward(_speed, want_speed, ACCEL * delta)
 	var fwd := Vector3(sin(_yaw), 0, cos(_yaw))
 	var np := global_position + fwd * _speed * delta
 	np.y = farm.world.terrain.height_at(np.x, np.z)

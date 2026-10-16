@@ -11,19 +11,21 @@ extends Node3D
 
 const HAJNY := "hajny"
 const STRAZ := "straz"
-const WALK_SPEED := 1.4                # m/s obchůzka
-const RUN_SPEED := 3.2                 # m/s k výstřelu / k místu činu
-const PATROL_R := 900.0                # m od chaty – okruh obchůzky
-const WATER_PATROL_R := 1200.0         # m od chaty – stráž hledá úseky potoků a řeky v tomto okruhu
+## M8.D2d: pohyb, sluch a kontroly ladí menu pro vývojáře (F3 → Zvěř/Ostatní).
+static var WALK_SPEED := 1.4           # m/s obchůzka
+static var RUN_SPEED := 3.2            # m/s k výstřelu / k místu činu
+static var PATROL_R := 900.0           # m od chaty – okruh obchůzky
+static var WATER_PATROL_R := 1200.0    # m od chaty – stráž hledá úseky potoků a řeky v tomto okruhu
+static var ARRIVE_R := 2.0             # m – cíl obchůzky dosažen
 const WATER_TRIES := 40                # pokusů o náhodný bod na úseku vody, než stráž jde obvyklou obchůzkou
 const BOWS := ["luk", "kuse"]          # zakázané prostředky lovu (zabavují se při pytláctví)
 const BOW_REP := -20.0                 # pověst a respekt zemědělců za zabavený luk / kuši (jedna událost)
-const HEAR_SHOT_R := 1500.0            # m – výstřel, který hajný slyší
-const HEAR_P := 0.7                    # šance, že hajný výstřel vyslechne a vyrazí
-const INVESTIGATE_S := 240.0           # s – jak dlouho hledá místo činu
-const CONTROL_R := 15.0                # m – dosah kontroly dokladů
-const CHECK_CD_MIN := 90.0             # herních minut mezi kontrolami téhož hráče
-const CARCASS_NEAR_R := 8.0            # m – nelegální úlovek u hráče (kus na zemi)
+static var HEAR_SHOT_R := 1500.0       # m – výstřel, který hajný slyší
+static var HEAR_P := 0.7               # šance, že hajný výstřel vyslechne a vyrazí
+static var INVESTIGATE_S := 240.0      # s – jak dlouho hledá místo činu
+static var CONTROL_R := 15.0           # m – dosah kontroly dokladů
+static var CHECK_CD_MIN := 90.0        # herních minut mezi kontrolami téhož hráče
+static var CARCASS_NEAR_R := 8.0       # m – nelegální úlovek u hráče (kus na zemi)
 const CAPSULE_H := 1.75                # m – výška modelu NPC (procedurální kapsle)
 const CHATA_R := 12.0                  # m od dveří chaty – nabídka spolku
 const TEST_DOC := {"zbrojni": "zbrojni", "lovecky": "lovecky_listek", "rybarsky": "rybarsky_listek"}   # eTest → doklad
@@ -141,7 +143,7 @@ func _move(delta: float) -> void:
 	if _target == Vector3.INF:
 		_pick_patrol()
 	var d := _flat_dist(_target)
-	if d < 2.0:
+	if d < ARRIVE_R:
 		if _invest_left <= 0.0:
 			_pick_patrol()
 		return

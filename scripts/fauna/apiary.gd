@@ -13,9 +13,38 @@ class_name Apiary
 extends Node3D
 
 const N_BEES := 110
-const FORAGE_R := 45.0               # jak daleko létají na květy (m) – ve hře kratší než ve skutečnosti
-const BEE_SPEED := 5.5               # m/s (skutečnost 6–7 m/s)
-const ANGRY_N := 22
+## M8.D2d: chování včel ladí menu pro vývojáře (F3 → Zvěř/Ostatní).
+static var FORAGE_R := 45.0          # jak daleko létají na květy (m) – ve hře kratší než ve skutečnosti (nová včelnice)
+static var BEE_SPEED := 5.5          # m/s (skutečnost 6–7 m/s)
+static var ANGRY_N := 22             # tolik včel nejvýš útočí najednou
+static var SIM_R := 90.0             # m – včely se simulují jen do této vzdálenosti
+static var ACT_DAY_K := 1.3          # aktivita: clamp(denní světlo × tohle − ACT_DAY_OFF)
+static var ACT_DAY_OFF := 0.2
+static var ACT_TEMP_MIN := 9.0       # °C – vylétají od této teploty …
+static var ACT_TEMP_RANGE := 8.0     # … naplno o tolik °C výš
+static var ACT_RAIN_LO := 0.02       # déšť: útlum od …
+static var ACT_RAIN_HI := 0.15       # … do úplného zastavení
+static var ACT_WIND_LO := 7.0        # m/s – vítr: útlum od …
+static var ACT_WIND_HI := 12.0       # … do úplného zastavení
+static var ACT_BLOOM_K := 1.4        # kvetení × tohle + ACT_BLOOM_OFF (strop 1)
+static var ACT_BLOOM_OFF := 0.08
+static var HIVE_WAIT := [3.0, 10.0]  # s – včela v úlu čeká (od–do)
+static var FLOWER_WAIT := [2.0, 7.0] # s – na květu (od–do)
+static var HOME_WAIT := [4.0, 15.0]  # s – po návratu v úlu (÷ aktivita)
+static var WOBBLE := 1.5             # m/s – kličkování letu
+static var STEER_BLEND := 4.0        # 1/s – zatáčení k cíli
+static var ATTACK_SPEED := 7.5       # m/s – rozzlobená včela
+static var ATTACK_BLEND := 5.0       # 1/s
+static var STING_R := 0.5            # m – bodne blíž než tohle …
+static var STING_RATE := 1.5         # … s touto šancí za s
+static var STING_COOL := [0.8, 2.5]  # s mezi bodnutími (od–do)
+static var STING_DMG := 1.5          # zranění bodnutím
+static var DISTURB_R := 2.2          # m – kdo stojí u česna blíž …
+static var DISTURB_S := 1.5          # … déle než tolik s, rozzlobí včely
+static var DISTURB_DECAY := 0.5      # rozrušení opadá × tohle
+static var ANGRY_S := 25.0           # s – jak dlouho jsou rozzlobené
+static var ANGRY_GIVEUP_R := 30.0    # m – dál od úlů pronásledování vzdají
+static var REINFORCE_P := 0.05       # šance za snímek, že z úlu vyletí posila
 const HIVE_COLORS := [Color(0.25, 0.45, 0.72), Color(0.3, 0.6, 0.35), Color(0.85, 0.72, 0.25), Color(0.75, 0.35, 0.25), Color(0.9, 0.9, 0.85)]
 
 var fauna: Fauna
@@ -146,7 +175,7 @@ func _physics_process_impl(delta: float) -> void:
 	_t += delta
 	var w = fauna.world
 	var d: float = w.nearest_player_dist(global_position)
-	_near = d < 90.0
+	_near = d < SIM_R
 	_mmi.visible = _near
 	if not _near:
 		if _snd.playing:
@@ -177,22 +206,22 @@ func _physics_process_impl(delta: float) -> void:
 					_tgt[i] = flowers[rng.randi() % flowers.size()] + Vector3(rng.randf_range(-2, 2), rng.randf_range(0, 0.6), rng.randf_range(-2, 2))
 					_vel[i] = (_tgt[i] - p).normalized() * 1.0
 				elif _wait[i] <= 0.0:
-					_wait[i] = rng.randf_range(3.0, 10.0)
+					_wait[i] = rng.randf_range(HIVE_WAIT[0], HIVE_WAIT[1])
 			1, 3:  # let
 				var to := _tgt[i] - p
 				var dist := to.length()
 				if dist < 0.3:
 					if st == 1:
 						_st[i] = 2
-						_wait[i] = rng.randf_range(2.0, 7.0)
+						_wait[i] = rng.randf_range(FLOWER_WAIT[0], FLOWER_WAIT[1])
 					else:
 						_st[i] = 0
-						_wait[i] = rng.randf_range(4.0, 15.0) / maxf(act, 0.2)
+						_wait[i] = rng.randf_range(HOME_WAIT[0], HOME_WAIT[1]) / maxf(act, 0.2)
 						p = _tgt[i]
 				else:
 					var sp := minf(BEE_SPEED, dist * 2.0 + 0.4)
-					var wob := Vector3(sin(_t * 9.0 + i), sin(_t * 7.0 + i * 1.7) * 0.6, cos(_t * 8.0 + i * 0.7)) * 1.5
-					_vel[i] = _vel[i].lerp(to / dist * sp + wob, 1.0 - exp(-delta * 4.0))
+					var wob := Vector3(sin(_t * 9.0 + i), sin(_t * 7.0 + i * 1.7) * 0.6, cos(_t * 8.0 + i * 0.7)) * WOBBLE
+					_vel[i] = _vel[i].lerp(to / dist * sp + wob, 1.0 - exp(-delta * STEER_BLEND))
 					p += _vel[i] * delta
 			2:  # na květu – popojíždí
 				_wait[i] -= delta
@@ -208,9 +237,9 @@ func _physics_process_impl(delta: float) -> void:
 					_tgt[i] = hives[i % hives.size()]
 				else:
 					var to := ppos + Vector3(sin(_t * 5.0 + i) * 0.5, sin(_t * 4.0 + i) * 0.4, cos(_t * 6.0 + i) * 0.5) - p
-					_vel[i] = _vel[i].lerp(to.normalized() * 7.5, 1.0 - exp(-delta * 5.0))
+					_vel[i] = _vel[i].lerp(to.normalized() * ATTACK_SPEED, 1.0 - exp(-delta * ATTACK_BLEND))
 					p += _vel[i] * delta
-					if authority and to.length() < 0.5 and _sting_cool <= 0.0 and rng.randf() < delta * 1.5:
+					if authority and to.length() < STING_R and _sting_cool <= 0.0 and rng.randf() < delta * STING_RATE:
 						_sting(player)
 		_pos[i] = p
 		var scl := 0.001 if st == 0 else 2.2
@@ -222,12 +251,12 @@ func _physics_process_impl(delta: float) -> void:
 	_sting_cool -= delta
 	if _angry_t > 0.0:
 		_angry_t -= delta
-		if player == null or player.global_position.distance_to(global_position) > 30.0 or player.get("car") != null:
+		if player == null or player.global_position.distance_to(global_position) > ANGRY_GIVEUP_R or player.get("car") != null:
 			_angry_t = 0.0
 		# posily z úlu
 		if n_angry < ANGRY_N:
 			for i in N_BEES:
-				if _st[i] != 4 and rng.randf() < 0.05:
+				if _st[i] != 4 and rng.randf() < REINFORCE_P:
 					_st[i] = 4
 					if _pos[i].distance_to(hives[i % hives.size()]) < 0.1:
 						_pos[i] = hives[i % hives.size()]
@@ -238,12 +267,12 @@ func _physics_process_impl(delta: float) -> void:
 func _activity() -> float:
 	var w: Weather = fauna.weather
 	var c: Clock = fauna.clock
-	var a := clampf(c.daylight() * 1.3 - 0.2, 0.0, 1.0)
+	var a := clampf(c.daylight() * ACT_DAY_K - ACT_DAY_OFF, 0.0, 1.0)
 	if w:
-		a *= clampf((w.temp - 9.0) / 8.0, 0.0, 1.0)
-		a *= 1.0 - smoothstep(0.02, 0.15, w.rain)
-		a *= 1.0 - smoothstep(7.0, 12.0, w.wind)
-	a *= clampf(Seasons.bloom(c.day_of_year()) * 1.4 + 0.08, 0.0, 1.0)
+		a *= clampf((w.temp - ACT_TEMP_MIN) / ACT_TEMP_RANGE, 0.0, 1.0)
+		a *= 1.0 - smoothstep(ACT_RAIN_LO, ACT_RAIN_HI, w.rain)
+		a *= 1.0 - smoothstep(ACT_WIND_LO, ACT_WIND_HI, w.wind)
+	a *= clampf(Seasons.bloom(c.day_of_year()) * ACT_BLOOM_K + ACT_BLOOM_OFF, 0.0, 1.0)
 	return a
 
 
@@ -255,12 +284,12 @@ func _check_disturb(delta: float, act: float) -> void:
 		return
 	var close := false
 	for h in hives:
-		if h.distance_to(p.global_position + Vector3(0, 0.5, 0)) < 2.2:
+		if h.distance_to(p.global_position + Vector3(0, 0.5, 0)) < DISTURB_R:
 			close = true
 			break
-	_disturb = _disturb + delta if close else maxf(_disturb - delta * 0.5, 0.0)
-	if _disturb > 1.5 and _angry_t <= 0.0:
-		_angry_t = 25.0
+	_disturb = _disturb + delta if close else maxf(_disturb - delta * DISTURB_DECAY, 0.0)
+	if _disturb > DISTURB_S and _angry_t <= 0.0:
+		_angry_t = ANGRY_S
 		_angry_id = p.id
 		w.notify(p.id, "show_message", ["Rozzlobil jsi včely! Uteč od úlů.", 3.0])
 
@@ -268,6 +297,6 @@ func _check_disturb(delta: float, act: float) -> void:
 func _sting(p: Player) -> void:
 	if p == null or not p.has_method("knock"):
 		return
-	_sting_cool = rng.randf_range(0.8, 2.5)
-	p.body.hurt(1.5, "bodnutí včelou")
+	_sting_cool = rng.randf_range(STING_COOL[0], STING_COOL[1])
+	p.body.hurt(STING_DMG, "bodnutí včelou")
 	fauna.world.emit_game_event(p.id, "bee_sting", {})

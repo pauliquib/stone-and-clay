@@ -21,33 +21,78 @@
 class_name BirdFlock
 extends Node3D
 
-## časy (s): [od, do]
-const CROW_GROUND := Vector2(60.0, 150.0)      # jak dlouho se hejno vran prochází po poli, než zvažuje bidýlka
-const CROW_PERCH_CHANCE := 0.5                 # šance, že se pak přesune na bidýlka
-const CROW_STAY := Vector2(30.0, 90.0)         # jak dlouho vrány posedí
-const BLACKBIRD_CYCLE := Vector2(20.0, 60.0)   # kos: zem ↔ bidýlko
-const SWALLOW_HUNT := Vector2(40.0, 90.0)      # vlaštovky loví
-const SWALLOW_SIT := Vector2(15.0, 40.0)       # a pak sedí na hřebeni
-const BUZZARD_REST_EVERY := 180.0              # káně za termiky: jednou za tolik s hodí kostkou…
-const BUZZARD_REST_CHANCE := 0.15              # …a s touto šancí slétne na strom
-const BUZZARD_STAY := Vector2(40.0, 120.0)
-## dosah vyrušení hráčem (m) na zemi / na bidýlku (auto ×1,6)
-const SCARE_GROUND := {"vrana": 18.0, "kos": 6.0}
-const SCARE_PERCH := {"vrana": 12.0, "kos": 6.0, "vlastovka": 8.0, "kane": 31.0}
-const RELOCATE_AWAY := 30.0                    # nové bidýlko aspoň tak daleko od hráče
+## časy (s): [od, do]. M8.D2d: konstanty jsou `static var` – ladí je menu pro vývojáře (F3 → Zvěř/Hejna a murmurace).
+static var CROW_GROUND := [60.0, 150.0]      # jak dlouho se hejno vran prochází po poli, než zvažuje bidýlka
+static var CROW_PERCH_CHANCE := 0.5          # šance, že se pak přesune na bidýlka
+static var CROW_STAY := [30.0, 90.0]         # jak dlouho vrány posedí
+static var BLACKBIRD_CYCLE := [20.0, 60.0]   # kos: zem ↔ bidýlko
+static var SWALLOW_HUNT := [40.0, 90.0]      # vlaštovky loví
+static var SWALLOW_SIT := [15.0, 40.0]       # a pak sedí na hřebeni
+static var BUZZARD_REST_EVERY := 180.0       # káně za termiky: jednou za tolik s hodí kostkou…
+static var BUZZARD_REST_CHANCE := 0.15       # …a s touto šancí slétne na strom
+static var BUZZARD_STAY := [40.0, 120.0]
+## dosah vyrušení hráčem (m) na zemi / na bidýlku (auto × CAR_SCARE_K)
+static var SCARE_GROUND := {"vrana": 18.0, "kos": 6.0}
+static var SCARE_PERCH := {"vrana": 12.0, "kos": 6.0, "vlastovka": 8.0, "kane": 31.0}
+static var RELOCATE_AWAY := 30.0             # nové bidýlko aspoň tak daleko od hráče
 ## Režimy a cíle přistání jako čísla pro síť (index v poli = číslo ve stavu; nové jen na konec).
 const MODES := ["ground", "fly", "perch", "hunt", "soar"]
 const LANDS := ["", "ground", "perch"]
 ## M8.10 boidy (Reynolds 1987) pro letící hejno vran: oddělení, zarovnání, soudržnost → posun cíle ptáka
-const BOID_S := 0.2                            # s – jak často se síly hejna přepočítají
-const BOID_SEP_R := 3.0                        # m – blíž než tohle se ptáci odpuzují
-const BOID_K := Vector3(4.0, 0.6, 0.15)        # váhy: oddělení, zarovnání, soudržnost
-const BOID_MAX := 8.0                          # m – největší posun cíle
+static var BOID_S := 0.2                     # s – jak často se síly hejna přepočítají
+static var BOID_SEP_R := 3.0                 # m – blíž než tohle se ptáci odpuzují
+static var BOID_K := [4.0, 0.6, 0.15]        # váhy: oddělení, zarovnání, soudržnost
+static var BOID_MAX := 8.0                   # m – největší posun cíle
 ## M8.10 káně a termika: krouží v nejbližší bublině `Thermals` (tam, kde stoupá i paraglide); bez bubliny
 ## v dosahu krouží nad okrskem ve „slabé termice“, kterou letecký model nesimuluje (BUZZARD_WEAK_LIFT)
-const BUZZARD_THERMAL_R := 1200.0              # m – jak daleko od domova káně bublinu najde
-const BUZZARD_WEAK_LIFT := 1.2                 # m/s
-const BUZZARD_CEIL := 220.0                    # m nad terénem – strop kroužení (výš ji termika „nepustí“)
+static var BUZZARD_THERMAL_R := 1200.0       # m – jak daleko od domova káně bublinu najde
+static var BUZZARD_WEAK_LIFT := 1.2          # m/s
+static var BUZZARD_CEIL := 220.0             # m nad terénem – strop kroužení (výš ji termika „nepustí“)
+## --- M8.D2d: čísla dřív zapsaná přímo ve vzorcích (stejné hodnoty)
+static var SIM_R := 450.0                    # m – hejno se simuluje jen do této vzdálenosti od hráče
+static var CAR_SCARE_K := 1.6                # auto vyruší ptáky z dosahu × tohle
+static var CROW_N := [6, 12]                 # vran v hejnu (od–do)
+static var CROW_WINTER_ADD := 6              # v zimě o tolik víc
+static var SWALLOW_N := [5, 11]              # vlaštovek v hejnu (od–do)
+static var CROW_NIGHT_DAY := 0.2             # vrány za soumraku (denní světlo pod tolik) táhnou nocovat
+static var ROOST_R := 400.0                  # m – nocoviště v lese do této vzdálenosti
+static var SCATTER_R := 160.0                # m – vyplašené vrány hledají stromy v tomto okruhu
+static var FIELD_R := 250.0                  # m – návrat vran na pole v okruhu od domova
+static var CROW_SPREAD := 12.0               # m – vrány se po poli rozptýlí do tolika
+static var CROW_WANDER_P := 0.05             # 1/s – vrána si vybere nové místo na poli
+static var KOS_SPREAD := 7.0                 # m – kos po zahradě
+static var KOS_WANDER_P := 0.1               # 1/s
+static var KOS_GARDEN_R := 25.0              # m – kos se vrací na zahradu v tomto okruhu
+static var KOS_LEAVE_R := 14.0               # m – kos neslétne z bidýlka, je-li hráč blíž
+static var SING_MORNING_H := 7.5             # h – kos zpívá za svítání do …
+static var SING_EVENING_H := 19.0            # h – … a večer od
+static var SING_P := 0.12                    # 1/s – šance na zpěv z bidýlka
+static var SWALLOW_DAY := 0.15               # vlaštovky létají při denním světle nad tolik
+static var SWALLOW_R := [5.0, 70.0]          # m – loví v okruhu od domova (od–do)
+static var SWALLOW_LOW := [0.8, 4.0]         # m nad zemí – před deštěm (od–do)
+static var SWALLOW_HIGH := [3.0, 20.0]       # m nad zemí – za pěkného počasí (od–do)
+static var SWALLOW_LOW_CLOUD := 0.75         # nízko létají při oblačnosti nad tolik …
+static var SWALLOW_LOW_RAIN := 0.05          # … nebo při dešti nad tolik
+static var SWALLOW_SPEED := [10.0, 14.0]     # m/s – rychlost lovu (od–do)
+static var SWALLOW_RETARGET_P := 0.15        # 1/s – nový cíl lovu
+static var RIDGE_R := 90.0                   # m – hřeben střechy pro vlaštovky do této vzdálenosti
+static var THERMAL_DAY := 0.6                # káně krouží (termika) při denním světle nad tolik …
+static var THERMAL_CLOUD := 0.85             # … oblačnosti pod tolik …
+static var THERMAL_RAIN := 0.05              # … a dešti pod tolik
+static var SOAR_R := 55.0                    # m – poloměr kroužení (bez bubliny)
+static var SOAR_WANDER := 150.0              # m – střed kroužení putuje nad okrskem
+static var SOAR_ALT := 90.0                  # m nad terénem – výška kroužení (bez letového modelu / bubliny)
+static var SOAR_ALT_VAR := 25.0              # m – kolísání výšky
+static var SOAR_BUBBLE_K := 0.4              # v bublině poloměr kruhu = poloměr bubliny × tohle …
+static var SOAR_R_MIN := 35.0                # m
+static var SOAR_R_MAX := 60.0                # m
+static var SOAR_SPEED := 9.5                 # m/s
+static var APPROACH_D := 15.0                # m – blíž k místu přistání zpomalí …
+static var APPROACH_K := 0.6                 # … na cestovní × tohle
+static var LAND_TIMEOUT := 40.0              # s – po tolika s letu hejno přistane hned
+static var PERCH_R_CROW := 90.0              # m – vrány hledají bidýlka v tomto okruhu
+static var PERCH_R_KOS := 40.0               # m – kos
+static var PERCH_R_KANE := 200.0             # m – káně
 
 var fauna: Fauna
 var net_id := 0                      # stabilní síťové číslo (Fauna ho přiděluje)
@@ -89,13 +134,13 @@ func _ready() -> void:
 	var n := 1
 	match species:
 		"vrana":
-			n = rng.randi_range(6, 12) + (6 if fauna.clock.month() in [11, 12, 1, 2] else 0)
+			n = rng.randi_range(CROW_N[0], CROW_N[1]) + (CROW_WINTER_ADD if fauna.clock.month() in [11, 12, 1, 2] else 0)
 			mode = "ground"
 		"kos":
 			n = 2 if fauna.clock.month() in [3, 4, 5, 6, 7] else 1
 			mode = "ground"
 		"vlastovka":
-			n = rng.randi_range(5, 11)
+			n = rng.randi_range(SWALLOW_N[0], SWALLOW_N[1])
 			mode = "hunt"
 		"kane":
 			n = 1
@@ -125,7 +170,7 @@ func _physics_process(delta: float) -> void:
 
 func _physics_process_impl(delta: float) -> void:
 	var w = fauna.world
-	var near: bool = w.nearest_player_dist(spot) < 450.0
+	var near: bool = w.nearest_player_dist(spot) < SIM_R
 	if near != _near:
 		_near = near
 		for b in birds:
@@ -246,7 +291,7 @@ func _client_place(ground: bool) -> void:
 ## Krok klientské kopie hejna: let / přistání, chůze po zemi, lov vlaštovek, kroužení káněte.
 func _client_step(delta: float, day: float, c: Clock, weather: Weather) -> void:
 	if species == "vlastovka":
-		var present := Seasons.swallows_present(c.day_of_year()) and day > 0.15
+		var present := Seasons.swallows_present(c.day_of_year()) and day > SWALLOW_DAY
 		for b in birds:
 			b.visible = present
 		if not present:
@@ -265,8 +310,8 @@ func _client_step(delta: float, day: float, c: Clock, weather: Weather) -> void:
 			if flying:
 				_fly_all(delta)
 			elif _remote_mode == "ground":
-				var spread := 12.0 if species == "vrana" else 7.0
-				var rate := 0.05 if species == "vrana" else 0.1
+				var spread: float = CROW_SPREAD if species == "vrana" else KOS_SPREAD
+				var rate: float = CROW_WANDER_P if species == "vrana" else KOS_WANDER_P
 				for b in birds:
 					var g: Vector3 = _goals[b]
 					if b.global_position.distance_to(g) < 0.4 or rng.randf() < delta * rate:
@@ -277,19 +322,24 @@ func _client_step(delta: float, day: float, c: Clock, weather: Weather) -> void:
 
 ## Vlaštovky loví (stejné jako `_swallows`, jen bez rozhodování o sednutí).
 func _client_hunt(delta: float, weather: Weather) -> void:
-	var low := weather != null and (weather.cloud > 0.75 or weather.rain > 0.05)
+	_hunt_step(delta, weather)
+
+
+## Lov vlaštovek nízko nad loukami (před deštěm níž) – sdílí server (`_swallows`) i klient.
+func _hunt_step(delta: float, weather: Weather) -> void:
+	var low := weather != null and (weather.cloud > SWALLOW_LOW_CLOUD or weather.rain > SWALLOW_LOW_RAIN)
 	for b in birds:
 		var g: Vector3 = _goals[b]
-		if b.global_position.distance_to(g) < 3.0 or rng.randf() < delta * 0.15:
+		if b.global_position.distance_to(g) < 3.0 or rng.randf() < delta * SWALLOW_RETARGET_P:
 			var a := rng.randf() * TAU
-			var r := rng.randf_range(5.0, 70.0)
+			var r := rng.randf_range(SWALLOW_R[0], SWALLOW_R[1])
 			g = home + Vector3(cos(a) * r, 0, sin(a) * r)
-			g.y = fauna.terrain.height_at(g.x, g.z) + (rng.randf_range(0.8, 4.0) if low else rng.randf_range(3.0, 20.0))
+			g.y = fauna.terrain.height_at(g.x, g.z) + (rng.randf_range(SWALLOW_LOW[0], SWALLOW_LOW[1]) if low else rng.randf_range(SWALLOW_HIGH[0], SWALLOW_HIGH[1]))
 			_goals[b] = g
 		b.target = g
 		b.land_on = ""
 		b.state = "fly"
-		b.fly_step(delta, rng.randf_range(10.0, 14.0))
+		b.fly_step(delta, rng.randf_range(SWALLOW_SPEED[0], SWALLOW_SPEED[1]))
 
 
 ## Káně krouží nad domovem (stejný střed jako `_buzzard`, čas v režimu se hlídá se serverem).
@@ -304,24 +354,24 @@ func _crows(delta: float, day: float, w: Node) -> void:
 	match mode:
 		"ground":
 			var threat := _threat(w, SCARE_GROUND["vrana"])
-			if threat or day < 0.2:
+			if threat or day < CROW_NIGHT_DAY:
 				if threat:
 					_call("crow", 1.2)
-				if day < 0.2:
-					_fly_to_trees(spot, 400.0, true)         # nocoviště v lese
+				if day < CROW_NIGHT_DAY:
+					_fly_to_trees(spot, ROOST_R, true)         # nocoviště v lese
 				else:
-					_scatter(160.0)
+					_scatter(SCATTER_R)
 				return
 			if _mode_t > _stay:
 				if rng.randf() < CROW_PERCH_CHANCE:
-					_scatter(160.0)
+					_scatter(SCATTER_R)
 					return
 				_mode_t = 0.0
 				_stay = _roll_stay()
 			for b in birds:
 				var g: Vector3 = _goals[b]
-				if b.global_position.distance_to(g) < 0.4 or rng.randf() < delta * 0.05:
-					g = spot + Vector3(rng.randf_range(-12, 12), 0, rng.randf_range(-12, 12))
+				if b.global_position.distance_to(g) < 0.4 or rng.randf() < delta * CROW_WANDER_P:
+					g = spot + Vector3(rng.randf_range(-CROW_SPREAD, CROW_SPREAD), 0, rng.randf_range(-CROW_SPREAD, CROW_SPREAD))
 					_goals[b] = g
 				b.ground_step(delta, g)
 		"fly":
@@ -329,9 +379,9 @@ func _crows(delta: float, day: float, w: Node) -> void:
 		"perch":
 			if _threat(w, SCARE_PERCH["vrana"]):
 				_relocate(w)
-			elif day >= 0.2 and _mode_t > _stay:
+			elif day >= CROW_NIGHT_DAY and _mode_t > _stay:
 				# zpátky na pole (jinam, když tam pořád někdo je)
-				spot = fauna.random_point(home, 250.0, "field", rng)
+				spot = fauna.random_point(home, FIELD_R, "field", rng)
 				_fly_all_to_ground(spot, 12.0)
 
 
@@ -344,7 +394,7 @@ func _scatter(tree_radius: float) -> void:
 # ------------------------------------------------------------------ kos
 
 func _blackbird(delta: float, day: float, w: Node, c: Clock) -> void:
-	var sing_time := c.month() >= 3 and c.month() <= 7 and (c.hour() < 7.5 and day > 0.05 or c.hour() > 19.0 and day > 0.05)
+	var sing_time := c.month() >= 3 and c.month() <= 7 and (c.hour() < SING_MORNING_H and day > 0.05 or c.hour() > SING_EVENING_H and day > 0.05)
 	match mode:
 		"ground":
 			var threat := _threat(w, SCARE_GROUND["kos"])
@@ -361,8 +411,8 @@ func _blackbird(delta: float, day: float, w: Node, c: Clock) -> void:
 				return
 			for b in birds:
 				var g: Vector3 = _goals[b]
-				if b.global_position.distance_to(g) < 0.4 or rng.randf() < delta * 0.1:
-					g = spot + Vector3(rng.randf_range(-7, 7), 0, rng.randf_range(-7, 7))
+				if b.global_position.distance_to(g) < 0.4 or rng.randf() < delta * KOS_WANDER_P:
+					g = spot + Vector3(rng.randf_range(-KOS_SPREAD, KOS_SPREAD), 0, rng.randf_range(-KOS_SPREAD, KOS_SPREAD))
 					_goals[b] = g
 				b.ground_step(delta, g)
 		"fly":
@@ -371,16 +421,16 @@ func _blackbird(delta: float, day: float, w: Node, c: Clock) -> void:
 			if _threat(w, SCARE_PERCH["kos"]):
 				_relocate(w)
 				return
-			if sing_time and rng.randf() < delta * 0.12:
+			if sing_time and rng.randf() < delta * SING_P:
 				_call("blackbird", 1.0)
-			if not sing_time and day > 0.05 and _mode_t > _stay and not _threat(w, 14.0):
-				spot = fauna.random_point(home, 25.0, "garden", rng, 4)
+			if not sing_time and day > 0.05 and _mode_t > _stay and not _threat(w, KOS_LEAVE_R):
+				spot = fauna.random_point(home, KOS_GARDEN_R, "garden", rng, 4)
 				_fly_all_to_ground(spot, 4.0)
 
 
 ## Kos zpívá z nejvyššího bidýlka do 40 m (hřeben střechy / vrchol stromu).
 func _sing_perch() -> bool:
-	var spots: Array = fauna.perch_spots(spot, 40.0, 5, 1.0, 0.6, 3.0)
+	var spots: Array = fauna.perch_spots(spot, PERCH_R_KOS, 5, 1.0, 0.6, 3.0)
 	if spots.is_empty():
 		return false
 	var best: Vector4 = spots[0]
@@ -394,7 +444,7 @@ func _sing_perch() -> bool:
 # ------------------------------------------------------------------ vlaštovky
 
 func _swallows(delta: float, day: float, c: Clock, weather: Weather, w: Node) -> void:
-	var present := Seasons.swallows_present(c.day_of_year()) and day > 0.15
+	var present := Seasons.swallows_present(c.day_of_year()) and day > SWALLOW_DAY
 	for b in birds:
 		b.visible = present
 	if not present:
@@ -415,24 +465,12 @@ func _swallows(delta: float, day: float, c: Clock, weather: Weather, w: Node) ->
 		_mode_t = 0.0
 		_stay = _roll_stay()
 	# před deštěm (vlhko, nízká oblačnost) loví hmyz nízko nad zemí
-	var low := weather != null and (weather.cloud > 0.75 or weather.rain > 0.05)
-	for b in birds:
-		var g: Vector3 = _goals[b]
-		if b.global_position.distance_to(g) < 3.0 or rng.randf() < delta * 0.15:
-			var a := rng.randf() * TAU
-			var r := rng.randf_range(5.0, 70.0)
-			g = home + Vector3(cos(a) * r, 0, sin(a) * r)
-			g.y = fauna.terrain.height_at(g.x, g.z) + (rng.randf_range(0.8, 4.0) if low else rng.randf_range(3.0, 20.0))
-			_goals[b] = g
-		b.target = g
-		b.land_on = ""
-		b.state = "fly"
-		b.fly_step(delta, rng.randf_range(10.0, 14.0))
+	_hunt_step(delta, weather)
 
 
 ## Hejno se v řadě usadí na hřeben střechy do 90 m od domova (`w` = hráč, od kterého se utíká; null = nic).
 func _swallow_sit(w: Node) -> bool:
-	var row: Array = fauna.ridge_row(home, 90.0, birds.size())
+	var row: Array = fauna.ridge_row(home, RIDGE_R, birds.size())
 	if row.is_empty():
 		return false
 	if w != null:
@@ -459,7 +497,7 @@ func _swallow_hunt() -> void:
 # ------------------------------------------------------------------ káně
 
 func _buzzard(delta: float, day: float, weather: Weather, w: Node) -> void:
-	var thermals := day > 0.6 and weather != null and weather.cloud < 0.85 and weather.rain < 0.05
+	var thermals := day > THERMAL_DAY and weather != null and weather.cloud < THERMAL_CLOUD and weather.rain < THERMAL_RAIN
 	var b: Bird = birds[0]
 	if mode == "fly":
 		_fly_all(delta)
@@ -493,10 +531,10 @@ func _buzzard(delta: float, day: float, weather: Weather, w: Node) -> void:
 ## v dosahu bublina `Thermals`, krouží v ní (střed bubliny táhne s větrem) a stoupá; jinak ji nese slabá termika
 ## `BUZZARD_WEAK_LIFT` u středu kruhu. Termika slábne pod stropem kroužení (`BUZZARD_CEIL` nad terénem).
 func _soar_step(delta: float, b: Bird) -> void:
-	var r := 55.0
+	var r := SOAR_R
 	_soar_a += delta * b.speed / r
-	spot = home + Vector3(sin(_mode_t * 0.01) * 150.0, 0, cos(_mode_t * 0.013) * 150.0)
-	var gy := fauna.terrain.height_at(spot.x, spot.z) + 90.0 + sin(_mode_t * 0.05) * 25.0
+	spot = home + Vector3(sin(_mode_t * 0.01) * SOAR_WANDER, 0, cos(_mode_t * 0.013) * SOAR_WANDER)
+	var gy := fauna.terrain.height_at(spot.x, spot.z) + SOAR_ALT + sin(_mode_t * 0.05) * SOAR_ALT_VAR
 	if FlightModel.on and b.fm:
 		var w: World = fauna.world
 		var best := BUZZARD_THERMAL_R
@@ -509,7 +547,7 @@ func _soar_step(delta: float, b: Bird) -> void:
 					best = d
 					found = true
 					spot = Vector3(bp.x, 0.0, bp.y)
-					r = clampf(float(bb["r"]) * 0.4, 35.0, 60.0)
+					r = clampf(float(bb["r"]) * SOAR_BUBBLE_K, SOAR_R_MIN, SOAR_R_MAX)
 		var ground := fauna.terrain.height_at(spot.x, spot.z)
 		b.fm.soar_ceil = ground + BUZZARD_CEIL
 		# bez bubliny: slabá termika u středu kruhu (ať káně neztrácí výšku a nemává)
@@ -519,12 +557,12 @@ func _soar_step(delta: float, b: Bird) -> void:
 	b.target = Vector3(spot.x + cos(_soar_a) * r, gy, spot.z + sin(_soar_a) * r)
 	b.state = "soar"
 	b.land_on = ""
-	b.fly_step(delta, 9.5)
+	b.fly_step(delta, SOAR_SPEED)
 
 
 func _buzzard_perch() -> void:
 	if not _perch_to(_find_perches(home)):
-		_fly_to_trees(home, 200.0, false)
+		_fly_to_trees(home, PERCH_R_KANE, false)
 
 
 # ------------------------------------------------------------------ společné
@@ -536,7 +574,7 @@ func _threat(w: Node, r: float) -> bool:
 	for b in birds:
 		var d: float = b.global_position.distance_to(p.global_position)
 		var car: Node3D = p.get("car")
-		if d < r or (car and d < r * 1.6):
+		if d < r or (car and d < r * CAR_SCARE_K):
 			return true
 	return false
 
@@ -600,8 +638,8 @@ func _fly_all(delta: float) -> void:
 			# na zemi i na předmětu stojí pták na nohách (0,28 délky), na větvi jen 0,05 m
 			var off: float = float(b.spec["length"]) * 0.28 if b.land_on == "ground" else float(b.perch_off)
 			b.set_land_goal(g + Vector3(0, off, 0))      # M8.10: letový model k tomu bodu brzdí a klesá
-			var d: float = b.fly_step(delta, float(b.spec["cruise"]) * (1.0 if b.global_position.distance_to(g) > 15.0 else 0.6))
-			if d < b.land_reach() or _mode_t > 40.0:
+			var d: float = b.fly_step(delta, float(b.spec["cruise"]) * (1.0 if b.global_position.distance_to(g) > APPROACH_D else APPROACH_K))
+			if d < b.land_reach() or _mode_t > LAND_TIMEOUT:
 				b.global_position = g + Vector3(0, off, 0)
 				b.yaw = rng.randf() * TAU                 # každý pták jinam
 				b.state = "ground" if b.land_on == "ground" else "perch"
@@ -655,13 +693,13 @@ func _boids(delta: float) -> void:
 			var l2 := dd.length_squared()
 			if l2 < BOID_SEP_R * BOID_SEP_R and l2 > 0.0001:
 				sep += dd / l2
-		var bias: Vector3 = sep * BOID_K.x + (av - b.vel) * BOID_K.y + (c - p) * BOID_K.z
+		var bias: Vector3 = sep * float(BOID_K[0]) + (av - b.vel) * float(BOID_K[1]) + (c - p) * float(BOID_K[2])
 		b.boid_bias = bias.limit_length(BOID_MAX)
 
 
 ## Jak dlouho potrvá klidový režim, do kterého se hejno právě dostalo (ground / perch / hunt).
 func _roll_stay() -> float:
-	var r := Vector2(60.0, 60.0)
+	var r: Array = [60.0, 60.0]
 	match species:
 		"vrana":
 			r = CROW_GROUND if mode == "ground" else CROW_STAY
@@ -671,7 +709,7 @@ func _roll_stay() -> float:
 			r = SWALLOW_HUNT if mode == "hunt" else SWALLOW_SIT
 		"kane":
 			r = BUZZARD_STAY
-	return rng.randf_range(r.x, r.y)
+	return rng.randf_range(r[0], r[1])
 
 
 ## Bidýlka v okolí `center` podle druhu (Vector4 x, y, z, kind): vrány mix stromů a střech,
@@ -679,11 +717,11 @@ func _roll_stay() -> float:
 func _find_perches(center: Vector3) -> Array:
 	match species:
 		"vrana":
-			return fauna.perch_spots(center, 90.0, mini(ceili(birds.size() / 2.0), 8), 1.0, 0.5, 6.0)
+			return fauna.perch_spots(center, PERCH_R_CROW, mini(ceili(birds.size() / 2.0), 8), 1.0, 0.5, 6.0)
 		"kos":
-			return fauna.perch_spots(center, 40.0, 4, 1.0, 0.6, 3.0)
+			return fauna.perch_spots(center, PERCH_R_KOS, 4, 1.0, 0.6, 3.0)
 		"kane":
-			return fauna.perch_spots(center, 200.0, 3, 1.0, 0.0, 10.0)
+			return fauna.perch_spots(center, PERCH_R_KANE, 3, 1.0, 0.0, 10.0)
 	return []
 
 
@@ -727,11 +765,11 @@ func _relocate(w: Node) -> void:
 	# žádné vhodné bidýlko → původní chování
 	match species:
 		"kane":
-			_fly_to_trees(home, 200.0, false)
+			_fly_to_trees(home, PERCH_R_KANE, false)
 		"kos":
-			_fly_all_to_ground(fauna.random_point(home, 25.0, "garden", rng, 4), 4.0)
+			_fly_all_to_ground(fauna.random_point(home, KOS_GARDEN_R, "garden", rng, 4), 4.0)
 		_:
-			_fly_all_to_ground(fauna.random_point(home, 250.0, "field", rng), 12.0)
+			_fly_all_to_ground(fauna.random_point(home, FIELD_R, "field", rng), 12.0)
 
 
 func _calls(delta: float, day: float, c: Clock) -> void:
