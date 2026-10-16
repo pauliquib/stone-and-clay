@@ -810,6 +810,9 @@ func _journal_bbcode() -> String:
 		var mcj = game.get("micro")       # M8.9: „V údolí ráno mrzlo, na kopci ne.“
 		if mcj != null and String(mcj.journal_line()) != "":
 			s += "\n" + String(mcj.journal_line())
+		var fj = game.get("fields")       # M8.12: „Letošní úroda: suchý červen, …“
+		if fj != null and String(fj.journal_line()) != "":
+			s += "\n" + String(fj.journal_line())
 		s += "\n\n"
 	var nl = game.get("nature_log")
 	if nl:

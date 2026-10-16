@@ -383,6 +383,7 @@ func build() -> void:
 	micro.setup(self)
 	phenology = Phenology.new()              # M8.11: fenologie a růst (eco_hour / eco_day, tabulka pheno_lut pro shadery stromů)
 	phenology.setup(self)
+	fields.setup_eco(self)                   # M8.12: plodiny polí podle růstového modelu (eco_hour / eco_day, Micro, SoilWater)
 
 	loading.emit("Vegetace…")
 	await _frames(1)

@@ -162,6 +162,14 @@ kvetou bíle / růžově v koruně. Pozdní mráz v době květu spálí květy 
 povyrostou (Chapman–Richards, slabší přírůstek po suchém létě). Deník J → „Rok v přírodě“, F2 → Příroda – ladění →
 „Fenologický kalendář“ (odchylka roku ±K), vrstva mapy `fenologie`, měřicí scéna `--perfscene=les_jaro`. Prahy druhů
 v `data/dreviny.json` → `fenologie`. Bez nového offline nástroje.
+**M8.12 Plodiny a zahrada** (`CropModel` v `scripts/eko/crop_model.gd`, tabulka `data/plodiny.json` – 9 zahradních
+a 6 polních plodin, hodnoty „odhad – ověřit“; přepínač `crops` v Realismu): zahrada i pole rostou podle sum teplot
+(GDD se základem plodiny), vody v půdě (`SoilWater`) a světla (záření z oblohy M8.5, stín stromů a budov na záhonu).
+Nezalévaný záhon v suchém roce dá malou úrodu, zalévaný plnou; mráz v noci (teplota v místě, přízemní mráz M8.9)
+spálí rajčata venku, skleník je ochrání; v teplém suchém létě pole dřív zežloutne, obilí je nižší a žne se dřív.
+Zálivka plní „kyblík“ záhonu (+ půdní buňku). Prohlídka záhonu: „Brambory kvetou, půda je suchá.“ + odhad úrody
+(přesnější se Zahradničením). Deník J → Počasí: „Letošní úroda: suchý červen, …, obilí se začalo žnout 12. 7.“
+Vypnuto = původní růstové dny a kalendář polí. Měřicí scéna `--perfscene=pole_pulnoc` (denní krok během měření).
 **M8.10 Lokomoce zvířat 2 a let ptáků** (přepínač `animal_gait`): zvěř, kůň i hospodářská zvířata mění chod podle
 Froudova čísla (krok → klus → cval plynule, s hysterezí), ohýbají páteř v zatáčce a ve cvalu, dýchají, uši a ocas
 dopruží za pohybem a uši se natočí za zvukem; vyplašený srnec rozevře bílé zrcátko a v obilí / vysoké trávě skáče.

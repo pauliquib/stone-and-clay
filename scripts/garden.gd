@@ -20,6 +20,12 @@
 ## - **Růst**: jeden krok za herní den (změna `Clock.jd()`, při spánku a skoku času se dožene po dnech, nejvýš `MAX_CATCHUP_DAYS`).
 ##   Přírůstek = teplotní faktor × vláha × (1 − plevel/2); bez vláhy víc než `water_need` dní plodina vadne a ztrácí zdraví; mráz pod
 ##   `frost_kill` plodinu zničí (kontrola průběžně i při denním kroku). Výnos podle zdraví, plevele, doby po dozrání a Zahradničení.
+## - **M8.12 růstový model** (přepínač `crops`, Esc → Nastavení → Realismus; vypnuto = časovač výše): záhon nese stav
+##   `CropModel` (`cm`: GDD, biomasa, LAI, stres, potenciál výnosu), denní krok z teplot a záření v místě záhonu
+##   (`World.micro`, `CropModel.DayAcc` z `eco_hour`), vlhkost = půdní buňka `SoilWater` + kyblík záhonu `bw` (zálivka
+##   `WATER_MM`, výpar Hargreaves × pokryv), stín stromů a budov `sh` (jednou za den, jen u hráče), mráz hodinově
+##   (vzduch i přízemní `frost_at`). Výnos = horní mez `yield` × `YIELD_NORMAL_Q` × výnos/normál × kvalita. Prohlídka:
+##   „Brambory kvetou, půda je suchá.“ + odhad úrody (přesnější se Zahradničením).
 ## - **Ukládání**: `to_dict` / `restore` (klíč `garden` v `SaveGame`): záhony, pronájem pole, zvolená semena, náplň konve.
 ## API pro další kroky: `plot_at(pos)` / `in_plot(pos, margin)` (M2.5: nesázet stromy do záhonů), `CROPS[..]["feed"]` a klíč
 ## `feed` u úrody v `ItemsDB` (M2.6: krmivo), `cells_of_crop(item)`, signál-událost `harvest` {crop, item, n} přes `World.emit_game_event`.
@@ -81,6 +87,24 @@ const COMPOST_MAX := 6               # dávek hnoje v kompostu; doplňuje se 1 z
 const FERT_MAX := 1.0                # plné pohnojení záhonu (klíč `f`)
 static var FERT_K := 0.4             # +40 % růstu při plném hnojení
 static var FERT_DECAY := 0.1         # úbytek hnojiva za den (účinek ~10 dní)
+# ---- M8.12: růstový model (přepínač `crops`; F3 → Příroda/Plodiny a zahrada)
+static var WATER_MM := 15.0          # mm vody na záhon 1 m² z jedné zálivky (≈ 15 l)
+static var BED_AWC_MM := 60.0        # mm – „kyblík“ záhonu navíc k půdní buňce SoilWater (32 m)
+static var GH_SOIL_MOIST := 0.2      # vlhkost půdy pod sklem bez zálivky (déšť sem nepadá)
+static var ET_COVER_MIN := 0.3       # výpar ze záhonu: holá půda (podíl Hargreavesova výparu) …
+static var WATER_FULL := 0.8         # „Půda je ještě vlhká“ – zálivka nejde nad tuto vlhkost záhonu
+static var MOIST_VISUAL := 0.45      # záhon vypadá mokrý (tmavší hlína) nad touto vlhkostí
+static var WILT_WS := 0.35           # rostlina vadne (žlutne, svěšené listy) pod tímto stresem vody
+static var YIELD_NORMAL_Q := 0.75    # výnos v normálním roce = tolik × horní mez `yield` (víc za výborných podmínek)
+static var ESTIMATE_ERR := 0.5       # odhad výnosu při pohledu: chyba ± tolik × (1 − Zahradničení)
+static var SHADE_PLAYER_R := 320.0   # stín počítej jen pro záhony do této vzdálenosti od hráče (m)
+static var SHADE_TREE_R := 30.0      # stromy do této vzdálenosti mohou záhon stínit (m)
+static var CROWN_H_K := 0.62         # střed koruny ve výšce × výška stromu
+static var CROWN_R_K := 0.22         # poloměr koruny × výška stromu
+static var CROWN_OPACITY := 0.7      # koruna propustí 1 − tolik světla
+static var SHADE_RAY_M := 40.0       # paprsek ke slunci (budovy, terén) – délka (m)
+## Stín: [hodina pravého slunečního času, váha] – ráno, poledne, odpoledne (jednou za den).
+static var SHADE_SAMPLES := [[9.0, 0.25], [12.0, 0.5], [15.0, 0.25]]
 
 ## Plodiny. sow_months = měsíce výsevu, days = růstové dny do zralosti (při plném růstu), water_need = kolik dní bez vláhy snese,
 ## frost_kill = pod touto teplotou (°C) zmrzne, yield = [min, max] kusů, xp = XP Zahradničení za sklizeň, feed = hodnota jako krmivo (M2.6),
@@ -185,6 +209,7 @@ var sow_pick := {}                       # id hráče → klíč plodiny, kterou
 var can_left := {}                       # id hráče → kolik záhonů ještě zalije plná konev
 
 var _last_jd := -1
+var _accs := {}                          # M8.12: klíč plochy → CropModel.DayAcc (teploty a záření dne v místě záhonu)
 var _rained_today := false
 var _chk := 0.0
 var _rebuild_t := 0.0
@@ -219,6 +244,7 @@ func setup(w: World) -> void:
 	Actions.set_target_check("naplnit_kohoutek", _check_fill)
 	Actions.set_target_check("naplnit_studna", _check_fill)
 	Actions.set_time_mod("ryt", _mod_dig)
+	w.eco_hour.connect(_on_eco_hour)       # M8.12: hodinové teploty, záření a noční mráz pro růstový model
 	_last_jd = w.clock.jd() if w.clock else -1
 	if not w.places.has("domov"):
 		return
@@ -624,10 +650,15 @@ func pick_crop(id: int) -> String:
 func growth_percent(cell: Dictionary) -> int:
 	if not CROPS.has(cell.get("c", "")):
 		return 0
+	if _model_cell(cell):        # M8.12: podle sumy teplot do zralosti
+		var st := _cm(cell)
+		return clampi(roundi(float(st.get("gdd", 0.0)) / maxf(CropModel.gdd_at(CropModel.spec(String(cell["c"])), 3), 1.0) * 100.0), 0, 100)
 	return clampi(roundi(float(cell.get("g", 0.0)) / float(CROPS[cell["c"]]["days"]) * 100.0), 0, 100)
 
 
 func _wilting(cell: Dictionary) -> bool:
+	if _model_cell(cell):
+		return int(cell["s"]) == S_ZASETO and float(_cm(cell).get("ws", 1.0)) < WILT_WS
 	return int(cell["s"]) == S_ZASETO and int(cell.get("dry", 0)) > int(CROPS[cell["c"]]["water_need"])
 
 
@@ -641,6 +672,11 @@ func cell_text(cell: Dictionary, gh := false) -> String:
 		S_ZRYTO:
 			return "Zryto, čeká na semena%s%s%s." % [weeds, fert, ghs]
 		S_ZASETO:
+			if _model_cell(cell):        # M8.12: „Brambory kvetou, půda je suchá.“
+				var sp := CropModel.spec(String(cell["c"]))
+				var mt := CropModel.status_text(_cm(cell), sp, float(cell.get("sm", 0.5)))
+				var shade := " · stín %d %%" % roundi(float(cell.get("sh", 0.0)) * 100.0) if float(cell.get("sh", 0.0)) > 0.15 else ""
+				return "%s (%d %%)%s%s%s%s" % [mt.trim_suffix("."), growth_percent(cell), weeds, fert, ghs, shade]
 			var wet := "vlhko" if float(cell.get("m", 0.0)) > 0.0 else "sucho"
 			if _wilting(cell):
 				wet = "VADNE"
@@ -684,7 +720,9 @@ func _check_water(aim: Dictionary, id: int) -> String:
 		return "Není co zalévat."
 	if int(c["s"]) == S_ZRALE:
 		return "Zralé se nezalévá."
-	if float(c.get("m", 0.0)) >= MOIST_WATER:
+	if crops_on() and float(c.get("sm", 0.0)) >= WATER_FULL:
+		return "Půda je ještě vlhká."
+	if not crops_on() and float(c.get("m", 0.0)) >= MOIST_WATER:
 		return "Půda je ještě vlhká."
 	if int(can_left.get(id, CAN_CHARGES)) <= 0:
 		return "Konev je prázdná."
@@ -764,7 +802,9 @@ func _on_sow(id: int, _def: Dictionary, aim: Dictionary, ok_: bool) -> void:
 		world.commit_offense(id, "nedovolene_pestovani", {})
 	var pl: Plot = aim["plot"]
 	pl.cells[aim["cell"]] = {"s": S_ZASETO, "c": crop, "g": 0.0, "dry": 0, "m": 0.0, "w": float(c.get("w", 0.0)), "h": 1.0, "o": 0,
-		"f": float(c.get("f", 0.0))}        # hnojivo v zrytém záhonu výsev přežije – kbelík hnoje nepřijde nazmar
+		"f": float(c.get("f", 0.0)), "bw": float(c.get("bw", 0.0)), "sm": float(c.get("sm", 0.5))}   # hnojivo i zálivka výsev přežijí
+	if crops_on() and CropModel.modeled(crop) and world.clock != null:   # M8.12: stav růstového modelu
+		pl.cells[aim["cell"]]["cm"] = CropModel.new_state(crop, floorf(world.clock.day_of_year()), world.clock.year())
 	pl.dirty = true
 	world.give_xp(id, "zahradnictvi", 3.0, "sit")
 	_msg(id, "Zaseto: %s. Nezapomeň zalévat." % _crop_name(crop), 2.5)
@@ -777,6 +817,15 @@ func _on_water(id: int, _def: Dictionary, aim: Dictionary, ok_: bool) -> void:
 		return
 	c["m"] = MOIST_WATER
 	c["dry"] = 0
+	if crops_on():                       # M8.12: voda do kyblíku záhonu + do půdní buňky SoilWater (poměrem plochy 1 m²)
+		var pl: Plot = aim["plot"]
+		var k: Vector2i = aim["cell"]
+		c["bw"] = minf(1.0, float(c.get("bw", 0.0)) + WATER_MM / BED_AWC_MM)
+		c["sm"] = bed_moist(pl, k, c)
+		var sw: SoilWater = world.soil_water
+		if sw != null:
+			var cp := pl.cell_center(k)
+			sw.add_water(cp.x, cp.z, WATER_MM, 1.0)
 	(aim["plot"] as Plot).dirty = true
 	can_left[id] = int(can_left.get(id, CAN_CHARGES)) - 1
 	if int(can_left[id]) <= 0:
@@ -798,6 +847,13 @@ func _on_harvest(id: int, _def: Dictionary, aim: Dictionary, ok_: bool) -> void:
 	q = clampf(q + randf_range(-0.1, 0.1), 0.05, 1.0)
 	var yl: Array = spec["yield"]
 	var n := maxi(1, roundi(lerpf(float(yl[0]), float(yl[1]), q)))
+	if _model_cell(c):
+		# M8.12: výnos z modelu vůči normálu (sucho / zálivka / stín / horko při kvetení) × kvalita (plevel, přezrálé, dovednost)
+		var ratio := CropModel.yield_ratio(_cm(c), CropModel.spec(crop), crop)
+		var qm := (1.0 - 0.35 * float(c.get("w", 0.0))) * (1.0 - over) * (0.85 + 0.3 * bonus)
+		n = maxi(1, roundi(float(yl[1]) * YIELD_NORMAL_Q * ratio * qm * randf_range(0.93, 1.07)))
+		if world.fields != null and world.clock != null:
+			world.fields.note_harvest(crop, ratio, floorf(world.clock.day_of_year()), world.clock.year())
 	var item := String(spec["item"])
 	if spec.has("fresh"):
 		# M4.8 sušák: čerstvá sklizeň se suší, suchý předmět vznikne později (Vyhlasky.add_batch)
@@ -806,7 +862,8 @@ func _on_harvest(id: int, _def: Dictionary, aim: Dictionary, ok_: bool) -> void:
 			world.vyhlasky.add_batch(id, n, item, String(spec["item"]), SUSENI_DAYS)
 	p.add_item(item, n)
 	var pl: Plot = aim["plot"]
-	pl.cells[aim["cell"]] = {"s": S_ZRYTO, "w": float(c.get("w", 0.0)) * 0.5, "h": 1.0, "f": float(c.get("f", 0.0))}
+	pl.cells[aim["cell"]] = {"s": S_ZRYTO, "w": float(c.get("w", 0.0)) * 0.5, "h": 1.0, "f": float(c.get("f", 0.0)),
+		"bw": float(c.get("bw", 0.0))}
 	pl.dirty = true
 	world.give_xp(id, "zahradnictvi", float(spec["xp"]) * (0.5 + 0.5 * q), "sklidit")
 	_msg(id, "Sklizeno: %d× %s." % [n, ItemsDB.name_of(item)], 3.0)
@@ -838,7 +895,12 @@ func _on_fertilize(id: int, _def: Dictionary, aim: Dictionary, ok_: bool) -> voi
 
 func _on_info(id: int, _def: Dictionary, aim: Dictionary, _ok: bool) -> void:
 	var pl: Plot = aim.get("plot")
-	_msg(id, cell_text(_cell_of(aim), pl != null and gh_cell(pl, aim.get("cell", Vector2i(-1, -1)))), 4.0)
+	var c := _cell_of(aim)
+	var text := cell_text(c, pl != null and gh_cell(pl, aim.get("cell", Vector2i(-1, -1))))
+	var est := _estimate(c, id)          # M8.12: odhad úrody (přesnější se Zahradničením)
+	if not est.is_empty():
+		text += "\nOdhad úrody: %d–%d ks." % [int(est[0]), int(est[1])]
+	_msg(id, text, 4.0)
 
 
 func _on_fill(id: int, _def: Dictionary, _aim: Dictionary, ok_: bool) -> void:
@@ -1066,7 +1128,8 @@ func _process(delta: float) -> void:
 			_advance_days(mini(jd - _last_jd, MAX_CATCHUP_DAYS))
 		_last_jd = jd
 		_rained_today = false
-	_check_frost(w.temp if w != null else 10.0)
+	if not crops_on():                   # M8.12: s modelem hlídá mráz `_on_eco_hour` (teplota v místě, přízemní mráz)
+		_check_frost(w.temp if w != null else 10.0)
 
 
 func _teplota() -> float:
@@ -1106,10 +1169,22 @@ func _advance_days(n: int) -> void:
 	var raining_now := w != null and w.is_raining()
 	var recent := w.rain_recent if w != null else 0.0
 	var died := 0
+	var model := crops_on()
+	if model:
+		for pl in plots:
+			_shade_plot(pl)                  # M8.12: stín stromů a budov – jednou za den, jen záhony u hráče
 	for i in n:
 		var rained := (i == 0 and (_rained_today or raining_now)) or (i > 0 and randf() < RAIN_SKIP_BASE + RAIN_SKIP_K * recent)
 		for pl in plots:
-			died += _grow_plot(pl, day_t, min_t if (n > 1 or hour >= 9.0) else t, rained)
+			if model:
+				died += _grow_plot_model(pl, i, n, rained)
+			else:
+				died += _grow_plot(pl, day_t, min_t if (n > 1 or hour >= 9.0) else t, rained)
+	if model:
+		for pl in plots:
+			var acc: CropModel.DayAcc = _accs.get((pl as Plot).key)
+			if acc != null:
+				acc.reset()
 	if died > 0:
 		_notify_all("Na záhonech uschlo %d rostlin (sucho)." % died, 4.0)
 	# kompost zraje: 1 dávka hnoje za herní den (Fáze 8)
@@ -1145,6 +1220,7 @@ func _grow_plot(pl: Plot, day_t: float, min_t: float, rained: bool) -> int:
 		var wet := false
 		if s >= S_ZASETO:
 			var spec: Dictionary = CROPS[c["c"]]
+			c.erase("cm")                # M8.12: bez modelu stav modelu zastará – po zapnutí se založí z časovače (`_cm`)
 			if m_t < float(spec["frost_kill"]):
 				pl.cells[k] = {"s": S_ZRYTO, "w": float(c.get("w", 0.0)), "h": 1.0, "f": float(c.get("f", 0.0))}
 				pl.dirty = true
@@ -1185,6 +1261,225 @@ func _grow_plot(pl: Plot, day_t: float, min_t: float, rained: bool) -> int:
 		c["w"] = minf(1.0, float(c.get("w", 0.0)) + wk)
 		pl.dirty = true
 	return died
+
+
+# ------------------------------------------------------------------ M8.12: růstový model (CropModel)
+
+## Přepínač `crops` (Esc → Nastavení → Realismus); vypnuto = původní časovač růstových dnů.
+func crops_on() -> bool:
+	return world != null and world.realism_on("crops")
+
+
+func spec_days(crop: String) -> int:
+	return int(CROPS[crop]["days"]) if CROPS.has(crop) else 100
+
+
+## Buňka roste podle modelu (zapnuto a plodina je v `data/plodiny.json`).
+func _model_cell(c: Dictionary) -> bool:
+	return crops_on() and int(c.get("s", 0)) >= S_ZASETO and CropModel.modeled(String(c.get("c", "")))
+
+
+## Stav modelu buňky; chybí (starý save, přepnutí uprostřed sezóny) → podle normálu v poměru starého časovače.
+func _cm(c: Dictionary) -> Dictionary:
+	var st: Dictionary = c.get("cm", {})
+	if not st.is_empty():
+		return st
+	var crop := String(c.get("c", ""))
+	var sp: Dictionary = CROPS.get(crop, {})
+	var frac := clampf(float(c.get("g", 0.0)) / maxf(float(sp.get("days", 100)), 1.0), 0.0, 1.0)
+	if int(c.get("s", S_ZASETO)) == S_ZRALE:
+		frac = 1.0
+	var cl := CropModel.clim(crop)
+	var idx := CropModel.clim_index_for_gdd(cl, frac * CropModel.gdd_at(CropModel.spec(crop), 3))
+	var doy := floorf(world.clock.day_of_year()) if world.clock else 120.0
+	var year := world.clock.year() if world.clock else 0
+	st = CropModel.clim_state(crop, fposmod(doy - float(idx) - 1.0, 365.0) + 1.0, year, idx)
+	c["cm"] = st
+	return st
+
+
+func _soil_moist(pl: Plot) -> float:
+	var sw: SoilWater = world.soil_water
+	return sw.moisture_at(pl.center.x, pl.center.z) if sw != null else 0.5
+
+
+## Vlhkost záhonu 0..1: půdní buňka SoilWater (pod sklem `GH_SOIL_MOIST`) + vlastní „kyblík“ zálivky `bw`.
+func bed_moist(pl: Plot, k: Vector2i, c: Dictionary) -> float:
+	var base := GH_SOIL_MOIST if gh_cell(pl, k) else _soil_moist(pl)
+	return clampf(base + float(c.get("bw", 0.0)), 0.0, 1.0)
+
+
+## Hodinový krok: teplota a záření dne v místě záhonu (`DayAcc`), noční mráz z `World.micro` (vzduch i přízemní).
+func _on_eco_hour(dt_h: float) -> void:
+	if not crops_on() or plots.is_empty():
+		return
+	var ghi := CropModel.ghi_now(world)
+	var mc: Microclimate = world.micro
+	var killed := 0
+	var tk := 0.0
+	for pl in plots:
+		var q: Plot = pl
+		var t := mc.temp_at(q.center) if mc != null else _teplota()
+		var fr := mc.frost_at(q.center) if mc != null else -1.0
+		var acc: CropModel.DayAcc = _accs.get(q.key)
+		if acc == null:
+			acc = CropModel.DayAcc.new()
+			_accs[q.key] = acc
+		acc.add(t, ghi, dt_h)
+		for k in q.cells.keys():
+			var c: Dictionary = q.cells[k]
+			if not _model_cell(c):
+				continue
+			var sp := CropModel.spec(String(c["c"]))
+			var gh := gh_cell(q, k)
+			if CropModel.frost_kills(sp, _cm(c), t + (GH_BONUS if gh else 0.0), -1.0 if gh else fr):
+				q.cells[k] = {"s": S_ZRYTO, "w": float(c.get("w", 0.0)), "h": 1.0, "f": float(c.get("f", 0.0)),
+					"bw": float(c.get("bw", 0.0))}
+				q.dirty = true
+				killed += 1
+				tk = t
+	if killed > 0:
+		_notify_all("Mráz (%d °C) zničil úrodu na %d záhonech." % [roundi(tk), killed], 5.0)
+
+
+## Denní krok plochy s modelem: den `i` z `n` (poslední = včerejšek ze skutečného počasí, starší podle normálu).
+## Vrací počet rostlin, které uschly suchem.
+func _grow_plot_model(pl: Plot, i: int, n: int, rained: bool) -> int:
+	var died := 0
+	var frozen := 0
+	var acc: CropModel.DayAcc = _accs.get(pl.key)
+	var doy := floorf(world.clock.day_of_year()) - float(n - i)
+	if doy < 1.0:
+		doy += 365.0
+	var t := CropModel.clim_temp(doy)
+	var rng_c := CropModel.clim_range(doy)
+	var tmin := t - rng_c * 0.5
+	var tmax := t + rng_c * 0.5
+	var rad := CropModel.clim_rad_mj(doy, CropModel.CLIM_CLOUD)
+	if i == n - 1 and acc != null and acc.valid():
+		t = acc.mean()
+		tmin = acc.tmin
+		tmax = acc.tmax
+		rad = acc.rad_mj()
+	var soil := _soil_moist(pl)
+	var et0 := SoilWater.hargreaves_mm_day(t, maxf(tmax - tmin, 0.0), doy)
+	for k in pl.cells.keys():
+		var c: Dictionary = pl.cells[k]
+		var s := int(c["s"])
+		var gh := gh_cell(pl, k)
+		var cover := ET_COVER_MIN
+		if _model_cell(c):
+			var crop := String(c["c"])
+			var sp := CropModel.spec(crop)
+			var st := _cm(c)
+			if s == S_ZASETO:
+				var bonus := GH_BONUS if gh else 0.0
+				var light := (1.0 - float(c.get("sh", 0.0))) * (1.0 - WEED_GROWTH_K * float(c.get("w", 0.0)))
+				var dead := CropModel.step_day(st, sp, t + bonus, tmin + bonus, tmax + bonus, rad, bed_moist(pl, k, c), light,
+					1.0 + FERT_K * float(c.get("f", 0.0)))
+				if dead != 0:
+					pl.cells[k] = {"s": S_ZRYTO, "w": float(c.get("w", 0.0)), "h": 1.0, "f": float(c.get("f", 0.0)),
+						"bw": float(c.get("bw", 0.0))}
+					pl.dirty = true
+					if dead == 1:
+						frozen += 1
+					else:
+						died += 1
+					continue
+				if int(st["st"]) >= CropModel.ST_RIPE:
+					c["s"] = S_ZRALE
+				# starý časovač drží krok (přepínač Plodiny jde vypnout uprostřed sezóny)
+				c["g"] = float(spec_days(crop)) * clampf(float(st["gdd"]) / maxf(CropModel.gdd_at(sp, 3), 1.0), 0.0, 1.0)
+			else:
+				c["o"] = int(c.get("o", 0)) + 1
+			cover += (1.0 - ET_COVER_MIN) * (1.0 - exp(-float(sp.get("k", 0.6)) * float(st.get("lai", 0.0))))
+		# vodní kyblík záhonu: výpar (Hargreaves × pokryv listy) – déšť jde přes půdní buňku SoilWater
+		c["bw"] = maxf(0.0, float(c.get("bw", 0.0)) - et0 * cover / BED_AWC_MM)
+		var moist := bed_moist(pl, k, c)
+		c["sm"] = moist
+		c["m"] = 1.0 if moist > MOIST_VISUAL else 0.0
+		var wet := moist > MOIST_VISUAL or (rained and not gh)
+		if float(c.get("f", 0.0)) > 0.0:
+			c["f"] = maxf(0.0, float(c.get("f", 0.0)) - FERT_DECAY)
+		var wk := (WEED_WET if wet else WEED_DRY) * randf_range(0.5, 1.5)
+		c["w"] = minf(1.0, float(c.get("w", 0.0)) + wk)
+		pl.dirty = true
+	if frozen > 0:
+		_notify_all("Mráz zničil úrodu na %d záhonech." % frozen, 5.0)
+	return died
+
+
+## Stín stromů a budov na záhonech (podíl 0..1 v buňce `sh`) – paprsky ke slunci ráno, v poledne a odpoledne,
+## jednou za den a jen pro plochy u hráče (00_PRINCIPY kap. 6). Stromy analyticky (koule koruny), budovy a terén paprskem.
+func _shade_plot(pl: Plot) -> void:
+	if world.clock == null or not is_inside_tree():
+		return
+	var near := false
+	for p in world.players.values():
+		if is_instance_valid(p) and (p as Node3D).global_position.distance_to(pl.center) < SHADE_PLAYER_R:
+			near = true
+	if not near:
+		return
+	var sown := false
+	for c in pl.cells.values():
+		if int((c as Dictionary)["s"]) >= S_ZASETO:
+			sown = true
+			break
+	if not sown:
+		return
+	var doy := world.clock.day_of_year()
+	var decl := 0.4093 * sin(TAU * (284.0 + doy) / 365.0)
+	var north := world.weather.north_deg if world.weather != null else 78.37
+	var dirs: Array = []
+	var wsum := 0.0
+	for smp in SHADE_SAMPLES:
+		var enu := Clock._enu(decl, deg_to_rad((float(smp[0]) - 12.0) * 15.0))
+		wsum += float(smp[1])
+		if enu.z > 0.05:
+			dirs.append([Clock.enu_to_world(enu, north), float(smp[1])])
+	var trees: Array = []
+	if world.fauna != null:
+		trees = world.fauna.trees_near(pl.center, SHADE_TREE_R + Vector2(pl.w, pl.d).length() * 0.5, 60)
+	var space := get_world_3d().direct_space_state
+	for k in pl.cells.keys():
+		var c: Dictionary = pl.cells[k]
+		if int(c["s"]) < S_ZASETO:
+			continue
+		var p := pl.cell_center(k)
+		p.y = _ground(p) + 0.3
+		var lit := 0.0
+		for d in dirs:
+			var dir: Vector3 = d[0]
+			var block := 0.0
+			var q := PhysicsRayQueryParameters3D.create(p + dir * 0.5, p + dir * SHADE_RAY_M, 1)
+			if not space.intersect_ray(q).is_empty():
+				block = 1.0
+			else:
+				for tr in trees:
+					var v: Vector4 = tr
+					var rel := Vector3(v.x, v.y + v.w * CROWN_H_K, v.z) - p
+					var tt := rel.dot(dir)
+					var r := v.w * CROWN_R_K
+					if tt > 0.0 and (rel - dir * tt).length_squared() < r * r:
+						block = minf(1.0, block + CROWN_OPACITY)
+			lit += float(d[1]) * (1.0 - block)
+		c["sh"] = clampf(1.0 - lit / maxf(wsum, 0.01), 0.0, 1.0) if not dirs.is_empty() else 0.0
+
+
+## Odhad úrody při pohledu na záhon (přesnější s úrovní Zahradničení): [od, do] kusů, nebo [] bez modelu.
+func _estimate(c: Dictionary, id: int) -> Array:
+	if not _model_cell(c):
+		return []
+	var crop := String(c["c"])
+	var sp := CropModel.spec(crop)
+	var st := _cm(c)
+	var r := CropModel.yield_ratio(st, sp, crop) if int(c["s"]) == S_ZRALE else CropModel.yield_forecast_ratio(st, sp, crop)
+	var mx := float((CROPS[crop]["yield"] as Array)[1])
+	var n := mx * YIELD_NORMAL_Q * r
+	var sk: Skills = world.skills.get(id)
+	var bonus := sk.bonus("zahradnictvi") if sk else 0.0
+	var err := ESTIMATE_ERR * (1.0 - clampf(bonus, 0.0, 1.0))
+	return [maxi(0, floori(n * (1.0 - err))), maxi(1, ceili(n * (1.0 + err)))]
 
 
 # ------------------------------------------------------------------ vzhled
@@ -1422,10 +1717,16 @@ func _build_plant(mk: MeshKit, pl: Plot, cp: Vector3, cell: Dictionary, rng: Ran
 	var ripe := int(cell["s"]) == S_ZRALE
 	var f := 1.0 if ripe else clampf(float(cell.get("g", 0.0)) / float(spec["days"]), 0.0, 1.0)
 	var wilt := clampf(float(int(cell.get("dry", 0)) - int(spec["water_need"])) / 2.0, 0.0, 1.0) if not ripe else 0.0
+	var vig := 1.0
+	if _model_cell(cell):        # M8.12: velikost podle fáze (GDD) a vzrůstu vůči normálu, vadnutí podle stresu vody
+		var st := _cm(cell)
+		f = 1.0 if ripe else clampf(float(st.get("gdd", 0.0)) / maxf(CropModel.gdd_at(CropModel.spec(crop), 1), 1.0), 0.0, 1.0)
+		vig = clampf(CropModel.vigor(st, crop), 0.5, 1.15)
+		wilt = clampf(1.0 - float(st.get("ws", 1.0)) / WILT_WS, 0.0, 1.0) if not ripe else 0.0
 	var col: Color = (spec["ripe"] if ripe else spec["leaf"]) as Color
 	col = col.lerp(WILTED, wilt)
 	var full_h := float(spec["h"])
-	var h := lerpf(0.05, full_h, smoothstep(0.0, 1.0, f)) * (1.0 - 0.4 * wilt)
+	var h := lerpf(0.05, full_h, smoothstep(0.0, 1.0, f)) * (1.0 - 0.4 * wilt) * vig
 	var nb := 3 + int(f * 7.0)
 	var wid := float(spec["wid"]) * lerpf(0.5, 1.0, f)
 	var lean := float(spec["lean"]) * lerpf(0.5, 1.0, f) * (1.0 + wilt)
@@ -1470,7 +1771,9 @@ func to_dict() -> Dictionary:
 			var c: Dictionary = q.cells[k]
 			cs.append({"i": k.x, "j": k.y, "s": int(c["s"]), "c": String(c.get("c", "")), "g": snappedf(float(c.get("g", 0.0)), 0.01),
 				"dry": int(c.get("dry", 0)), "m": snappedf(float(c.get("m", 0.0)), 0.1), "w": snappedf(float(c.get("w", 0.0)), 0.01),
-				"h": snappedf(float(c.get("h", 1.0)), 0.01), "o": int(c.get("o", 0)), "f": snappedf(float(c.get("f", 0.0)), 0.01)})
+				"h": snappedf(float(c.get("h", 1.0)), 0.01), "o": int(c.get("o", 0)), "f": snappedf(float(c.get("f", 0.0)), 0.01),
+				"bw": snappedf(float(c.get("bw", 0.0)), 0.001), "sm": snappedf(float(c.get("sm", 0.5)), 0.001),
+				"sh": snappedf(float(c.get("sh", 0.0)), 0.01), "cm": c.get("cm", {})})     # M8.12: kyblík, vlhkost, stín, stav modelu
 		ps.append({"key": q.key, "cx": snappedf(q.center.x, 0.01), "cz": snappedf(q.center.z, 0.01), "yaw": snappedf(q.yaw, 0.001),
 			"w": q.w, "d": q.d, "cells": cs})
 	var picks := {}
@@ -1515,7 +1818,11 @@ func restore(d: Dictionary) -> void:
 			if st >= S_ZASETO and not CROPS.has(crop):
 				st = S_ZRYTO
 			pl.cells[k] = {"s": st, "c": crop, "g": float(ce.get("g", 0.0)), "dry": int(ce.get("dry", 0)), "m": float(ce.get("m", 0.0)),
-				"w": float(ce.get("w", 0.0)), "h": float(ce.get("h", 1.0)), "o": int(ce.get("o", 0)), "f": float(ce.get("f", 0.0))}
+				"w": float(ce.get("w", 0.0)), "h": float(ce.get("h", 1.0)), "o": int(ce.get("o", 0)), "f": float(ce.get("f", 0.0)),
+				"bw": float(ce.get("bw", 0.0)), "sm": float(ce.get("sm", 0.5)), "sh": float(ce.get("sh", 0.0))}
+			var cm: Dictionary = ce.get("cm", {})     # M8.12: starý save bez klíče = stav podle normálu (`_cm`)
+			if st >= S_ZASETO and not cm.is_empty() and String(cm.get("k", "")) == crop:
+				pl.cells[k]["cm"] = cm
 		pl.dirty = true
 	_last_jd = -1
 	_rained_today = false

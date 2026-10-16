@@ -489,3 +489,32 @@ Co změřit: `--perfscene=les_jaro,30` a `--perfscene=les_leto,30` (s přepína�
 Očekávání: CPU ≈ 0 ms za snímek (denní krok ~0,2 ms jednou za 48 s reálně, tabulka 16 × 32 texelů), GPU ≤ +0,1 ms
 (3 texelFetch na vrchol, pár ALU na fragment listí). Po Novém roce / načtení savu s růstem: přeškálování ~150 stromů
 za snímek přes `EcoClock.slice` (≤ 1 ms/snímek po dobu ~6 s) – změřit `--perfscene=les_leto` těsně po načtení savu.
+## M8.12 – Plodiny a zahrada podle růstového modelu
+
+Pozn.: záhony i pole rostou po herních dnech (denní krok o půlnoci; zahrada dožene přeskočené dny podle normálu).
+Rychlé sezóny: spánek / F2 → Datum. Prohlídka záhonu = akce „Prohlédnout záhon“ (E na záhon).
+
+1. Duben, zahrada: zrýt 2 záhony, zasadit brambory, jeden pravidelně zalévat (konev), druhý ne; F2 → Počasí Jasno
+   opakovaně (sucho), spát do srpna → nezalévaný dá ~1–3 ks, zalévaný ~8–10 ks (horní mez 12 × 0,75 × výnos/normál).
+2. Prohlídka záhonu během léta: „Brambory kvetou, půda je suchá. (55 %)“ + „Odhad úrody: 2–5 ks.“; s vyšším
+   Zahradničením užší rozpětí odhadu.
+3. Květen: rajčata venku i ve skleníku, F2 → čas 3:00, Počasí Jasno, teplota pod 0 °C (F2 → Počasí → Teplota −2)
+   → do herní hodiny hláška „Mráz (−2 °C) zničil úrodu…“, venkovní záhony prázdné, skleník přežije.
+4. Salát pod korunou stromu (nebo u zdi domu) vs. na slunci: prohlídka ukáže „· stín NN %“ a pomalejší postup %.
+5. Pole s pšenicí (F2 → Teleport na pole, červen–červenec): v suchém roce (dlouho Jasno) dřív zlátne a je nižší než
+   obvykle, strniště o 1–3 týdny dřív než ~27. 7.; v normálním roce barvy jako dřív.
+6. Deník J → Počasí po sklizni: „Letošní úroda: suchý červen, ozimá pšenice slabá úroda (60 %), obilí se začalo
+   žnout 12. 7.“ (jen měsíce / plodiny mimo normál; jinak „zatím běžný rok“).
+7. F5 → F9 uprostřed sezóny: záhony (fáze, % i odhad) a barvy polí zůstanou; starý save (před M8.12) se načte – záhony
+   pokračují podle starého % (převod na normál), pole podle normálu k dnešku.
+8. Esc → Nastavení → Realismus → vypnout „Plodiny podle počasí“ → zahrada roste po růstových dnech jako dřív (hláška
+   „Brambory – 40 % · vlhko …“), pole podle pevného kalendáře; zapnout zpět → pokračuje bez skoku.
+9. F3 → Příroda/Plodiny a zahrada (379 parametrů): „Brambory – RUE“ 2,8 → 6 → za pár dní znatelně větší rostliny;
+   „Stres vody – sucho od vlhkosti“ 0,35 → 0,8 → záhony vadnou i po dešti; ↺ vrátí. Konzole bez chyb `tune_m8_12`.
+10. Kukuřice / slunečnice v září: pole dozraje a sklidí se podle sezóny (ne pevný den), za deště se nežne.
+
+Co změřit: `tools/launcher.sh --perfscene=pole_pulnoc,30` (pole 15. 7. ve 23:51 – půlnoc a denní krok proběhne během
+měření) a `--perfscene=pole_leto` proti stavu před M8.12, totéž s vypnutým přepínačem „Plodiny podle počasí“. Očekávání:
+průměr CPU +≤ 0,05 ms (hodinový vzorek záření a teplot, ~100 buněk záhonu), ve snímcích po půlnoci špička +≤ 1 ms po
+~22 snímků (12 polí za snímek, `EcoClock.slice`), jednou přepočet LUT polí (~1 ms) a stín záhonu (~300 paprsků,
+≤ 2 ms jednorázově, jen u hráče); GPU beze změny (jedno násobení v `vegetation.gdshader`). Paměť ≈ 0 (255 malých slovníků).
