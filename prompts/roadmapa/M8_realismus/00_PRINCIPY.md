@@ -129,3 +129,7 @@ Barva povrchu (listí, kůra) **nesmí** jít do barev vrcholů – patří do t
   krok, nápověda, jednotka)`, `id` = `<systém>.<parametr>`), výchozí hodnota = dnešní konstanta (chování beze změny).
 - Hodnotu nikdy nečti z registru za snímek – drž ji v členské proměnné a obnov v handleru signálu `changed`.
 - Vyladěné hodnoty od uživatele přicházejí v kořenovém `config.json` – při kalibraci (M8.19) je přenes jako nové výchozí do kódu / dat.
+- **Od vlny 5:** každý krok registruje do **vlastního** souboru `scripts/dev/tune_m8_<číslo>.gd` (např. `tune_m8_11.gd`), ne do
+  `tune_priroda.gd` / `tune_clovek.gd` (ty patří M8.D2) – paralelní kroky tak nekolidují. Skupiny dál podle kategorií
+  (`"Příroda/Fenologie"`, `"Člověk/Tělo – teplo a energie"` …). Návod: `docs/DEV.md` → „Menu pro vývojáře (F3) – jak zaregistrovat parametr“.
+- Stav po M8.D (16. 10. 2026): 3 633 parametrů (Svět 17, Vozidla 502, Létání 256, Člověk 382, Činnosti 371, Příroda 848, Zvěř 1 257).
