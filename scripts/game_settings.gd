@@ -27,6 +27,7 @@ const REALISM_ROWS: Array = [
 	["species", "Dřeviny a porosty", "Druh, věk a vitalita stromů podle stanoviště: cena dřeva při kácení, „Prohlédnout strom“, ovoce jen na ovocných druzích (M8.3). Vypnuto = staré chování.", "≈ 0 ms (data offline)"],
 	["wind", "Pole větru", "Nárazy běžící krajinou, závětří a hřebeny, ohyb stromů po úrovních, vlny přes obilí; létání, kouř a čich zvěře podle větru v místě (M8.4). Vypnuto = jedno číslo a sinusovka.", "≤ 0,3 ms GPU"],
 	["soil_water", "Vodní bilance", "Vlhkost půdy, tání sněhu, odtok, potoky stoupají a kalní po bouřce, v suchu vysychají; bláto a louže podle místa (M8.7). Vypnuto = jedno globální mokro.", "~0,1 ms CPU"],
+	["micro", "Mikroklima", "Za jasné bezvětrné noci studený vzduch v údolích a kotlinách, ranní údolní mlha, rosa a jinovatka, teplé jižní svahy, chladný les, teplejší obec; HUD a tělo berou teplotu v místě (M8.9). Vypnuto = teplota všude stejná.", "~0,05 ms CPU, mlha ≈ 0 ms GPU"],
 ]
 
 var realism: Dictionary = {}

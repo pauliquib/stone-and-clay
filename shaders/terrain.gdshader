@@ -38,6 +38,9 @@ uniform float tex_scale = 4.0;     // velikost dlaždice textury v metrech
 global uniform float snow_cover;   // sníh na zemi 0..1
 global uniform float wetness;      // mokrý povrch 0..1
 global uniform float grass_green;  // svěžest trávy 0..1 (zima / sucho → hnědá)
+global uniform float micro_dew;    // M8.9: rosa na trávě 0..1 (Microclimate → MicroFx)
+global uniform float micro_frost;  // M8.9: 1 = rosa na dně údolí je zmrzlá (jinovatka)
+global uniform float micro_frost_y; // M8.9: svět Y, pod kterým je zem zmrzlá
 uniform vec2 north_xz = vec2(-0.98, -0.20);   // světový směr severu (z map.json north_angle; pro sněhové jazyky)
 
 varying vec3 wpos;
@@ -326,8 +329,13 @@ void fragment() {
 	}
 	// mokro: tmavší a lesklejší povrch; v kolejích polních cest drží voda déle
 	float wet = min(wetness * (1.0 + rut * 0.6), 1.0) * (1.0 - snow);
+	// M8.9: jinovatka pod mrazovou hranicí (rovina, rozbitá šumem), rosa nad ní – lesk jako mokro, slabší
+	float rime = micro_dew * micro_frost * smoothstep(micro_frost_y + 8.0, micro_frost_y - 8.0, wpos.y)
+		* (1.0 - snow) * smoothstep(0.6, 0.9, n.y);
+	wet = max(wet, max(micro_dew - rime, 0.0) * (1.0 - snow) * 0.6);
 	col *= 1.0 - 0.32 * wet;
 	col = mix(col, vec3(0.9, 0.92, 0.96) * (0.92 + 0.08 * d1), snow);
+	col = mix(col, vec3(0.80, 0.84, 0.88) * (0.9 + 0.1 * d1), rime * (0.35 + 0.35 * d2));   // M8.9 jinovatka
 	ALBEDO = col * 1.05;
 	ROUGHNESS = mix(mix(0.93, 0.5, wet), 0.75, snow);
 	SPECULAR = mix(0.25, 0.45, wet);

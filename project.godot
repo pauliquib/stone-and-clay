@@ -85,6 +85,18 @@ grass_green={
 "type": "float",
 "value": 1.0
 }
+micro_dew={
+"type": "float",
+"value": 0.0
+}
+micro_frost={
+"type": "float",
+"value": 0.0
+}
+micro_frost_y={
+"type": "float",
+"value": -10000.0
+}
 foliage={
 "type": "float",
 "value": 1.0

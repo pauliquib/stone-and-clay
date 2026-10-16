@@ -301,6 +301,8 @@ func open_debug_layers() -> void:
 		opts.append([label, Callable(_hud(), "set_debug_layer").bind(key)])
 	if world.soil_water != null:     # M8.7: tabulka průtoků hlavních toků
 		opts.append(["Průtoky toků (M8.7)", _water_flows])
+	if world.micro != null:          # M8.9: stav mikroklimatu (inverze, mlha, mráz, rosa)
+		opts.append(["Mikroklima (M8.9)", _micro_info])
 	opts.append(["← Zpět", open_main])
 	_hud().open_menu("Příroda – ladění", "Vybraná vrstva se kreslí na mapě (M) místo podkladu – " +
 		"barevná mřížka po 16–64 m podle přiblížení. Každý krok M8 přidá svou vrstvu.", opts)
@@ -416,6 +418,19 @@ func open_player() -> void:
 		["Postavit ruční vozík", _cargo_debug.bind("vozik")],
 		["← Zpět", open_main],
 	])
+
+
+## M8.9: F2 → Příroda – ladění → Mikroklima: síla inverze, mlžná vrstva, mrazová hranice, rosa, údolí vs. hřbet.
+func _micro_info() -> void:
+	var p: Vector3 = _hud().player.global_position if _hud().player else Vector3.ZERO
+	var m: Microclimate = world.micro
+	var t := m.debug_text() + "\nTady: %.1f °C (přízemní %.1f °C), vlhkost %d %%, rosný bod %.1f °C, mlha %.2f, mráz %.2f, rosa %.2f, pocitově %.1f °C" % [
+		m.temp_at(p), m.ground_temp_at(p), roundi(m.humidity_at(p) * 100.0), m.dewpoint_at(p), m.fog_at(p),
+		m.frost_at(p), m.dew_at(p), m.wind_chill_at(p)]
+	var jl := m.journal_line()
+	if jl != "":
+		t += "\n" + jl
+	_hud().open_menu("Mikroklima", t, [["Obnovit", _micro_info], ["← Zpět", open_debug_layers]])
 
 
 ## M8.7: F2 → Příroda – ladění → Průtoky: Q, normál, hladina a kalnost hlavních toků + souhrn vodní bilance.

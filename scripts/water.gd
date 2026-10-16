@@ -374,12 +374,12 @@ func _process_impl(delta: float) -> void:
 	var now: float = world.clock.minutes
 	if _last_min < 0.0:
 		_last_min = now
-		var t0: float = world.weather.temp
+		var t0: float = world.micro.temp_valley() if world.micro != null else world.weather.temp   # M8.9: nádrže leží v údolí
 		ice = clampf((-t0 - 1.0) / 4.0, 0.0, 1.0)
 		ice_flow = clampf((-t0 - 5.0) / 6.0, 0.0, 1.0)
 	var dh := clampf((now - _last_min) / 60.0, 0.0, 48.0)
 	_last_min = now
-	var temp: float = world.weather.temp
+	var temp: float = world.micro.temp_valley() if world.micro != null else world.weather.temp   # M8.9: teplota u vody (inverze)
 	ice = move_toward(ice, clampf((-temp - 1.0) / 4.0, 0.0, 1.0), dh * 0.08)
 	ice_flow = move_toward(ice_flow, clampf((-temp - 5.0) / 6.0, 0.0, 1.0), dh * 0.05)
 	_vis_tick += 0.2

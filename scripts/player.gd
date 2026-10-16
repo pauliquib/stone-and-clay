@@ -1395,6 +1395,11 @@ func _update_body(delta: float, hs: float) -> void:
 		env = {"rain": rain, "temp": weather.temp,
 			"wind": 0.0 if sheltered else weather.wind, "in": sheltered,
 			"heat": heat, "shelter_min": shelter_min}
+		var wd := get_parent() as World       # M8.9: teplota (a vítr venku) v místě hráče – kotlina, les, svah
+		if wd != null and wd.micro != null:
+			env["temp"] = wd.micro.temp_at(global_position)
+			if not sheltered:
+				env["wind"] = wd.micro.wind_speed_at(global_position)
 		if wade > 0.2:
 			body.wetness = maxf(body.wetness, minf(wade * 1.5, 1.0))
 			# voda chladí víc než vzduch (M5.2): pocitová teplota nejvýš na teplotu vody

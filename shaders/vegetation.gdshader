@@ -25,11 +25,16 @@ uniform sampler2D field_lut : filter_nearest, repeat_disable;
 global uniform float snow_cover;               // sníh na zemi 0..1 (Atmosphere)
 global uniform float grass_green;              // svěžest trávy 0..1 (Seasons.GREEN)
 global uniform float foliage;                  // olistění listnáčů 0..1 (Seasons.FOLIAGE)
+global uniform float micro_dew;                // M8.9: rosa 0..1 (Microclimate → MicroFx)
+global uniform float micro_frost;              // M8.9: 1 = rosa na dně údolí zmrzlá (jinovatka)
+global uniform float micro_frost_y;            // M8.9: svět Y, pod kterým je zem zmrzlá
 
 #include "res://shaders/include/wind.gdshaderinc"
 
 varying vec3 v_col;
 varying float v_snow;
+varying float v_dew;                           // M8.9: rosa (lesk)
+varying float v_rime;                          // M8.9: jinovatka (bělavé špičky)
 
 void vertex() {
 	vec3 tint = INSTANCE_CUSTOM.rgb;
@@ -75,13 +80,17 @@ void vertex() {
 
 	v_col = COLOR.rgb * tint;
 	v_snow = snow_cover * smoothstep(0.15, 0.9, UV.y + NORMAL.y * 0.4);
+	float rime_k = micro_dew * micro_frost * smoothstep(micro_frost_y + 8.0, micro_frost_y - 8.0, org.y);
+	v_rime = rime_k * smoothstep(0.2, 0.9, UV.y) * (1.0 - snow_cover);
+	v_dew = max(micro_dew - rime_k, 0.0) * (1.0 - snow_cover);
 }
 
 void fragment() {
 	vec3 c = v_col;
 	c = mix(c, vec3(0.85, 0.87, 0.92), clamp(v_snow * 0.85, 0.0, 0.8));
+	c = mix(c, vec3(0.82, 0.86, 0.9), clamp(v_rime * 0.6, 0.0, 0.6));   // M8.9 jinovatka
 	ALBEDO = c;
-	ROUGHNESS = 0.85;
-	SPECULAR = 0.3;
+	ROUGHNESS = mix(0.85, 0.4, v_dew);              // M8.9: orosená tráva se leskne
+	SPECULAR = mix(0.3, 0.55, v_dew);
 	BACKLIGHT = c * 0.3;                            // prosycení proti světlu (listy/tráva)
 }

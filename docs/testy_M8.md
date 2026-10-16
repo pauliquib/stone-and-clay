@@ -280,3 +280,30 @@ Co změřit: `tools/launcher.sh --perfscene=pole_leto,60` (60 s, ať měření z
 `soil_water` a `water`). Očekávání: `soil_water` ≤ 0,3 ms průměr na snímek během průchodu (48 buněk/snímek), mimo průchod
 ~0; po startu během stavby mřížky (prvních ~40 s) do ~0,5 ms. `water` se nemá zvednout o víc než ~0,05 ms (aktualizace
 426 hladin 1× za sekundu jen při změně). FPS/frame proti poslední baseline `pole_leto` bez zhoršení > 0,5 ms.
+
+## M8.9 – Mikroklima: inverze, mrazové kotliny, údolní mlha, rosa a jinovatka
+
+Pozn.: stav mikroklimatu (síla inverze, mlžná vrstva, rosa) se počítá jednou za herní hodinu (~2 min reálně) a mezi
+kroky plynule prolíná; po F2 změně data / času / počasí se hned dopočítá „rozběhem“ (18 h s dnešním počasím).
+F2 → Příroda – ladění → „Mikroklima (M8.9)“ ukazuje inverzi, výšku mlhy, mrazovou hranici, rosu a hodnoty v místě hráče.
+
+1. `--perfscene=kopec_inverze` (nebo F2 → Datum 12. 10., Počasí Jasno, čas 6:30 a teleport na hřbet ~1340, −2670) →
+   v údolí na JV leží mlha s ostrým horním okrajem („moře mlhy“), hřbet je nad ní. Sejít / sjet dolů → uvnitř vrstvy
+   je dohled ~200 m, ne bílá stěna.
+2. Leden, jasno, 4:00: HUD teplota na dně údolí (u potoka) vs. na hřebeni → rozdíl 3–8 °C; v poledne téměř stejná.
+3. Za větru (Bouřka / Přeháňky) nebo Zataženo: v F2 → Mikroklima inverze < 1 K, mlha v údolí není, teplota všude ~stejná.
+4. Ráno 6:00–7:00 po jasné noci: tráva a terén lesklé (rosa), pod mrazovou hranicí (dno údolí, říjen–duben) bělavé
+   (jinovatka); v 10:00 už nic. HUD ukazuje „· rosa“ / „· jinovatka“ / „· přízemní mráz“.
+5. Kouř z komínů v obci za jasného bezvětrného rána (inverze ≥ 2,5 K) → drží se nízko a rozlévá.
+6. Červenec, jasno, 15:00: jižní stráň (vrstva `site_insol` žlutá) o 1–3 °C tepleji než v lese (F2 → Mikroklima „Tady“).
+7. Leden, jasno, noc, bez bundy: v kotlině prochladneš rychleji než na kopci (ukazatel chladu / zprávy těla).
+8. Mapa M s vrstvou `teplota` v noci za jasna → údolnice a kotliny modré, hřbety a obec načervenalé; vrstvy `mlha`, `mraz`.
+9. Esc → Nastavení → Realismus → vypnout „Mikroklima“ → HUD teplota všude stejná jako Počasí, mlha v údolí zmizí, rosa ne.
+10. Deník J → Počasí po jasné mrazivé noci (po poledni): „V údolí v noci mrzlo (−3 °C), na kopci ne (1 °C).“; F5 → F9
+    zachová stav (klíč `micro`), starý save se načte (rozběh).
+
+Co změřit: `tools/launcher.sh --perfscene=kopec_inverze,30` a `--perfscene=udoli_noc,30` (porovnat FPS/frame s vypnutým
+přepínačem „Mikroklima“). Očekávání: CPU ≈ +0,05 ms (HUD řádek 2×/s, tělo hráče 1 dotaz za snímek z mezipaměti, hodinový
+krok ~40 vyhodnocení profilu jednou za 2 min); GPU ≤ +0,1 ms (výšková mlha je jen pár instrukcí ve stávající mlze, rosa
+a jinovatka pár ALU v terénu a vegetaci) – cíl +≤ 0,5 ms na Střední. Volumetrická mlha se nepoužívá.
+`--perfscene=les_rano_mlha` beze změny proti baseline (advekční mlha z Weather jako dřív).

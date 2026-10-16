@@ -461,6 +461,7 @@ func update(delta: float) -> void:
 	env.fog_density = (FOG_BASE + FOG_MIST * fog * fog + FOG_RAIN * rain) * (1.0 - 0.7 * high)
 	env.fog_sky_affect = clampf(fog * 0.8 + rain * 0.3 + high * 0.25, 0.0, 0.9)
 	env.fog_aerial_perspective = lerpf(0.5, 0.85, high) * (1.0 - fog)
+	_micro_fx_update(cam, delta)          # M8.9: údolní mlha (výšková) a rosa / jinovatka podle World.micro
 	if sky_on:
 		# M8.5: expozice z vyhlazené EV100 (SkyModel) – kalibrováno, ať je jasné poledne ≈ jako dřív (1,0),
 		# v soumraku a v noci násobič roste (oko se roztáhne), ať zůstane scéna čitelná (Purkyně).
@@ -549,6 +550,16 @@ func _set_wind_globals() -> void:
 	rs.global_shader_parameter_set("wind_offset", wind_field.offset)
 	rs.global_shader_parameter_set("wind_time", wind_field.time)
 	rs.global_shader_parameter_set("wind_hier", 1.0 if wind_field.enabled() else 0.0)
+
+
+## M8.9: vzhled mikroklimatu (`MicroFx`) – `Microclimate` si najde přes Weather → World (null = staré chování).
+var _micro_fx: MicroFx
+func _micro_fx_update(cam: Camera3D, delta: float) -> void:
+	if _micro_fx == null:
+		_micro_fx = MicroFx.new()
+	if _micro_fx.micro == null and weather != null:
+		_micro_fx.micro = weather.get_parent().get("micro") as Microclimate
+	_micro_fx.update(env, cam, delta, _indoor_s)
 
 
 ## Natočí směrové světlo tak, aby svítilo ze směru `to_light` (jednotkový vektor ke zdroji).

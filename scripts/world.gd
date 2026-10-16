@@ -133,6 +133,7 @@ var _collected_jd := {}          # pořadí předmětu → juliánský den sběr
 var surface: SurfaceMap          # maska povrchu terénu (data/surface.bin) – procedurální materiály, minimapa
 var site: Site                   # M8.2: mapa stanovišť (data/site.bin) – terén, voda, oslunění, půda (00_PRINCIPY §3)
 var wind_field: WindField        # M8.4: pole větru – nárazy, závětří, profil (scripts/eko/wind_field.gd)
+var micro: Microclimate          # M8.9: mikroklima – inverze, kotliny, mlha, rosa (scripts/eko/microclimate.gd); vrstvy „teplota/mlha/mraz“
 var surroundings: Surroundings   # M6.2: levná krajina za katastrem (bez kolizí, bez dat fallback prstenec)
 var villages: Villages           # vizuální zástavba 5 okolních vesnic (data/obce.json; jen pohled z dálky)
 var building_details: BuildingDetails   # okna, dveře, vrata a komíny budov (data/buildings.json; null bez dat)
@@ -377,6 +378,8 @@ func build() -> void:
 	MapLoader.build_trees(map_root, water.drop_trees, terrain, trees)
 	tree_eco = TreeEco.new()                 # M8.3: až po indexu stromů (fallback čte TreeManager)
 	tree_eco.setup(self)
+	micro = Microclimate.new()               # M8.9: vrstva nad Weather (Site, TreeEco, SoilWater, WindField); krok přes eco_hour
+	micro.setup(self)
 
 	loading.emit("Vegetace…")
 	await _frames(1)
