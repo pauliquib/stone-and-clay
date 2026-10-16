@@ -21,6 +21,8 @@ var atmosphere: Atmosphere
 var street_lights: StreetLights     # M5.12: pouliční osvětlení obce a světelný smog (klient, vzniká v attach)
 var chimney_smoke: ChimneySmoke   # kouř z komínů podle teploty (M1.3)
 var season_fx: SeasonFx           # pole podle kalendáře, květy v trávě, ovoce a padané listí
+var soundscape: Soundscape        # M8.18: zvuková krajina (ptačí chorál, hmyz, žáby, šumění korun)
+var small_life: SmallLife         # M8.18: netopýři, světlušky, motýli, komáři, jepice u hráče
 var game_menu: GameMenu          # F2 – roční období, čas, počasí, vozidla, teleport
 var pause_menu: PauseMenu        # Esc – pauza, uložit / načíst, nastavení, ovládání, ukončit
 var dev_menu: DevMenu            # M8.D: F3 – ladění parametrů (jen v Režimu vývojáře)
@@ -103,6 +105,13 @@ func attach(p: Player) -> void:
 	chimney_smoke.name = "KourZKominu"
 	add_child(chimney_smoke)
 	chimney_smoke.setup(world, p)
+	if soundscape == null:            # M8.18: zvuková krajina a drobný život (přepínač „soundscape“)
+		soundscape = Soundscape.new()
+		add_child(soundscape)
+		soundscape.setup(world, self)
+		small_life = SmallLife.new()
+		add_child(small_life)
+		small_life.setup(world, self, soundscape)
 	settings.apply(self)               # po SeasonFx (vegetace) a se světem hotovým (dohlednost)
 	world.sound.connect(_on_world_sound)
 	p.jumped.connect(func(): sfx.play("jump", randf_range(0.95, 1.08), -4.0))

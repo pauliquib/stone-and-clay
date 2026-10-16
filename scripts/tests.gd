@@ -2155,6 +2155,12 @@ const PERF_SCENES := {
 		"weather": "jasno", "popis": "M8.17: náves ve středu v lednu ráno – rozsvěcují se kuchyně, kouří víc komínů, v 7:00 hodinový krok domácností (prof. „villager“)"},
 	"ves_sobota_rijen": {"pos": Vector3(60.0, 0.0, 110.0), "yaw": 0.0, "date": [2026, 10, 17], "hour": 10.0,
 		"weather": "jasno", "popis": "M8.17: náves v sobotu v říjnu dopoledne – štípání dřeva a hrabání listí u domů, vesničané na dvorech"},
+	"les_rano_kveten": {"pos": Vector3(-383.0, 0.0, -1010.0), "yaw": PI, "date": [2026, 5, 10], "hour": 4.75,
+		"weather": "jasno", "popis": "M8.18: les u chaty 10. 5. ve 4:45 – nástup ranního chorálu (kos první), kukačka; prof. „soundscape“ (cíl ≤ 0,2 ms)"},
+	"rybnik_soumrak": {"pos": Vector3(-23.0, 0.0, -2753.0), "yaw": PI * 0.5, "date": [2026, 4, 20], "hour": 20.6,
+		"weather": "jasno", "popis": "M8.18: břeh rybníka v dubnu za soumraku – žáby, netopýři, komáři; prof. „soundscape“ a „small_life“"},
+	"les_cerven_noc": {"pos": Vector3(-383.0, 0.0, -1010.0), "yaw": PI, "date": [2026, 6, 25], "hour": 22.5,
+		"weather": "jasno", "popis": "M8.18: les u chaty v červnu ve 22:30 – světlušky na okraji lesa, cvrčci, puštík; prof. „small_life“"},
 }
 
 

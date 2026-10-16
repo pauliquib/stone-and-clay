@@ -2688,3 +2688,49 @@ dopravy, ne o regresi.
 - Bytový dům startu se losuje při každém startu světa (`Estate._pick_start`) – domácnosti bytů se mapují podle klíčů,
   při jiném losu se drby z bytů ztratí (ne chyba savu).
 - Vesničan s BT se do domu neschovává (strom zatím neví o domácnosti); „zaseknutý u dveří“ zajde dovnitř do 5 m.
+
+## 2026-10-17 – M8.18 Zvuková krajina a drobný život
+
+### Hotovo (staticky ověřeno čtením kódu – ruční test čeká)
+- **Zvuková krajina** (`scripts/priroda/soundscape.gd` `Soundscape`, klient z `LocalClient.attach`, přepínač `soundscape` +
+  řádek v Realismu): mřížka 40 m v okruhu 200 m kolem kamery, rysy buňky jednou (les, okraj, louka, pole, obec, voda,
+  nádrž, niva, podíl jehličnanů, 16 buněk / výběr); 22 zdrojů z `data/zvuky_prirody.json` (13 ptáků + vrána/káně ze starých
+  zvuků, cvrček, kobylka, bzučení louky, komáři, skokan, ropucha, pes a kohout od domácností) s aktivitou podle měsíce,
+  **minut od východu / západu slunce** (NOAA), teploty, deště, větru a kvetení; teritoria stabilním hashem. Výběr 2×/s →
+  nejvýš 16 `AudioStreamPlayer3D` (pool, prolínání, ≤ 4 na druh) + 2 vrstvy šumění korun (listnáče / jehličnany podle
+  `TreeEco`, síla podle `WindField`, olistění `Phenology.foliage`). **Dolbearův zákon** u cvrčků (T z `Microclimate.temp_at`
+  v místě zdroje). Útlum vegetací (low-pass + dB podle lesa na spojnici, bez paprsků), maskování větrem, bus „Priroda“
+  s dozvukem podle `Site.tpi` (ozvěna v údolí), interiér −20 dB / auto −12 dB.
+- **Syntéza** (`NatureSfx.synth`, 24 nových zvuků s variantami ze seedu: drozd, pěnkava, sýkora, červenka, budníček,
+  bubnování strakapouda, hřivnáč, kukačka, skřivan, žluva, puštík, cvrček, kobylka, bzučení louky, komár, skokan zelený /
+  hnědý, ropucha, pes, kohout, koruny šustí / syčí, sekačka, hrábě, lopata) běží ve vlákně `WorkerThreadPool` → PCM →
+  `NatureSfx.put_pcm` (hlavní vlákno bez záseku; ověřeno headless `tools/check_m8_18.gd`: všech 48 variant, špičky ≤ 0,8,
+  ~2,5 s CPU celkem ve vlákně).
+- **Drobný život** (`scripts/priroda/small_life.gd` `SmallLife`, `shaders/small_life.gdshader`): 5 MultiMesh (netopýři,
+  světlušky, motýli 5 barev, komáří roj, jepice), kotvy z buněk zvukové krajiny 1×/s, pohyb a blikání ve vertex shaderu;
+  podmínky měsíc / den v roce, výška slunce, teplota, déšť, vítr, kvetení.
+- **Deník pozorování** (`NatureLog`): +19 druhů (uslyšené ptáci, hmyz, žáby; netopýr, světluška, motýl, jepice),
+  `hear()` = „Nově uslyšeno“, XP do Myslivosti `XP_FIRST` (tabulka dovedností se nerozšiřovala). Save beze změny (klíč
+  `nature_log`).
+- **M8.17 zbytky:** sekačka má vlastní zvuk (`mower`, `Households.MOW_PITCH` 0,42 → 1,0), hrabání listí (`rake`) a
+  odhazování sněhu (`shovel`) znějí u domů (`RAKE_*`, `SHOVEL_*`).
+- **API (00_PRINCIPY kap. 3):** použito `World.micro.temp_at`, `World.phenology.bees_bloom/foliage`, `World.wind_field`
+  (`speed`, `gust_at`, `enabled`), `World.site` (`dist_water`, `hand`, `tpi`), `World.tree_eco` (`canopy_at`,
+  `species_near`, `species_info`), `World.meadows.index_at`, `World.households` (`hh`: pes, slepice), `Atmosphere`
+  (`sun_illuminance_lux`, `sky_illuminance_lux`), `World.realism_on("soundscape")` – vše s kontrolou `null`.
+  (`World.habitat` se nepoužil – zvuky ptáků nejsou v Habitat modelu; `SoilWater` jen nepřímo přes šumění potoka M8.7.)
+- **Ladění:** F3 → `scripts/dev/tune_m8_18.gd`: **867 parametrů** (Příroda/Zvuková krajina 49, Příroda/Zvuková krajina –
+  druhy 756 = celá tabulka JSON, Zvěř/Hmyz a drobný život 62; ověřeno `DevTune.ids` headless skriptem).
+- Měřicí scény `les_rano_kveten`, `rybnik_soumrak`, `les_cerven_noc`; profily „soundscape“, „small_life“.
+- Docs: `docs/SYSTEMS.md`, README, `ZVIRATA.md` (tabulka zvuků a drobného života), `docs/testy_M8.md` → M8.18,
+  `assets/LICENSES.md` (procedurální zvuky, nic staženo). Kontrolní skripty `tools/check_m8_18.sh`, `tools/check_m8_18.gd`.
+- Kontrola překladu (kap. 6) i `tools/shader_check.gd` (mobile, forward_plus): výstup prázdný.
+
+### Otevřené body
+- Čeká na ruční test a měření (`--perfscene=les_rano_kveten,30`, `rybnik_soumrak`, `les_cerven_noc`, `les_rano_mlha`;
+  cíl +≤ 0,2 ms CPU). Hlasitosti druhů a šumění korun jsou odhad – doladit uchem v F3 (Zvuková krajina – druhy).
+- Netopýři „u lamp“ = buňky obce (bez přímé vazby na polohu lamp `StreetLights`).
+- F2 → Příroda – ladění nemá oddíl zvukové krajiny (`Soundscape.debug_text()` je připravená, nenapojená).
+- Šumění potoka zůstává z M8.7 (`LocalClient._brook`); vzdálený vlak / silnice ne (nejsou v datech).
+- Žluva a niva závisí na `Site.hand` – bez `data/site.bin` niva = 0 (žluva se neozve).
+- Popisek F3 `village.mow_pitch` (tune_m8_17) říká „zpomalená pila“ – sekačka už má vlastní zvuk (nesahal jsem do cizího tune).

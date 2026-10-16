@@ -223,6 +223,26 @@ Semenný rok dubu a buku 1× za 3–6 let (F2 → Příroda – ladění → Pop
 louky u lesa (tmavá místa, zarostou za 40 dní) a škodí v kukuřici → drby a vnadění u krmelce pod posedem.
 Všechny konstanty: F3 → Zvěř/Stanoviště a Zvěř/Populace a škody (`scripts/dev/tune_m8_15.gd`).
 
+## Zvuková krajina a drobný život (krok M8.18)
+
+Zdroje zvuků přírody jsou v `data/zvuky_prirody.json` (úprava bez kódu, nebo živě F3 → Příroda/Zvuková krajina – druhy).
+Každý zdroj: zvuk (`NatureSfx.synth` – procedurální motiv, žádná nahrávka), typ (volání / smyčka / cvrček podle Dolbeara),
+aktivita v měsících, časová okna (minuty od východu `v` / západu `z` slunce nebo hodiny `h`), vhodnost stanoviště (les, okraj,
+louka, pole, obec, voda, nádrž, niva), hustota teritorií, hlasitost, dosah, interval, výška, teplota, útlum deštěm a větrem.
+
+| Skupina | Druhy (zvuk) | Kdy / kde |
+|---|---|---|
+| ranní chorál | kos (−65 min od východu), červenka (−55), drozd (−50), sýkora (−35), kukačka (−30, IV–VI), pěnkava (−15), budníček, hřivnáč (−10), žluva (0, V–VII, niva) | jaro–léto ráno a večer, les, okraj, obec |
+| celoročně / zima | sýkora koňadra, vrána, strakapoud (bubnování II–IV), puštík (noc, nejvíc I–III a X–XI) | les, pole, obec |
+| otevřená krajina | skřivan (smyčka z výšky 30–60 m, II–VIII), káně (den) | pole, louky |
+| hmyz | cvrček polní (V–VIII, rychlost = 7·T − 30 cvrknutí/min), kobylka zelená (VII–IX večer, ½ rychlosti), bzučení louky (× kvetení), komáři (soumrak u vody) | louky, voda |
+| obojživelníci | skokan zelený / hnědý (III–VI večer, > 8 °C), ropucha (III–IV, > 6 °C) | rybníky a tůně |
+| obec | pes (domácnosti se psem), kohout (domácnosti se slepicemi, ráno) | `World.households` |
+
+Drobný život (`scripts/priroda/small_life.gd`, konstanty F3 → Zvěř/Hmyz a drobný život): netopýři (IV–X, slunce pod −1,5°,
+> 8 °C, nad vodou a v obci), světlušky (7. 6.–15. 7., tma, > 14 °C, okraj lesa a niva), motýli (IV–IX, den, > 13 °C,
+kvetoucí louka), komáří roj (V–IX, soumrak, voda), jepice (5. 5.–15. 6., nad tekoucí vodou). Déšť a vítr je zruší.
+
 ## Lov zvěře – zásah, postřelení, úlovek (krok M2.9)
 
 Zvěř (`Animal`) po zásahu střelou (`Animal.shot(zóna, energie, odkud, info)`, volá `Hunting.animal_shot`) reaguje podle zóny z `Weapons.hit_zone`:

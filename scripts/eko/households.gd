@@ -126,7 +126,11 @@ static var MOW_EVERY_S := 0.65         # s mezi „zabručeními“ sekačky
 static var CHOP_VOL := -4.0            # dB u zdroje
 static var MOW_VOL := -13.0
 static var SOUND_ATTEN := 0.12         # dB/m útlum
-static var MOW_PITCH := 0.42           # sekačka = zpomalená pila
+static var MOW_PITCH := 1.0            # M8.18: sekačka má vlastní zvuk (NatureSfx „mower“); dřív 0,42 = zpomalená pila
+static var RAKE_EVERY_S := 1.3         # M8.18: s mezi tahy hrábí (± 20 %)
+static var SHOVEL_EVERY_S := 2.4       # M8.18: s mezi odhozením sněhu
+static var RAKE_VOL := -14.0           # M8.18: dB u zdroje
+static var SHOVEL_VOL := -10.0
 ## vesničan s modelem
 static var HIDE_INSIDE := true         # doma (spánek, jídlo, odpočinek) se schová do domu
 static var SNAP_DEEP := true           # za simulační bublinou se přesune rovnou na místo (bez chůze)
@@ -1330,7 +1334,11 @@ func _process(delta: float) -> void:
 				snd = "chop"
 				break
 			if a == "sekani":
-				snd = "saw"
+				snd = "mower"
+			elif a == "listi" and snd == "":
+				snd = "rake"                   # M8.18: hrabání listí
+			elif a == "snih" and snd == "":
+				snd = "shovel"                 # M8.18: odhazování sněhu
 		if snd == "":
 			_snd_next[i] = _clock_s + 1.0
 			continue
@@ -1340,9 +1348,13 @@ func _process(delta: float) -> void:
 		if snd == "chop":
 			_snd_next[i] = _clock_s + CHOP_EVERY_S * (0.85 + 0.3 * fposmod(float(i) * 0.37 + _clock_s, 1.0))
 			world.sound.emit(pos, "chop", 0.9 + 0.2 * fposmod(_clock_s * 3.1, 1.0), CHOP_VOL - dist * SOUND_ATTEN, SOUND_R)
-		else:
+		elif snd == "mower":
 			_snd_next[i] = _clock_s + MOW_EVERY_S
-			world.sound.emit(pos, "saw", MOW_PITCH, MOW_VOL - dist * SOUND_ATTEN, SOUND_R)
+			world.sound.emit(pos, "mower", MOW_PITCH, MOW_VOL - dist * SOUND_ATTEN, SOUND_R)
+		else:                                  # M8.18: hrábě / lopata (zvuky NatureSfx, Sfx „rake“ / „shovel“)
+			var rake := snd == "rake"
+			_snd_next[i] = _clock_s + (RAKE_EVERY_S if rake else SHOVEL_EVERY_S) * (0.8 + 0.4 * fposmod(float(i) * 0.61 + _clock_s, 1.0))
+			world.sound.emit(pos, snd, 0.9 + 0.2 * fposmod(_clock_s * 2.3, 1.0), (RAKE_VOL if rake else SHOVEL_VOL) - dist * SOUND_ATTEN, SOUND_R)
 
 
 func _refresh_near() -> void:

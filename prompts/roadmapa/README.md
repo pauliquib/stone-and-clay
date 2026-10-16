@@ -151,7 +151,7 @@ voda, vítr, světlo, mikroklima → stromy, rostliny, plodiny, zvěř → člov
 | [x] | M8.15 Ekologie a populace zvěře | [`M8_realismus/15_ekologie_zvere.md`](M8_realismus/15_ekologie_zvere.md) | M8.2, M8.3, M8.11 |
 | [x] | M8.16 Tělo 2: tepelná a energetická bilance, žízeň, pád | [`M8_realismus/16_telo_tepelna_a_energeticka_bilance.md`](M8_realismus/16_telo_tepelna_a_energeticka_bilance.md) | M8.9 |
 | [x] | M8.17 Život vesnice: domácnosti, potřeby, vztahy, drby | [`M8_realismus/17_zivot_vesnice.md`](M8_realismus/17_zivot_vesnice.md) | M8.1 |
-| [ ] | M8.18 Zvuková krajina a drobný život | [`M8_realismus/18_zvukova_krajina_a_drobny_zivot.md`](M8_realismus/18_zvukova_krajina_a_drobny_zivot.md) | M8.9, M8.11, M8.15 |
+| [x] | M8.18 Zvuková krajina a drobný život | [`M8_realismus/18_zvukova_krajina_a_drobny_zivot.md`](M8_realismus/18_zvukova_krajina_a_drobny_zivot.md) | M8.9, M8.11, M8.15 |
 | [ ] | M8.19 Kalibrace na realitu, výkon, uzavření | [`M8_realismus/19_kalibrace_vykon_uzavreni.md`](M8_realismus/19_kalibrace_vykon_uzavreni.md) | M8.1–M8.18 + měření uživatele |
 
 **Vlny (souběh):** 1: 8.1 · 2: 8.2 ∥ 8.5 ∥ 8.6 · 3: 8.3 ∥ 8.4 ∥ 8.7 · 4: 8.8 ∥ 8.9 ∥ 8.10 · 5: 8.11 ∥ 8.12 ∥ 8.13 ∥ 8.16 ·

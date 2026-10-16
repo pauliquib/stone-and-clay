@@ -4,6 +4,9 @@
 ## Pozorování = druh je do VIEW_R m a v zorném kuželu ±VIEW_HALF° (směr pohledu `Player.yaw`, na koni směr koně),
 ## nebo v dalekohledu (X) do SCOPE_R m v úzkém kuželu; mezi hráčem a zvířetem nesmí být překážka (paprsek).
 ## Včely se počítají u včelnice do BEES_R m, když právě létají; mravenci u mraveniště do ANTS_R m.
+## M8.18: druhy ze zvukové krajiny se zapisují i **uslyšené** (`hear` – volá `Soundscape`: kukačka, puštík, skřivan,
+## cvrček, žáby…) a drobný život **viděný** zblízka (`SmallLife`: netopýr, světluška, motýl, jepice); za první setkání
+## XP do Myslivosti (`XP_FIRST`; dovednost „Přírodovědec“ by vyžadovala zásah do tabulky dovedností).
 ## Z auta se nepozoruje. Kontrola běží 1× za TICK s. Uložení: `get_log` / `set_log` (SaveGame, klíč „nature_log“,
 ## chybějící klíč = prázdný deník).
 class_name NatureLog
@@ -14,7 +17,15 @@ const SPECIES := [
 	["zajic", "Zajíc polní"], ["srnec", "Srnec obecný"], ["divocak", "Prase divoké"], ["vrana", "Vrána"],
 	["kos", "Kos černý"], ["vlastovka", "Vlaštovka obecná"], ["kane", "Káně lesní"], ["vcely", "Včela medonosná"],
 	["mravenci", "Mravenec lesní"],
+	# M8.18 – uslyšené (Soundscape, data/zvuky_prirody.json) a drobný život (SmallLife)
+	["cervenka", "Červenka obecná"], ["drozd", "Drozd zpěvný"], ["sykora", "Sýkora koňadra"], ["penkava", "Pěnkava obecná"],
+	["budnicek", "Budníček menší"], ["hrivnac", "Holub hřivnáč"], ["kukacka", "Kukačka obecná"], ["skrivan", "Skřivan polní"],
+	["zluva", "Žluva hajní"], ["strakapoud", "Strakapoud velký"], ["pustik", "Puštík obecný"], ["cvrcek", "Cvrček polní"],
+	["kobylka", "Kobylka zelená"], ["skokan", "Skokan"], ["ropucha", "Ropucha obecná"], ["netopyr", "Netopýr"],
+	["svetluska", "Světluška"], ["motyl", "Motýli (bělásek, babočka)"], ["jepice", "Jepice"],
 ]
+## M8.18: XP do Myslivosti za první pozorování / uslyšení druhu.
+static var XP_FIRST := 15.0
 const VIEW_R := 60.0
 const VIEW_HALF := 35.0
 const SCOPE_R := 250.0
@@ -131,13 +142,27 @@ func _check(p: Player) -> void:
 				observe(p, "mravenci")
 
 
+## M8.18: první uslyšení druhu (Soundscape) – stejný zápis jako pozorování, jiná hláška.
+func hear(p: Player, key: String, label := "") -> void:
+	var l: Dictionary = logs.get(p.id, {})
+	if l.has(key):
+		return
+	observe(p, key, true, label)
+
+
 ## První pozorování druhu: zapíše se datum, hráč dostane zprávu.
-func observe(p: Player, key: String) -> void:
+func observe(p: Player, key: String, heard := false, label := "") -> void:
 	var l: Dictionary = logs.get(p.id, {})
 	if l.has(key):
 		return
 	l[key] = world.clock.date_text()
 	logs[p.id] = l
-	world.notify(p.id, "show_message", ["Nové pozorování: %s  (%d/%d)  – zapsáno do deníku [J]" % [name_of(key), l.size(), SPECIES.size()], 4.0])
+	var nm := name_of(key)
+	if nm == key and label != "":
+		nm = label
+	world.notify(p.id, "show_message", ["%s: %s  (%d/%d)  – zapsáno do deníku [J]" % [
+		"Nově uslyšeno" if heard else "Nové pozorování", nm, l.size(), SPECIES.size()], 4.0])
+	if XP_FIRST > 0.0:
+		world.give_xp(p.id, "myslivost", XP_FIRST, "pozorování přírody")
 	world.emit_game_event(p.id, "sfx", {"name": "pickup"})
 	world.emit_game_event(p.id, "nature_seen", {"species": key})

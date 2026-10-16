@@ -224,6 +224,16 @@ Sousedské vztahy a **drby z událostí** (i tvých činů) se šíří od hospo
 srazil srnce…“). F2 → Příroda – ladění → Domácnosti, vrstva mapy `obyvatele`; F3 → Člověk/Život vesnice. Měřicí scény
 `ves_rano_zima`, `ves_sobota_rijen`.
 
+**M8.18 Zvuková krajina a drobný život** (`Soundscape`, `SmallLife`, přepínač `soundscape` v Realismu, data
+`data/zvuky_prirody.json`): krajina se pozná se zavřenýma očima – ranní ptačí chorál podle druhu, měsíce a minut od východu
+slunce (kos první, kukačka v květnu, skřivan nad polem, žluva v lužním lese, puštík v noci), v zimě jen sýkory, vrány
+a strakapoud; cvrčci a kobylky cvrkají tím rychleji, čím je tepleji (Dolbearův zákon), louka v létě bzučí, u rybníků na jaře
+kvákají žáby, u vody za soumraku komáři, z obce pes a ráno kohout. Koruny šumí podle větru (smrčina syčí, bučina šustí), hustý
+les tlumí výšky, v údolí je ozvěna. Za soumraku létají netopýři, v červnu v teplé noci blikají světlušky, nad kvetoucí loukou
+motýli, nad potokem v květnu jepice. Všechny zvuky jsou procedurální (žádné nahrávky). Nové druhy se zapisují do deníku
+pozorování (J) i uslyšené. F3 → Příroda/Zvuková krajina, Zvěř/Hmyz a drobný život; měřicí scény `les_rano_kveten`,
+`rybnik_soumrak`, `les_cerven_noc`.
+
 ### Menu pro vývojáře (F3, M8.D)
 
 Esc → Nastavení → Vývoj → **Režim vývojáře** (výchozí vypnuto, `nastaveni.cfg`) odemkne **F3**: živé ladění

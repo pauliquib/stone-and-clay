@@ -474,6 +474,27 @@
   před N dny“. Popularitu M7 jen čte. Ukládá se klíč `households` (stav domů, změny vztahů proti seedu, drby s mapou znalostí).
   Ladění: F2 → Příroda – ladění → Domácnosti (nejbližší domy, kdo co dělá, potřeby, dřevo, kouř) a vrstva mapy `obyvatele`;
   F3 → Člověk/Život vesnice (+ „– činnosti“). Měřicí scény `ves_rano_zima`, `ves_sobota_rijen`.
+- **Zvuková krajina a drobný život** (M8.18, klient, přepínač `soundscape`; `scripts/priroda/soundscape.gd` `Soundscape`,
+  `small_life.gd` `SmallLife`, `shaders/small_life.gdshader`, data `data/zvuky_prirody.json`, syntéza `NatureSfx.synth`):
+  kolem kamery mřížka 40 m v okruhu 200 m; rysy buňky (les, okraj, louka, pole, obec, voda, nádrž, niva, podíl jehličnanů)
+  z `Fauna.forest_at/settle_at`, `TreeEco.canopy_at/species_near`, `Fields`, `Meadows`, `Site.dist_water/hand`,
+  `Water.ponds` se spočtou jednou (16 buněk za výběr). 22 zdrojů (13 ptáků – kos, červenka, drozd, sýkora, kukačka, skřivan,
+  pěnkava, budníček, hřivnáč, žluva, strakapoud, puštík, káně, vrána; cvrček, kobylka, bzučení louky, komáři; skokan,
+  ropucha; pes a kohout od domácností M8.17) má aktivitu = měsíc × časové okno (**minuty od východu / západu slunce**
+  NOAA, nebo hodiny) × teplota (`Microclimate.temp_at`) × déšť × vítr (× kvetení louky `Phenology.bees_bloom`);
+  teritorium v buňce stabilním hashem × hustota × vhodnost. Výběr 2×/s: odhad hlasitosti u posluchače (vzdálenost,
+  útlum lesem na spojnici, maskování větrem) → nejvýš 16 `AudioStreamPlayer3D` (pool, prolínání, ≤ 4 hlasy druhu)
+  na busu „Priroda“ s dozvukem (mokrý podíl podle `Site.tpi` – ozvěna v údolí, trochu v lese; v interiéru −20 dB,
+  v autě −12 dB); low-pass hlasu podle lesa na spojnici. **Cvrčci a kobylky podle Dolbearova zákona** (cvrknutí/min =
+  7·T − 30, T v místě zdroje). Dvě 2D vrstvy šumění korun (listnáče šustí, jehličnany syčí) podle `WindField.speed/gust_at`
+  a olistění `Phenology.foliage`. Zvuky (24 druhů × varianty ze seedu: motivy, trylky, opakování – žádné nahrávky) se
+  syntetizují ve vlákně `WorkerThreadPool` a do cache vloží jako PCM (`NatureSfx.put_pcm`). **Drobný život** (5 MultiMesh,
+  pohyb v shaderu z kotev 1×/s): netopýři za soumraku nad vodou a v obci, světlušky 7. 6.–15. 7. za tmy nad 14 °C na okraji
+  lesa a v nivě, motýli nad kvetoucí loukou, komáří roj nad vodou za soumraku, jepice nad potokem v květnu; déšť, vítr
+  a chlad je zruší. **Deník** J: první uslyšení (`NatureLog.hear`) a viděný drobný život (`observe`) s datem, +XP Myslivost.
+  Práce u domů (M8.17) mají vlastní zvuky: sekačka (motor), hrábě, lopata na sníh. F3 → Příroda/Zvuková krajina
+  (+ „– druhy“ = celá tabulka JSON), Zvěř/Hmyz a drobný život (`scripts/dev/tune_m8_18.gd`). Měřicí scény
+  `les_rano_kveten`, `rybnik_soumrak`, `les_cerven_noc` (profily „soundscape“, „small_life“).
 - **Pověst v obci** (`reputation.gd`, HUD vlevo, deník J): −100 až 100, stupně vážený občan / slušný soused /
   nenápadný / problémový / postrach vsi. Ubírá: řízení pod vlivem (i na kole, i bez svědků) a přes zákaz,
   zadržení policií, ujetí policii, sražení chodce či koně, nehody, poškození věcí, rychlá jízda obcí kolem
