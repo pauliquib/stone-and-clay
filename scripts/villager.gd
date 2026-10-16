@@ -9,9 +9,9 @@
 class_name Villager
 extends CharacterBody3D
 
-const PHYSICS_RANGE := 160.0
+static var PHYSICS_RANGE := 160.0
 ## Krok kinematického pohybu hluboce uspaného vesničana (za simulační bublinou World.sim_radius).
-const SLEEP_STEP := 0.5
+static var SLEEP_STEP := 0.5
 ## Kolik prvních spawnutých vesničanů dostane behavior strom (0 = BT nikdo; Fáze 3: testovací podmnožina).
 const BT_VILLAGERS := 5
 const BT_TREE := "res://ai/villager_routine.tres"
@@ -34,8 +34,49 @@ const JOB_PLACE := {
 ## = nepracuje tady, jen to slovo zní podobně).
 const JOB_EXCLUDE := ["býval", "soused", "okresn"]
 ## Po kolika zaseknutích cestou za jedním cílem z BT vesničan cíl vzdá (a na ~`BT_GIVEUP_S` s ho nezkouší).
-const BT_STUCK_MAX := 3
-const BT_GIVEUP_S := 90.0
+static var BT_STUCK_MAX := 3
+static var BT_GIVEUP_S := 90.0
+## M8.D2b: chování vesničana – dřív čísla v kódu, laditelné v menu F3 (Člověk / NPC a vesničané). Sdílené všemi
+## vesničany (`static var`, za snímek žádný registr ani alokace – desítky instancí).
+static var DEEP_K := 1.7               # × simulační bublina – za ní hluboký spánek (schovaný, ~2 Hz)
+static var GRAVITY := 20.0             # m/s² – pád vesničana (jako hráč)
+static var WALK_ACCEL := 8.0           # m/s² – rozjezd a brzdění chůze
+static var WALK_TURN := 5.0            # /s – natáčení do směru chůze
+static var SIDE_MIN := 2.9             # m od osy silnice – chodí při krajnici (nově vytvoření vesničané)
+static var SIDE_MAX := 3.6
+static var PATH_SIDE_K := 0.6          # × odstup na pěšině / polní cestě (skoro uprostřed)
+static var SPEED_DEFAULT := 1.3        # m/s – tempo chůze, když ho postava nemá v profilu (nově vytvoření)
+static var SPEED_JITTER := 0.07        # ± podíl náhodné odchylky tempa (nově vytvoření)
+static var ARRIVE_R := 1.3             # m – dosažení bodu trasy
+static var ARRIVE_LAST_R := 1.0        # m – dosažení cíle z behavior stromu (musí být menší než `arrive` v BT)
+static var TARGET_TOL := 3.0           # m – nový cíl z BT blíž než tohle = stejný cíl
+static var PAUSE_P := 0.06             # šance zastavení na křižovatce
+static var PAUSE_MIN := 2.0            # s
+static var PAUSE_MAX := 6.0            # s
+static var STUCK_V := 0.25             # m/s – pod touto rychlostí (a s cílem) je zaseknutý
+static var STUCK_S := 2.0              # s zaseknutí, než se otočí / přeplánuje
+static var AVOID_R := 1.6              # m – neprojde skrz hráče, který stojí v cestě
+static var GREET_R := 3.2              # m – pozdraví hráče
+static var GREET_S := 3.5              # s – délka pozdravu
+static var GREET_CD := 14.0            # s – znovu pozdraví nejdřív za
+static var WAVE_S := 1.7               # s – mává na začátku repliky
+static var TALK_TURN := 6.0            # /s – otočení k hráči při hovoru
+static var WAIT_R := 11.0              # m – čeká na odpověď hráče, dokud je blíž
+static var WAIT_TURN := 4.0            # /s – otočení k hráči při čekání
+static var SAY_BASE_S := 2.0           # s – délka repliky: základ
+static var SAY_CHARS_PER_S := 14.0     # znaků za s čtení
+static var SAY_MIN_S := 3.5
+static var SAY_MAX_S := 9.0
+static var SAY_CD := 10.0              # s – po replice nezdraví
+static var FLEE_SPEED := 4.6           # m/s – útěk před střelbou
+static var FLEE_ACCEL := 12.0          # m/s² – rozběh při útěku
+static var FLEE_TURN := 8.0            # /s – otočení při útěku
+static var KNOCK_S := 4.0              # s ležení po sražení autem
+static var KNOCK_PER_V := 0.2          # s navíc za m/s nárazu
+static var KNOCK_DECEL := 6.0          # m/s² – dobrzdění sraženého
+static var PROMILE_DECAY := 0.01       # ‰/s reálně – vystřízlivění (zjednodušené)
+static var DRUNK_FULL_PROMILE := 2.0   # ‰ – plné potácení
+static var GARDEN_D := 4.0             # m před domem – zahrada (BT)
 
 var graph: RoadGraph
 var terrain: Terrain
@@ -94,8 +135,8 @@ func setup(g: RoadGraph, t: Terrain, w: Node, start_node: int, seed_: int, prof:
 	_cur = start_node
 	_next = graph.next_node(_cur, -1, rng)
 	# chodí při krajnici (auta jezdí 1–1,6 m od osy silnice)
-	_side = rng.randf_range(2.9, 3.6) * (1.0 if rng.randf() < 0.5 else -1.0)
-	_speed = float(prof.get("speed", 1.3)) * rng.randf_range(0.93, 1.07)
+	_side = rng.randf_range(SIDE_MIN, SIDE_MAX) * (1.0 if rng.randf() < 0.5 else -1.0)
+	_speed = float(prof.get("speed", SPEED_DEFAULT)) * rng.randf_range(1.0 - SPEED_JITTER, 1.0 + SPEED_JITTER)
 	var n := graph.nodes[_cur]
 	position = Vector3(n.x, terrain.height_at(n.x, n.y) + 0.1, n.y)
 
@@ -212,7 +253,7 @@ func _home_pos() -> Vector3:
 func _garden_pos() -> Vector3:
 	if _bt_home == Vector3.INF:
 		return Vector3.INF
-	var g := _bt_home + _bt_home_normal * 4.0
+	var g := _bt_home + _bt_home_normal * GARDEN_D
 	g.y = terrain.height_at(g.x, g.z)
 	return g
 
@@ -258,9 +299,9 @@ func move_to(target: Vector3) -> bool:
 		return false
 	# cíl, který vesničan po opakovaném zaseknutí vzdal, chvíli nezkouší (A4-03) → BT akce selže
 	if _bt_giveup_pos != Vector3.INF and Time.get_ticks_msec() < _bt_giveup_until \
-			and _bt_giveup_pos.distance_to(target) <= 3.0:
+			and _bt_giveup_pos.distance_to(target) <= TARGET_TOL:
 		return false
-	if _bt_target_pos == Vector3.INF or _bt_target_pos.distance_to(target) > 3.0:
+	if _bt_target_pos == Vector3.INF or _bt_target_pos.distance_to(target) > TARGET_TOL:
 		_bt_target_pos = target
 		_bt_path = PackedVector3Array()
 		_bt_path_i = 0
@@ -304,7 +345,7 @@ func _bt_step() -> Vector3:
 		var last := _bt_path_i == _bt_path.size() - 1
 		# poslední bod <1,0 m: musí být menší než `arrive` v BT akcích Jdi na… (1,5+), jinak
 		# by vesničan zaparkoval na okraji a BT úkol zůstal navždy RUNNING
-		if d.length() < (1.0 if last else 1.3):
+		if d.length() < (ARRIVE_LAST_R if last else ARRIVE_R):
 			_bt_path_i += 1
 			continue
 		return Vector3(d.x, 0, d.y).normalized() * _speed
@@ -328,7 +369,7 @@ func _physics_impl(delta) -> void:
 	# plynule, levné), >1.7×simr hluboký spánek = schovaný vizuál, chůze ~2 Hz
 	var simr: float = world.sim_radius if world != null else 320.0
 	if dist > simr and _knocked <= 0.0 and _flee_t <= 0.0:
-		if dist > simr * 1.7:
+		if dist > simr * DEEP_K:
 			if not _deep:
 				_deep = true
 				_visual.visible = false
@@ -366,14 +407,14 @@ func _physics_impl(delta) -> void:
 		_name_label.visible = true
 	_talk_cool = maxf(_talk_cool - delta, 0.0)
 	if promile > 0.0:
-		promile = maxf(promile - delta * 0.01, 0.0)   # ~0,6 ‰ za reálnou minutu (Fáze 3)
+		promile = maxf(promile - delta * PROMILE_DECAY, 0.0)   # ~0,6 ‰ za reálnou minutu (Fáze 3)
 
 	# --- sražený autem: leží, pak vstane
 	if _knocked > 0.0:
 		_knocked -= delta
-		velocity.x = move_toward(velocity.x, 0.0, 6.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, 6.0 * delta)
-		velocity.y -= 20.0 * delta
+		velocity.x = move_toward(velocity.x, 0.0, KNOCK_DECEL * delta)
+		velocity.z = move_toward(velocity.z, 0.0, KNOCK_DECEL * delta)
+		velocity.y -= GRAVITY * delta
 		move_and_slide()
 		if global_position.y < terrain.height_at(global_position.x, global_position.z) - 1.0:
 			global_position.y = terrain.height_at(global_position.x, global_position.z) + 0.3
@@ -387,11 +428,11 @@ func _physics_impl(delta) -> void:
 		var away := global_position - _flee_from
 		away.y = 0.0
 		away = away.normalized() if away.length() > 0.1 else Vector3.FORWARD
-		var run := away * 4.6
-		_yaw = lerp_angle(_yaw, atan2(run.x, run.z), 1.0 - exp(-8.0 * delta))
-		velocity.x = move_toward(velocity.x, run.x, 12.0 * delta)
-		velocity.z = move_toward(velocity.z, run.z, 12.0 * delta)
-		velocity.y = -0.5 if is_on_floor() else velocity.y - 20.0 * delta
+		var run := away * FLEE_SPEED
+		_yaw = lerp_angle(_yaw, atan2(run.x, run.z), 1.0 - exp(-FLEE_TURN * delta))
+		velocity.x = move_toward(velocity.x, run.x, FLEE_ACCEL * delta)
+		velocity.z = move_toward(velocity.z, run.z, FLEE_ACCEL * delta)
+		velocity.y = -0.5 if is_on_floor() else velocity.y - GRAVITY * delta
 		move_and_slide()
 		_visual.rotation.y = _yaw
 		_visual.speed = Vector3(velocity.x, 0, velocity.z).length()
@@ -402,10 +443,10 @@ func _physics_impl(delta) -> void:
 		return
 	# --- pozdrav
 	var in_car: bool = player != null and player.get("car") != null
-	if dist < 3.2 and _talk_cool <= 0.0 and _talk <= 0.0 and not in_car:
-		_talk = 3.5
+	if dist < GREET_R and _talk_cool <= 0.0 and _talk <= 0.0 and not in_car:
+		_talk = GREET_S
 		_talk_len = _talk
-		_talk_cool = 14.0
+		_talk_cool = GREET_CD
 		_label.text = Dialog.greet(world.dialog_context(int(player.get("id")), self))
 		_label.visible = true
 	var desired := Vector3.ZERO
@@ -415,15 +456,15 @@ func _physics_impl(delta) -> void:
 		_bt_inst.update(delta)
 	if _talk > 0.0:
 		_talk -= delta
-		_yaw = lerp_angle(_yaw, atan2(to_player.x, to_player.z), 1.0 - exp(-6.0 * delta))
-		_visual.waving = _talk > _talk_len - 1.7
+		_yaw = lerp_angle(_yaw, atan2(to_player.x, to_player.z), 1.0 - exp(-TALK_TURN * delta))
+		_visual.waving = _talk > _talk_len - WAVE_S
 		if _talk <= 0.0:
 			_label.visible = false
 			_visual.waving = false
 	elif _wait > 0.0:
 		_wait -= delta
-		if dist < 11.0:
-			_yaw = lerp_angle(_yaw, atan2(to_player.x, to_player.z), 1.0 - exp(-4.0 * delta))
+		if dist < WAIT_R:
+			_yaw = lerp_angle(_yaw, atan2(to_player.x, to_player.z), 1.0 - exp(-WAIT_TURN * delta))
 		else:
 			_wait = 0.0     # hráč zatím odešel daleko, nečekej nadarmo
 	elif _pause > 0.0:
@@ -435,15 +476,15 @@ func _physics_impl(delta) -> void:
 		else:
 			var goal := _goal()
 			var d := Vector2(goal.x - global_position.x, goal.y - global_position.z)
-			if d.length() < 1.3:
+			if d.length() < ARRIVE_R:
 				_advance()
 			else:
 				desired = Vector3(d.x, 0, d.y).normalized() * _speed
 		if desired.length() > 0.1:
 			# neprojít skrz hráče
-			if dist < 1.6 and to_player.normalized().dot(desired.normalized()) > 0.5:
+			if dist < AVOID_R and to_player.normalized().dot(desired.normalized()) > 0.5:
 				desired = Vector3.ZERO
-			_yaw = lerp_angle(_yaw, atan2(desired.x, desired.z), 1.0 - exp(-5.0 * delta)) \
+			_yaw = lerp_angle(_yaw, atan2(desired.x, desired.z), 1.0 - exp(-WALK_TURN * delta)) \
 				if desired.length() > 0.1 else _yaw
 
 	if dist > PHYSICS_RANGE:
@@ -452,17 +493,17 @@ func _physics_impl(delta) -> void:
 		global_position.y = terrain.height_at(global_position.x, global_position.z)
 		velocity = desired
 	else:
-		velocity.x = move_toward(velocity.x, desired.x, 8.0 * delta)
-		velocity.z = move_toward(velocity.z, desired.z, 8.0 * delta)
+		velocity.x = move_toward(velocity.x, desired.x, WALK_ACCEL * delta)
+		velocity.z = move_toward(velocity.z, desired.z, WALK_ACCEL * delta)
 		if is_on_floor():
 			velocity.y = -0.5
 		else:
-			velocity.y -= 20.0 * delta
+			velocity.y -= GRAVITY * delta
 		move_and_slide()
 		# zaseknutý (plot, strom, hráč) → otočit se
-		if desired.length() > 0.1 and Vector3(velocity.x, 0, velocity.z).length() < 0.25:
+		if desired.length() > 0.1 and Vector3(velocity.x, 0, velocity.z).length() < STUCK_V:
 			_stuck += delta
-			if _stuck > 2.0:
+			if _stuck > STUCK_S:
 				_stuck = 0.0
 				if _bt_target_pos != Vector3.INF:
 					# zaseknutý cestou za cílem z BT → přeskoč bod a naplánuj trasu znovu odsud;
@@ -489,7 +530,7 @@ func _physics_impl(delta) -> void:
 	_visual.rotation.y = _yaw
 	_visual.speed = Vector3(velocity.x, 0, velocity.z).length()
 	_visual.on_floor = true
-	_visual.drunk = clampf(promile / 2.0, 0.0, 1.0)   # Fáze 3: potácení podle promile
+	_visual.drunk = clampf(promile / DRUNK_FULL_PROMILE, 0.0, 1.0)   # Fáze 3: potácení podle promile
 
 
 ## Pohyb hluboce uspaného vesničana (za simulační bublinou): posun po grafu / trase BT jedním
@@ -506,7 +547,7 @@ func _deep_step(delta: float) -> void:
 	else:
 		var goal := _goal()
 		var d := Vector2(goal.x - global_position.x, goal.y - global_position.z)
-		if d.length() < 1.3:
+		if d.length() < ARRIVE_R:
 			_advance()
 		else:
 			desired = Vector3(d.x, 0, d.y).normalized() * _speed
@@ -522,7 +563,7 @@ func _goal() -> Vector2:
 	var b := graph.nodes[_next]
 	var dir := (b - a).normalized()
 	# na silnici při krajnici, na pěšině / polní cestě uprostřed
-	var side := _side if graph.edge(_cur, _next) in RoadGraph.CAR_KINDS else signf(_side) * 0.6
+	var side := _side if graph.edge(_cur, _next) in RoadGraph.CAR_KINDS else signf(_side) * PATH_SIDE_K
 	return b + Vector2(-dir.y, dir.x) * side
 
 
@@ -531,8 +572,8 @@ func _advance() -> void:
 	_prev = _cur
 	_cur = _next
 	_next = nxt
-	if rng.randf() < 0.06:
-		_pause = rng.randf_range(2.0, 6.0)
+	if rng.randf() < PAUSE_P:
+		_pause = rng.randf_range(PAUSE_MIN, PAUSE_MAX)
 
 
 ## Rozhovor (E): drb z vesnice.
@@ -547,9 +588,9 @@ func talk() -> String:
 func say(text: String, dur := -1.0) -> void:
 	if _knocked > 0.0:
 		return
-	_talk = dur if dur > 0.0 else clampf(2.0 + text.length() / 14.0, 3.5, 9.0)
+	_talk = dur if dur > 0.0 else clampf(SAY_BASE_S + text.length() / SAY_CHARS_PER_S, SAY_MIN_S, SAY_MAX_S)
 	_talk_len = _talk
-	_talk_cool = maxf(_talk_cool, 10.0)
+	_talk_cool = maxf(_talk_cool, SAY_CD)
 	_label.text = text
 	_label.visible = true
 
@@ -577,7 +618,7 @@ func flee_from(src: Vector3, dur := 8.0) -> void:
 
 ## Sražení autem.
 func knock(vel: Vector3, spd: float) -> void:
-	_knocked = 4.0 + spd * 0.2
+	_knocked = KNOCK_S + spd * KNOCK_PER_V
 	velocity = vel
 	_visual.pose = "lie"
 	_visual.waving = false

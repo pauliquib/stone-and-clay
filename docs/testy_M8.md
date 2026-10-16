@@ -424,3 +424,22 @@ snímek nečte); s otevřeným menu F3 jen cena UI.
    váha soudržnosti“ 0,15 → 2 → letící hejno vran se drží v chumlu; „Vyrušení – vrány na zemi do“ 18 → 50.
 6. Výchozí (vše) → vše zpět; konzole bez chyb; s desítkami zvířat v okolí výkon jako před krokem (F2 výkon /
    `--perfscene`, kategorie `animal`, `flock`).
+### M8.D2b – Člověk a Činnosti
+
+Kategorie **Člověk** (382 parametrů: Pohyb hráče, Tělo, Chůze a postoj, NPC a vesničané, Pes) a **Činnosti** (371:
+Rybaření, Lov a balistika, Oheň a požáry, Těžba a řemesla, Návykové látky a efekty). Výchozí stav se nesmí lišit od hry
+před krokem.
+
+1. Bez zásahu do menu: chůze, sprint, skok, skluz, plavání, skateboard, rybaření, střelba, oheň a kácení se chovají
+   stejně jako dřív (žádný parametr F3 není zvýrazněný, konzole bez chyb).
+2. F3 → Člověk → Pohyb hráče: „Rychlost – chůze“ 4,6 → 9 a „Skok – rychlost výskoku“ 6,6 → 12 → hned rychlejší chůze
+   a vysoký skok; „Skok – gravitace hráče“ 20 → 8 → skok jako na Měsíci; ↺ vše vrátí.
+3. Člověk → Chůze a postoj: „Chůze – boční posun pánve“ 0,045 → 0,15 a „Chůze – protipohyb paží“ → 2 → hráč i vesničané
+   se viditelně kolébají a mávají rukama; Člověk → NPC: „Hovor – pozdraví hráče do“ 3,2 → 15 → vesničan zdraví z dálky.
+4. Člověk → Tělo: „Opilost – odbourávání alkoholu“ 0,15 → 2 → promile v HUD rychle klesají; „Chlad – prochládání“ ×10
+   v zimě → HUD „prochladl jsi“ za chvíli. Pes: „Pes – všimne si hráče do“ 16 → 60 → pes běží za hráčem z dálky.
+5. Činnosti → Rybaření: „Záběr – průměrná doba čekání“ 40 → 2 → záběr skoro hned; „Zdolávání – růst napětí při
+   navíjení“ ×3 → vlasec praská. Lov a balistika: „Puška – úsťová rychlost“ 800 → 100 → kulka na 100 m výrazně padá;
+   „Balistika – gravitace střel“ 0 → šíp letí rovně.
+6. Činnosti → Oheň a požáry: „Zapálení – základní šance“ 0,9 → 0,05 → oheň skoro nechytne; „Ohniště – teplo končí v“
+   3 → 10 m → hřeje z dálky. Těžba a řemesla: „Kácení – doba: základ“ 0,8 → 0,1 → kácení výrazně kratší. Výchozí (vše) → zpět.

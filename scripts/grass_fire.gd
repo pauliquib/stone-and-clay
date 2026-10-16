@@ -6,13 +6,15 @@
 class_name GrassFire
 extends Node3D
 
-const MAX_R := 30.0                # m – největší poloměr
-const BURN_MIN := 20.0             # herní minuty od vzniku do dohoření (DOPLNIT: 1 herní min = 2 s, laditelné)
-const GROW_MIN := 8.0              # herní minuty, za které oheň dorostne do plné velikosti
-const START_R := 1.5
-const SUPPRESS_K := 0.55           # jedno hašení zmenší poloměr na tolik
-const OUT_R := 1.8                 # pod tímto poloměrem oheň zhasne
-const BURN_DPS := 4.0              # zranění za sekundu uvnitř kruhu
+static var MAX_R := 30.0                # m – největší poloměr
+static var BURN_MIN := 20.0             # herní minuty od vzniku do dohoření (DOPLNIT: 1 herní min = 2 s, laditelné)
+static var GROW_MIN := 8.0              # herní minuty, za které oheň dorostne do plné velikosti
+static var START_R := 1.5
+static var SUPPRESS_K := 0.55           # jedno hašení zmenší poloměr na tolik
+static var OUT_R := 1.8                 # pod tímto poloměrem oheň zhasne
+static var BURN_DPS := 4.0              # zranění za sekundu uvnitř kruhu
+## M8.D2b: laditelné v menu F3 (Činnosti / Oheň a požáry).
+static var START_SIZE_K := 0.5          # požár na začátku míří k tomuto podílu největšího poloměru
 const MAX_EMITTERS := 14
 const ACTIVE_R := 260.0
 
@@ -99,7 +101,7 @@ func advance(dm: float) -> bool:
 		return true
 	age += dm
 	var k := clampf(age / GROW_MIN, 0.0, 1.0)
-	var full := MAX_R * (0.5 + 0.5 * k)              # plná velikost roste s věkem
+	var full := MAX_R * (START_SIZE_K + (1.0 - START_SIZE_K) * k)              # plná velikost roste s věkem
 	if not suppressed:
 		radius = maxf(radius, lerpf(START_R, full, k))
 	peak_r = maxf(peak_r, radius)

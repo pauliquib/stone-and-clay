@@ -8,12 +8,15 @@
 class_name Fire
 extends Node3D
 
-const WOOD_MIN := {"polena": 25.0, "vetve": 8.0, "vetve_cerstve": 3.0}     # herní minuty hoření na 1 kus (čerstvé hoří krátce a kouří)
-const MAX_FUEL := 300.0                              # herní minuty (strop přikládání)
-const EMBER_MIN := 20.0                              # doba žhavých uhlíků po dohoření
-const RAIN_K := 2.0                                  # déšť (0..1) zrychlí hoření až na 3×
-const HEAT_R_FULL := 1.5                             # m – plné teplo
-const HEAT_R := 3.0                                  # m – teplo končí
+static var WOOD_MIN := {"polena": 25.0, "vetve": 8.0, "vetve_cerstve": 3.0}     # herní minuty hoření na 1 kus (čerstvé hoří krátce a kouří)
+static var MAX_FUEL := 300.0                              # herní minuty (strop přikládání)
+static var EMBER_MIN := 20.0                              # doba žhavých uhlíků po dohoření
+static var RAIN_K := 2.0                                  # déšť (0..1) zrychlí hoření až na 3×
+static var HEAT_R_FULL := 1.5                             # m – plné teplo
+static var HEAT_R := 3.0                                  # m – teplo končí
+## M8.D2b: laditelné v menu F3 (Činnosti / Oheň a požáry).
+static var EMBER_HEAT := 0.4                           # teplo žhavých uhlíků (× plný oheň)
+static var HEAT_DY := 2.5                              # m – teplo jen do tohoto výškového rozdílu
 const ACTIVE_R := 130.0                              # m – vizuál (částice, světlo, zvuk) jen do této vzdálenosti
 const RING_R := 0.55
 
@@ -144,10 +147,10 @@ func advance(dm: float, rain: float) -> void:
 
 ## Teplo pro postavu na místě `p` (0..1): plné do `HEAT_R_FULL`, k nule do `HEAT_R`; uhlíky hřejí slaběji.
 func heat_at(p: Vector3) -> float:
-	if not is_hot() or absf(p.y - global_position.y) > 2.5:
+	if not is_hot() or absf(p.y - global_position.y) > HEAT_DY:
 		return 0.0
 	var d := Vector2(p.x - global_position.x, p.z - global_position.z).length()
-	var k := 1.0 if fuel > 0.0 else 0.4
+	var k := 1.0 if fuel > 0.0 else EMBER_HEAT
 	return k * clampf((HEAT_R - d) / (HEAT_R - HEAT_R_FULL), 0.0, 1.0)
 
 

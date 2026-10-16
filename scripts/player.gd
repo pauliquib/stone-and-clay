@@ -28,27 +28,137 @@ const SHAKE_COLD_AMP := 0.003        # amplituda při plném prochladnutí
 const SHAKE_COLD_MAX := 0.003        # pevný strop třesu zimou
 const SHAKE_FREQ := 9.0              # rychlost chvění (vstup do šumu: _t × tato hodnota)
 
-@export var walk_speed := 4.6
-@export var sprint_speed := 8.4
-@export var crouch_speed := 2.2
-@export var ground_accel := 48.0
-@export var ground_decel := 38.0
-@export var turn_accel := 80.0
-@export var air_accel := 11.0
-@export var jump_velocity := 6.6
-@export var gravity := 20.0
-@export var fall_multiplier := 1.55
-@export var low_jump_multiplier := 2.3
-@export var coyote_time := 0.13
-@export var jump_buffer_time := 0.14
-@export var slide_boost := 1.8
-@export var slide_friction := 3.2
+## M8.D2b: pohyb hráče je laditelný (F3 → Člověk / Pohyb hráče) – sdílený všemi hráči (`static var`).
+static var walk_speed := 4.6
+static var sprint_speed := 8.4
+static var crouch_speed := 2.2
+static var ground_accel := 48.0
+static var ground_decel := 38.0
+static var turn_accel := 80.0
+static var air_accel := 11.0
+static var jump_velocity := 6.6
+static var gravity := 20.0
+static var fall_multiplier := 1.55
+static var low_jump_multiplier := 2.3
+static var coyote_time := 0.13
+static var jump_buffer_time := 0.14
+static var slide_boost := 1.8
+static var slide_friction := 3.2
 @export var mouse_sensitivity := 0.0024
+
+## M8.D2b: čísla, která dřív byla přímo ve vzorcích pohybu – laditelné v menu F3 (Člověk / Pohyb hráče, Činnosti).
+## Výchozí hodnoty = původní čísla (chování beze změny). Za snímek se čte jen `static var`, registr nikdy.
+static var WALK_FLOOR_ANGLE := 46.0         # ° – nejstrmější svah, po kterém se dá jít (víc = sjíždí); po startu / seskoku ze skateboardu
+static var WALK_GRIP_MIX := 0.75            # kolik z přilnavosti povrchu (mokro, led) dostanou podrážky (0 = vůbec, 1 = jako pneu)
+static var STAMINA_SPRINT_DRAIN := 0.11     # /s – úbytek výdrže při sprintu (× tělo)
+static var STAMINA_REGEN := 0.2             # /s – obnova výdrže
+static var STAMINA_REGEN_DELAY := 0.9       # s – po námaze se výdrž chvíli neobnovuje
+static var STAMINA_UNLOCK := 0.3            # vyčerpaný hráč smí sprintovat až od tohoto podílu max. výdrže
+static var SLIDE_MIN_V := 6.0               # m/s – přikrčení ze sprintu nad touto rychlostí = skluz
+static var SLIDE_END_V := 2.6               # m/s – skluz končí pod touto rychlostí
+static var SLIDE_MAX_S := 1.4               # s – nejdelší skluz
+static var SLIDE_DOWNHILL := 0.9            # × g – zrychlení skluzu z kopce
+static var SLIDE_GRIP_MIX := 0.7            # jak moc kluzký povrch prodlouží skluz
+static var SLIDE_STEER := 2.0               # m/s² – řízení ve skluzu
+static var SLIDE_JUMP_BONUS := 0.6          # m/s – výskok ze skluzu je vyšší
+static var BUSY_SPEED := 1.6                # m/s – nejvyšší rychlost při pití / jídle
+static var WADE_SLOW_DEPTH := 0.6           # m – hloubka brodu, ve které voda brzdí nejvíc
+static var WADE_SLOW_MIN := 0.4             # × rychlost – v plné hloubce brodu
+static var SWIM_SPRINT_DRAIN := 0.12        # /s – úbytek výdrže při rychlém plavání
+static var SWIM_VY_ACCEL := 9.0             # m/s² – jak rychle se mění svislá rychlost při plavání
+static var FALLEN_DECEL := 6.0              # m/s² – ležící hráč na zemi dobrzdí
+static var FALLEN_AIR_DECEL := 1.0          # m/s² – ležící hráč ve vzduchu
+static var AIR_DRAG := 0.08                 # /s – odpor vzduchu ve skoku
+static var TERMINAL_VY := 55.0              # m/s – nejvyšší rychlost pádu
+static var STEEP_DEG := 38.0                # ° – od tohoto sklonu hráč ze svahu sjíždí
+static var STEEP_SLIDE_K := 0.6             # × g – zrychlení sjíždění z příkrého svahu
+static var CROUCH_RATE := 5.0               # m/s – rychlost změny výšky kapsle (přikrčení / vstávání)
+static var SPRINT_DETECT := 0.8             # m/s nad chůzí – „sprintuje“ (zvuky, dovednosti, svědci)
+static var PUSH_K := 0.9                    # impulz do fyzikálního předmětu při strčení (× rychlost)
+static var PUSH_UP_K := 0.3                 # svislá složka strčení
+static var PUSH_HIT_K := 0.8                # síla „nárazu“ předmětu (rozbití, zvuk) × rychlost
+static var BREATH_REGEN := 3.0              # s dechu za s nad hladinou
+static var KCAL_WALK := 250.0               # kcal/h herní – chůze
+static var KCAL_SPRINT := 700.0             # kcal/h herní – běh
+static var KCAL_MOVE_V := 0.5               # m/s – od této rychlosti se počítá chůze
+static var KCAL_RUN_V := 6.0                # m/s – od této rychlosti běh
+static var SNOW_WET_K := 0.35               # sněžení promáčí jen z části (× déšť)
+static var WADE_WET_FROM := 0.2             # m – od této hloubky brodu se promáčí oblečení
+static var WADE_WET_K := 1.5                # promoknutí = hloubka × tohle
+static var FALL_HURT_PER_M := 9.0           # zdraví za každý metr pádu nad bezpečnou výšku
+static var FALL_DOWN_S := 1.5               # s ležení po tvrdém dopadu
+static var FALL_DOWN_PER_M := 0.25          # s ležení navíc za metr pádu
+static var KNOCK_HURT_K := 0.4              # zranění při sražení autem = k × v²
+static var KNOCK_LIGHT_V := 5.0             # m/s – pod touto rychlostí je sražení lehké
+static var KNOCK_LIGHT_S := 1.2             # s ležení po lehkém sražení
+static var KNOCK_FALL_S := 3.0              # s ležení po sražení
+static var KNOCK_FALL_PER_V := 0.1          # s ležení navíc za m/s
+static var BOTTLE_BREAK_P := 0.25           # šance rozbití lahve při pádu
+static var BOTTLE_BREAK_PER_V := 0.08       # + za m/s rychlosti
+static var BOTTLE_BREAK_MAX := 0.85         # strop šance rozbití lahve
+static var DRUNK_DELAY_K := 0.1             # s zpoždění reakcí na 1 ‰
+static var DRUNK_DELAY_MAX := 0.45          # s – strop zpoždění reakcí
+static var DRUNK_DRIFT_FROM := 0.35         # ‰ – od kdy opilého táhne do stran
+static var DRUNK_DRIFT_K := 1.05            # síla driftu na ‰ nad prahem
+static var DRUNK_DRIFT_SIDE := 1.6          # m/s – drift do stran
+static var DRUNK_DRIFT_FWD := 0.6           # m/s – drift dopředu / dozadu
+static var DRUNK_ACCEL_LOSS := 0.5          # o kolik opilost (1,0) zhorší rozjezd
+static var DRUNK_BRAKE_LOSS := 0.6          # o kolik opilost (1,0) zhorší brzdění a obrat
+static var DRUNK_JUMP_FALL_FROM := 1.5      # ‰ – od kdy opilý skok končí pádem
+static var DRUNK_JUMP_FALL_K := 0.35        # šance pádu po skoku na ‰ nad prahem
+static var WALL_BUMP_V := 5.0               # m/s – opilý náraz do zdi od rychlosti
+static var WALL_BUMP_PROMILE := 1.0         # ‰ – od kdy opilý naráží do zdí
+static var WALL_BUMP_CD := 1.5              # s – nejkratší rozestup nárazů
+static var WALL_BUMP_HURT := 0.8            # zdraví za m/s nárazu
+static var WALL_BUMP_FALL_PROMILE := 1.6    # ‰ – od kdy po nárazu upadne
+static var WALL_BUMP_FALL_S := 1.8          # s ležení po nárazu
+static var DRUNK_LAND_PROMILE := 1.4        # ‰ – od kdy opilý dopad končí pádem
+static var DRUNK_LAND_DROP := 2.0           # m – opilý pád až od této výšky
+static var DRUNK_LAND_BASE := 1.2           # ‰ – základ šance pádu po dopadu
+static var DRUNK_LAND_K := 0.4              # šance pádu po dopadu na ‰ nad základem
+static var DRUNK_LAND_S := 2.0              # s ležení po opilém dopadu
+static var STUMBLE_PROMILE := 1.2           # ‰ – od kdy opilý zakopává
+static var STUMBLE_RATE := 0.06             # /s šance zakopnutí na ‰ nad prahem
+static var STUMBLE_SPEED_K := 0.35          # + za m/s rychlosti
+static var STUMBLE_SPRINT_K := 2.5          # × při sprintu
+static var STUMBLE_SLOPE := 0.25            # rad – od tohoto sklonu terénu se zakopává víc
+static var STUMBLE_SLOPE_K := 1.6           # × na svahu
+static var STUMBLE_IDLE_K := 0.2            # × ve stoje
+static var STUMBLE_IDLE_PROMILE := 2.4      # ‰ – nad touto hladinou padá i ve stoje naplno
+static var STUMBLE_FORCE_S := 30.0          # s – nejdéle bez zakopnutí při silné opilosti
+static var STUMBLE_FORCE_PROMILE := 2.0     # ‰ – silná opilost (vynucené zakopnutí)
+static var STUMBLE_CD := 2.5                # s – nejkratší rozestup zakopnutí
+static var STUMBLE_FALL_PROMILE := 1.7      # ‰ – nad touto hladinou zakopnutí = pád
+static var STUMBLE_FALL_V := 5.0            # m/s – nad touto rychlostí zakopnutí = pád
+static var STUMBLE_HURT_FROM := 2.5         # m/s – zranění při pádu ze zakopnutí od rychlosti
+static var STUMBLE_HURT_K := 1.5            # zdraví za m/s nad prahem
+static var STUMBLE_FALL_S := 2.2            # s ležení po zakopnutí
+static var STUMBLE_FALL_PER_PROMILE := 0.3  # s ležení navíc za ‰
+static var STAGGER_V := 2.5                 # m/s – nejvyšší boční zavrávorání
+static var BOARD_SIDE_DAMP := 8.0           # m/s² – útlum bočního skluzu desky
+static var BOARD_TURN_FULL_V := 2.5         # m/s – od této rychlosti zatáčí deska naplno
+static var BOARD_ROUGH_DRAG := 6.0          # m/s² – odpor navíc na kluzkém / nerovném povrchu (× (1 − přilnavost))
+static var BOARD_PUSH_GRIP_MIN := 0.3       # nejmenší účinnost odrazu na kluzkém povrchu
+static var BOARD_WOBBLE_HZ := 14.0          # rad/s – kmitání desky při vysoké rychlosti
+static var BOARD_WOBBLE_AMP := 1.6          # m/s² – síla kmitání desky
+static var BOARD_ROUGH_FALL_V := 2.5        # m/s – nad touto rychlostí na nerovném povrchu přepadneš
+static var BOARD_ROUGH_FALL_GRIP := 0.45    # přilnavost, pod kterou je povrch „nerovný“
+static var BOARD_TRIP_S := 1.2              # s ležení po přepadnutí
+static var BOARD_CRASH_S := 1.5             # s ležení po pádu z rychlosti / nárazu
+static var BOARD_LAND_DEG := 25.0           # ° – čistý dopad ollie do tohoto náklonu
+static var BOARD_TRICK_AIR_S := 0.2         # s ve vzduchu, od kdy se ollie počítá
+static var DRINK_S_PER_500ML := 3.0         # s pití na půl litru
+static var DRINK_MIN_S := 1.0               # s – nejkratší napití
+static var DRINK_MAX_S := 3.2               # s – nejdelší napití
+static var EAT_S := 2.4                     # s jídla
+static var SMOKE_LIGHT_S := 1.0             # s zapálení cigarety (pak se dá chodit)
+static var SMOKE_S := 14.0                  # s kouření
+static var VOMIT_S := 2.2                   # s zvracení
 var shake_enabled := true       # třes obrazu zapnut (Esc → Nastavení → Třes obrazu)
 var base_fov := 72.0             # základní zorné pole (Esc → Nastavení)
 
-const STAND_HEIGHT := 1.8
-const CROUCH_HEIGHT := 1.1
+static var STAND_HEIGHT := 1.8
+static var CROUCH_HEIGHT := 1.1
 const RADIUS := 0.30          # kapsle Ø 0,6 m – s rezervou projde dveřmi interiérů (0,8–0,9 m) a mezi nábytkem
 const FRAGILE := ["pivo", "nealko", "vino_bile", "vino_cervene", "slivovice", "vodka", "rum", "becherovka", "voda"]
 
@@ -85,13 +195,13 @@ var wade := 0.0                       # hloubka vody, ve které hráč stojí (m
 var water_level := -INF               # hladina vody v místě hráče (m) – nastavuje Water (M5.2)
 var water_temp := 15.0                # teplota vody v místě hráče (°C) – nastavuje Water (M5.2)
 var breath := 15.0                    # dech pod vodou (s); plavání M5.2, obnoví se nad hladinou
-const SWIM_DEPTH := 1.2               # od této hloubky (m) se plave (bez gravitace, vztlak)
-const SWIM_SPEED := 1.2               # m/s plavání (Shift = SWIM_SPRINT, výdrž ubývá rychle)
-const SWIM_SPRINT := 2.0
-const SWIM_VY := 1.4                  # m/s svislý pohyb: Mezerník nahoru, Ctrl (C) potopit
-const BREATH_MAX := 15.0              # s dechu pod hladinou (10–20 s)
-const HEAD_H := 1.6                   # výška hlavy nad nohama (m)
-const DROWN_DPS := 2.0                # ztráta zdraví za sekundu, když dech dojde
+static var SWIM_DEPTH := 1.2               # od této hloubky (m) se plave (bez gravitace, vztlak)
+static var SWIM_SPEED := 1.2               # m/s plavání (Shift = SWIM_SPRINT, výdrž ubývá rychle)
+static var SWIM_SPRINT := 2.0
+static var SWIM_VY := 1.4                  # m/s svislý pohyb: Mezerník nahoru, Ctrl (C) potopit
+static var BREATH_MAX := 15.0              # s dechu pod hladinou (10–20 s)
+static var HEAD_H := 1.6                   # výška hlavy nad nohama (m)
+static var DROWN_DPS := 2.0                # ztráta zdraví za sekundu, když dech dojde
 var scope_on := false                 # drží dalekohled (X) – nastavuje LocalClient
 var scope := 0.0                      # 0..1 zapnutí dalekohledu (plynule), zužuje zorný úhel kamery
 var outfit := {}                       # oblečení: slot → id předmětu (M2.3, `Wardrobe`); ukládá se
@@ -103,19 +213,19 @@ var beekeeper_suit: bool:
 	set(v):
 		Wardrobe.set_beekeeper(self, v)
 # --- skateboard (M5.7): režim pohybu – deska pod nohama, `board_on`; jízdu řeší `_board_step`
-const BOARD_PUSH := 1.5                 # m/s – přídavek rychlosti jedním odrazem (W)
-const BOARD_PUSH_CD := 0.45             # s – minimální rozestup odrazů
-const BOARD_MAX_FLAT := 6.0             # m/s – nejvyšší rychlost odrazem po rovině (z kopce víc)
-const BOARD_DRAG := 0.35                # m/s² – valivý odpor na asfaltu
-const BOARD_BRAKE := 7.0                # m/s² – brzda patou (S)
-const BOARD_TURN := 1.9                 # rad/s – zatáčení (A/D) při plné rychlosti
-const BOARD_G := 9.8                    # m/s² – gravitace pro jízdu z kopce
-const BOARD_OLLIE_VY := 3.2             # m/s – vertikální rychlost ollie (~0,5 m)
-const BOARD_OLLIE_PTS := 10             # body za čistý ollie (dopad rovně)
-const BOARD_WOBBLE_V := 12.0            # m/s – od této rychlosti deska kmitá
-const BOARD_FALL_V := 15.0              # m/s – nad touto rychlostí pád
-const BOARD_WALL_V := 3.0               # m/s – náraz do zdi nad touto rychlostí = pád
-const BOARD_FLOOR_ANGLE := 75.0         # ° – nejstrmější povrch, který je ještě „podlaha“ (přechod U-rampy ~68°)
+static var BOARD_PUSH := 1.5                 # m/s – přídavek rychlosti jedním odrazem (W)
+static var BOARD_PUSH_CD := 0.45             # s – minimální rozestup odrazů
+static var BOARD_MAX_FLAT := 6.0             # m/s – nejvyšší rychlost odrazem po rovině (z kopce víc)
+static var BOARD_DRAG := 0.35                # m/s² – valivý odpor na asfaltu
+static var BOARD_BRAKE := 7.0                # m/s² – brzda patou (S)
+static var BOARD_TURN := 1.9                 # rad/s – zatáčení (A/D) při plné rychlosti
+static var BOARD_G := 9.8                    # m/s² – gravitace pro jízdu z kopce
+static var BOARD_OLLIE_VY := 3.2             # m/s – vertikální rychlost ollie (~0,5 m)
+static var BOARD_OLLIE_PTS := 10             # body za čistý ollie (dopad rovně)
+static var BOARD_WOBBLE_V := 12.0            # m/s – od této rychlosti deska kmitá
+static var BOARD_FALL_V := 15.0              # m/s – nad touto rychlostí pád
+static var BOARD_WALL_V := 3.0               # m/s – náraz do zdi nad touto rychlostí = pád
+static var BOARD_FLOOR_ANGLE := 75.0         # ° – nejstrmější povrch, který je ještě „podlaha“ (přechod U-rampy ~68°)
 var board_on := false                   # hráč stojí na skateboardu
 var board_score := 0                    # body z aktuální jízdy (ollie)
 var board_best := 0                     # rekord (ukládá SaveGame, klíč skate)
@@ -134,7 +244,7 @@ var aim_optic := false                # zbraň s optikou: míření zapne přibl
 var aim_sway := Vector2.ZERO          # kolísání mušky (rad: x doleva, y nahoru) – přičítá se k pohledu kamery
 var weapon_status := ""               # text o zásobníku / nabíjení pro HUD (Weapons)
 const AIM_SENS := 0.6                 # citlivost myši při míření bez optiky (násobek)
-const AIM_SPEED_MULT := 0.45          # rychlost chůze při míření
+static var AIM_SPEED_MULT := 0.45          # rychlost chůze při míření
 
 var _shape: CapsuleShape3D
 var _col: CollisionShape3D
@@ -148,7 +258,7 @@ var _slide_time := 0.0
 var _was_on_floor := true
 var _prev_vy := 0.0
 var _air_top_y := 0.0            # nejvyšší bod od posledního kontaktu se zemí (výška pádu)
-const SAFE_FALL_HEIGHT := 6.0     # pád do 6 m je bez následků
+static var SAFE_FALL_HEIGHT := 6.0     # pád do 6 m je bez následků
 var _void_fall_t := 0.0           # s propadávání beze dna (chybná pozice po výstupu z interiéru apod.)
 const FALL_RECOVER_T := 1.2       # tak dlouho padat rychlostí FALL_RECOVER_VY bez zastavení → vrátit na povrch
 const FALL_RECOVER_VY := -25.0    # m/s – běžný skok / seskok takhle rychle nepadá, jen opravdový propad terénem
@@ -191,7 +301,7 @@ var camera: Camera3D
 func _ready() -> void:
 	collision_layer = 2
 	collision_mask = 1 | 4 | 8 | 16
-	floor_max_angle = deg_to_rad(46.0)
+	floor_max_angle = deg_to_rad(WALK_FLOOR_ANGLE)
 	floor_snap_length = 0.45
 	floor_constant_speed = true
 	floor_block_on_wall = true
@@ -338,8 +448,8 @@ func unstick() -> String:
 # ------------------------------------------------------------------ inventář a konzumace
 
 ## Nosnost (kg). Později podle dovednosti / kondice.
-const CARRY_KG := 25.0
-const OVERLOAD_SPEED_MULT := 0.6
+static var CARRY_KG := 25.0
+static var OVERLOAD_SPEED_MULT := 0.6
 
 
 ## Celková hmotnost věcí v kapse (kg): součet hmotnost 1 ks × počet (otevřená lahev se počítá jako celá).
@@ -466,7 +576,7 @@ func equipped_text() -> String:
 ## Ubere výdrž (akce); po dobu akce se výdrž nedobíjí.
 ## Modifikátory rychlosti pohybu: zdroj (např. "vozik", "rameno") → {walk_k: násobek chůze a sprintu (výchozí 1),
 ## no_sprint: bool (sprint zakázán), jump: strop rychlosti výskoku}. Žádný zdroj nesahá na `walk_speed` /
-## `sprint_speed` (zůstávají výchozími `@export` hodnotami), takže se modifikátory nemohou „zaseknout“
+## `sprint_speed` (zůstávají výchozími hodnotami – laditelné jen v menu F3), takže se modifikátory nemohou „zaseknout“
 ## ani se obnovit v opačném pořadí (A3-06). Zdroj modifikátor sám nastaví a po skončení smaže.
 var speed_mods: Dictionary = {}
 
@@ -520,7 +630,7 @@ func effective_jump() -> float:
 
 func drain_stamina(v: float) -> void:
 	stamina = maxf(stamina - v, 0.0)
-	_stamina_delay = 0.9
+	_stamina_delay = STAMINA_REGEN_DELAY
 
 
 func is_stamina_locked() -> bool:
@@ -596,19 +706,19 @@ func _begin(act: String, id: String, ml: float) -> void:
 	_action_t = 0.0
 	match act:
 		"drink":
-			_action_len = clampf(ml / 500.0 * 3.0, 1.0, 3.2)
+			_action_len = clampf(ml / 500.0 * DRINK_S_PER_500ML, DRINK_MIN_S, DRINK_MAX_S)
 			visual.hold(PropModels.drink_model(id))
 			visual.start_action("drink")
 			game_event.emit("sfx", {"name": "gulp", "delay": 0.6})
 		"eat":
-			_action_len = 2.4
+			_action_len = EAT_S
 			visual.hold(PropModels.food_model(id))
 			visual.start_action("eat")
 			game_event.emit("sfx", {"name": "eat", "delay": 0.3})
 		"smoke":
-			_action_len = 1.0
+			_action_len = SMOKE_LIGHT_S
 			visual.start_action("smoke")
-			_smoke_t = 14.0
+			_smoke_t = SMOKE_S
 			var thc_s := float(Consumables.info(id).get("thc", 0.0))   # M4.8: konopí = THC, ostatní = nikotin
 			if thc_s > 0.0:
 				body.smoke_thc(thc_s)
@@ -638,7 +748,7 @@ func _on_vomit() -> void:
 	busy = true
 	_action = "vomit"
 	_action_t = 0.0
-	_action_len = 2.2
+	_action_len = VOMIT_S
 	visual.start_action("vomit")
 	game_event.emit("sfx", {"name": "vomit"})
 	game_event.emit("vomited", {})
@@ -650,11 +760,11 @@ func knock(vel: Vector3, spd: float) -> void:
 		return
 	velocity = vel
 	# zranění roste s kinetickou energií (~v²): 15 km/h ≈ 7, 30 km/h ≈ 28, 50 km/h ≈ 77
-	body.hurt(0.4 * spd * spd, "srážka s autem")
-	if spd < 5.0:
-		fall(1.2, "srazilo tě auto")
+	body.hurt(KNOCK_HURT_K * spd * spd, "srážka s autem")
+	if spd < KNOCK_LIGHT_V:
+		fall(KNOCK_LIGHT_S, "srazilo tě auto")
 	else:
-		fall(3.0 + spd * 0.1, "srazilo tě auto")
+		fall(KNOCK_FALL_S + spd * KNOCK_FALL_PER_V, "srazilo tě auto")
 
 
 ## Pád na zem (zakopnutí, sražení). Lahve v batohu se můžou rozbít.
@@ -673,7 +783,7 @@ func fall(duration: float, reason: String) -> void:
 	# rozbité lahve
 	var hs := Vector3(velocity.x, 0, velocity.z).length()
 	for id in FRAGILE:
-		if item_count(id) > 0 and randf() < clampf(0.25 + hs * 0.08, 0.0, 0.85):
+		if item_count(id) > 0 and randf() < clampf(BOTTLE_BREAK_P + hs * BOTTLE_BREAK_PER_V, 0.0, BOTTLE_BREAK_MAX):
 			remove_item(id)
 			game_event.emit("bottle_broken", {"id": id})
 			break
@@ -699,7 +809,7 @@ func board_mount() -> bool:
 ## Seskok (F). Při rychlosti nad 2 m/s hlídá volání (World) – tady jen sundání desky.
 func board_dismount() -> void:
 	board_on = false
-	floor_max_angle = deg_to_rad(46.0)     # jako při chůzi (viz _ready)
+	floor_max_angle = deg_to_rad(WALK_FLOOR_ANGLE)     # jako při chůzi (viz _ready)
 	if _board_node:
 		_board_node.visible = false
 	velocity.x = 0.0
@@ -752,36 +862,36 @@ func _board_step(delta: float) -> void:
 	var hv := Vector3(velocity.x, 0.0, velocity.z)
 	var spd := hv.length()
 	if not controls_locked and absf(move_in.x) > 0.05:
-		yaw -= move_in.x * BOARD_TURN * clampf(spd / 2.5, 0.0, 1.0) * delta
+		yaw -= move_in.x * BOARD_TURN * clampf(spd / BOARD_TURN_FULL_V, 0.0, 1.0) * delta
 	var fwd := Basis(Vector3.UP, yaw) * Vector3.FORWARD
 	var right := Basis(Vector3.UP, yaw) * Vector3.RIGHT
 	var s := hv.dot(fwd)                   # rychlost ve směru desky
 	var lat := hv - fwd * s                # boční skluz se rychle utlumí (deska nejede do stran)
-	lat = lat.move_toward(Vector3.ZERO, 8.0 * delta)
+	lat = lat.move_toward(Vector3.ZERO, BOARD_SIDE_DAMP * delta)
 	var grip := _ground_traction()
 	var acc := 0.0
 	if on_floor:
 		var n := get_floor_normal()
 		var g_t := Vector3(0.0, -BOARD_G, 0.0) - n * Vector3(0.0, -BOARD_G, 0.0).dot(n)
 		acc += g_t.dot(fwd)                # svah: z kopce zrychluje, do kopce zpomaluje
-		var drag := BOARD_DRAG + (1.0 - grip) * 6.0    # mokro / tráva brzdí víc
+		var drag := BOARD_DRAG + (1.0 - grip) * BOARD_ROUGH_DRAG    # mokro / tráva brzdí víc
 		if absf(s) > 0.02:
 			acc -= signf(s) * drag
 		if move_in.y > 0.1:                # S = brzda patou
 			acc -= (signf(s) * BOARD_BRAKE if absf(s) > 0.02 else 0.0)
 		if move_in.y < -0.1 and _board_push_cd <= 0.0 and s < BOARD_MAX_FLAT:
-			s += BOARD_PUSH * clampf(grip, 0.3, 1.0)
+			s += BOARD_PUSH * clampf(grip, BOARD_PUSH_GRIP_MIN, 1.0)
 			_board_push_cd = BOARD_PUSH_CD
 		s += acc * delta
 		if absf(s) < 0.05 and absf(acc) < 0.5:
 			s = 0.0
 		# jednou za čas kmitne jen při vysoké rychlosti
 		if absf(s) > BOARD_WOBBLE_V:
-			lat += right * sin(_t * 14.0) * 1.6 * delta
+			lat += right * sin(_t * BOARD_WOBBLE_HZ) * BOARD_WOBBLE_AMP * delta
 		# jízda po nerovném povrchu (tráva, bahno, mokro): přepadneš dopředu
-		if absf(s) > 2.5 and grip < 0.45:
+		if absf(s) > BOARD_ROUGH_FALL_V and grip < BOARD_ROUGH_FALL_GRIP:
 			board_dismount()
-			fall(1.2, "pad_skate")
+			fall(BOARD_TRIP_S, "pad_skate")
 			return
 		velocity.y = minf(velocity.y, 0.0)
 		_board_air = 0.0
@@ -791,10 +901,10 @@ func _board_step(delta: float) -> void:
 		velocity.y = BOARD_OLLIE_VY
 		_board_air = 0.0001
 	elif not on_floor:
-		velocity.y = maxf(velocity.y - gravity * delta, -55.0)
+		velocity.y = maxf(velocity.y - gravity * delta, -TERMINAL_VY)
 	if absf(s) > BOARD_FALL_V:
 		board_dismount()
-		fall(1.5, "pad_skate")
+		fall(BOARD_CRASH_S, "pad_skate")
 		return
 	velocity.x = fwd.x * s + lat.x
 	velocity.z = fwd.z * s + lat.z
@@ -805,11 +915,11 @@ func _board_step(delta: float) -> void:
 	# náraz do zdi nebo obrubníku rychlostí = pád
 	if is_on_wall() and sprev > BOARD_WALL_V:
 		board_dismount()
-		fall(1.5, "pad_skate")
+		fall(BOARD_CRASH_S, "pad_skate")
 		return
 	# čistý ollie: dopad rovně, deska pod nohama (natočení dopadu do 25°)
-	if not on_floor and is_on_floor() and was_air > 0.2:
-		if get_floor_normal().angle_to(Vector3.UP) < deg_to_rad(25.0):
+	if not on_floor and is_on_floor() and was_air > BOARD_TRICK_AIR_S:
+		if get_floor_normal().angle_to(Vector3.UP) < deg_to_rad(BOARD_LAND_DEG):
 			board_score += BOARD_OLLIE_PTS
 			board_best = maxi(board_best, board_score)
 			game_event.emit("skate_trick", {"name": "ollie", "pts": BOARD_OLLIE_PTS, "score": board_score})
@@ -1087,7 +1197,7 @@ func _physics_process_impl(delta: float) -> void:
 	var d := body.drunk_level()
 	# --- opilost: zpožděné reakce
 	var inp := _read_input()
-	var delay := clampf(p * 0.1, 0.0, 0.45)
+	var delay := clampf(p * DRUNK_DELAY_K, 0.0, DRUNK_DELAY_MAX)
 	_input_hist.append([_t, inp])
 	while _input_hist.size() > 1 and _t - _input_hist[1][0] >= delay:
 		_input_hist.pop_front()
@@ -1113,7 +1223,7 @@ func _physics_process_impl(delta: float) -> void:
 	var hvel := Vector3(velocity.x, 0.0, velocity.z)
 	var want_crouch := crouch_in
 	if want_crouch and not _crouching and not _sliding:
-		if on_floor and hvel.length() > 6.0:
+		if on_floor and hvel.length() > SLIDE_MIN_V:
 			_sliding = true
 			_slide_time = 0.0
 			velocity += hvel.normalized() * slide_boost
@@ -1123,7 +1233,7 @@ func _physics_process_impl(delta: float) -> void:
 		_sliding = false
 	if _sliding:
 		_slide_time += delta
-		if hvel.length() < 2.6 or _slide_time > 1.4 or not want_crouch:
+		if hvel.length() < SLIDE_END_V or _slide_time > SLIDE_MAX_S or not want_crouch:
 			_sliding = false
 	_set_height(CROUCH_HEIGHT if (_crouching or _sliding or fallen > 0.0) else STAND_HEIGHT, delta)
 
@@ -1132,15 +1242,15 @@ func _physics_process_impl(delta: float) -> void:
 	var sprinting := sprint_in and move_in.length() > 0.1 and not _crouching \
 		and not _stamina_lock and move_in.y < 0.3 and not busy and not overloaded and not aim_on and not sprint_blocked()
 	if sprinting and on_floor and hvel.length() > effective_walk():
-		stamina = maxf(stamina - delta * 0.11 * body.stamina_drain_mult(), 0.0)
-		_stamina_delay = 0.9
+		stamina = maxf(stamina - delta * STAMINA_SPRINT_DRAIN * body.stamina_drain_mult(), 0.0)
+		_stamina_delay = STAMINA_REGEN_DELAY
 		if stamina <= 0.0:
 			_stamina_lock = true
 	else:
 		_stamina_delay = maxf(_stamina_delay - delta, 0.0)
 		if _stamina_delay <= 0.0:
-			stamina = minf(stamina + delta * 0.2, smax)
-		if _stamina_lock and stamina > 0.3 * smax:
+			stamina = minf(stamina + delta * STAMINA_REGEN, smax)
+		if _stamina_lock and stamina > STAMINA_UNLOCK * smax:
 			_stamina_lock = false
 	stamina = minf(stamina, smax)
 
@@ -1155,45 +1265,45 @@ func _physics_process_impl(delta: float) -> void:
 	elif _crouching:
 		target_speed = crouch_speed
 	if busy and _action != "smoke":
-		target_speed = minf(target_speed, 1.6)
+		target_speed = minf(target_speed, BUSY_SPEED)
 	if wade > 0.05:
 		# brodění potokem / řekou: voda brzdí (po kolena ~ poloviční rychlost)
-		target_speed *= lerpf(1.0, 0.4, clampf(wade / 0.6, 0.0, 1.0))
+		target_speed *= lerpf(1.0, WADE_SLOW_MIN, clampf(wade / WADE_SLOW_DEPTH, 0.0, 1.0))
 	if _swimming():
 		# plavání (M5.2): pomalé tempo, Shift rychleji za cenu výdrže
 		target_speed = SWIM_SPRINT if sprint_in and stamina > 0.05 else SWIM_SPEED
 		if sprint_in and wish.length() > 0.05:
-			drain_stamina(delta * 0.12)
+			drain_stamina(delta * SWIM_SPRINT_DRAIN)
 	var target := wish * target_speed
 
 	# --- opilost: drift do stran a dopředu/dozadu, i ve stoje
 	var drift := Vector3.ZERO
-	if p > 0.35:
-		var amp := (p - 0.35) * 1.05
+	if p > DRUNK_DRIFT_FROM:
+		var amp := (p - DRUNK_DRIFT_FROM) * DRUNK_DRIFT_K
 		var right := Basis(Vector3.UP, yaw) * Vector3.RIGHT
 		var fwd := Basis(Vector3.UP, yaw) * Vector3.FORWARD
 		var moving := clampf(move_in.length(), 0.25, 1.0)
-		drift = (right * _noise.get_noise_1d(_t * 9.0) * 1.6 + fwd * _noise.get_noise_1d(_t * 7.0 + 50.0) * 0.6) * amp * moving
+		drift = (right * _noise.get_noise_1d(_t * 9.0) * DRUNK_DRIFT_SIDE + fwd * _noise.get_noise_1d(_t * 7.0 + 50.0) * DRUNK_DRIFT_FWD) * amp * moving
 		if fallen > 0.0:
 			drift = Vector3.ZERO
 
 	# --- horizontální pohyb
 	if fallen > 0.0:
-		hvel = hvel.move_toward(Vector3.ZERO, (6.0 if on_floor else 1.0) * delta)
+		hvel = hvel.move_toward(Vector3.ZERO, (FALLEN_DECEL if on_floor else FALLEN_AIR_DECEL) * delta)
 	elif _sliding:
 		var fn := get_floor_normal() if on_floor else Vector3.UP
-		var downhill := Vector3(fn.x, 0.0, fn.z) * gravity * 0.9
+		var downhill := Vector3(fn.x, 0.0, fn.z) * gravity * SLIDE_DOWNHILL
 		# na kluzkém povrchu (mokro, led, sníh) se skluz táhne dál
-		hvel = hvel.move_toward(Vector3.ZERO, slide_friction * lerpf(1.0, _ground_traction(), 0.7) * delta) + downhill * delta
-		hvel += wish * 2.0 * delta
+		hvel = hvel.move_toward(Vector3.ZERO, slide_friction * lerpf(1.0, _ground_traction(), SLIDE_GRIP_MIX) * delta) + downhill * delta
+		hvel += wish * SLIDE_STEER * delta
 	elif on_floor:
 		# kluzký povrch (déšť, sníh, náledí, bahno): horší rozjezd, brzdění i zatáčení
 		var traction := _ground_traction()
-		var accel := ground_accel * (1.0 - d * 0.5) * traction
+		var accel := ground_accel * (1.0 - d * DRUNK_ACCEL_LOSS) * traction
 		if wish.length() < 0.05:
-			accel = ground_decel * (1.0 - d * 0.6) * traction
+			accel = ground_decel * (1.0 - d * DRUNK_BRAKE_LOSS) * traction
 		elif hvel.dot(target) < 0.0:
-			accel = turn_accel * (1.0 - d * 0.6) * traction
+			accel = turn_accel * (1.0 - d * DRUNK_BRAKE_LOSS) * traction
 		hvel = hvel.move_toward(target + drift, accel * delta)
 	else:
 		if wish.length() > 0.05:
@@ -1203,35 +1313,35 @@ func _physics_process_impl(delta: float) -> void:
 			if nv.length() > cap and nv.length() > hvel.length():
 				nv = nv.normalized() * maxf(hvel.length(), cap)
 			hvel = nv
-		hvel *= 1.0 - 0.08 * delta
+		hvel *= 1.0 - AIR_DRAG * delta
 	velocity.x = hvel.x
 	velocity.z = hvel.z
 
 	# --- gravitace (plavání M5.2: vztlak, žádná gravitace; Mezerník nahoru, Ctrl potopit)
 	if _swimming():
 		var up := (1.0 if input.jump else 0.0) - (1.0 if input.crouch else 0.0)
-		velocity.y = move_toward(velocity.y, up * SWIM_VY, 9.0 * delta)
+		velocity.y = move_toward(velocity.y, up * SWIM_VY, SWIM_VY_ACCEL * delta)
 	elif not on_floor:
 		var g := gravity
 		if velocity.y < 0.0:
 			g *= fall_multiplier
 		elif not input.jump:
 			g *= low_jump_multiplier
-		velocity.y = maxf(velocity.y - g * delta, -55.0)
+		velocity.y = maxf(velocity.y - g * delta, -TERMINAL_VY)
 	else:
 		var fn := get_floor_normal()
-		if fn.angle_to(Vector3.UP) > deg_to_rad(38.0):
-			velocity += Vector3(fn.x, 0.0, fn.z).normalized() * gravity * 0.6 * delta
+		if fn.angle_to(Vector3.UP) > deg_to_rad(STEEP_DEG):
+			velocity += Vector3(fn.x, 0.0, fn.z).normalized() * gravity * STEEP_SLIDE_K * delta
 
 	# --- skok
 	if _jump_buffer > 0.0 and _coyote > 0.0 and _can_stand() and fallen <= 0.0 and not busy and not _swimming():
-		velocity.y = (effective_jump() + (0.6 if _sliding else 0.0)) * body.jump_mult()
+		velocity.y = (effective_jump() + (SLIDE_JUMP_BONUS if _sliding else 0.0)) * body.jump_mult()
 		_jump_buffer = 0.0
 		_coyote = 0.0
 		_sliding = false
 		_crouching = false
 		jumped.emit()
-		if p > 1.5 and randf() < (p - 1.5) * 0.35:
+		if p > DRUNK_JUMP_FALL_FROM and randf() < (p - DRUNK_JUMP_FALL_FROM) * DRUNK_JUMP_FALL_K:
 			_stumble_cool = 0.0   # opilý skok často končí pádem
 
 	_prev_vy = velocity.y
@@ -1252,17 +1362,17 @@ func _physics_process_impl(delta: float) -> void:
 			_floor_surf = bdy.get_meta("surface", "teren")   # povrch pod nohama (asfalt / šterk / budova…)
 		if bdy is RigidBody3D:
 			var push := -c.get_normal()
-			push.y = maxf(push.y, 0.0) * 0.3
+			push.y = maxf(push.y, 0.0) * PUSH_UP_K
 			var rel := maxf(Vector3(velocity.x, 0, velocity.z).length(), 1.0)
-			bdy.apply_impulse(push * rel * 0.9, c.get_position() - bdy.global_position)
+			bdy.apply_impulse(push * rel * PUSH_K, c.get_position() - bdy.global_position)
 			if bdy.has_method("on_hit"):
-				bdy.on_hit(rel * 0.8)
-		elif absf(c.get_normal().y) < 0.4 and hvel.length() > 5.0 and _wall_bump_cool <= 0.0 and p > 1.0:
+				bdy.on_hit(rel * PUSH_HIT_K)
+		elif absf(c.get_normal().y) < 0.4 and hvel.length() > WALL_BUMP_V and _wall_bump_cool <= 0.0 and p > WALL_BUMP_PROMILE:
 			# opilý náraz do zdi
-			_wall_bump_cool = 1.5
-			body.hurt(hvel.length() * 0.8, "náraz do zdi")
-			if p > 1.6:
-				fall(1.8, "narazil jsi do zdi")
+			_wall_bump_cool = WALL_BUMP_CD
+			body.hurt(hvel.length() * WALL_BUMP_HURT, "náraz do zdi")
+			if p > WALL_BUMP_FALL_PROMILE:
+				fall(WALL_BUMP_FALL_S, "narazil jsi do zdi")
 
 	var now_floor := is_on_floor()
 	if not now_floor:
@@ -1275,10 +1385,10 @@ func _physics_process_impl(delta: float) -> void:
 		landed.emit(impact)
 		# zranění jen podle skutečné výšky pádu (běžný skok ani seskok z bedny nebolí)
 		if drop > SAFE_FALL_HEIGHT:
-			body.hurt((drop - SAFE_FALL_HEIGHT) * 9.0, "pád z výšky")
-			fall(1.5 + (drop - SAFE_FALL_HEIGHT) * 0.25, "tvrdý dopad")
-		elif p > 1.4 and drop > 2.0 and randf() < (p - 1.2) * 0.4:
-			fall(2.0, "opilý dopad")
+			body.hurt((drop - SAFE_FALL_HEIGHT) * FALL_HURT_PER_M, "pád z výšky")
+			fall(FALL_DOWN_S + (drop - SAFE_FALL_HEIGHT) * FALL_DOWN_PER_M, "tvrdý dopad")
+		elif p > DRUNK_LAND_PROMILE and drop > DRUNK_LAND_DROP and randf() < (p - DRUNK_LAND_BASE) * DRUNK_LAND_K:
+			fall(DRUNK_LAND_S, "opilý dopad")
 	if now_floor:
 		_air_top_y = global_position.y
 	_was_on_floor = now_floor
@@ -1299,22 +1409,22 @@ func _physics_process_impl(delta: float) -> void:
 
 	# --- zakopnutí
 	_stumble_cool -= delta
-	if p > 1.2 and on_floor and fallen <= 0.0 and _stumble_cool <= 0.0:
+	if p > STUMBLE_PROMILE and on_floor and fallen <= 0.0 and _stumble_cool <= 0.0:
 		var hs := hvel.length()
-		var chance := (p - 1.2) * 0.06 * delta * (1.0 + hs * 0.35)
+		var chance := (p - STUMBLE_PROMILE) * STUMBLE_RATE * delta * (1.0 + hs * STUMBLE_SPEED_K)
 		if sprinting:
-			chance *= 2.5
-		if get_floor_normal().angle_to(Vector3.UP) > 0.25:
-			chance *= 1.6
-		if hs < 0.3 and p < 2.4:
-			chance *= 0.2
-		if (_stumble_cool < -30.0 and p > 2.0) or randf() < chance:
-			_stumble_cool = 2.5
-			if p > 1.7 or hs > 5.0:
-				body.hurt(maxf(hs - 2.5, 0.0) * 1.5, "zakopnutí")
-				fall(2.2 + p * 0.3, "zakopl jsi")
+			chance *= STUMBLE_SPRINT_K
+		if get_floor_normal().angle_to(Vector3.UP) > STUMBLE_SLOPE:
+			chance *= STUMBLE_SLOPE_K
+		if hs < 0.3 and p < STUMBLE_IDLE_PROMILE:
+			chance *= STUMBLE_IDLE_K
+		if (_stumble_cool < -STUMBLE_FORCE_S and p > STUMBLE_FORCE_PROMILE) or randf() < chance:
+			_stumble_cool = STUMBLE_CD
+			if p > STUMBLE_FALL_PROMILE or hs > STUMBLE_FALL_V:
+				body.hurt(maxf(hs - STUMBLE_HURT_FROM, 0.0) * STUMBLE_HURT_K, "zakopnutí")
+				fall(STUMBLE_FALL_S + p * STUMBLE_FALL_PER_PROMILE, "zakopl jsi")
 			else:
-				velocity += (Basis(Vector3.UP, yaw) * Vector3.RIGHT) * randf_range(-2.5, 2.5)
+				velocity += (Basis(Vector3.UP, yaw) * Vector3.RIGHT) * randf_range(-STAGGER_V, STAGGER_V)
 				game_event.emit("stagger", {})
 
 	_update_body(delta, hvel.length())
@@ -1327,7 +1437,7 @@ func _physics_process_impl(delta: float) -> void:
 func _ground_traction() -> float:
 	if weather == null or _roof:         # pod střechou / uvnitř budovy je sucho
 		return 1.0
-	return lerpf(1.0, weather.grip_factor(_floor_surf), 0.75)
+	return lerpf(1.0, weather.grip_factor(_floor_surf), WALK_GRIP_MIX)
 
 
 ## Je nad hráčem střecha / strop? Paprsek z hlavy nahoru; stromy nestačí, jen budovy.
@@ -1370,14 +1480,14 @@ func _swim_breath(delta: float) -> void:
 		if breath <= 0.0:
 			body.hurt(DROWN_DPS * delta, "utopení")
 	else:
-		breath = minf(breath + 3.0 * delta, BREATH_MAX)
+		breath = minf(breath + BREATH_REGEN * delta, BREATH_MAX)
 
 
 func _update_body(delta: float, hs: float) -> void:
 	# výdej energie: chůze ~250 kcal/h, sprint ~700 kcal/h (herní hodiny)
 	var act := 0.0
-	if hs > 0.5:
-		act = 250.0 if hs < 6.0 else 700.0
+	if hs > KCAL_MOVE_V:
+		act = KCAL_WALK if hs < KCAL_RUN_V else KCAL_SPRINT
 	# počasí na těle: déšť/sníh a vítr venku, uvnitř (v autě nebo pod střechou) sucho a teplo
 	var env := {}
 	if weather != null:
@@ -1391,7 +1501,7 @@ func _update_body(delta: float, hs: float) -> void:
 			if weather.is_raining():
 				rain = weather.rain
 			elif weather.is_snowing():
-				rain = weather.rain * 0.35      # sněžení promáčí jen trochu
+				rain = weather.rain * SNOW_WET_K      # sněžení promáčí jen trochu
 		env = {"rain": rain, "temp": weather.temp,
 			"wind": 0.0 if sheltered else weather.wind, "in": sheltered,
 			"heat": heat, "shelter_min": shelter_min}
@@ -1400,8 +1510,8 @@ func _update_body(delta: float, hs: float) -> void:
 			env["temp"] = wd.micro.temp_at(global_position)
 			if not sheltered:
 				env["wind"] = wd.micro.wind_speed_at(global_position)
-		if wade > 0.2:
-			body.wetness = maxf(body.wetness, minf(wade * 1.5, 1.0))
+		if wade > WADE_WET_FROM:
+			body.wetness = maxf(body.wetness, minf(wade * WADE_WET_K, 1.0))
 			# voda chladí víc než vzduch (M5.2): pocitová teplota nejvýš na teplotu vody
 			if not sheltered:
 				env["temp"] = minf(float(env["temp"]), water_temp)
@@ -1446,14 +1556,14 @@ func _can_stand() -> bool:
 
 
 func _set_height(hgt: float, delta: float) -> void:
-	var nh := move_toward(_shape.height, hgt, delta * 5.0)
+	var nh := move_toward(_shape.height, hgt, delta * CROUCH_RATE)
 	if not is_equal_approx(nh, _shape.height):
 		_shape.height = nh
 		_col.position.y = nh * 0.5
 
 
 func is_sprinting() -> bool:
-	return Vector3(velocity.x, 0, velocity.z).length() > walk_speed + 0.8
+	return Vector3(velocity.x, 0, velocity.z).length() > walk_speed + SPRINT_DETECT
 
 
 # ------------------------------------------------------------------ vizuál a kamera
@@ -1557,7 +1667,7 @@ func _process_impl(delta: float) -> void:
 	arm.spring_length = _arm_len
 	arm.position = Vector3(0.0 if first_person else 0.35, 0, 0) + bob_off
 	var fov := base_fov + d * 6.0 * sin(_t * 0.4)
-	if hspeed > walk_speed + 0.8:
+	if hspeed > walk_speed + SPRINT_DETECT:
 		fov += (hspeed - walk_speed) * 1.6
 	if _sliding:
 		fov += 4.0

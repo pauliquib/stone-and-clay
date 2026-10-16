@@ -16,38 +16,61 @@ extends Node
 
 # ------------------------------------------------------------------ laditelné hodnoty
 
-const OWN_GARDEN_R := 35.0               # m od dveří vlastního domu – vlastní pozemek (DOPLNIT: skutečný tvar zahrady)
-const RENTED_MARGIN := 3.0               # m kolem pronajaté zahrady (byt v nájmu, M1.7) – počítá se jako „vlastní“
-const ROAD_R := 8.0                      # m od silnice – ohrožení provozu
-const HEAR_AXE := 120.0                  # m – sekeru je slyšet
-const HEAR_SAW := 300.0                  # m – motorovou pilu je slyšet
-const CRIME_VALUE_KC := 10000            # součet hodnoty dřeva za herní den nad limit = trestný čin
-const WOOD_KC_PER_M3 := 1800.0
-const SEVERITY_VALUE_KC := 20000.0       # hodnota dřeva, od které je přestupek „nejtěžší“ (závažnost 1.0)
-const KARMA_UNSEEN := -2.0               # kácení v cizím bez svědků (se svědkem se karma strhne přes offense)
-const FELL_MIN_S := 2.4                  # nejkratší doba pádu stromu (s)
-const FELL_PER_M := 0.05                 # + s na metr výšky
-const FALL_JITTER := 0.12                # rad – náhodná odchylka směru pádu
-const TRUNK_USE := 0.7                   # podíl výšky, který je použitelný kmen (zbytek jsou větve a špice)
-const SPALEK_LEN := 1.0                  # m – délka špalku
+static var OWN_GARDEN_R := 35.0               # m od dveří vlastního domu – vlastní pozemek (DOPLNIT: skutečný tvar zahrady)
+static var RENTED_MARGIN := 3.0               # m kolem pronajaté zahrady (byt v nájmu, M1.7) – počítá se jako „vlastní“
+static var ROAD_R := 8.0                      # m od silnice – ohrožení provozu
+static var HEAR_AXE := 120.0                  # m – sekeru je slyšet
+static var HEAR_SAW := 300.0                  # m – motorovou pilu je slyšet
+static var CRIME_VALUE_KC := 10000            # součet hodnoty dřeva za herní den nad limit = trestný čin
+static var WOOD_KC_PER_M3 := 1800.0
+static var SEVERITY_VALUE_KC := 20000.0       # hodnota dřeva, od které je přestupek „nejtěžší“ (závažnost 1.0)
+static var KARMA_UNSEEN := -2.0               # kácení v cizím bez svědků (se svědkem se karma strhne přes offense)
+static var FELL_MIN_S := 2.4                  # nejkratší doba pádu stromu (s)
+static var FELL_PER_M := 0.05                 # + s na metr výšky
+static var FALL_JITTER := 0.12                # rad – náhodná odchylka směru pádu
+static var TRUNK_USE := 0.7                   # podíl výšky, který je použitelný kmen (zbytek jsou větve a špice)
+static var SPALEK_LEN := 1.0                  # m – délka špalku
 const MAX_SPALKY := 14
 const MAX_LOGS := 40
 const MAX_BLOCKS := 160
-const POLENA_PER_SPALEK := 4
-const XP_FELL := [20.0, 80.0]            # XP za pokácení podle velikosti
-const XP_VOLUME_FULL := 6.0              # m³, od kterého je XP maximální
-const HIT_DAMAGE := [20.0, 55.0]         # zásah padajícím stromem podle výšky
-const HURT_NO_GEAR := {"sekera_stara": 0.05, "sekera": 0.05, "motorova_pila": 0.15}   # šance úrazu bez pomůcek
-const FELL_TOOL_K := {"sekera_stara": 1.6, "sekera": 1.0, "motorova_pila": 0.35}
-const LOP_TOOL_K := {"sekera_stara": 1.6, "sekera": 1.0, "motorova_pila": 0.5}        # odvětvení
-const CUT_TOOL_K := {"sekera_stara": 3.2, "sekera": 2.5, "motorova_pila": 0.5}        # rozřezání (sekerou pomalu)
-const SPLIT_TOOL_K := {"sekera_stara": 1.3, "sekera": 1.0}
+static var POLENA_PER_SPALEK := 4
+static var XP_FELL := [20.0, 80.0]            # XP za pokácení podle velikosti
+static var XP_VOLUME_FULL := 6.0              # m³, od kterého je XP maximální
+static var HIT_DAMAGE := [20.0, 55.0]         # zásah padajícím stromem podle výšky
+static var HURT_NO_GEAR := {"sekera_stara": 0.05, "sekera": 0.05, "motorova_pila": 0.15}   # šance úrazu bez pomůcek
+static var FELL_TOOL_K := {"sekera_stara": 1.6, "sekera": 1.0, "motorova_pila": 0.35}
+static var LOP_TOOL_K := {"sekera_stara": 1.6, "sekera": 1.0, "motorova_pila": 0.5}        # odvětvení
+static var CUT_TOOL_K := {"sekera_stara": 3.2, "sekera": 2.5, "motorova_pila": 0.5}        # rozřezání (sekerou pomalu)
+static var SPLIT_TOOL_K := {"sekera_stara": 1.3, "sekera": 1.0}
 const SOUND_GAP := {"sekera_stara": 0.75, "sekera": 0.65, "motorova_pila": 0.32}
 const BARK := Color(0.33, 0.23, 0.14)
 const CUT_FACE := Color(0.72, 0.58, 0.38)
 const LEAF_DECID := Color(0.18, 0.32, 0.1)
 const LEAF_CONIF := Color(0.08, 0.2, 0.09)
-const LOP_DRY_SHARE := 0.34      # podíl suchých (spodních odumřelých) větví při odvětvení – zbytek čerstvé (M4.4 B)
+static var LOP_DRY_SHARE := 0.34      # podíl suchých (spodních odumřelých) větví při odvětvení – zbytek čerstvé (M4.4 B)
+## M8.D2b: dřív čísla ve vzorcích – laditelné v menu F3 (Činnosti / Těžba a řemesla). Výchozí = původní čísla.
+static var FELL_TIME_BASE := 0.8          # doba kácení: základ (× velikost stromu)
+static var FELL_TIME_H := 40.0            # m výšky, které dobu kácení zdvojnásobí (+1 × základ)
+static var FELL_SCALE_MIN := 0.5          # meze velikosti stromu pro dobu kácení
+static var FELL_SCALE_MAX := 2.2
+static var LOP_REF_LEN := 6.0             # m kmene = základní doba odvětvení
+static var LOP_K_MIN := 0.5
+static var LOP_K_MAX := 3.0
+static var CUT_REF_LEN := 6.0             # m kmene = základní doba rozřezání
+static var CUT_REF_R := 0.2               # m poloměru = základní doba rozřezání
+static var CUT_K_MIN := 0.4
+static var CUT_K_MAX := 5.0
+static var VOL_FORM_K := 0.6              # tvarový činitel kmene (objem = π r² h × tohle)
+static var HURT_SAW_MIN := 8.0            # zdraví – úraz motorovou pilou bez pomůcek
+static var HURT_SAW_MAX := 25.0
+static var HURT_AXE_MIN := 3.0            # zdraví – úraz sekerou bez pomůcek
+static var HURT_AXE_MAX := 10.0
+static var HIT_FULL_H := 30.0             # m – strom této výšky zraní nejvíc (HIT_DAMAGE[1])
+static var HIT_R := 0.9                   # m od osy kmene – zasáhne člověka
+static var HIT_CAR_R := 1.6               # m od osy kmene – zasáhne auto
+static var HIT_FALL_S := 3.0              # s ležení po zásahu stromem
+static var HIT_CAR_K := 0.6               # poškození auta (× zranění)
+static var HIT_KNOCK_V := 4.0             # m/s – odhození vesničana padajícím stromem
 
 var world: World
 var trees: TreeManager
@@ -137,7 +160,7 @@ func _mod_fell(aim: Dictionary, tool_id: String) -> float:
 	var i := int(aim.get("tree", -1))
 	if trees == null or not trees.has_tree(i):
 		return 1.0
-	var k := clampf(trees.scale_of(i), 0.5, 2.2) * (0.8 + trees.height_of(i) / 40.0)
+	var k := clampf(trees.scale_of(i), FELL_SCALE_MIN, FELL_SCALE_MAX) * (FELL_TIME_BASE + trees.height_of(i) / FELL_TIME_H)
 	return k * float(FELL_TOOL_K.get(tool_id, 1.0))
 
 
@@ -149,16 +172,16 @@ func _log_of(aim: Dictionary) -> Log:
 
 func _mod_lop(aim: Dictionary, tool_id: String) -> float:
 	var lg := _log_of(aim)
-	var len_k := lg.length / 6.0 if lg else 1.0
-	return clampf(len_k, 0.5, 3.0) * float(LOP_TOOL_K.get(tool_id, 1.0))
+	var len_k := lg.length / LOP_REF_LEN if lg else 1.0
+	return clampf(len_k, LOP_K_MIN, LOP_K_MAX) * float(LOP_TOOL_K.get(tool_id, 1.0))
 
 
 func _mod_cut(aim: Dictionary, tool_id: String) -> float:
 	var lg := _log_of(aim)
 	var k := 1.0
 	if lg:
-		k = (lg.use_length() / 6.0) * clampf(lg.radius / 0.2, 0.6, 2.5)
-	return clampf(k, 0.4, 5.0) * float(CUT_TOOL_K.get(tool_id, 2.5))
+		k = (lg.use_length() / CUT_REF_LEN) * clampf(lg.radius / CUT_REF_R, 0.6, 2.5)
+	return clampf(k, CUT_K_MIN, CUT_K_MAX) * float(CUT_TOOL_K.get(tool_id, 2.5))
 
 
 func _mod_split(_aim: Dictionary, tool_id: String) -> float:
@@ -200,7 +223,7 @@ func _on_fell(id: int, _def: Dictionary, aim: Dictionary, ok: bool) -> void:
 	var dir := away.normalized().rotated(Vector3.UP, randf_range(-FALL_JITTER, FALL_JITTER))
 	var h := trees.height_of(i)
 	var r := trees.trunk_radius(i)
-	var vol := PI * r * r * h * 0.6
+	var vol := PI * r * r * h * VOL_FORM_K
 	var value := int(roundf(vol * WOOD_KC_PER_M3 / 10.0) * 10.0)
 	var eco: TreeEco = world.tree_eco if world.realism_on("species") else null
 	if eco != null:      # M8.3: objem z dbh a výšky (tvarové číslo), cena podle druhu – buk ≠ smrk
@@ -227,7 +250,7 @@ func _check_gear(id: int, p: Player, tool_id: String) -> void:
 		return
 	world.notify(id, "show_message", ["Bez ochranných pomůcek riskuješ úraz.", 3.0])
 	if randf() < float(HURT_NO_GEAR.get(tool_id, 0.05)):
-		var dmg := randf_range(8.0, 25.0) if tool_id == "motorova_pila" else randf_range(3.0, 10.0)
+		var dmg := randf_range(HURT_SAW_MIN, HURT_SAW_MAX) if tool_id == "motorova_pila" else randf_range(HURT_AXE_MIN, HURT_AXE_MAX)
 		p.body.hurt(dmg, "úraz při kácení")
 
 
@@ -287,29 +310,29 @@ func _check_hits(f: Dictionary, angle: float) -> void:
 	var a: Vector3 = Basis(f["axis"] as Vector3, angle) * Vector3.UP
 	var len := h * 0.95
 	var hit: Dictionary = f["hit"]
-	var dmg := lerpf(HIT_DAMAGE[0], HIT_DAMAGE[1], clampf(h / 30.0, 0.0, 1.0))
+	var dmg := lerpf(HIT_DAMAGE[0], HIT_DAMAGE[1], clampf(h / HIT_FULL_H, 0.0, 1.0))
 	for pid in world.players:
 		var p: Player = world.players[pid]
 		if p.car != null or hit.has(p):
 			continue
-		if _tree_dist(base, a, len, float(f["crown"]), p.global_position + Vector3(0, 1.0, 0)) < 0.9:
+		if _tree_dist(base, a, len, float(f["crown"]), p.global_position + Vector3(0, 1.0, 0)) < HIT_R:
 			hit[p] = true
 			p.body.hurt(dmg, "zavalil tě strom")
-			p.fall(3.0, "zasažen padajícím stromem")
+			p.fall(HIT_FALL_S, "zasažen padajícím stromem")
 			world.notify(int(pid), "show_message", ["Strom tě zasáhl!", 3.0])
 			world.emit_game_event(int(pid), "tree_hit", {"who": "player", "damage": dmg})
 	if world.bots_root:
 		for v in world.bots_root.get_children():
 			if v is Villager and not hit.has(v):
-				if _tree_dist(base, a, len, float(f["crown"]), v.global_position + Vector3(0, 1.0, 0)) < 0.9:
+				if _tree_dist(base, a, len, float(f["crown"]), v.global_position + Vector3(0, 1.0, 0)) < HIT_R:
 					hit[v] = true
-					v.knock(a.slide(Vector3.UP).normalized() * 4.0, 4.0)
+					v.knock(a.slide(Vector3.UP).normalized() * HIT_KNOCK_V, HIT_KNOCK_V)
 	if world.traffic:
 		for c in world.traffic.get_children():
 			if c is Car and not hit.has(c):
-				if _tree_dist(base, a, len, float(f["crown"]), c.global_position + Vector3(0, 0.8, 0)) < 1.6:
+				if _tree_dist(base, a, len, float(f["crown"]), c.global_position + Vector3(0, 0.8, 0)) < HIT_CAR_R:
 					hit[c] = true
-					c.damage = minf(c.damage + dmg * 0.6, 100.0)
+					c.damage = minf(c.damage + dmg * HIT_CAR_K, 100.0)
 					world.sound.emit(c.global_position, "crash", 0.8, 2.0, 120.0)
 
 

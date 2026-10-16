@@ -13,8 +13,12 @@ extends Node3D
 
 const FIRING_YAW_DEG := -1.0         # DOPLNIT: směr střelby ve stupních (0 = +Z, 90 = +X); -1 = automaticky podle terénu
 const START_D := 16.0                # stůl stojí tolik m od dveří chaty
-const STAND_R := 14.0                # do kolika m od stolu se střelba počítá jako střelnice
-const LANE_DOT := 0.6                # min. cos úhlu mezi směrem výstřelu a dráhou (vodorovně)
+static var STAND_R := 14.0                # do kolika m od stolu se střelba počítá jako střelnice
+static var LANE_DOT := 0.6                # min. cos úhlu mezi směrem výstřelu a dráhou (vodorovně)
+## M8.D2b: XP Střelby za zásah terče – laditelné v menu F3 (Činnosti / Lov a balistika).
+static var XP_BASE := 0.5             # XP za zásah: základ
+static var XP_PER_PT := 0.25          # + za každý bod
+static var XP_DIST_M := 40.0          # m – na tuto vzdálenost se XP zdvojnásobí
 const MARKS_MAX := 40                # tolik zásahů se na jednom terči drží (nejstarší mizí)
 const SCORE_KEEP := 5
 ## Terče: [vzdálenost od stolu (m), boční posun (m), poloměr (m), střed nad zemí (m)]
@@ -240,7 +244,7 @@ func on_hit(id: int, idx: int, hit_pos: Vector3, w: String, shooter_pos: Vector3
 	if pts > 0:
 		world.notify(id, "show_message", ["Terč %d m: %d bodů (%s)" % [roundi(float(t["dist"])), pts, wname], 2.5])
 		# XP Střelby: přesnost (body) × vzdálenost – na 100 m z pušky se vyplatí nejvíc
-		var xp := (0.5 + 0.25 * float(pts)) * (1.0 + dist / 40.0)
+		var xp := (XP_BASE + XP_PER_PT * float(pts)) * (1.0 + dist / XP_DIST_M)
 		world.give_xp(id, "strelba", xp, "střelnice")
 	else:
 		world.notify(id, "show_message", ["Terč %d m: mimo kruhy." % roundi(float(t["dist"])), 2.0])

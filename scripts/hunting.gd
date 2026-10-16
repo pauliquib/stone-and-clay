@@ -39,30 +39,42 @@ const FALLBACK := {
 ## Všechny druhy zvěřiny v ItemsDB (pro výkup s dokladem).
 const VENISON_ITEMS := ["zverina_srnci", "zverina_divocak", "zverina_zajic"]
 
-const INTERACT_R := 2.6              # dosah nabídky u těla (m)
-const LIFT_R := 3.0                  # dosah zvednutí na rameno (G)
-const FOUND_R := 15.0                # tak blízko musí hráč k postřelenému zvířeti, aby se „dohledalo“
-const SEE_CARCASS_R := 25.0          # do kolika m vesničan uvidí hráče s nelegálním úlovkem
-const NEAR_CARCASS_R := 8.0          # hráč je „u svého úlovku“ do tolika m
-const SHOT_WITNESS_R := {"luk": 60.0, "kuse": 60.0, "puska": 250.0}   # kdo střelbu uvidí / uslyší (puška je slyšet dál)
-const SHOT_WITNESS_DEFAULT_R := 100.0
-const TICK_S := 3.0
-const KARMA_POACH := -3.0            # za každý nelegálně ulovený kus
-const KARMA_UNFOUND := -5.0          # postřelené zvíře, které hráč nedohledal („trpí“)
-const KARMA_NEIGHBOR := -1.0
-const RESPECT_NEIGHBOR := 1.0        # štamgasti +1 za „sousedy, kteří se neptají“
-const GUT_TIME_K := 0.35             # vyvrhnutí trvá reálně tolik z tabulky `vyvrhnout_s` (DOPLNIT: prompt chce 30–90 s)
-const GUT_BLACKOUT_S := 2.5
-const DOC_COVER_PCS := 15            # jeden doklad o původu kryje tolik kusů zvěřiny při prodeji
-const CARRY_MAX_KG := 35.0           # víc na rameno nevezmeš (těžší: vozík / auto, `Cargo`, M2.10)
+static var INTERACT_R := 2.6              # dosah nabídky u těla (m)
+static var LIFT_R := 3.0                  # dosah zvednutí na rameno (G)
+static var FOUND_R := 15.0                # tak blízko musí hráč k postřelenému zvířeti, aby se „dohledalo“
+static var SEE_CARCASS_R := 25.0          # do kolika m vesničan uvidí hráče s nelegálním úlovkem
+static var NEAR_CARCASS_R := 8.0          # hráč je „u svého úlovku“ do tolika m
+static var SHOT_WITNESS_R := {"luk": 60.0, "kuse": 60.0, "puska": 250.0}   # kdo střelbu uvidí / uslyší (puška je slyšet dál)
+static var SHOT_WITNESS_DEFAULT_R := 100.0
+static var TICK_S := 3.0
+static var KARMA_POACH := -3.0            # za každý nelegálně ulovený kus
+static var KARMA_UNFOUND := -5.0          # postřelené zvíře, které hráč nedohledal („trpí“)
+static var KARMA_NEIGHBOR := -1.0
+static var RESPECT_NEIGHBOR := 1.0        # štamgasti +1 za „sousedy, kteří se neptají“
+static var GUT_TIME_K := 0.35             # vyvrhnutí trvá reálně tolik z tabulky `vyvrhnout_s` (DOPLNIT: prompt chce 30–90 s)
+static var GUT_BLACKOUT_S := 2.5
+static var DOC_COVER_PCS := 15            # jeden doklad o původu kryje tolik kusů zvěřiny při prodeji
+static var CARRY_MAX_KG := 35.0           # víc na rameno nevezmeš (těžší: vozík / auto, `Cargo`, M2.10)
 const CARRY_SHOULDER := Vector3(0.0, 1.3, 0.0)
-const CARRY_STAMINA_K := 0.03        # úbytek výdrže za s při chůzi s nákladem × (kg / 20)
+static var CARRY_STAMINA_K := 0.03        # úbytek výdrže za s při chůzi s nákladem × (kg / 20)
 const BLOOD_MAX := 300
-const BLOOD_LIFE_MIN := 120.0        # krvavá kapka zmizí za 2 herní hodiny
-const BLOOD_RAIN_K := 3.0            # v dešti 3× rychleji
+static var BLOOD_LIFE_MIN := 120.0        # krvavá kapka zmizí za 2 herní hodiny
+static var BLOOD_RAIN_K := 3.0            # v dešti 3× rychleji
 const BLOOD_COLOR := Color(0.32, 0.03, 0.03)
-const ROADKILL_R := 60.0             # sražená zvěř do tolika m od hráče se dá „přivlastnit“ (pytláctví)
-const PICK_ROADKILL_R := 3.0
+static var ROADKILL_R := 60.0             # sražená zvěř do tolika m od hráče se dá „přivlastnit“ (pytláctví)
+static var PICK_ROADKILL_R := 3.0
+## M8.D2b: dřív čísla ve vzorcích – laditelné v menu F3 (Činnosti / Lov a balistika). Výchozí = původní čísla.
+static var GUT_FULL_KG := 90.0        # kg živé váhy = nejdelší vyvrhnutí z tabulky
+static var GUT_SKILL_K := 0.4         # dovednost Myslivost zkrátí vyvrhnutí až o tolik
+static var CARRY_SLOW_KG := 60.0      # kg na rameni = nulová rychlost (lineárně, viz meze)
+static var CARRY_SLOW_MIN := 0.35     # nejpomalejší chůze se zvěří (×)
+static var CARRY_SLOW_MAX := 0.9      # nejrychlejší chůze se zvěří (×)
+static var CARRY_STAMINA_KG := 20.0   # kg, na které platí CARRY_STAMINA_K
+static var BLOOD_RAIN_FROM := 0.3     # déšť (0..1), od kterého krev mizí rychleji
+static var GONE_FAR_R := 40.0         # m – úlovek mizí, jen když je hráč dál
+static var XP_KILL := 10.0            # XP za úlovek
+static var XP_PROCESS_MIN := 10.0     # XP za zpracování zvěřiny
+static var XP_PROCESS_MAX := 25.0
 
 static var _data := {}
 
@@ -281,7 +293,7 @@ func on_animal_died(a: Animal) -> void:
 		if rep:
 			rep.change_karma(KARMA_POACH, "pytláctví: %s" % String(species_info(a.species).get("nazev", a.species)))
 		_msg(id, "Zvěř leží (E = co s ní). Je to pytláctví – drž se stranou od lidí.", 4.0)
-	world.give_xp(id, "myslivost", 10.0, "úlovek")
+	world.give_xp(id, "myslivost", XP_KILL, "úlovek")
 	world.emit_game_event(id, "hunt_kill", {"species": a.species, "legal": c.legal, "weapon": c.weapon, "pos": c.pos,
 		"kg": c.live_kg})
 
@@ -352,7 +364,7 @@ func add_blood(pos: Vector3) -> void:
 
 func _blood_tick(dt_game_min: float) -> void:
 	var k := 1.0
-	if world.weather != null and world.weather.rain > 0.3:
+	if world.weather != null and world.weather.rain > BLOOD_RAIN_FROM:
 		k = BLOOD_RAIN_K
 	for i in range(blood.size() - 1, -1, -1):
 		var b: Dictionary = blood[i]
@@ -429,7 +441,7 @@ func _carcass_tick(now: float) -> void:
 		if not c.legal and not c.reported and c.owner_id != 0:
 			_witness_carcass(c)
 		# zmizí po 2 dnech mimo domov
-		if c.carried_by == 0 and c.stored == "" and c.age_h(now) >= gone_h and world.nearest_player_dist(c.pos) > 40.0 \
+		if c.carried_by == 0 and c.stored == "" and c.age_h(now) >= gone_h and world.nearest_player_dist(c.pos) > GONE_FAR_R \
 				and Vector2(c.pos.x - home.x, c.pos.z - home.z).length() > home_r:
 			if c.unfound_penalty and not c.found:
 				_unfound(c.owner_id, c.species)
@@ -567,7 +579,7 @@ func _gut(id: int, c: Carcass) -> void:
 	var sk: Skills = world.skills.get(id)
 	var bonus := sk.bonus("myslivost") if sk else 0.0
 	var dur_a: Array = sp.get("vyvrhnout_s", [25, 45])
-	var dur := lerpf(float(dur_a[0]), float(dur_a[1]), clampf(c.live_kg / 90.0, 0.0, 1.0)) * GUT_TIME_K * (1.0 - 0.4 * bonus)
+	var dur := lerpf(float(dur_a[0]), float(dur_a[1]), clampf(c.live_kg / GUT_FULL_KG, 0.0, 1.0)) * GUT_TIME_K * (1.0 - GUT_SKILL_K * bonus)
 	p.controls_locked = true
 	var t := 0.0
 	var dark := false
@@ -626,7 +638,7 @@ func _process_home(id: int, c: Carcass) -> void:
 		extra = " a trofej (%s)" % ItemsDB.name_of(troph)
 	c.node.queue_free()
 	carcasses.erase(c)
-	world.give_xp(id, "myslivost", _rng.randf_range(10.0, 25.0), "zpracování zvěřiny")
+	world.give_xp(id, "myslivost", _rng.randf_range(XP_PROCESS_MIN, XP_PROCESS_MAX), "zpracování zvěřiny")
 	world.play_sfx(id, "pickup")
 	_msg(id, "Zpracováno: %d × %s%s." % [n, ItemsDB.name_of(item), extra], 4.0)
 	world.emit_game_event(id, "venison_processed", {"item": item, "n": n, "legal": c.legal})
@@ -673,7 +685,7 @@ func lift(id: int, c: Carcass) -> void:
 		return
 	c.carried_by = id
 	_carry[id] = {"c": c}
-	var k := clampf(1.0 - kg / 60.0, 0.35, 0.9)
+	var k := clampf(1.0 - kg / CARRY_SLOW_KG, CARRY_SLOW_MIN, CARRY_SLOW_MAX)
 	p.set_speed_mod(MOD_CARRY, {"walk_k": k, "no_sprint": true, "jump": Cargo.JUMP_CARRIED})   # se zvěří na rameni se neběhá, jen malý hop (M2.10)
 	c.node.set_physics_process(false)
 	_msg(id, "Neseš %s (%d kg). G = položit." % [String(sp.get("nazev", c.species)), roundi(kg)], 3.0)
@@ -756,7 +768,7 @@ func _carry_follow(delta: float) -> void:
 		# výdrž: chůze s břemenem unavuje; při nule ho hráč upustí
 		var hv := Vector2(p.velocity.x, p.velocity.z).length()
 		if hv > 0.5:
-			p.drain_stamina(delta * CARRY_STAMINA_K * carried_kg(id) / 20.0)
+			p.drain_stamina(delta * CARRY_STAMINA_K * carried_kg(id) / CARRY_STAMINA_KG)
 		if p.stamina <= 0.01:
 			_msg(id, "Došly ti síly – zvěř ti sklouzla z ramene.", 3.0)
 			drop(id)
