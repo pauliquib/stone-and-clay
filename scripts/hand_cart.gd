@@ -41,6 +41,7 @@ var puller: Player                      # hráč, který táhne (nastavuje `Carg
 var _wheels: Array[MeshInstance3D] = []
 var _tarp: MeshInstance3D
 var _rolled := 0.0
+var mud := Terramech.Probe.new()        # M8.13: úzká kola v blátě – odpor valení (`resist_k`), zpomalení chůze (`speed_k`)
 
 
 static func make(pos: Vector3, yaw: float) -> HandCart:
@@ -266,6 +267,13 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	right = right.normalized() if right.length() > 0.01 else Vector3.RIGHT
 	v -= right * right.dot(v) * minf(1.0, SIDE_GRIP * dt)
 	state.linear_velocity = v
+	# M8.13: odpor valení úzkých kol v blátě (síla proti pohybu, drží jako brzda)
+	if mud.resist_k > 0.001:
+		var hv := Vector3(v.x, 0.0, v.z)
+		var rmax := mud.resist_k * mass * 9.81
+		var need := hv.length() * mass / maxf(dt, 0.001)
+		if hv.length() > 0.01:
+			state.apply_central_force(-hv.normalized() * minf(rmax, need))
 	# vozík se nepřeklopí na bok (stabilizace klopení kolem podélné osy)
 	var fwd := -xf.basis.z
 	var err := xf.basis.y.cross(Vector3.UP).dot(fwd)
@@ -287,6 +295,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 
 
 func _process(delta: float) -> void:
+	Terramech.probe_cart(mud, delta, global_position, mass)       # M8.13 (obnova po 0,25 s)
 	# kola se točí podle rychlosti dopředu (vizuál)
 	var fv := linear_velocity.dot(-global_transform.basis.z)
 	_rolled += fv / WHEEL_R * delta

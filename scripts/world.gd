@@ -369,6 +369,11 @@ func build() -> void:
 	add_child(u_rampa)
 	u_rampa.build(self, terrain)
 	_setup_soil_water()                    # M8.7: vodní bilance (půda, sníh, odtok, toky) – po Water a Site
+	ruts = RutMap.new()                    # M8.13: terramechanika – koleje a stopy v blátě (deformační mapa, Terramech.bind)
+	ruts.name = "RutMap"
+	add_child(ruts)
+	ruts.setup(self)
+	debug_layers["unosnost"] = Callable(ruts, "debug_bearing")
 
 	loading.emit("Stromy (51 736)…")
 	await _frames(1)
@@ -4510,6 +4515,7 @@ func drone_person_under(pos: Vector3, r: float) -> bool:
 ## M8.7: vlhkost půdy, sníh, odtok a průtoky toků (`scripts/eko/soil_water.gd`, 00_PRINCIPY kap. 3).
 ## Mřížka se staví po kouscích přes `EcoClock.slice`, hodinový krok přes `eco_hour`; přepínač `soil_water`.
 var soil_water: SoilWater
+var ruts: RutMap                 # M8.13: koleje a stopy v blátě (scripts/priroda/rut_map.gd), bahno přes Terramech
 
 
 func _setup_soil_water() -> void:

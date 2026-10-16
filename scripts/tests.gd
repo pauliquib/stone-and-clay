@@ -2136,6 +2136,8 @@ const PERF_SCENES := {
 		"weather": "jasno", "popis": "M8.8: les u myslivecké chaty v létě bez mlhy – LOD0/LOD1 generovaných stromů zblízka, karty listí"},
 	"pole_rijen_vecer": {"pos": Vector3(600.0, 0.0, 600.0), "yaw": 0.0, "date": [2026, 10, 12], "hour": 17.9,
 		"weather": "jasno", "popis": "M8.10: pole v říjnu za soumraku – zvěř vychází na pole, hejno špačků (murmurace), vrány táhnou na nocoviště"},
+	"pole_blato": {"pos": Vector3(600.0, 0.0, 600.0), "yaw": 0.0, "date": [2026, 10, 20], "hour": 12.0,
+		"weather": "dest", "popis": "M8.13: pole v říjnu v dešti – terramechanika a koleje (sednout do auta / traktoru a jet po poli; profil „car“)"},
 }
 
 

@@ -118,6 +118,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["npc_grow"] = world.npc_grow.to_dict()       # M4.8: záhon zahrádkáře (starý save = žádný)
 	if world.soil_water:
 		d["soil_water"] = world.soil_water.to_dict()   # M8.7: vlhkost půdy, sníh, zásoby toků (base64, kompaktně)
+	if world.ruts:
+		d["ruts"] = world.ruts.to_dict()               # M8.13: koleje v blátě (jen dlaždice se stopami, ZSTD + base64, ≤ 2 MB)
 	if world.micro:
 		d["micro"] = world.micro.to_dict()             # M8.9: inverze, mlžná vrstva, rosa, noční minima (pár čísel)
 	if world.fences:
@@ -382,6 +384,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		world.npc_grow.restore(d.get("npc_grow", {}))         # M4.8: starý save bez klíče = žádný záhon
 	if world.soil_water:
 		world.soil_water.restore(d.get("soil_water", {}))     # M8.7: starý save bez klíče = rozběh z klimatu
+	if world.ruts:
+		world.ruts.restore(d.get("ruts", {}))                 # M8.13: starý save bez klíče = žádné koleje
 	if world.micro:
 		world.micro.restore(d.get("micro", {}))               # M8.9: starý save bez klíče = rozběh z dnešního počasí
 	if world.fences:

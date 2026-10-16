@@ -39,6 +39,16 @@ class Wheel extends RayCast3D:
 	var v_lat := 0.0                  # boční rychlost v místě kola (m/s, diagnostika smyku)
 	var sus_len := 0.0                # aktuální délka pružení attach→střed (m)
 	var contact_body: Object = null   # collider pod kolem (pro _surface_grip)
+	# M8.13 terramechanika (jen kolo na terénu, `Car._tm_active`)
+	var tc: Terramech.Contact = null  # výsledek kontaktu s půdou (sdílený objekt kola, žádné alokace za snímek)
+	var soft := false                 # kolo stojí na měkkém terénu (počítá se zaboření)
+	var sink := 0.0                   # vyhlazené zaboření (m) – kolo a podvozek níž
+	var dig := 0.0                    # vyhrabaná díra prokluzem (m)
+	var rut := 0.0                    # hloubka už vyjeté koleje pod kolem (m, RutMap)
+	var tm_slip := 0.0                # 0..1 kolik tahu se protočilo (hrabe)
+	var tm_dir := 0.0                 # směr posledního tahu (kývání dopředu-dozadu)
+	var rut_at := Vector3.INF         # kde kolo naposledy zapsalo kolej
+	var rut_d := 0.0                  # a jak hlubokou
 
 	func is_in_contact() -> bool:
 		return is_colliding()
@@ -120,6 +130,24 @@ static var DRUNK_WOBBLE_MAX := 0.8
 static var DRUNK_OVER_K := 0.25         # přehnané korekce (na 1 ‰)
 static var MICROSLEEP_PROMILE := 1.2    # mikrospánek od (‰)
 static var MICROSLEEP_P := 0.35         # pravděpodobnost mikrospánku při každé příležitosti
+# M8.13 terramechanika – společné pro všechna vozidla (F3 → Vozidla/Terén a bláto, `scripts/dev/tune_m8_13.gd`)
+static var TM_DT := 0.2                 # jak často auto znovu přečte půdu pod sebou (s)
+static var TM_AI_R := 80.0              # auta AI počítají bláto jen do této vzdálenosti od hráče (m) – dál LOD vypnuto
+static var TM_SINK_RATE := 5.0          # rychlost, jakou kolo dosedne do zaboření (1/s)
+static var TM_DIG_RATE := 0.05          # prokluzující kolo se vyhrabe hlouběji (m/s při plném prokluzu)
+static var TM_DIG_MAX_R := 0.5          # nejhlubší vyhrabaná díra (× poloměr kola)
+static var TM_DIG_RECOVER := 0.08       # odvalující se kolo z díry vyjede (m díry na m jízdy)
+static var TM_ROCK_K := 0.25            # kývání: změna směru tahu zarovná tolik z díry (×)
+static var TM_SPIN_V := 6.0             # vizuální protáčení kola při plném prokluzu (m/s obvodu)
+static var TM_SIDE_K := 1.0             # boční přilnavost v blátě: nejvýš × tažná síla půdy
+static var TM_STUCK_S := 2.5            # hláška „Zapadl jsi“ po tolika s hrabání na místě
+static var TM_STUCK_V := 0.4            # „na místě“ = pomaleji než tohle (m/s)
+static var TM_PUSH_N := 1500.0          # síla, kterou hráč tlačí auto (N)
+static var TM_PUSH_UNDIG := 0.04        # tlačení zarovná díru pod koly (m/s)
+static var TM_RUT_STEP := 0.25          # kolej se zapisuje po tolika m
+static var TM_RUT_MIN := 0.012          # mělčí zaboření kolej nenechá (m)
+static var TM_RUT_K := 1.0              # hloubka koleje = zaboření × tohle
+static var TM_RUT_COMPACT := 0.6        # ve vyjeté koleji je půda ulehlá: zaboření − kolej × tohle
 
 
 ## M8.D: laditelné parametry fyziky podle druhu vozidla (auto, traktor, motorka, kolo) – jeden sdílený objekt
@@ -209,6 +237,10 @@ class Tune extends RefCounted:
 	var back_vmax := 1.5              # tlačení dozadu do rychlosti (m/s)
 	var vmax_fade := 2.5              # síla šlapání slábne tolik m/s před max. rychlostí
 	var pedal_dmg := 200.0            # poškození: síla × (1 − poškození / tohle)
+	# M8.13 terramechanika (model může přepsat klíči `tire_w`, `tire_kpa`, `lug` ve specifikaci)
+	var tm_tire_w := 0.195            # šířka pneumatiky (m)
+	var tm_tire_kpa := 180.0          # tlak pneumatiky na zem ≈ huštění + tuhost kostry (kPa)
+	var tm_lug := 1.0                 # dezén: tažná síla v měkké půdě × (traktor: drapáky)
 
 	## Jednostopá: těžiště bez posunu dopředu; kolo navíc slabší brzdy (dřív přímo v `_pedal_force`).
 	static func make(kind: String) -> Tune:
@@ -217,6 +249,18 @@ class Tune extends RefCounted:
 			t.com_z = 0.0
 		if kind == "bike":
 			t.brake_decel = 7.5
+		match kind:                   # M8.13: pneumatiky podle druhu
+			"tractor":
+				t.tm_tire_w = 0.38
+				t.tm_tire_kpa = 70.0
+				t.tm_lug = 2.0
+			"moto":
+				t.tm_tire_w = 0.12
+				t.tm_tire_kpa = 220.0
+			"bike":
+				t.tm_tire_w = 0.04
+				t.tm_tire_kpa = 300.0
+				t.tm_lug = 0.9
 		return t
 
 
@@ -343,6 +387,17 @@ var _rain_roof: AudioStreamPlayer3D
 const DRIVER_SHOW_M := 120.0           # M5.11: řidič AI / policejního auta se zobrazí jen do této vzdálenosti od hráče
 const DRIVER_ANIM_M := 40.0            # a animuje se jen do této (dál stojí v pózе ride)
 var _ai_driver: Humanoid = null        # M5.11 viditelný řidič (AI a policejní auto; vizuál, bez fyziky a AI)
+# M8.13 terramechanika
+var _tm_soil: Terramech.Soil = null    # stav půdy pod autem (obnova po TM_DT)
+var _tm_t := 0.0
+var _tm_active := false                # počítá se bláto (hráčovo vozidlo / AI blízko hráče, přepínač terramech)
+var _tm_b := 0.195                     # šířka pneu (m)
+var _tm_kpa := 180.0                   # tlak na zem (kPa)
+var _tm_lug := 1.0
+var _tm_stuck_t := 0.0
+var _tm_msg := false
+var _push := Vector3.ZERO              # tlačení hráčem (push_by)
+var _push_t := 0.0
 
 ## Pružení kol v SI jednotkách (spec["susp"] z modelu je relativní násobek): M8.D – `tn.susp_k` / `tn.susp_c`
 ## (dřív @export suspension_stiffness 35000 / suspension_damping 5200).
@@ -411,6 +466,7 @@ func _ready() -> void:
 		w.collision_mask = collision_mask
 		w.exclude_parent = true
 		w.sus_len = rest                                   # start na klidové délce
+		w.tc = Terramech.Contact.new()                     # M8.13
 		var front := p.z > 0.0
 		w.front = front
 		w.traction = front == _driven_front
@@ -532,6 +588,10 @@ func _apply_tune() -> void:
 		# jinak se podvozek propadne k zemi
 		w.stiff = tn.susp_k * susp_scale * (tn.track1_stiff if single_track else 1.0)
 		w.damp = tn.susp_c * susp_scale * (tn.track1_damp if single_track else 1.0)
+	# M8.13: pneumatiky pro terramechaniku – klíče modelu mají přednost před druhem
+	_tm_b = float(spec.get("tire_w", tn.tm_tire_w))
+	_tm_kpa = float(spec.get("tire_kpa", tn.tm_tire_kpa))
+	_tm_lug = float(spec.get("lug", tn.tm_lug))
 
 
 ## M8.D: změna parametru v menu F3 – jen to, co se nečte za snímek (hmotnost, pružení, těžiště, gravitace).
@@ -1151,9 +1211,13 @@ func _physics_impl(delta) -> void:
 		_:
 			throttle = 0.0
 			brake_in = 0.0
-			handbrake = true
+			handbrake = _push_t <= 0.0          # M8.13: tlačené auto bez řidiče = neutrál, bez ruční brzdy
+	_tm_update(delta)
 	_powertrain(delta)
 	_wheels(delta)
+	if _push_t > 0.0:                        # M8.13: hráč tlačí (push_by)
+		_push_t -= delta
+		apply_central_force(_push * TM_PUSH_N)
 	# odpor vzduchu a valivý odpor
 	var v := linear_velocity
 	var vl := v.length()
@@ -1302,9 +1366,19 @@ func _wheels(delta: float) -> void:
 		w.spin += w.v_lon / w.radius * delta
 		var v_lat := w.v_lat
 		w.contact_body = w.get_collider() if have else null
+		# M8.13: měkký terén – zaboření (kolo a podvozek níž), odpor valení, omezená trakce
+		w.soft = _tm_active and have and w.contact_body != null and String(w.contact_body.get_meta("surface", "")) == "teren"
+		var sink_to := 0.0
+		if w.soft:
+			Terramech.wheel_contact(_tm_soil, w.load, _tm_b, w.radius, _tm_kpa, w.dig - w.rut * TM_RUT_COMPACT, w.tc)
+			sink_to = maxf(w.tc.sinkage_m, w.rut)
+		else:
+			w.dig = 0.0
+			w.tm_slip = 0.0
+		w.sink = lerpf(w.sink, sink_to, 1.0 - exp(-TM_SINK_RATE * delta))
 		var sus := w.rest + w.travel                       # bez kontaktu: plně vypružené (doraz)
 		if have:
-			sus = clampf(pt.distance_to(w.global_position) - w.radius, maxf(w.rest - w.travel, 0.02), w.rest + w.travel)
+			sus = clampf(pt.distance_to(w.global_position) - w.radius + w.sink, maxf(w.rest - w.travel, 0.02), w.rest + w.travel)
 		w.sus_len = sus
 		# tlumič: rychlost stlačování z rychlosti kontaktního bodu podél normály
 		var cvel := -v_pt.dot(n) if have else 0.0
@@ -1327,9 +1401,104 @@ func _wheels(delta: float) -> void:
 		if absf(w.v_lon) < hold_v:
 			# pomalý pohyb: brzda drží auto na místě (odpor proti rozběhu, ne sign-flick)
 			f_lon = w.engine_force + clampf(-w.v_lon * m_eff / delta, -w.brake, w.brake)
+		if w.soft:
+			f_lon = _tm_wheel_force(w, f_lon, m_eff, delta)
+			cap = minf(cap, w.tc.max_traction_n * _tm_lug * TM_SIDE_K)
+			f_lat = clampf(f_lat_d, -cap, cap)
 		apply_force(right_w * f_lat + fwd_w * f_lon, pt - xf.origin)
 		var dem := sqrt(f_lat_d * f_lat_d + f_lon * f_lon)
 		w.skid = 1.0 if dem <= cap or dem < 1.0 else clampf(cap / dem, 0.0, 1.0)
+		if w.soft:
+			w.skid = minf(w.skid, 1.0 - w.tm_slip)
+			_tm_rut(w, pt)
+
+
+# ------------------------------------------------------------------ M8.13 terramechanika
+
+## Throttling: půda pod autem a koleje pod koly se čtou jen po TM_DT. LOD: AI auto dál než TM_AI_R od hráče bláto
+## nepočítá (jezdí po silnici; i mimo ni stačí dnešní přilnavost z počasí).
+func _tm_update(delta: float) -> void:
+	_tm_t -= delta
+	if _tm_t > 0.0:
+		return
+	_tm_t = TM_DT
+	var on := Terramech.enabled() and (drive == Drive.PLAYER or _push_t > 0.0
+		or global_position.distance_squared_to(Terramech.focus) < TM_AI_R * TM_AI_R)
+	if on and _tm_soil == null:
+		_tm_soil = Terramech.Soil.new()
+	_tm_active = on
+	if not on:
+		return
+	var p := global_position
+	Terramech.sample_soil(_tm_soil, p.x, p.z)
+	var rm: RutMap = Terramech.world.ruts if Terramech.world != null else null
+	for w in wheels:
+		w.rut = rm.depth_at(w.get_collision_point()) if rm != null and w.soft else 0.0
+	# hláška hráči: hrabe na místě
+	if drive == Drive.PLAYER:
+		var slip := 0.0
+		for w in wheels:
+			if w.traction and w.soft:
+				slip = maxf(slip, w.tm_slip)
+		if slip > 0.5 and absf(speed) < TM_STUCK_V and throttle > 0.3:
+			_tm_stuck_t += TM_DT
+			if _tm_stuck_t > TM_STUCK_S and not _tm_msg:
+				_tm_msg = true
+				Terramech.notify(driver_id, "Zapadl jsi v blátě. Zkus kývání (dopředu – dozadu), roztlačit, nebo traktor.")
+		else:
+			_tm_stuck_t = 0.0
+			if absf(speed) > 2.0:
+				_tm_msg = false
+
+
+## Podélná síla kola v měkké půdě: tah / brzda omezené smykem půdy (Mohr–Coulomb × dezén), odpor valení
+## (kompakce, drží auto jako brzda), prokluz → vyhrabaná díra, kývání a jízda díru zarovnají.
+func _tm_wheel_force(w: Wheel, f_lon: float, m_eff: float, delta: float) -> float:
+	var hcap := w.tc.max_traction_n * _tm_lug
+	var demand := f_lon
+	f_lon = clampf(f_lon, -hcap, hcap)
+	var rr := w.tc.roll_resist_n
+	f_lon += clampf(-w.v_lon * m_eff / delta, -rr, rr)
+	var push := absf(w.engine_force)
+	w.tm_slip = clampf((push - hcap + rr) / push, 0.0, 1.0) if push > 1.0 else 0.0
+	if push > 1.0:
+		var dir := signf(w.engine_force)
+		if dir != w.tm_dir and w.tm_dir != 0.0:
+			w.dig *= 1.0 - TM_ROCK_K                  # kývání: změna směru zarovná díru
+		w.tm_dir = dir
+	if w.tm_slip > 0.05 and absf(w.v_lon) < TM_STUCK_V * 3.0:
+		w.dig = minf(w.dig + TM_DIG_RATE * w.tm_slip * delta, TM_DIG_MAX_R * w.radius)
+		w.spin += signf(demand) * TM_SPIN_V * w.tm_slip / w.radius * delta     # kolo se protáčí (vizuál)
+	elif absf(w.v_lon) > 0.3:
+		w.dig = maxf(w.dig - TM_DIG_RECOVER * absf(w.v_lon) * delta, 0.0)
+	if _push_t > 0.0:
+		w.dig = maxf(w.dig - TM_PUSH_UNDIG * delta, 0.0)
+	return f_lon
+
+
+## Kolej do deformační mapy (RutMap) – po TM_RUT_STEP m nebo když se kolo vyhrabe hlouběji.
+func _tm_rut(w: Wheel, pt: Vector3) -> void:
+	if w.sink < TM_RUT_MIN:
+		return
+	if w.rut_at.distance_squared_to(pt) < TM_RUT_STEP * TM_RUT_STEP and w.sink < w.rut_d + 0.02:
+		return
+	var rm: RutMap = Terramech.world.ruts if Terramech.world != null else null
+	if rm == null:
+		return
+	w.rut_at = pt
+	w.rut_d = w.sink
+	rm.stamp(pt, _tm_b * 0.5, w.sink * TM_RUT_K)
+
+
+## M8.13: hráč pěšky tlačí do auta (Player – kolize při chůzi). `dir` = vodorovný směr tlačení.
+func push_by(dir: Vector3) -> void:
+	dir.y = 0.0
+	if dir.length_squared() < 0.01:
+		return
+	_push = dir.normalized()
+	_push_t = 0.2
+	if _asleep and not kinematic:
+		set_asleep(false)
 
 
 ## Poloha kol pro vizuál: attach → střed kola podle délky pružení `w.sus_len` (fyzikální

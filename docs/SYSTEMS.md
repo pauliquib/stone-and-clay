@@ -587,6 +587,30 @@
   `odtok`, F2 → Příroda – ladění → „Průtoky toků (M8.7)“. Uložení: klíč `soil_water` (vlhkost a sníh po bajtech v
   base64, zásoby toků float32). Mřížka se po startu staví po kouscích (~30–40 s), do té doby platí staré
   globální chování.
+- **Bláto a koleje – terramechanika (M8.13)**: `Terramech` (`scripts/eko/terramech.gd`, statické funkce, `bind(world)`),
+  `World.ruts` (`RutMap`, `scripts/priroda/rut_map.gd`), přepínač Realismus `terramech`. **Půda v bodě** (`sample_soil`,
+  throttling volajícího): půdní třída `Site.soil` → tabulka Bekkerových konstant (n, k_c, k_φ) a smyku (c, φ) pro
+  „sucho“ a „rozmáčeno“ (Wong, *Theory of Ground Vehicles*, tab. 2.3, zjednodušeno na 6 tříd), mezi nimi rozmáčenost
+  = max(smoothstep vlhkosti `SoilWater.moisture_at`, bláto `mud_at`) (tuhosti geometricky), zamrzlá půda × tvrdost,
+  sníh (`snow_at`) jako vrstva navrch. **Kolo** (`wheel_contact`, bez alokací): zaboření = menší z Bekkerova tuhého kola
+  a pneumatiky jako desky s tlakem `tire_kpa`, kompakční odpor `b·k·z^(n+1)/(n+1)`, tažná síla Mohr–Coulomb
+  `A·c + W·tan φ` × dezén; výstup `sinkage_m, roll_resist_n, max_traction_n, slip_k`. **Auto** (`car.gd` `_tm_update`,
+  `_tm_wheel_force`): jen kola na povrchu „teren“ (ne asfalt / šterk), půda pod autem po 0,2 s, AI auta jen do 80 m
+  od hráče (LOD); kolo klesne o zaboření (pružení), odpor valení drží jako brzda, tah / brzda / boční síla omezené
+  smykem půdy, přebytek tahu = prokluz → vyhrabaná díra (hlouběji), kývání (změna směru) a jízda ji zarovnají, tlačení
+  hráčem (`push_by` z kolize chůze, 1,5 kN, auto bez řidiče na neutrál). Pneu podle druhu `Car.Tune.tm_*` (auto
+  0,195 m / 180 kPa, traktor 0,38 m / 70 kPa / drapáky 2×, motorka, kolo), model přepíše `tire_w`, `tire_kpa`, `lug`.
+  **Koleje** (`RutMap`): dlaždice 64 m × 256 px (0,25 m/px, half-float hloubka v m) vznikají až při prvním otisku,
+  nejvýš 24 v paměti, vzdálené ZSTD; shader terénu čte okno 3 × 3 dlaždic jako kruhový buffer (slot = index mod 3,
+  `uv = fract(svět / 192 m)`, při přejezdu hranice se přepíšou 3 sloty po jednom za snímek, nahrání textury po změně
+  nejvýš 4× za s) → ztmavení mokrou hlínou, svahy koleje v normále, louže v hlubších kolejích za mokra. Mizení přes
+  `eco_hour`: exp(−dt·(sucho 0,0006 + déšť 0,03 × intenzita + rozmáčení)) /h, mráz × 0,1 – aplikuje se líně
+  (`Image.adjust_bcs`). Zapisují kola (po 0,25 m), boty a kopyta. **Chodec / kůň / vozík** (`Probe`, obnova po 0,25 s):
+  zaboření desky (bota 25 kPa, kopyto 180 kPa) → zpomalení, přilnavost z `Weather.surface_grip_at` (bláto v místě místo
+  globálního mokra), čvachtání (`splash` s nízkým tónem), vozík: odpor úzkých kol jako síla + pomalejší chůze a výdrž
+  (`Cargo`). Ladění: vrstva mapy `unosnost`, F3 → Vozidla/Terén a bláto, Člověk/Pohyb hráče (Bláto –), Zvěř/Hospodářská
+  zvířata (Kůň – bláto), Příroda/Louže, stopy (Koleje v blátě –). Uložení: klíč `ruts` (dlaždice se stopami ZSTD +
+  base64, nejnovější do 2 MB, po 60 dnech bez nové stopy zapomenuté); starý save = žádné koleje.
 - **Mikroklima (M8.9)**: `World.micro` (`Microclimate`, `scripts/eko/microclimate.gd`), přepínač Realismus `micro`;
   vrstva **nad** `Weather` (nic v něm nemění) bez vlastní mřížky – stav je pár čísel: síla přízemní inverze `I` (K),
   rosný bod vzduchové hmoty, výška a hustota radiační mlhy nad dnem údolí, rosa, mrazová hranice. Krok jednou za herní

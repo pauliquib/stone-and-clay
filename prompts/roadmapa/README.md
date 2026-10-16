@@ -146,7 +146,7 @@ voda, vítr, světlo, mikroklima → stromy, rostliny, plodiny, zvěř → člov
 | [x] | M8.D Menu pro vývojáře (F3): živé ladění parametrů vozidel a systémů M8, export do `config.json` | [`M8_realismus/10b_menu_vyvojare.md`](M8_realismus/10b_menu_vyvojare.md) | M8.1–M8.10 · vložený krok (požadavek uživatele 16. 10. 2026) |
 | [ ] | M8.11 Fenologie a růst stromů v letech | [`M8_realismus/11_fenologie_a_rust.md`](M8_realismus/11_fenologie_a_rust.md) | M8.3, M8.9, (M8.8) |
 | [ ] | M8.12 Plodiny a zahrada podle růstového modelu | [`M8_realismus/12_plodiny_a_zahrada.md`](M8_realismus/12_plodiny_a_zahrada.md) | M8.7, M8.9, (M8.11) |
-| [ ] | M8.13 Terramechanika: bláto, zaboření, koleje | [`M8_realismus/13_terramechanika.md`](M8_realismus/13_terramechanika.md) | M8.7 |
+| [x] | M8.13 Terramechanika: bláto, zaboření, koleje | [`M8_realismus/13_terramechanika.md`](M8_realismus/13_terramechanika.md) | M8.7 |
 | [ ] | M8.14 Přízemní vegetace, seč, sukcese, interaktivní tráva | [`M8_realismus/14_prizemni_vegetace_louky_sukcese.md`](M8_realismus/14_prizemni_vegetace_louky_sukcese.md) | M8.2–M8.4, M8.7 |
 | [ ] | M8.15 Ekologie a populace zvěře | [`M8_realismus/15_ekologie_zvere.md`](M8_realismus/15_ekologie_zvere.md) | M8.2, M8.3, M8.11 |
 | [ ] | M8.16 Tělo 2: tepelná a energetická bilance, žízeň, pád | [`M8_realismus/16_telo_tepelna_a_energeticka_bilance.md`](M8_realismus/16_telo_tepelna_a_energeticka_bilance.md) | M8.9 |

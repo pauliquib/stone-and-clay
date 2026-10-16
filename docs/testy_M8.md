@@ -458,3 +458,30 @@ před krokem.
    se objeví (Louže, stopy „Stopy – zapisují se od sněhu“). „Situace Jasno – vítr“ 2 → 15 při Jasnu → HUD „silný vítr“.
 6. Voda a půda: déšť (F2 → Počasí Déšť) + „Odtok – CN: orná půda, skupina C“ 85 → 98 → po herní hodině F2 → Příroda – ladění
    → Průtoky ukáže vyšší Q a kalnost; ↺ vrátí. Výchozí (vše) → vše zpět, nic zvýrazněné.
+
+## M8.13 – Terramechanika: bláto, zaboření, koleje
+
+Pozn.: rozmáčenost bere vlhkost půdy z vodní bilance (M8.7) – ta se po startu staví ~30–40 s a déšť se do půdy
+promítne po herních hodinách (F2 → 5 dní deště, nebo spát). Mapa M s vrstvou `vlhkost` / `unosnost` ukáže, kde je
+niva mokrá a bořivá (červená). Kalibrace: osobní auto zapadne od rozmáčenosti ~0,6 na glejích / fluvizemích, traktor
+projede i při plné; v suchu je odpor valení na louce ~0,05 × tíha.
+
+1. F2 → Počasí Déšť, 5 dní (spát / posun času) → osobní auto na louku v nivě (vrstva `unosnost` červená) → zpomalí,
+   kola klesnou, hrabe na místě, hláška „Zapadl jsi v blátě…“ do ~3 s.
+2. Couvání / kývání (plyn ↔ brzda) → díra se zarovná, v okrajových místech se vyprostí; vystoupit a tlačit do auta
+   (chůze proti karoserii) → auto bez řidiče se pohne / díra se zmenší.
+3. Traktůrek na stejné louce → projede (pomaleji), za ním tmavé vyjeté koleje, za mokra s loužemi.
+4. F2 → Jasno 3 dny → koleje pořád vidět (tmavé); F2 → týden deště → zmizí (rozmáčené).
+5. Červenec, sucho, stejná louka → osobní auto projede bez potíží (rozjezd na trávě o kus horší než na asfaltu).
+6. Chůze blátem po dešti → pomalejší, čvachtání místo kroků, vlastní stopy (tečky) v blátě; kůň v blátě zpomalí a nechá otisky.
+7. Ruční vozík s dřevem přes rozmáčenou louku → jde těžko, pomalá chůze, rychleji dochází výdrž.
+8. F5 → F9 → koleje zůstanou (klíč `ruts`); starý save se načte bez kolejí.
+9. Esc → Nastavení → Realismus → vypnout „Bláto a koleje“ → auto na mokré louce jen klouže jako dřív, koleje se nekreslí.
+10. F3 → Vozidla/Terén a bláto: „Půda pseudoglej / glej – k_φ (tření) – rozmáčeno“ 90 → 1000 → auto na glejové louce
+    projede; ↺ vrátí.
+
+Co změřit: `--perfscene=pole_blato,30` (déšť na poli; sednout do auta / traktoru a jezdit po poli – profil „car“) a
+`--perfscene=pole_leto,30` s přepínačem „Bláto a koleje“ zapnutým / vypnutým. Očekávání: CPU +≤ 0,1 ms (hráčovo vozidlo:
+4× pár `pow` za fyzikální krok, půda po 0,2 s; AI auta dál než 80 m nic; okno kolejí: přepis slotu ~0,5 ms jen při
+přejezdu hranice 64 m, nahrání textury 768² při změně nejvýš 4×/s, mizení ~1 ms jednou za několik herních hodin
+na dlaždici); GPU +≤ 0,1 ms (3–5 vzorků textury na pixel terénu do 120 m). Cíl kroku +≤ 0,3 ms CPU, +≤ 0,3 ms GPU.
