@@ -143,6 +143,7 @@ voda, vítr, světlo, mikroklima → stromy, rostliny, plodiny, zvěř → člov
 | [ ] | M8.8 Generátor stromů (space colonization, LOD, impostory) | [`M8_realismus/08_generator_stromu.md`](M8_realismus/08_generator_stromu.md) | M8.3, M8.4 |
 | [ ] | M8.9 Mikroklima: inverze, údolní mlha, rosa, jinovatka | [`M8_realismus/09_mikroklima.md`](M8_realismus/09_mikroklima.md) | M8.2, M8.5, M8.7 |
 | [ ] | M8.10 Lokomoce zvířat 2 a let ptáků | [`M8_realismus/10_lokomoce_zvirat_a_let_ptaku.md`](M8_realismus/10_lokomoce_zvirat_a_let_ptaku.md) | M8.1, (M8.4) |
+| [ ] | M8.D Menu pro vývojáře (F3): živé ladění parametrů vozidel a systémů M8, export do `config.json` | [`M8_realismus/10b_menu_vyvojare.md`](M8_realismus/10b_menu_vyvojare.md) | M8.1–M8.10 · vložený krok (požadavek uživatele 16. 10. 2026) |
 | [ ] | M8.11 Fenologie a růst stromů v letech | [`M8_realismus/11_fenologie_a_rust.md`](M8_realismus/11_fenologie_a_rust.md) | M8.3, M8.9, (M8.8) |
 | [ ] | M8.12 Plodiny a zahrada podle růstového modelu | [`M8_realismus/12_plodiny_a_zahrada.md`](M8_realismus/12_plodiny_a_zahrada.md) | M8.7, M8.9, (M8.11) |
 | [ ] | M8.13 Terramechanika: bláto, zaboření, koleje | [`M8_realismus/13_terramechanika.md`](M8_realismus/13_terramechanika.md) | M8.7 |
