@@ -229,6 +229,17 @@ const MODELS := {
 }
 
 const HALF_PTS := 9
+## M8.D: živé (laditelné) kopie specifikací – jedna na model, sdílená všemi kusy; menu F3 (DevTune,
+## `scripts/dev/tune_vozidla.gd`) do nich zapisuje hmotnost, moment, převody, odpor, rejd, náklon…
+## `MODELS` zůstává konstantní katalog (ceny, kategorie, výchozí hodnoty).
+static var LIVE := {}
+
+
+## Laditelná kopie specifikace modelu `id` (vzniká při prvním použití hlubokou kopií `MODELS[id]`).
+static func live_spec(id: String) -> Dictionary:
+	if not LIVE.has(id):
+		LIVE[id] = (MODELS[id] as Dictionary).duplicate(true)
+	return LIVE[id]
 
 var model_id := "octavia"
 var kind := "car"             # car / bike / moto
@@ -264,7 +275,7 @@ var _mats: Array = []
 
 func _init(id := "octavia", color := Color(0.7, 0.1, 0.1), is_police := false, plate_text := "") -> void:
 	model_id = id
-	spec = MODELS[id]
+	spec = live_spec(id)          # M8.D: laditelná kopie (výchozí = MODELS)
 	# volitelný model z .glb (M1.6): jen když soubor existuje a je naimportovaný; jinak zůstává procedurální fallback
 	var glb: String = spec.get("glb", "")
 	if glb != "" and kind_of(id) == "car" and not spec.has("builder") and ResourceLoader.exists(glb):

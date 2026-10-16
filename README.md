@@ -75,6 +75,7 @@ Vize, pilíře a herní smyčka: [`GAME_DESIGN.md`](GAME_DESIGN.md).
 | M (mapa) | kolečko = zoom ke kurzoru, tažení = posun; mapa se překresluje jen při změně pohledu (marker hráče ~4× za s) | zavřít: M / Esc |
 | U | vysvobození ze zaseknutí | – |
 | F1 / Esc / F2 | nápověda / pauza a nastavení (mj. přepínač „Třes obrazu“ – abstinence a zima, ukládá se do `nastaveni.cfg`) / herní menu (čas, počasí, teleport…) | |
+| F3 | menu pro vývojáře – ladění parametrů (jen se zapnutým **Režimem vývojáře**, Esc → Nastavení → Vývoj) | také (hra běží dál) |
 
 Místa mají otevírací doby (`Place.HOURS` / `WEEK_HOURS`, výpis `hours_text()` ukazuje i víkend). Zavřené místo
 od dveří nenabízí práci, úkoly ani zboží (`World.buy` to hlídá taky) a obsluha stojí venku jen v otevírací době.
@@ -158,6 +159,18 @@ dopruží za pohybem a uši se natočí za zvukem; vyplašený srnec rozevře b�
 Ptáci létají podle zjednodušené aerodynamiky (`FlightModel`): vrána mává a klouže, kos vlní, káně krouží bez mávání
 v termice (`Thermals`, tam kde paraglide), proti větru letí pomaleji, přistávají s brzděním. V září–listopadu
 za soumraku se nad poli vlní hejna špačků (murmurace, až 400 ptáků). Měřicí scéna `pole_rijen_vecer`.
+
+### Menu pro vývojáře (F3, M8.D)
+
+Esc → Nastavení → Vývoj → **Režim vývojáře** (výchozí vypnuto, `nastaveni.cfg`) odemkne **F3**: živé ladění
+„fyzikálních funkcí světa“ – dlouhý seznam parametrů ve dvou úrovních (kategorie → podskupina): **Svět** (gravitace,
+fyzikální kroky, rychlost simulace a herního času, eko-takt, přilnavost povrchů) a **Vozidla** (auto, traktor, motorka,
+kolo, vlastnosti každého modelu, AI řidič, nárazy a opilý řidič, ruční vozík) – ~520 parametrů; další kategorie
+(Létání, Člověk, Činnosti, Příroda, Zvěř) doplňují kroky M8.D2 a další. Hra za otevřeného menu běží, změna platí hned.
+Hledání (název / id / nápověda), změněné řádky zvýrazněné, ↺ = výchozí, **Uložit** → `user://ladeni.cfg` (jen tento
+počítač), **Exportovat** → kořenový **`config.json`** (jen hodnoty odlišné od kódu, seřazené – nové výchozí hodnoty
+projektu, jdou do gitu; v exportované hře vedle spustitelného souboru). Pořadí při startu: kód → `config.json` →
+`ladeni.cfg` (automatické testy a `--shot` `ladeni.cfg` ignorují). Registr `DevTune`, návod v [`docs/DEV.md`](docs/DEV.md).
 
 ## Dokumentace
 

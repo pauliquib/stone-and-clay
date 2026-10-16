@@ -368,3 +368,32 @@ očekávání **+≤ 0,3 ms CPU** celkem (rig nově nealokuje a IK vzorkuje ter�
 `tools/launcher.sh --perfscene=pole_rijen_vecer` (říjen, soumrak, pole – zvěř na poli, vrány, hejno špačků; pokud se
 hejno ten den neobjeví, posunout datum o den): `murmuration` **≤ 0,3 ms** průměr (¼ hejna za snímek, max. 400 ptáků,
 1 draw call), GPU +≤ 0,2 ms. Pro srovnání totéž s vypnutým „Lokomoce zvířat a let ptáků“.
+
+## M8.D – Menu pro vývojáře
+
+Část M8.D1: registr `DevTune`, menu F3, Režim vývojáře, Uložit / Export a kategorie **Svět** + **Vozidla** (~520
+parametrů). Ostatní kategorie (Létání, Člověk, Činnosti, Příroda, Zvěř) doplní M8.D2 – do té doby v menu nejsou.
+
+1. Esc → Nastavení → Vývoj → zapnout „Režim vývojáře“; F1 ukáže řádek „F3 – menu pro vývojáře“. F3 otevře menu
+   vpravo (hra běží dál, kurzor je vidět), F3 i Esc ho zavřou (Esc nejdřív zavře menu, ne pauzu).
+2. Sednout do auta (Oktávka), F3 → Vozidla → Auto: „Brzdy – zpomalení“ z 8,8 na 4 → brzdná dráha znatelně delší;
+   „Přilnavost – tření pneu“ na 0,5 → auto v zatáčce klouže; ↺ vrátí výchozí, zvýraznění řádku zmizí.
+   Vozidla → Auto – modely → „Oktávka Kombi: Motor – max. moment“ 250 → 600 → zrychlení hned silnější.
+3. Psaní do hledání / čísla nepohne autem ani postavou (WASD stojí, dokud je fokus v poli); posuvníkem jde měnit
+   za jízdy (držet W, táhnout myší).
+4. Motorka Armádka / Krosák (F2 → Vozidla): Vozidla → Motorka – modely → „Náklon – největší náklon“ menší → v zatáčce
+   se nakloní míň; Vozidla → Motorka → „Náklon – vyvažování: tuhost“ na 3 → vratká. Kolo: „Šlapání – síla“ znát hned.
+5. Hledání „brz“ → brzdy auta, traktoru, motorky i kola (s nadpisy podskupin); „gravit“ → gravitace světa i vozidel.
+6. Svět → Čas „Rychlost herního času“ 30 → 120 → hodiny v HUD běží 4× rychleji; Svět → Povrchy „Přilnavost – suchý
+   asfalt“ 0,4 → auto i chůze kloužou.
+7. Uložit → ukončit, znovu spustit → hodnoty drží (zvýrazněné). Exportovat (potvrdit Ano) → v kořeni projektu
+   `config.json` jen se změněnými hodnotami, klíče seřazené; smazat `~/.local/share/godot/app_userdata/<hra>/ladeni.cfg`
+   → po restartu hodnoty platí z `config.json` (už nejsou zvýrazněné – jsou to nové výchozí). Po testu `config.json` smazat.
+8. Výchozí (skupina) a Výchozí (vše) se ptají v dolní liště (Ano / Ne) → vše zpět, zvýraznění zmizí.
+9. Ruční vozík (F2 → Hráč → Postavit ruční vozík, E = táhnout): Vozidla → Ruční vozík „Útlum puštěného vozíku“ 0,9 → 0,1 → na svahu
+   ujede daleko; „Tažení – pružina“ menší → vozík se za hráčem víc „vleče“.
+10. Režim vývojáře vypnout → F3 nic nedělá, F1 o něm nemluví; konzole bez chyb (`DevTune`, `DevMenu`, `Car`).
+
+Co změřit: `tools/launcher.sh --perfscene=…` (scéna s provozem) proti baseline – kategorie `car` beze změny
+(konstanty auta jsou teď členy sdíleného objektu `Car.TUNES` a `static var` – čtení za snímek ~stejné, registr se za
+snímek nečte); s otevřeným menu F3 jen cena UI.

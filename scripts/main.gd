@@ -59,6 +59,7 @@ func _ready() -> void:
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED)
 	if _args.has("maxfps"):
 		Engine.max_fps = int(_args["maxfps"])
+	DevTune.ensure()        # M8.D: laditelné parametry (config.json, ladeni.cfg) dřív, než se postaví svět a vozidla
 	world = World.new()
 	world.name = "Svet"
 	world.args = _args

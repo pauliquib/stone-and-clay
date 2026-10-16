@@ -9,7 +9,7 @@
 class_name Clock
 extends Node
 
-const TIME_SCALE := 30.0
+static var TIME_SCALE := 30.0       # M8.D: laditelné (F3 → Svět → Čas), čte se dál jako Clock.TIME_SCALE
 const LAT := 49.1                    # zeměpisná šířka obce (°) – přibližná
 const LON := 17.7                    # zeměpisná délka (°) – přibližná
 

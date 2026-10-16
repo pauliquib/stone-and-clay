@@ -56,6 +56,7 @@ var adult_content := false   # M4.8: obsah pro dospělé (návykové látky) –
 var vsync_from_args := false # --vsync / --novsync na příkazové řádce má přednost před uloženým nastavením
 var maxfps_from_args := false
 var renderer := "forward_plus"  # uloženo do nastaveni.cfg, čte ho run.sh (projeví se až po restartu hry)
+var dev_mode := false        # M8.D: Režim vývojáře – odemyká menu F3 (ladění parametrů, DevTune); výchozí vypnuto
 
 # --- grafika (indexy do tabulek níž)
 const PRESET_NAMES := ["Nízká", "Střední", "Vysoká", "Ultra", "Vlastní"]
@@ -148,6 +149,7 @@ func load_file() -> void:
 		renderer = RENDERER_VALUES[0]
 	for k in REALISM_KEYS:        # M8.1: přepínače realismu (sekce [realismus]); starý cfg bez klíče = výchozí true
 		realism[k] = bool(cf.get_value("realismus", k, realism.get(k, true)))
+	dev_mode = bool(cf.get_value("vyvojar", "rezim", dev_mode))     # M8.D
 
 
 func save_file() -> void:
@@ -171,6 +173,7 @@ func save_file() -> void:
 	cf.set_value("grafika", "renderer", renderer)
 	for k in REALISM_KEYS:
 		cf.set_value("realismus", k, bool(realism.get(k, true)))
+	cf.set_value("vyvojar", "rezim", dev_mode)
 	cf.save(PATH)
 
 

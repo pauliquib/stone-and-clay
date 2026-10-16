@@ -56,18 +56,173 @@ const WIPER_SWEEP := -1.6               # rozsah stírání (rad, záporný = na
 const WIPER_LEN := 0.56                 # délka ramena i s gumičkou (m)
 const WIPER_X := [0.55, 0.0]            # x os stěračů (řidič, spolujezdec)
 const WIPER_SPEED := 4.2                # rad/s (≈ cyklus tam a zpět za 3 s)
-const AI_SLOW := 0.45                   # AI řidič v plném dešti / mlze / sněhu zpomalí na ~55 %
-const AI_GAP := 0.8                     # a drží ~o tolik delší rozestup
-const AI_SHARP := 0.7                   # lom trasy větší než ~40° = ostrá zatáčka (AI zpomalí, cíl za rohem se zkracuje)
-const AI_LOOK_K := 0.6                  # pure pursuit: cílový bod L = clamp(AI_LOOK_K·v + AI_LOOK_BASE, MIN, MAX) před autem po trase
-const AI_LOOK_BASE := 3.0
-const AI_LOOK_MIN := 4.0
-const AI_LOOK_MAX := 14.0
-const AI_PASS_R := 2.5                  # bod trasy blíž než tohle je odbavený vždy (jinak až za rovinou rohu)
-const AI_BRAKE := 2.5                   # plánované zpomalení před zatáčkou (m/s²)
-const AI_REACT := 0.4                   # reakční rezerva řidiče + zpoždění regulátoru (s) – brzdí o kus dřív
-const AI_PASS_LEN := 20.0               # objíždění stojící překážky protisměrem na délce ~tolik m trasy
-const AI_STATIC_LIFT := 1.3            # střed kvádru hledání statické překážky nad pruhem (m) – nad hrboly terénu
+## M8.D: AI řidič – laditelné v menu pro vývojáře (F3 → Vozidla → AI řidič, `scripts/dev/tune_vozidla.gd`).
+## `static var` místo `const`: výchozí hodnota zůstává tady, DevTune do ní zapisuje (čte se dál jako `Car.AI_SLOW`).
+static var AI_SLOW := 0.45              # AI řidič v plném dešti / mlze / sněhu zpomalí na ~55 %
+static var AI_GAP := 0.8                # a drží ~o tolik delší rozestup
+static var AI_SHARP := 0.7              # lom trasy větší než ~40° = ostrá zatáčka (AI zpomalí, cíl za rohem se zkracuje)
+static var AI_LOOK_K := 0.6             # pure pursuit: cílový bod L = clamp(AI_LOOK_K·v + AI_LOOK_BASE, MIN, MAX) před autem po trase
+static var AI_LOOK_BASE := 3.0
+static var AI_LOOK_MIN := 4.0
+static var AI_LOOK_MAX := 14.0
+static var AI_PASS_R := 2.5             # bod trasy blíž než tohle je odbavený vždy (jinak až za rovinou rohu)
+static var AI_BRAKE := 2.5              # plánované zpomalení před zatáčkou (m/s²)
+static var AI_REACT := 0.4              # reakční rezerva řidiče + zpoždění regulátoru (s) – brzdí o kus dřív
+static var AI_PASS_LEN := 20.0          # objíždění stojící překážky protisměrem na délce ~tolik m trasy
+static var AI_STATIC_LIFT := 1.3        # střed kvádru hledání statické překážky nad pruhem (m) – nad hrboly terénu
+static var AI_HORIZON := 70.0           # jak daleko po trase AI plánuje rychlost podle zatáček (m)
+static var AI_ALAT_MIN := 2.0           # boční zrychlení ve vlásence (m/s²)
+static var AI_ALAT_MAX := 3.5           # boční zrychlení v široké zatáčce (m/s²)
+static var AI_ALAT_R := 20.0            # rozdíl poloměru (m) mezi vlásenkou (4 m) a širokou zatáčkou
+static var AI_SLIP_ALAT := 1.8          # o kolik méně bočního zrychlení na kluzku (× caution)
+static var AI_VMIN := 2.0               # nejnižší plánovaná rychlost na trase (m/s)
+static var AI_PASS_V := 5.0             # rychlost při objíždění (m/s)
+static var AI_PASS_OFFSET := 2.9        # boční posun při objíždění (m)
+static var AI_OFFSET_RATE := 1.5        # rychlost vybočení (m/s)
+static var AI_PASS_WAIT := 4.0          # po kolika s stání za překážkou ji objede
+static var AI_SEE_BASE := 4.0           # dohled na překážku: základ (m) …
+static var AI_SEE_K := 1.4              # … + tolik × rychlost (s)
+static var AI_OBST_DT := 0.1            # jak často hledá překážku (s)
+static var AI_STOP_GAP := 2.5           # zastaví tolik m před překážkou
+static var AI_SLIP_GAP := 4.0           # na kluzku navíc (m × caution)
+static var AI_FOLLOW_K := 0.6           # rychlost za překážkou = zbytek mezery × tohle (1/s)
+static var AI_CHASE_K := 0.7            # policie: rychlost = vzdálenost cíle × tohle (1/s)
+static var AI_STEER_RATE := 6.0         # rychlost otáčení volantem (1/s)
+static var AI_THR_K := 0.35             # P regulátor: plyn na 1 m/s chybějící rychlosti
+static var AI_BRK_K := 0.5              # P regulátor: brzda na 1 m/s přebytku rychlosti
+static var AI_CRUISE_THR := 0.12        # plyn při udržování rychlosti
+static var AI_STUCK_S := 2.0            # zaseknutí: po kolika s bez pohybu vycouvá
+static var AI_REVERSE_S := 1.8          # jak dlouho couvá (s)
+static var AI_HONK_S := 3.0             # troubí na překážku po tolika s stání
+static var AI_KIN_PASS := 7.0           # uspané (kinematické) auto odbaví bod trasy na tolik m
+## M8.D: společné pro všechna vozidla (F3 → Vozidla → Společné).
+static var VEH_G := 9.81                # gravitace vozidel (svět má 20 m/s² kvůli chůzi – auta jezdí s reálnou)
+static var FLIP_UP := 0.3               # převrácené = osa Y auta míří nahoru míň než tohle
+static var FLIP_S := 4.0                # AI auto převrácené tak dlouho se samo postaví (s)
+static var CRASH_DV := 2.2              # náraz = změna rychlosti za krok větší než tohle (m/s)
+static var CRASH_VERT := 0.35           # svislá složka změny rychlosti se počítá jen z části (doskoky)
+static var CRASH_COOL := 0.35           # mezi dvěma nárazy aspoň (s)
+static var CRASH_DMG_FROM := 2.0        # poškození = (náraz − tohle) × CRASH_DMG_K
+static var CRASH_DMG_K := 4.5
+static var CRASH_DMG_MAX := 60.0        # nejvíc poškození z jednoho nárazu (%)
+static var CRASH_UNDERBODY := 0.3       # dopad na podvozek (terén, silnice) poškodí jen z části
+static var SMOKE_DAMAGE := 45.0         # od tohoto poškození kouří motor (%)
+static var DEFORM_K := 0.018            # hloubka promáčknutí na 1 m/s nárazu (m)
+static var DEFORM_MAX := 0.22           # nejhlubší promáčknutí (m)
+static var HIT_V := 3.0                 # srážka s člověkem od rychlosti směrem k němu (m/s)
+static var HIT_COOL := 2.5              # stejný člověk znovu nejdřív po (s)
+static var KNOCK_K := 0.6               # odhození člověka: podíl rychlosti auta
+static var KNOCK_UP := 0.35             # a nahoru (× rychlost nárazu)
+static var DRUNK_DELAY_K := 0.16        # opilý řidič: zpoždění reakce (s na 1 ‰)
+static var DRUNK_DELAY_MAX := 0.6
+static var DRUNK_WOBBLE_K := 0.35       # rozkmit volantu (na 1 ‰)
+static var DRUNK_WOBBLE_MAX := 0.8
+static var DRUNK_OVER_K := 0.25         # přehnané korekce (na 1 ‰)
+static var MICROSLEEP_PROMILE := 1.2    # mikrospánek od (‰)
+static var MICROSLEEP_P := 0.35         # pravděpodobnost mikrospánku při každé příležitosti
+
+
+## M8.D: laditelné parametry fyziky podle druhu vozidla (auto, traktor, motorka, kolo) – jeden sdílený objekt
+## na druh (`TUNES`), auto čte své `tn.<parametr>` (žádné čtení registru za snímek). Výchozí hodnoty = původní
+## čísla z kódu; DevTune je při startu i při změně v menu F3 zapisuje přímo sem (`scripts/dev/tune_vozidla.gd`).
+## Vlastnosti jednotlivých modelů (hmotnost, moment, převody, odpor, rejd, náklon…) jsou v `CarModel.live_spec(id)`.
+class Tune extends RefCounted:
+	# pružení a karoserie
+	var susp_k := 35000.0             # tuhost pružiny za kolo při susp = 26 (N/m) – dřív @export suspension_stiffness
+	var susp_c := 5200.0              # tlumení za kolo při susp = 26 (N·s/m) – dřív @export suspension_damping
+	var susp_rest := 0.16             # klidová délka pružení (m)
+	var susp_travel := 0.45           # zdvih / doraz (m)
+	var susp_rebound := 1.45          # odpružení tlumí víc než stlačení (×)
+	var susp_fmax_g := 2.5            # strop síly pružiny (× m·g)
+	var susp_droop_g := 0.2           # tah visícího kola (× m·g)
+	var track1_stiff := 2.0           # jednostopé (2 kola v ose): tuhost ×
+	var track1_damp := 1.4            # a tlumení ×
+	var com_z := 0.05                 # těžiště dopředu (m)
+	var ang_damp := 0.4               # útlum otáčení karoserie
+	var body_friction := 0.4          # tření karoserie (nárazy, klouzání po boku)
+	var body_bounce := 0.05           # odraz karoserie
+	var roll_res := 0.012             # valivý odpor (× m·g)
+	# motor a převodovka
+	var idle_rpm := 800.0
+	var tq_low_x := 0.3               # momentová křivka: do tohoto podílu max. otáček roste …
+	var tq_low_f := 0.55              # … z tohoto podílu momentu
+	var tq_high_x := 0.65             # od tohoto podílu otáček klesá …
+	var tq_high_f := 0.72             # … na tento podíl při max. otáčkách
+	var rev_ratio := 3.3              # převod zpátečky
+	var clutch_rpm := 1300.0          # pod těmito otáčkami prokluzuje spojka (rozjezd)
+	var launch_rpm := 2200.0          # otáčky při rozjezdu s plným plynem
+	var rpm_follow := 12.0            # jak rychle otáčky sledují kola (1/s)
+	var limiter_over := 200.0         # omezovač: otáčky nad max. (ot/min)
+	var up_rpm := 2600.0              # řazení nahoru při malém plynu (ot/min) …
+	var up_frac := 0.93               # … a při plném plynu (podíl max. otáček)
+	var up_min_v := 2.0               # nahoru řadí až od rychlosti (m/s)
+	var shift_up_s := 0.3             # prodleva řazení nahoru (s)
+	var shift_down_s := 0.25          # prodleva řazení dolů (s)
+	var down_rpm := 1300.0            # podřazení pod otáčkami
+	var kick_thr := 0.8               # kickdown od plynu
+	var kick_frac := 0.8              # kickdown jen když nižší stupeň nepřetočí (podíl max. otáček)
+	var kick_rpm_frac := 0.55         # kickdown pod tímto podílem max. otáček
+	var driveline_eff := 0.9          # účinnost převodů
+	var dmg_power_from := 50.0        # motor ztrácí výkon od poškození (%)
+	var dmg_power_loss := 0.5         # nejvíc ztraceného výkonu
+	var engine_brake := 0.9           # brzdění motorem (m/s²)
+	# brzdy
+	var brake_decel := 8.8            # zpomalení při plné brzdě (m/s²)
+	var hand_decel := 7.0             # ruční brzda na zadních kolech (m/s²)
+	var hand_grip := 0.55             # boční přilnavost zadních kol s ruční brzdou (×)
+	var brake_hold_v := 0.1           # pod touto rychlostí kola drží brzdou na místě (m/s)
+	# přilnavost
+	var tire_mu := 1.05               # základní tření pneu (× povrch × model)
+	var xfer_v := 10.0                # přenos zatížení naplno od rychlosti (m/s)
+	var xfer_brake_f := 0.16          # brzda: přední kolo drží víc (+)
+	var xfer_brake_r := 0.10          # brzda: zadní kolo odlehčené (−)
+	var xfer_thr_f := 0.05            # plyn: přední odlehčené (−)
+	var xfer_thr_r := 0.08            # plyn: zadní drží víc (+)
+	# řízení
+	var steer_lock := 0.6             # rejd ve stání (rad)
+	var steer_clamp := 0.7            # mez natočení kol (rad)
+	var steer_in_rate := 3.2          # rychlost natáčení volantu hráčem (1/s)
+	var steer_out_rate := 5.0         # rychlost vracení volantu (1/s)
+	var rev_engage_v := 0.6           # brzda pod touto rychlostí zařadí zpátečku (m/s)
+	# náklon a vyvažování (jednostopá)
+	var bal_kp := 14.0                # vyvažování: tuhost (na rad odchylky)
+	var bal_kd := 3.5                 # vyvažování: tlumení
+	var cargo_stab_kg := 60.0         # náklad na nosiči: plná ztráta stability při tolika kg …
+	var cargo_stab_max := 0.4         # … nejvýš o tolik
+	var gyro_min := 0.45              # gyroskopický efekt ve stání (×)
+	var gyro_v := 14.0                # plný gyroskopický efekt od (m/s)
+	var park_gyro := 2.2              # zaparkovaná na stojánku (×)
+	var lean_from_v := 2.5            # náklon do zatáčky od rychlosti (m/s)
+	var lean_full_dv := 8.0           # plný náklon o tolik m/s výš
+	var lean_mu_cap := 1.6            # strop tření pro mez náklonu atan(µ)
+	var yaw_max := 1.2                # nejprudší zatáčení z náklonu (rad/s)
+	var camber_v := 2.0               # zatáčení náklonem (camber thrust) od rychlosti (m/s)
+	var stand_lean := 0.09            # náklon na stojánku (rad)
+	var lean_vis_rate := 6.0          # rychlost vizuálního náklonu (1/s)
+	var lean_vis_max := 0.75          # největší vizuální náklon (rad)
+	var cargo_com_kg := 25.0          # náklad posune těžiště dozadu o `cargo_com_step` na tolik kg …
+	var cargo_com_max := 1.5          # … nejvýš tolikrát
+	var cargo_com_step := 0.12        # (m)
+	# šlapání (kolo)
+	var pedal_ratio := 2.6            # převod šlapání (otáčky klik = kola / tohle)
+	var back_push := 0.4              # tlačení dozadu (× síla šlapání)
+	var back_vmax := 1.5              # tlačení dozadu do rychlosti (m/s)
+	var vmax_fade := 2.5              # síla šlapání slábne tolik m/s před max. rychlostí
+	var pedal_dmg := 200.0            # poškození: síla × (1 − poškození / tohle)
+
+	## Jednostopá: těžiště bez posunu dopředu; kolo navíc slabší brzdy (dřív přímo v `_pedal_force`).
+	static func make(kind: String) -> Tune:
+		var t := Tune.new()
+		if kind == "moto" or kind == "bike":
+			t.com_z = 0.0
+		if kind == "bike":
+			t.brake_decel = 7.5
+		return t
+
+
+## Sdílené parametry podle druhu (`_tune_kind()`): "car", "tractor", "moto", "bike".
+static var TUNES := {"car": Tune.make("car"), "tractor": Tune.make("tractor"), "moto": Tune.make("moto"),
+	"bike": Tune.make("bike")}
 const AI_GROUND := ["teren", "asfalt", "sterk"]   # vrstva 1, která překážkou není (povrch pod koly)
 const ROOF_DB_IN := -7.0                # déšť na střeše uvnitř auta
 const ROOF_DB_OUT := -24.0              # vnější tlumený
@@ -162,6 +317,8 @@ var _cam_idle := 0.0
 var _cam_pos := Vector3.ZERO
 var seat_pos := Vector3(0.38, 0.15, 0.0)
 var two_wheeler := false           # kolo / motorka
+var tn: Tune = TUNES["car"]        # M8.D: laditelné parametry fyziky druhu vozidla (sdílené, viz Tune)
+var _tkind := "car"                # druh pro DevTune: car / tractor / moto / bike
 # M1.6 – vlastnictví z bazaru (0 = základní vozidlo rodiny) a přívěs na tažném zařízení (M2.10)
 var bazaar_price := 0              # cena, za kterou hráč vozidlo koupil (základ pro výkup 60 %)
 var bazaar_year := 0               # rok výroby konkrétního kusu (z nabídky bazaru)
@@ -187,9 +344,8 @@ const DRIVER_SHOW_M := 120.0           # M5.11: řidič AI / policejního auta s
 const DRIVER_ANIM_M := 40.0            # a animuje se jen do této (dál stojí v pózе ride)
 var _ai_driver: Humanoid = null        # M5.11 viditelný řidič (AI a policejní auto; vizuál, bez fyziky a AI)
 
-## Pružení kol v SI jednotkách (spec["susp"] z modelu je relativní násobek).
-@export var suspension_stiffness := 35000.0   # N/m za kolo (při susp = 26)
-@export var suspension_damping := 5200.0      # N·s/m za kolo (při susp = 26)
+## Pružení kol v SI jednotkách (spec["susp"] z modelu je relativní násobek): M8.D – `tn.susp_k` / `tn.susp_c`
+## (dřív @export suspension_stiffness 35000 / suspension_damping 5200).
 
 
 func setup(id: String, color: Color, police := false, plate_text := "") -> void:
@@ -205,13 +361,14 @@ func _ready() -> void:
 	var spec := model.spec
 	seat_pos = model.seat
 	two_wheeler = model.kind != "car"
+	_tkind = _tune_kind()
+	tn = TUNES[_tkind]
 	mass = spec["mass"]
-	# projekt má gravitaci 20 m/s² (kvůli pocitu z chůze) – auta jezdí s reálnou 9,81 m/s²
-	gravity_scale = 9.81 / float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.81))
+	# projekt má gravitaci 20 m/s² (kvůli pocitu z chůze) – auta jezdí s reálnou 9,81 m/s² (VEH_G, gravity_scale
+	# nastaví _apply_tune)
 	collision_layer = 16
 	collision_mask = 1 | 2 | 4 | 8 | 16
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
-	center_of_mass = Vector3(0, spec.get("com_y", 0.62 if spec.get("boxy", false) else 0.48), 0.05 if not two_wheeler else 0.0)
 	contact_monitor = true
 	max_contacts_reported = 6
 	continuous_cd = true                 # Jolt: auto v rychlosti neprostřelí zeď/terén
@@ -219,12 +376,8 @@ func _ready() -> void:
 	linear_damp_mode = RigidBody3D.DAMP_MODE_REPLACE
 	linear_damp = 0.0
 	angular_damp_mode = RigidBody3D.DAMP_MODE_REPLACE
-	angular_damp = 0.4
 	_driven_front = spec.get("fwd", model_id in ["octavia", "fabia"])
-	var pm := PhysicsMaterial.new()
-	pm.friction = 0.4
-	pm.bounce = 0.05
-	physics_material_override = pm
+	physics_material_override = PhysicsMaterial.new()
 	var hull := ConvexPolygonShape3D.new()
 	hull.points = model.hull_points
 	var cs := CollisionShape3D.new()
@@ -241,7 +394,7 @@ func _ready() -> void:
 		vis.add_child(model.scene_root)
 	_plates()
 	var wr: float = spec["wheel_r"]
-	var rest := 0.16
+	var rest := tn.susp_rest
 	var wpos := model.wheel_positions()
 	var wmesh_l: Mesh = CarModel.wheel_mesh(wr, 1.0) if not two_wheeler else BikeModel.wheel_mesh(wr, float(spec.get("tire_w", 0.045 if model.kind == "bike" else 0.1)), model.kind == "moto")
 	var wmesh_r: Mesh = CarModel.wheel_mesh(wr, -1.0) if not two_wheeler else wmesh_l
@@ -249,23 +402,14 @@ func _ready() -> void:
 		wmesh_l = CarModel.first_mesh(spec["wheel_scene"])
 		wmesh_r = wmesh_l
 	var single_track := two_wheeler and float(spec.get("lean_max", 0.0)) > 0.0   # dvě kola v ose
-	# spec["susp"] (~20–42) = relativní tuhost podle modelu; výchozí auto 26 → exportní default
-	var susp_scale := float(spec.get("susp", 30.0 if spec.get("boxy", false) else 26.0)) / 26.0
 	for i in wpos.size():
 		var w := Wheel.new()
 		var p: Vector3 = wpos[i]
 		w.position = Vector3(p.x, wr + rest - 0.09, p.z)
 		w.attach = w.position
 		w.radius = wr
-		w.rest = rest
-		w.travel = 0.45                                  # doraz/droop – kolo dokáže sledovat prohlubně terénu
-		w.target_position = Vector3(0.0, -(rest + w.travel + wr), 0.0)  # paprsek sahá až po plně vypružené kolo (jako VehicleWheel3D)
 		w.collision_mask = collision_mask
 		w.exclude_parent = true
-		# single-track (2 kola v ose): každé kolo nese polovinu hmotnosti → dvojnásobná tuhost pružení,
-		# jinak se podvozek propadne k zemi
-		w.stiff = suspension_stiffness * susp_scale * (2.0 if single_track else 1.0)
-		w.damp = suspension_damping * susp_scale * (1.4 if single_track else 1.0)
 		w.sus_len = rest                                   # start na klidové délce
 		var front := p.z > 0.0
 		w.front = front
@@ -345,6 +489,62 @@ func _ready() -> void:
 	_cur_xf = global_transform
 	_prev_xf = _cur_xf
 	vis.global_transform = _cur_xf
+	_apply_tune()
+	DevTune.hub().changed.connect(_on_tune)     # M8.D: změna v menu F3 → hmotnost, pružení, těžiště hned
+
+
+## M8.D: druh vozidla pro sdílené laditelné parametry (`TUNES`, prefix id v DevTune).
+func _tune_kind() -> String:
+	if model.kind == "bike":
+		return "bike"
+	if model.kind == "moto":
+		return "moto"
+	if String(model.spec.get("builder", "")) == "tractor":
+		return "tractor"
+	return "car"
+
+
+## M8.D: hodnoty, které se nastavují jen jednou na tělese a kolech (ne za snímek) – při stavbě a po změně v menu F3.
+func _apply_tune() -> void:
+	var spec := model.spec
+	_mass0 = float(spec["mass"])
+	mass = _mass0 + cargo_kg
+	gravity_scale = VEH_G / float(DevTune.value("world.gravity",
+		ProjectSettings.get_setting("physics/3d/default_gravity", 9.81)))
+	var com_y := float(spec.get("com_y", 0.62 if spec.get("boxy", false) else 0.48))
+	if two_wheeler:
+		center_of_mass = Vector3(0, com_y, -clampf(cargo_kg / tn.cargo_com_kg, 0.0, tn.cargo_com_max) * tn.cargo_com_step)
+	else:
+		center_of_mass = Vector3(0, com_y, tn.com_z)
+	angular_damp = tn.ang_damp
+	var pm := physics_material_override
+	if pm != null:
+		pm.friction = tn.body_friction
+		pm.bounce = tn.body_bounce
+	var single_track := two_wheeler and float(spec.get("lean_max", 0.0)) > 0.0   # dvě kola v ose
+	# spec["susp"] (~20–42) = relativní tuhost podle modelu; výchozí auto 26 → tn.susp_k / susp_c
+	var susp_scale := float(spec.get("susp", 30.0 if spec.get("boxy", false) else 26.0)) / 26.0
+	for w in wheels:
+		w.rest = tn.susp_rest
+		w.travel = tn.susp_travel                          # doraz/droop – kolo dokáže sledovat prohlubně terénu
+		w.target_position = Vector3(0.0, -(w.rest + w.travel + w.radius), 0.0)  # paprsek až po plně vypružené kolo
+		# single-track (2 kola v ose): každé kolo nese polovinu hmotnosti → dvojnásobná tuhost pružení,
+		# jinak se podvozek propadne k zemi
+		w.stiff = tn.susp_k * susp_scale * (tn.track1_stiff if single_track else 1.0)
+		w.damp = tn.susp_c * susp_scale * (tn.track1_damp if single_track else 1.0)
+
+
+## M8.D: změna parametru v menu F3 – jen to, co se nečte za snímek (hmotnost, pružení, těžiště, gravitace).
+## Vlastnosti modelu tečou přes `CarModel.live_spec`; auto s vlastní kopií specifikace (.glb) si klíč dopíše.
+func _on_tune(id: String, v: Variant) -> void:
+	var mp := "model.%s." % model_id
+	if id.begins_with(mp):
+		var key := id.substr(mp.length())
+		if not key.begins_with("gear"):          # převody sdílí pole `gears` i kopie specifikace
+			model.spec[key] = v
+	elif not (id.begins_with(_tkind + ".") or id == "vehicle.gravity" or id == "world.gravity"):
+		return
+	_apply_tune()
 
 
 func _snd(stream: AudioStream, vol: float, dist: float) -> AudioStreamPlayer3D:
@@ -610,7 +810,7 @@ func kinematic_step(dt: float) -> void:
 		speed = 0.0
 		return
 	var pos := global_position
-	while ai_i < ai_path.size() - 1 and Vector2(ai_path[ai_i].x - pos.x, ai_path[ai_i].z - pos.z).length() < 7.0:
+	while ai_i < ai_path.size() - 1 and Vector2(ai_path[ai_i].x - pos.x, ai_path[ai_i].z - pos.z).length() < AI_KIN_PASS:
 		ai_i += 1
 	var tgt := ai_path[ai_i]
 	var dx := tgt.x - pos.x
@@ -870,7 +1070,8 @@ func set_cargo_kg(kg: float) -> void:
 	cargo_kg = maxf(kg, 0.0)
 	mass = _mass0 + cargo_kg
 	if two_wheeler:
-		center_of_mass = Vector3(0, float(model.spec.get("com_y", 0.48)), -clampf(cargo_kg / 25.0, 0.0, 1.5) * 0.12)
+		center_of_mass = Vector3(0, float(model.spec.get("com_y", 0.48)),
+			-clampf(cargo_kg / tn.cargo_com_kg, 0.0, tn.cargo_com_max) * tn.cargo_com_step)
 
 
 ## Nosnost tažného zařízení (kg); 0 = vozidlo netáhne nic.
@@ -958,7 +1159,7 @@ func _physics_impl(delta) -> void:
 	var vl := v.length()
 	if vl > 0.1:
 		var drag: float = model.spec["drag"]
-		apply_central_force(-v * vl * drag - v.normalized() * mass * 9.81 * 0.012 * minf(vl, 1.0))
+		apply_central_force(-v * vl * drag - v.normalized() * mass * VEH_G * tn.roll_res * minf(vl, 1.0))
 	# zvuk
 	var pitch := clampf(rpm / 60.0 * 2.0 / 42.0, 0.45, 4.5)
 	_engine.pitch_scale = lerpf(_engine.pitch_scale, pitch * float(model.spec.get("snd_pitch", 1.0)), 0.3)
@@ -984,9 +1185,9 @@ func _physics_impl(delta) -> void:
 	_detect_crash(delta)
 	_detect_people()
 	# převrácené auto
-	if global_transform.basis.y.y < 0.3 and linear_velocity.length() < 1.0:
+	if global_transform.basis.y.y < FLIP_UP and linear_velocity.length() < 1.0:
 		_flip_t += delta
-		if _flip_t > 4.0 and drive != Drive.PLAYER:
+		if _flip_t > FLIP_S and drive != Drive.PLAYER:
 			reset_upright()
 			_flip_t = 0.0
 	else:
@@ -1017,41 +1218,41 @@ func _balance(delta: float) -> void:
 		_roll = -asin(clampf(global_transform.basis.y.cross(Vector3.UP).dot(hf), -1.0, 1.0))   # + = náklon vpravo
 		var w_roll := angular_velocity.dot(hf)
 		# samovyvažování = gyroskopický efekt kol: roste s rychlostí, u stání zůstává ~polovina
-		var stab := 1.0 - clampf(cargo_kg / 60.0, 0.0, 0.4)          # náklad na nosiči: horší stabilizace
+		var stab := 1.0 - clampf(cargo_kg / tn.cargo_stab_kg, 0.0, tn.cargo_stab_max)   # náklad na nosiči: horší stabilizace
 		stab *= float(spec.get("stab", 1.0))
-		var gyro := lerpf(0.45, 1.0, clampf(absf(speed) / 14.0, 0.0, 1.0))
+		var gyro := lerpf(tn.gyro_min, 1.0, clampf(absf(speed) / tn.gyro_v, 0.0, 1.0))
 		if drive == Drive.NONE and absf(speed) < 0.5:
-			gyro = 2.2                                   # zaparkovaná: stojánek + ztuhlý rám, stojí pevně
+			gyro = tn.park_gyro                          # zaparkovaná: stojánek + ztuhlý rám, stojí pevně
 		stab *= gyro
 		# cílový náklon: vstup řízení → náklon (point-and-lean), autorská mez přilnavosti atan(mu),
 		# aby se na ledu/šotolině motorka nenakláněla víc, než pneu unesou
-		var auth := clampf((absf(speed) - 2.5) / 8.0, 0.0, 1.0)      # pod ~3 m/s se nenaklání (nepadá)
-		var mu := 1.05 * float(spec.get("grip", 1.0)) * (weather.surface_grip("asfalt") if weather != null else 0.9)
-		var tgt := -steer_in * minf(lean_max, atan(minf(mu, 1.6))) * auth if drive != Drive.NONE else 0.0
+		var auth := clampf((absf(speed) - tn.lean_from_v) / tn.lean_full_dv, 0.0, 1.0)   # pod ~3 m/s se nenaklání (nepadá)
+		var mu := tn.tire_mu * float(spec.get("grip", 1.0)) * (weather.surface_grip("asfalt") if weather != null else 0.9)
+		var tgt := -steer_in * minf(lean_max, atan(minf(mu, tn.lean_mu_cap))) * auth if drive != Drive.NONE else 0.0
 		var err := global_transform.basis.y.cross(Vector3.UP.rotated(hf, tgt)).dot(hf)
-		apply_torque(hf * (err * 14.0 - w_roll * 3.5) * mass * stab)
-		if drive != Drive.NONE and absf(speed) > 2.0:
+		apply_torque(hf * (err * tn.bal_kp - w_roll * tn.bal_kd) * mass * stab)
+		if drive != Drive.NONE and absf(speed) > tn.camber_v:
 			# camber thrust: nakloněné kolo tlačí do strany → yaw; uzavřená smyčka drží
 			# rovnovážnou zatáčku g·tan(roll)/v – větší náklon = prudší zatáčka, v rychlosti klidná
 			var yaw_up := angular_velocity.dot(Vector3.UP)
-			var want_yaw := clampf(-9.81 * tan(_roll) / absf(speed) * signf(speed), -1.2, 1.2)
+			var want_yaw := clampf(-VEH_G * tan(_roll) / absf(speed) * signf(speed), -tn.yaw_max, tn.yaw_max)
 			apply_torque(Vector3.UP * (want_yaw - yaw_up) * mass * float(spec.get("lean_yaw", 0.9)))
 		# vizuální přídavek už nepotřebujeme (náklon je v tuhém tělese); zaparkovaná na stojánku
-		var vwant := -0.09 if (drive == Drive.NONE and absf(speed) < 0.3) else 0.0
-		lean = lerpf(lean, vwant, 1.0 - exp(-6.0 * delta))
+		var vwant := -tn.stand_lean if (drive == Drive.NONE and absf(speed) < 0.3) else 0.0
+		lean = lerpf(lean, vwant, 1.0 - exp(-tn.lean_vis_rate * delta))
 	else:
 		var err := global_transform.basis.y.cross(Vector3.UP).dot(fwd)
 		var w_roll := angular_velocity.dot(fwd)
-		var stab := 1.0 - clampf(cargo_kg / 60.0, 0.0, 0.4)          # náklad na nosiči: horší stabilizace
+		var stab := 1.0 - clampf(cargo_kg / tn.cargo_stab_kg, 0.0, tn.cargo_stab_max)   # náklad na nosiči: horší stabilizace
 		stab *= float(model.spec.get("stab", 1.0))
-		apply_torque(fwd * (err * 14.0 - w_roll * 3.5) * mass * stab)
+		apply_torque(fwd * (err * tn.bal_kp - w_roll * tn.bal_kd) * mass * stab)
 		var yaw_rate := angular_velocity.dot(global_transform.basis.y)
-		var want := -atan(speed * yaw_rate / 9.81) if absf(speed) > 1.0 else 0.0
+		var want := -atan(speed * yaw_rate / VEH_G) if absf(speed) > 1.0 else 0.0
 		if drive == Drive.NONE and absf(speed) < 0.3:
-			want = -0.09                    # stojánek vlevo
-		lean = lerpf(lean, clampf(want, -0.75, 0.75), 1.0 - exp(-6.0 * delta))
+			want = -tn.stand_lean           # stojánek vlevo
+		lean = lerpf(lean, clampf(want, -tn.lean_vis_max, tn.lean_vis_max), 1.0 - exp(-tn.lean_vis_rate * delta))
 	if model.kind == "bike" and drive == Drive.PLAYER and throttle > 0.05 and gear == 1:
-		pedal_angle = fmod(pedal_angle + maxf(speed, 1.2) / float(model.spec["wheel_r"]) / 2.6 * delta, TAU)
+		pedal_angle = fmod(pedal_angle + maxf(speed, 1.2) / float(model.spec["wheel_r"]) / tn.pedal_ratio * delta, TAU)
 
 
 ## Kola (Jolt, náhrada VehicleWheel3D): paprsek z uchycení nápravy dolů o délce
@@ -1070,7 +1271,10 @@ func _wheels(delta: float) -> void:
 	var up := xf.basis.y.normalized()
 	var com := xf * center_of_mass                       # světové těžiště
 	var m_eff := mass / float(maxi(wheels.size(), 1))    # podíl hmotnosti na kolo
-	var f_max := mass * 9.81 * 2.5                       # strop pružné síly (dřív suspension_max_force)
+	var f_max := mass * VEH_G * tn.susp_fmax_g           # strop pružné síly (dřív suspension_max_force)
+	var f_droop := -mass * VEH_G * tn.susp_droop_g       # tah visícího kola
+	var rebound := tn.susp_rebound
+	var hold_v := tn.brake_hold_v
 	for w in wheels:
 		var steer_a := steering if w.front else 0.0
 		w.force_raycast_update()                           # čerstvý paprsek – po teleportu jinak vrací kontakt ze staré pozice
@@ -1104,11 +1308,11 @@ func _wheels(delta: float) -> void:
 		w.sus_len = sus
 		# tlumič: rychlost stlačování z rychlosti kontaktního bodu podél normály
 		var cvel := -v_pt.dot(n) if have else 0.0
-		var dk := 1.0 if cvel > 0.0 else 1.45            # odpružení tlumí víc než stlačení
+		var dk := 1.0 if cvel > 0.0 else rebound         # odpružení tlumí víc než stlačení
 		# za klidovou délkou jde síla do mínusu – kolo visí na dorazu a drží karoserii u země
 		# (jako VehicleBody3D); tah omezený, aby visící kolo neštíplo auto k zemi
 		var compr := w.rest - sus
-		var f_sus := clampf(w.stiff * compr + w.damp * dk * cvel, -mass * 9.81 * 0.2, f_max)
+		var f_sus := clampf(w.stiff * compr + w.damp * dk * cvel, f_droop, f_max)
 		w.load = maxf(f_sus, 0.0)
 		if f_sus != 0.0:
 			apply_force(n * f_sus, pt - xf.origin)
@@ -1120,7 +1324,7 @@ func _wheels(delta: float) -> void:
 		var f_lat_d := -v_lat * m_eff / delta
 		var f_lat := clampf(f_lat_d, -cap, cap)
 		var f_lon := w.engine_force - signf(w.v_lon) * w.brake
-		if absf(w.v_lon) < 0.1:
+		if absf(w.v_lon) < hold_v:
 			# pomalý pohyb: brzda drží auto na místě (odpor proti rozběhu, ne sign-flick)
 			f_lon = w.engine_force + clampf(-w.v_lon * m_eff / delta, -w.brake, w.brake)
 		apply_force(right_w * f_lat + fwd_w * f_lon, pt - xf.origin)
@@ -1158,7 +1362,7 @@ func _player_input(delta: float) -> void:
 	# --- opilost: zpoždění reakce, rozkmit volantu, mikrospánek
 	var p := body_state.promile() if body_state else 0.0
 	if p > 0.05:
-		var delay := clampf(p * 0.16, 0.0, 0.6)
+		var delay := clampf(p * DRUNK_DELAY_K, 0.0, DRUNK_DELAY_MAX)
 		_input_buf.append([_t, t, b, s, hb])
 		while _input_buf.size() > 1 and _t - _input_buf[1][0] >= delay:
 			_input_buf.pop_front()
@@ -1168,12 +1372,12 @@ func _player_input(delta: float) -> void:
 			b = d[2]
 			s = d[3]
 			hb = d[4]
-		s += _drunk_noise.get_noise_1d(_t * 20.0) * clampf(p * 0.35, 0.0, 0.8)
-		s = clampf(s * (1.0 + p * 0.25), -1.0, 1.0)     # přehnané korekce
+		s += _drunk_noise.get_noise_1d(_t * 20.0) * clampf(p * DRUNK_WOBBLE_K, 0.0, DRUNK_WOBBLE_MAX)
+		s = clampf(s * (1.0 + p * DRUNK_OVER_K), -1.0, 1.0)     # přehnané korekce
 		_microsleep_cool -= delta
-		if p > 1.2 and _microsleep <= 0.0 and _microsleep_cool <= 0.0:
+		if p > MICROSLEEP_PROMILE and _microsleep <= 0.0 and _microsleep_cool <= 0.0:
 			_microsleep_cool = randf_range(4.0, 10.0) / (p - 0.8)
-			if randf() < 0.35:
+			if randf() < MICROSLEEP_P:
 				_microsleep = randf_range(0.5, 0.4 + p * 0.5)
 		if _microsleep > 0.0:
 			_microsleep -= delta
@@ -1184,7 +1388,7 @@ func _player_input(delta: float) -> void:
 		t = 0.0
 		b = 1.0 if absf(speed) > 0.3 else 0.0
 		hb = true
-	steer_in = move_toward(steer_in, s, delta * (3.2 if absf(s) > absf(steer_in) else 5.0))
+	steer_in = move_toward(steer_in, s, delta * (tn.steer_in_rate if absf(s) > absf(steer_in) else tn.steer_out_rate))
 	# plyn/brzda ↔ zpátečka
 	if gear == -1:
 		throttle = b
@@ -1194,7 +1398,7 @@ func _player_input(delta: float) -> void:
 	else:
 		throttle = t
 		brake_in = b
-		if b > 0.1 and speed < 0.6 and t < 0.1:
+		if b > 0.1 and speed < tn.rev_engage_v and t < 0.1:
 			gear = -1
 	handbrake = hb
 
@@ -1203,10 +1407,10 @@ func _torque_at(r: float) -> float:
 	var rmax: float = model.spec["rpm_max"]
 	var x := r / rmax
 	var f := 1.0
-	if x < 0.3:
-		f = lerpf(0.55, 1.0, x / 0.3)
-	elif x > 0.65:
-		f = lerpf(1.0, 0.72, (x - 0.65) / 0.35)
+	if x < tn.tq_low_x:
+		f = lerpf(tn.tq_low_f, 1.0, x / tn.tq_low_x)
+	elif x > tn.tq_high_x:
+		f = lerpf(1.0, tn.tq_high_f, (x - tn.tq_high_x) / maxf(1.0 - tn.tq_high_x, 0.01))
 	return float(model.spec["torque"]) * f
 
 
@@ -1224,57 +1428,58 @@ func _powertrain(delta: float) -> void:
 			wrpm += absf(w.v_lon) / w.radius * 60.0 / TAU
 			n += 1
 	wrpm /= maxf(n, 1)
-	var ratio: float = (3.3 if gear == -1 else float(gears[gear - 1])) * final_d
+	var ratio: float = (tn.rev_ratio if gear == -1 else float(gears[gear - 1])) * final_d
 	var eng_rpm := wrpm * ratio
 	var dead := damage >= 100.0
 	if model.kind == "bike":
 		_pedal_force(wrpm, dead)
 		return
 	# spojka – rozjezd
-	if eng_rpm < 1300.0:
-		eng_rpm = lerpf(maxf(eng_rpm, IDLE_RPM), 2200.0, throttle * (1.0 - clampf(eng_rpm / 1300.0, 0.0, 1.0)) + 0.0)
-	rpm = lerpf(rpm, clampf(eng_rpm, IDLE_RPM, rmax + 200.0), clampf(delta * 12.0, 0.0, 1.0))
+	var idle := tn.idle_rpm
+	if eng_rpm < tn.clutch_rpm:
+		eng_rpm = lerpf(maxf(eng_rpm, idle), tn.launch_rpm, throttle * (1.0 - clampf(eng_rpm / tn.clutch_rpm, 0.0, 1.0)) + 0.0)
+	rpm = lerpf(rpm, clampf(eng_rpm, idle, rmax + tn.limiter_over), clampf(delta * tn.rpm_follow, 0.0, 1.0))
 	if dead:
 		rpm = 0.0
 	# automat
 	_shift_t = maxf(_shift_t - delta, 0.0)
 	if gear >= 1 and _shift_t <= 0.0:
-		var up_at := lerpf(2600.0, rmax * 0.93, throttle)
-		if rpm > up_at and gear < gears.size() and speed > 2.0:
+		var up_at := lerpf(tn.up_rpm, rmax * tn.up_frac, throttle)
+		if rpm > up_at and gear < gears.size() and speed > tn.up_min_v:
 			gear += 1
-			_shift_t = 0.3
+			_shift_t = tn.shift_up_s
 		elif gear > 1:
 			var r_low := absf(speed) / wr * 60.0 / TAU * float(gears[gear - 2]) * final_d
-			if rpm < 1300.0 or (throttle > 0.8 and r_low < rmax * 0.8 and rpm < rmax * 0.55):
+			if rpm < tn.down_rpm or (throttle > tn.kick_thr and r_low < rmax * tn.kick_frac and rpm < rmax * tn.kick_rpm_frac):
 				gear -= 1
-				_shift_t = 0.25
+				_shift_t = tn.shift_down_s
 	# síla motoru
 	var force := 0.0
 	if not dead and _shift_t <= 0.0 and throttle > 0.01:
 		var tq := _torque_at(rpm) * throttle
 		if rpm > rmax:
 			tq = 0.0
-		tq *= 1.0 - clampf((damage - 50.0) / 100.0, 0.0, 0.5)
-		force = tq * ratio * 0.9 / wr
+		tq *= 1.0 - clampf((damage - tn.dmg_power_from) / 100.0, 0.0, tn.dmg_power_loss)
+		force = tq * ratio * tn.driveline_eff / wr
 		if gear == -1:
 			force = -force
-	var brake_force := mass * 8.8 / 4.0 * brake_in             # N za kolo (~ zpomalení 9 m/s²)
+	var brake_force := mass * tn.brake_decel / 4.0 * brake_in   # N za kolo (~ zpomalení 9 m/s²)
 	var engine_brake := 0.0
 	if throttle < 0.05 and not dead:
-		engine_brake = mass * 0.9 / 4.0
+		engine_brake = mass * tn.engine_brake / 4.0
 	var tire_grip := float(spec.get("grip", 1.0))              # přilnavost pneu podle modelu (motorky: lepší guma)
 	var lean_phys := float(spec.get("lean_max", 0.0)) > 0.0
-	var load_xfer := clampf(absf(speed) / 10.0, 0.0, 1.0)
+	var load_xfer := clampf(absf(speed) / tn.xfer_v, 0.0, 1.0)
 	for w in wheels:
 		var surf := _surface_grip(w)
-		var grip := 1.05 * surf * tire_grip
+		var grip := tn.tire_mu * surf * tire_grip
 		if not w.front and handbrake:
-			grip *= 0.55
+			grip *= tn.hand_grip
 		if lean_phys:
 			# podélný přenos zatížení: brzda naloží přední kolo (+grip vpředu, zadek odlehčený),
 			# plyn zadní – zadek sice drží líp, ale klouže při plném výkonu
-			grip *= 1.0 + (0.16 if w.front else -0.10) * brake_in * load_xfer
-			grip *= 1.0 + (-0.05 if w.front else 0.08) * throttle * load_xfer
+			grip *= 1.0 + (tn.xfer_brake_f if w.front else -tn.xfer_brake_r) * brake_in * load_xfer
+			grip *= 1.0 + (-tn.xfer_thr_f if w.front else tn.xfer_thr_r) * throttle * load_xfer
 		w.grip = grip
 		if w.traction and brake_in < 0.05:
 			w.engine_force = force / maxf(n, 1)
@@ -1284,9 +1489,9 @@ func _powertrain(delta: float) -> void:
 			w.brake = brake_force + (engine_brake if w.traction else 0.0)
 		if handbrake and not w.front:
 			w.engine_force = 0.0
-			w.brake = mass * 7.0 / 4.0
+			w.brake = mass * tn.hand_decel / 4.0
 	# řízení – menší rejd při rychlosti (steer_v = rychlost dosažení minima, steer_hi = minimum, steer_rate = rychlost náběhu)
-	var max_steer := lerpf(0.6, float(spec.get("steer_hi", 0.09)), clampf(absf(speed) / float(spec.get("steer_v", 33.0)), 0.0, 1.0))
+	var max_steer := _max_steer_at(speed)
 	var s_tgt := steer_in * max_steer
 	if lean_phys:
 		# svod řízení (trail): přední kolo se fyzikálně samo skládá do náklonu – tohle je u skutečné
@@ -1295,7 +1500,7 @@ func _powertrain(delta: float) -> void:
 		# protizatáčení: náhlá změna vstupu krátce vychýlí řídítka opačně – překopne motorku do náklonu
 		var sdot := (steer_in - _si_prev) / maxf(delta, 0.001)
 		s_tgt -= sdot * float(spec.get("countersteer", 0.02))
-	steering = move_toward(steering, clampf(s_tgt, -0.7, 0.7), delta * float(spec.get("steer_rate", 2.2)))
+	steering = move_toward(steering, clampf(s_tgt, -tn.steer_clamp, tn.steer_clamp), delta * float(spec.get("steer_rate", 2.2)))
 	_si_prev = steer_in
 	# brzdová světla
 	var bl := 3.0 if (brake_in > 0.1 or handbrake) else (0.9 if lights_on else 0.3)
@@ -1307,26 +1512,26 @@ func _pedal_force(wrpm: float, dead: bool) -> void:
 	var spec := model.spec
 	var vmax: float = spec["vmax"]
 	var push: float = spec["push"]
-	rpm = wrpm / 2.6
+	rpm = wrpm / tn.pedal_ratio
 	var force := 0.0
 	if not dead and throttle > 0.01:
 		if gear == -1:
-			force = -push * 0.4 * throttle * clampf(1.5 - absf(speed), 0.0, 1.0)
+			force = -push * tn.back_push * throttle * clampf(tn.back_vmax - absf(speed), 0.0, 1.0)
 		else:
-			force = push * throttle * clampf((vmax - speed) / 2.5, 0.0, 1.0) * (1.0 - damage / 200.0)
-	var brake_force := mass * 7.5 / 4.0 * brake_in             # N za kolo
+			force = push * throttle * clampf((vmax - speed) / tn.vmax_fade, 0.0, 1.0) * (1.0 - damage / tn.pedal_dmg)
+	var brake_force := mass * tn.brake_decel / 4.0 * brake_in   # N za kolo
 	var tire_grip := float(spec.get("grip", 1.0))
 	for w in wheels:
-		var grip := 1.05 * _surface_grip(w) * tire_grip
+		var grip := tn.tire_mu * _surface_grip(w) * tire_grip
 		if not w.front and handbrake:
-			grip *= 0.55
+			grip *= tn.hand_grip
 		w.grip = grip
 		w.engine_force = force * 0.5 if w.traction and brake_in < 0.05 else 0.0
 		w.brake = brake_force if brake_in >= 0.05 else 0.0
 		if handbrake and not w.front:
 			w.engine_force = 0.0
-			w.brake = mass * 7.0 / 4.0
-	var max_steer := lerpf(0.6, float(spec.get("steer_hi", 0.12)), clampf(absf(speed) / float(spec.get("steer_v", 12.0)), 0.0, 1.0))
+			w.brake = mass * tn.hand_decel / 4.0
+	var max_steer := _max_steer_at(speed)
 	steering = move_toward(steering, steer_in * max_steer, get_physics_process_delta_time() * float(spec.get("steer_rate", 2.6)))
 	model.tail_mat.emission_energy_multiplier = 0.9 if lights_on else 0.3
 
@@ -1353,9 +1558,9 @@ func _detect_crash(delta: float) -> void:
 	var dv := linear_velocity - _prev_vel
 	_prev_vel = linear_velocity
 	# očekávaná změna (gravitace, brzdy) je < 0,3 m/s za krok
-	var dvh := Vector3(dv.x, dv.y * 0.35, dv.z)
+	var dvh := Vector3(dv.x, dv.y * CRASH_VERT, dv.z)
 	var impact := dvh.length()
-	if impact < 2.2 or _crash_cool > 0.0:
+	if impact < CRASH_DV or _crash_cool > 0.0:
 		return
 	var bodies := get_colliding_bodies()
 	var what := "neznámo"
@@ -1374,17 +1579,17 @@ func _detect_crash(delta: float) -> void:
 			what = "člověk"
 	if bodies.is_empty():
 		return
-	_crash_cool = 0.35
-	var dmg := clampf((impact - 2.0) * 4.5, 0.0, 60.0)
+	_crash_cool = CRASH_COOL
+	var dmg := clampf((impact - CRASH_DMG_FROM) * CRASH_DMG_K, 0.0, CRASH_DMG_MAX)
 	if what in ["silnice", "cesta", "terén"] and dv.y > 0.0 and absf(dv.y) > Vector2(dv.x, dv.z).length():
-		dmg *= 0.3    # dopad na podvozek
+		dmg *= CRASH_UNDERBODY    # dopad na podvozek
 	damage = minf(damage + dmg, 100.0)
 	# deformace v místě nárazu
 	var ldir := global_transform.basis.inverse() * (-dv.normalized())
 	var hit := Vector3(clampf(ldir.x * 3.0, -1.0, 1.0) * model.half_width, 0.75,
 		clampf(ldir.z * 3.0, -1.0, 1.0) * model.length * 0.5)
-	model.deform(hit, -ldir.normalized() * Vector3(1, 0.3, 1), clampf(impact * 0.018, 0.02, 0.22), 0.55 + impact * 0.03)
-	if damage > 45.0:
+	model.deform(hit, -ldir.normalized() * Vector3(1, 0.3, 1), clampf(impact * DEFORM_K, 0.02, DEFORM_MAX), 0.55 + impact * 0.03)
+	if damage > SMOKE_DAMAGE:
 		_smoke.emitting = true
 	crashed.emit(impact, what, other)
 	if other is RigidBody3D and other.has_method("on_hit"):
@@ -1401,11 +1606,11 @@ func _detect_people() -> void:
 			var hv := Vector3(linear_velocity.x, 0.0, linear_velocity.z)
 			var rel := hv.dot(to_b.normalized()) if to_b.length() > 0.01 else hv.length()
 			var id := b.get_instance_id()
-			if rel > 3.0 and Time.get_ticks_msec() > int(_person_cool.get(id, 0)):
-				_person_cool[id] = Time.get_ticks_msec() + 2500
+			if rel > HIT_V and Time.get_ticks_msec() > int(_person_cool.get(id, 0)):
+				_person_cool[id] = Time.get_ticks_msec() + int(HIT_COOL * 1000.0)
 				hit_person.emit(b, rel)
 				if b.has_method("knock"):
-					b.knock(linear_velocity * 0.6 + Vector3.UP * rel * 0.35, rel)
+					b.knock(linear_velocity * KNOCK_K + Vector3.UP * rel * KNOCK_UP, rel)
 
 
 func _beacons() -> void:
@@ -1444,14 +1649,14 @@ func _ai_drive(delta: float) -> void:
 		target = ai_direct_target
 		want = ai_speed_limit
 		var dist := Vector2(target.x - pos.x, target.z - pos.z).length()
-		want = minf(want, maxf(dist * 0.7, 0.0))
+		want = minf(want, maxf(dist * AI_CHASE_K, 0.0))
 	elif ai_path.size() >= 2:
 		# posun po trase: bod se odbaví, až ho auto opravdu mine (rovina rohu), ne už na 7 m –
 		# při seříznutí rohu tak cíl nezůstane za autem (dřív kroužilo / couvalo)
 		_ai_advance(pos)
 		if _ai_pass_until >= 0 and ai_i > _ai_pass_until:
 			_ai_pass_until = -1
-		_ai_offset = move_toward(_ai_offset, 2.9 if _ai_pass_until >= 0 else 0.0, delta * 1.5)
+		_ai_offset = move_toward(_ai_offset, AI_PASS_OFFSET if _ai_pass_until >= 0 else 0.0, delta * AI_OFFSET_RATE)
 		# pure pursuit na bod trasy interpolovaný L metrů před průmětem auta (ne na vrchol trasy za autem)
 		var look := clampf(AI_LOOK_K * absf(speed) + AI_LOOK_BASE, AI_LOOK_MIN, AI_LOOK_MAX)
 		target = _ai_carrot(pos, look)
@@ -1467,7 +1672,7 @@ func _ai_drive(delta: float) -> void:
 				dist = Vector2(pos.x, pos.z).distance_to(pj)
 			elif j > ai_i:
 				dist += pj.distance_to(Vector2(ai_path[j - 1].x, ai_path[j - 1].z))
-			if dist > 70.0:
+			if dist > AI_HORIZON:
 				break
 			var d0 := pj - Vector2(ai_path[j - 1].x, ai_path[j - 1].z)
 			var d1 := Vector2(ai_path[j + 1].x, ai_path[j + 1].z) - pj
@@ -1479,14 +1684,14 @@ func _ai_drive(delta: float) -> void:
 			var half := minf(d0.length(), d1.length()) * 0.5
 			var r := maxf(half / tan(minf(ang, 3.0) * 0.5), 3.0)
 			# těsnější oblouk = menší boční zrychlení → hlubší zpomalení (široká zatáčka ~3,5 m/s², vlásenka ~2 m/s²)
-			var a_lat := lerpf(2.0, 3.5, clampf((r - 4.0) / 20.0, 0.0, 1.0))
+			var a_lat := lerpf(AI_ALAT_MIN, AI_ALAT_MAX, clampf((r - 4.0) / AI_ALAT_R, 0.0, 1.0))
 			# na kluzkém povrchu projede zatáčku s menším bočním zrychlením
-			var v_curve := sqrt(maxf(a_lat - caution * 1.8, 1.0) * r)
+			var v_curve := sqrt(maxf(a_lat - caution * AI_SLIP_ALAT, 1.0) * r)
 			var to_tangent := maxf((dist - half if j >= ai_i else 0.0) - react, 0.0)
 			want = minf(want, sqrt(v_curve * v_curve + 2.0 * AI_BRAKE * to_tangent))
-		want = maxf(want, 2.0)
+		want = maxf(want, AI_VMIN)
 		if _ai_offset > 0.3:
-			want = minf(want, 5.0)     # objíždí → pomalu
+			want = minf(want, AI_PASS_V)     # objíždí → pomalu
 		var end_d := Vector2(ai_path[ai_path.size() - 1].x - pos.x, ai_path[ai_path.size() - 1].z - pos.z).length()
 		want = minf(want, end_d * 0.5)
 	if target == Vector3.INF or ai_stop:
@@ -1498,19 +1703,19 @@ func _ai_drive(delta: float) -> void:
 	if ai_direct_target == Vector3.INF:
 		_ai_obst_t -= delta
 		if _ai_obst_t <= 0.0 or (not _ai_obst.is_empty() and not is_instance_valid(_ai_obst["collider"])):
-			_ai_obst_t = 0.1
+			_ai_obst_t = AI_OBST_DT
 			# za špatné viditelnosti a kluzku "vidí" dál dopředu – větší rozestup
-			_ai_obst = _obstacle_ahead((4.0 + absf(speed) * 1.4) * (1.0 + caution * AI_GAP))
+			_ai_obst = _obstacle_ahead((AI_SEE_BASE + absf(speed) * AI_SEE_K) * (1.0 + caution * AI_GAP))
 		obst = _ai_obst
 	_ai_yield_ignore = maxf(_ai_yield_ignore - delta, 0.0)
 	if not obst.is_empty() and _ai_yield_ignore > 0.0 and obst["collider"] is Car:
 		obst = {}
 	if not obst.is_empty():
 		var dd: float = obst["d"]
-		want = minf(want, maxf(dd - 2.5 - caution * 4.0, 0.0) * 0.6)
+		want = minf(want, maxf(dd - AI_STOP_GAP - caution * AI_SLIP_GAP, 0.0) * AI_FOLLOW_K)
 		ai_blocked += delta
 		ai_blocker = obst["collider"]
-		if ai_blocked > 3.0 and fmod(ai_blocked, 6.0) < delta and (ai_blocker is Player or ai_blocker is Car):
+		if ai_blocked > AI_HONK_S and fmod(ai_blocked, 6.0) < delta and (ai_blocker is Player or ai_blocker is Car):
 			honk()
 		_resolve_block()
 	else:
@@ -1536,29 +1741,29 @@ func _ai_drive(delta: float) -> void:
 		throttle = 0.6
 		brake_in = 0.0
 		handbrake = false
-		steer_in = move_toward(steer_in, -s, delta * 6.0)
+		steer_in = move_toward(steer_in, -s, delta * AI_STEER_RATE)
 		if _ai_reverse <= 0.0:
 			gear = 1
 		return
 	if throttle > 0.5 and absf(speed) < 0.4 and obst.is_empty() and want > 1.0:
 		_ai_stuck += delta
-		if _ai_stuck > 2.0:
+		if _ai_stuck > AI_STUCK_S:
 			_ai_stuck = 0.0
-			_ai_reverse = 1.8
+			_ai_reverse = AI_REVERSE_S
 	else:
 		_ai_stuck = maxf(_ai_stuck - delta, 0.0)
-	steer_in = move_toward(steer_in, s, delta * 6.0)
+	steer_in = move_toward(steer_in, s, delta * AI_STEER_RATE)
 	# plyn / brzda (P regulátor)
 	var err := want - speed
 	gear = maxi(gear, 1)
 	if err > 0.5:
-		throttle = clampf(err * 0.35, 0.0, 1.0)
+		throttle = clampf(err * AI_THR_K, 0.0, 1.0)
 		brake_in = 0.0
 	elif err < -0.8:
 		throttle = 0.0
-		brake_in = clampf(-err * 0.5, 0.0, 1.0) if want > 0.5 else 1.0
+		brake_in = clampf(-err * AI_BRK_K, 0.0, 1.0) if want > 0.5 else 1.0
 	else:
-		throttle = 0.12 if want > 1.0 else 0.0
+		throttle = AI_CRUISE_THR if want > 1.0 else 0.0
 		brake_in = 0.0 if want > 1.0 else 0.6
 	handbrake = want < 0.5 and absf(speed) < 0.5
 
@@ -1645,8 +1850,8 @@ func _ai_shift(tp: Vector3, seg_a: Vector3, seg_b: Vector3) -> Vector3:
 func _max_steer_at(v: float) -> float:
 	var spec := model.spec
 	if model.kind == "bike":
-		return lerpf(0.6, float(spec.get("steer_hi", 0.12)), clampf(absf(v) / float(spec.get("steer_v", 12.0)), 0.0, 1.0))
-	return lerpf(0.6, float(spec.get("steer_hi", 0.09)), clampf(absf(v) / float(spec.get("steer_v", 33.0)), 0.0, 1.0))
+		return lerpf(tn.steer_lock, float(spec.get("steer_hi", 0.12)), clampf(absf(v) / float(spec.get("steer_v", 12.0)), 0.0, 1.0))
+	return lerpf(tn.steer_lock, float(spec.get("steer_hi", 0.09)), clampf(absf(v) / float(spec.get("steer_v", 33.0)), 0.0, 1.0))
 
 
 ## Bod trasy `k` posunutý doleva o `_ai_offset` (objíždění).
@@ -1761,7 +1966,7 @@ func _resolve_block() -> void:
 	var moving: bool = b is Car and absf(b.speed) > 0.8
 	if b is CharacterBody3D and not (b is Player):
 		moving = true      # chodec / pes odejde sám
-	if ai_blocked > 4.0 and not moving and _ai_pass_until < 0 and ai_path.size() > 2:
+	if ai_blocked > AI_PASS_WAIT and not moving and _ai_pass_until < 0 and ai_path.size() > 2:
 		# objíždí ~AI_PASS_LEN m trasy (body jsou v zaoblených zatáčkách hustší – počet bodů nestačí)
 		var k := ai_i
 		var acc := 0.0

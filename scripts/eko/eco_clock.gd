@@ -19,8 +19,9 @@
 class_name EcoClock
 extends RefCounted
 
-const SLICE_BUDGET_US := 2000     # 00_PRINCIPY kap. 6: max. ~2 ms práce EcoClock za snímek i ve špičce
-const MAX_CATCHUP_DAYS := 30      # delší dluh (dlouhé vězení…) → jeden hrubý krok místo stovek signálů
+## M8.D: laditelné (F3 → Svět → Eko-takt) – `static var`, výchozí beze změny.
+static var SLICE_BUDGET_US := 2000     # 00_PRINCIPY kap. 6: max. ~2 ms práce EcoClock za snímek i ve špičce
+static var MAX_CATCHUP_DAYS := 30      # delší dluh (dlouhé vězení…) → jeden hrubý krok místo stovek signálů
 
 var world: World
 var _last_hidx := -1              # poslední dohnaná "hodina" = jd * 24 + floor(hour); -1 = neinicializováno

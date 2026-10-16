@@ -49,8 +49,16 @@ const STAMINA_K := 0.03              # úbytek výdrže za s při chůzi × (kg 
 const MOD_OWN := "rameno"
 const MOD_CART := "vozik"
 const JUMP_CARRIED := 2.0            # skok s nákladem (malý hop; bez nákladu `Player.jump_velocity`)
-const GRIP_LOST_R := 3.6             # vzdálenost od madla, kdy oj vyklouzne z ruky
-const CART_STAMINA_K := 0.03         # úbytek výdrže za s při tažení × (kg / 60) × (1 + 6 × stoupání)
+## M8.D: tažení ručního vozíku – laditelné (F3 → Vozidla → Ruční vozík), `static var` se stejnou výchozí hodnotou.
+static var GRIP_LOST_R := 3.6        # vzdálenost od madla, kdy oj vyklouzne z ruky
+static var CART_STAMINA_K := 0.03    # úbytek výdrže za s při tažení × (kg / 60) × (1 + CART_STAMINA_GRADE × stoupání)
+static var CART_STAMINA_GRADE := 6.0
+static var CART_SPEED_KG := 320.0    # chůze s vozíkem: rychlost × (1 − kg / tohle) …
+static var CART_SPEED_MIN := 0.45    # … nejméně
+static var CART_SPEED_MAX := 0.9     # … nejvíc
+static var CART_GRADE_K := 2.0       # do kopce: × (1 − stoupání × (tohle + kg / CART_GRADE_KG))
+static var CART_GRADE_KG := 120.0
+static var CART_GRADE_MIN := 0.3     # do kopce nejpomaleji (×)
 const SEEN_R := 25.0                 # do kolika m vesničan uvidí viditelný náklad
 const SEEN_COOLDOWN_S := 30.0
 const TICK_S := 3.0
@@ -981,13 +989,13 @@ func _grip_update(id: int, delta: float) -> void:
 	var fwd := Basis(Vector3.UP, p.yaw) * Vector3.FORWARD
 	var pp := p.global_position
 	var grade := (world.terrain.height_at(pp.x + fwd.x * 2.0, pp.z + fwd.z * 2.0) - world.terrain.height_at(pp.x, pp.z)) / 2.0
-	var k := clampf(1.0 - total / 320.0, 0.45, 0.9)
+	var k := clampf(1.0 - total / CART_SPEED_KG, CART_SPEED_MIN, CART_SPEED_MAX)
 	if grade > 0.0:
-		k *= clampf(1.0 - grade * (2.0 + total / 120.0), 0.3, 1.0)          # do kopce pomalu (DOPLNIT: ladění podle pocitu)
+		k *= clampf(1.0 - grade * (CART_GRADE_K + total / CART_GRADE_KG), CART_GRADE_MIN, 1.0)   # do kopce pomalu (DOPLNIT: ladění podle pocitu)
 	p.set_speed_mod(MOD_CART, {"walk_k": k, "no_sprint": true, "jump": JUMP_CARRIED})
 	var hv := Vector2(p.velocity.x, p.velocity.z).length()
 	if hv > 0.5:
-		p.drain_stamina(delta * CART_STAMINA_K * (total / 60.0) * (1.0 + maxf(grade, 0.0) * 6.0))
+		p.drain_stamina(delta * CART_STAMINA_K * (total / 60.0) * (1.0 + maxf(grade, 0.0) * CART_STAMINA_GRADE))
 	if p.stamina <= 0.01:
 		_msg(id, "Došly ti síly – pustil jsi vozík.", 3.0)
 		grip_release(id, false)
