@@ -260,9 +260,13 @@ func _set_visible(i: int, on: bool) -> void:
 	if far and int(m[5]) < far.instance_count:
 		far.set_instance_transform(int(m[5]), xf)
 	if m[0] != null:
-		var near: MultiMesh = _near_mm.get([m[0], m[1]])
-		if near and int(m[2]) >= 0 and int(m[2]) < near.instance_count:
-			near.set_instance_transform(int(m[2]), xf)
+		# M8.8: generované stromy mají [MultiMesh LOD1, LOD0] (null = buňku zatím nepostavil TreeLodStreamer –
+		# ten při stavbě pokácené stromy skryje sám podle `felled`)
+		var nv: Variant = _near_mm.get([m[0], m[1]])
+		var nears: Array = nv if nv is Array else [nv]
+		for near in nears:
+			if near is MultiMesh and int(m[2]) >= 0 and int(m[2]) < (near as MultiMesh).instance_count:
+				(near as MultiMesh).set_instance_transform(int(m[2]), xf)
 	var si := int(m[6])
 	if si >= 0 and si < _shapes.size():
 		var rec: Array = _shapes[si]

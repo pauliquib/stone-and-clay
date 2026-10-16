@@ -10,6 +10,8 @@ const TREE_FAR_RANGE := 2600.0
 
 ## Prototypy stromů (Mesh s materiály, pořadí jako v tree_protos.bin) po `build_trees`; pro zasazené stromy (M2.5). Prázdné = zatím nenačteno.
 static var shared_protos: Array = []
+## M8.8: generované stromy (TreeGen, data/tree_species_protos.bin) po `build_trees` s přepínačem „treegen“, jinak null.
+static var tree_gen: TreeGen = null
 
 ## M6.2: daleké stromové MultiMeshe (dohled TREE_FAR_RANGE) – při letu vysoko Atmosphere
 ## prodlužuje přes `set_tree_far_mult`.
@@ -222,7 +224,12 @@ static func _low_dec_mesh(bark: Material, leaf: Material) -> ArrayMesh:
 ## `terrain` – stromy na zahloubeném terénu (koryta) se sníží, ať nevisí ve vzduchu.
 ## `mgr` (M2.1) – TreeManager dostane index: pro každý strom jeho instance v MultiMeshích a kolizní tvar,
 ## aby šel strom za běhu pokácet (`TreeManager.hide_tree`).
-static func build_trees(parent: Node3D, skip := {}, terrain: Terrain = null, mgr: TreeManager = null) -> Array:
+static func build_trees(parent: Node3D, skip := {}, terrain: Terrain = null, mgr: TreeManager = null,
+		treegen := false) -> Array:
+	tree_gen = TreeGen.load_protos() if treegen else null   # M8.8: modely podle druhu (bez dat → prototypy níž)
+	if tree_gen != null:
+		shared_protos = []
+		return tree_gen.build(parent, skip, terrain, mgr)
 	shared_protos = []
 	var bark := tree_material(false, Color.BLACK)
 	var leaf := tree_material(true, Color(0.09, 0.18, 0.05))

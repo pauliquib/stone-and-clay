@@ -146,6 +146,12 @@ Stromy jsou **instance kolekcí** (Empty s *Instance → Collection*) šesti pro
 
 Nové prototypy stromů (jiný tvar) exportér zatím nezná – umí jen těch šest.
 
+**Od M8.8 tvar stromu ve hře z Blenderu nepochází:** s přepínačem Realismus → „Generované stromy“ (výchozí) se
+model vybírá podle druhu, věku a vitality z `data/tree_species_protos.bin` (generátor `tools/treegen/treegen.py`,
+parametry v `data/dreviny.json` → `tvary`). Z Blenderu dál platí **poloha, natočení, výška a barva koruny** (šířka
+koruny jen ±25 %, tvar drží druh); prototyp 0–2 / 3–5 rozhoduje jen listnáč × jehličnan, když chybí `tree_eco.bin`.
+Šest prototypů z `OKOLI_StromyKnihovna` se použije jen s vypnutým přepínačem nebo bez souboru generátoru.
+
 ---
 
 ## 5. Barvy – atribut `tint`

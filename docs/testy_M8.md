@@ -280,3 +280,36 @@ Co změřit: `tools/launcher.sh --perfscene=pole_leto,60` (60 s, ať měření z
 `soil_water` a `water`). Očekávání: `soil_water` ≤ 0,3 ms průměr na snímek během průchodu (48 buněk/snímek), mimo průchod
 ~0; po startu během stavby mřížky (prvních ~40 s) do ~0,5 ms. `water` se nemá zvednout o víc než ~0,05 ms (aktualizace
 426 hladin 1× za sekundu jen při změně). FPS/frame proti poslední baseline `pole_leto` bez zhoršení > 0,5 ms.
+
+## M8.8 – Generátor stromů: tvary podle druhu, věku a vitality + LOD a impostory
+
+Pozn.: data jsou v gitu (`data/tree_species_protos.bin`, `assets/textures/trees/`); přegenerovat jen po změně
+`data/dreviny.json` → `tvary` (`python3 tools/treegen/treegen.py --preview`). Přepínač „Generované stromy“ se
+projeví až po novém načtení světa (nová hra / restart).
+
+1. `python3 tools/treegen/treegen.py --preview` → `tools/out/treegen/nahled_<tvar>.png`: řádky = varianty
+   (vitalita nízká/vysoká × mladý/dospělý), sloupce LOD0 | LOD1 | impostor. Poznáš smrk (kužel), borovici
+   (holý kmen, deštník), buk (kopule), břízu (bílý kmen, řídká převislá koruna)?
+2. Les zblízka (F2 → Teleport → les u myslivecké chaty, léto, poledne): listí jako karty se siluetou listů,
+   kůra podle druhu (buk šedý hladký, dub brázditý, bříza bílá s černými pásky, borovice oranžová).
+3. Chůze lesem 40–80 m od stromů: přechod LOD0 → LOD1 plynulý (dither), žádné probliknutí ani díry v korunách.
+4. Dron 200 m nad lesem (`--perfscene=dron_200m` nebo dron O): v dálce impostory, druhy rozeznatelné
+   (tmavé kužely smrků vs. kulaté listnáče), při kroužení kolem lesa se snímky impostorů nepřepínají skokem.
+5. F2 → Příroda – ladění → vrstva `vitalita`: hřbet s nízkou vitalitou (červeně) vs. niva – stromy na hřbetu
+   menší, řidší a křivější, v nivě vyšší a hustší.
+6. Pokácet strom (sekera) → zmizí správný strom (i jeho impostor), zůstane pařez; F5 → ukončit → F9 → strom
+   zůstává pokácený. Odejít > 250 m a vrátit se → pokácený strom se neobjeví (buňka se staví znovu).
+7. Podzim (F2 → Datum říjen–listopad): barvení a opad po chomáčích i na nových stromech a impostorech;
+   zima: holé větve (i impostory ukážou siluetu větví), sníh na horních plochách.
+8. Bouřka (F2 → Počasí): ohyb po úrovních – kmen pomalu, větve, listy se třepou; smrk tužší než bříza.
+9. Zasadit sazenici (M2.5) → mladý model druhu; po přeskočení času (F2) roste a přejde na dospělý model.
+10. Esc → Nastavení → Realismus → vypnout „Generované stromy“ → nová hra / restart → původních 6 modelů;
+    konzole bez chyb `TreeGen` / `tree.gdshader` / `tree_impostor.gdshader`.
+
+Co změřit: `tools/launcher.sh --perfscene=les_leto` (nová scéna: les v létě bez mlhy – LOD0/LOD1 a karty listí),
+`--perfscene=les_rano_mlha` a `--perfscene=dron_200m`, každé jednou se zapnutými a jednou s vypnutými
+„Generovanými stromy“ (restart mezi tím). Očekávání: GPU v lese +≤ 1,0 ms proti vypnutému (karty listí =
+víc přepisů pixelů, alfa test), na dronu spíš úspora (impostor 2 trojúhelníky místo ~130–200); CPU spíš
+nižší než dřív (uzlů stromů ~1,5 tisíce místo ~15 tisíc – blízké MultiMeshe jen kolem kamery, dálka 1 MultiMesh
+na buňku 256 m), streamování buněk ≤ 1 ms/snímek jen při pohybu. Draw calls (PERF) ≤ 2× dnešní. Kdyby GPU v lese
+přetékalo: snížit `BUDGET` / `hustota_listi` v generátoru nebo `TreeGen.L0_END` (LOD0 blíž).

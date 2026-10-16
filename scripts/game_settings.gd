@@ -27,6 +27,7 @@ const REALISM_ROWS: Array = [
 	["species", "Dřeviny a porosty", "Druh, věk a vitalita stromů podle stanoviště: cena dřeva při kácení, „Prohlédnout strom“, ovoce jen na ovocných druzích (M8.3). Vypnuto = staré chování.", "≈ 0 ms (data offline)"],
 	["wind", "Pole větru", "Nárazy běžící krajinou, závětří a hřebeny, ohyb stromů po úrovních, vlny přes obilí; létání, kouř a čich zvěře podle větru v místě (M8.4). Vypnuto = jedno číslo a sinusovka.", "≤ 0,3 ms GPU"],
 	["soil_water", "Vodní bilance", "Vlhkost půdy, tání sněhu, odtok, potoky stoupají a kalní po bouřce, v suchu vysychají; bláto a louže podle místa (M8.7). Vypnuto = jedno globální mokro.", "~0,1 ms CPU"],
+	["treegen", "Generované stromy", "Tvar stromu podle druhu, věku a vitality (kužel smrku, kopule buku, bílá bříza), listí a kůra z atlasu, impostory v dálce (M8.8). Projeví se po novém načtení světa. Vypnuto = 6 původních modelů.", "≈ jako dřív (ověřit --perfscene)"],
 ]
 
 var realism: Dictionary = {}
@@ -297,3 +298,15 @@ func _scale_range(n: Node) -> void:
 ## Pohyb myši (px) upravený podle citlivosti a obrácení osy Y.
 func look(rel: Vector2) -> Vector2:
 	return Vector2(rel.x, -rel.y if invert_y else rel.y) * mouse_sens
+
+
+## M8.8: přepínač realismu přímo z nastavení na disku – pro věci, které se staví už při načtení světa (`World.build`
+## běží dřív, než klient načte nastavení v `LocalClient.attach`). Automatické testy a snímky (`args`) mají výchozí true.
+static func realism_saved(key: String, args := {}) -> bool:
+	for k in args:
+		if k == "shot" or String(k).ends_with("test"):
+			return true
+	var cf := ConfigFile.new()
+	if cf.load(PATH) != OK:
+		return true
+	return bool(cf.get_value("realismus", key, true))

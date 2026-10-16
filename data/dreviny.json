@@ -229,5 +229,58 @@
 			"drevo": {"hustota": 640, "vyhrevnost": 15.0, "cena": 8000},
 			"houby": {"hrib": 0.0, "kremenac": 0.0},
 			"ovoce": {"predmet": "", "barva": "#6b8a3a"}}
-	]
+	],
+	"tvary": {
+		"_popis": "M8.8 Generátor stromů (tools/treegen/treegen.py → data/tree_species_protos.bin + atlasy v assets/textures/trees/). Tvar koruny podle druhu: listnáče kolonizací prostoru (Runions et al. 2007), jehličnany přeslenovým modelem; parametry ve stylu Weber & Penn 1995. Pořadí v `parametry` = pořadí dlaždic v atlasech listí a kůry (nové tvary přidávat NA KONEC). Po změně přegenerovat (python3 tools/treegen/treegen.py).",
+		"_klice": {
+			"druhy": "id druhu (pole `druhy` výše) → id tvaru; druh bez záznamu: jehličnan → smrk, jinak buk",
+			"model": "kolonizace (listnáč, space colonization) | presleny (jehličnan, přeslenový růst)",
+			"obalka": "tvar obálky koruny: kopule, vejcita, nepravidelna, previsla, kulata (listnáče); kuzel, destnik (jehličnany)",
+			"vyska_ref / vyska_mlady": "výška (m), ve které se generuje dospělý / mladý strom (ve hře se model škáluje na skutečnou výšku)",
+			"koruna_od / koruna_od_mlady": "nasazení koruny jako podíl výšky (dospělý / mladý)",
+			"sirka": "poloměr koruny / výška stromu (dospělý; mladý × 0,8)",
+			"vodic": "apikální dominance 0..1 – jak vysoko do koruny jde průběžný kmen (0 = rozvětví se hned na nasazení koruny)",
+			"body / krok / dosah / zabiti": "kolonizace: počet bodů pupenů v obálce, délka segmentu (m), poloměr vlivu a zabití bodu (násobky kroku)",
+			"tropismus / gravitace": "přitažlivost růstu vzhůru (fototropismus) / dolů (převislé větvičky)",
+			"kroutivost": "náhodné vychýlení segmentu (gnarl); nízká vitalita ho zvětšuje",
+			"presleny": "jehličnany: rozestup přeslenů (m u dospělého), počet větví v přeslenu, úhel větví (°, + vzhůru), převis konců (°)",
+			"ohebnost": "násobek COLOR.r (ohyb větví ve větru, 00_PRINCIPY kap. 4)",
+			"karta": "velikost karty listí (m u dospělého); hustota_listi = podíl obsazených koncových uzlů",
+			"list / kura": "motiv textury listu a kůry (tools/treegen/textures.py)",
+			"tuhost": "tuhost kmene pro wind_bend (shader uniform stiffness)",
+			"tloustka": "násobek výčetní tloušťky z Näslundovy alometrie (vizuální poloměr kmene)"
+		},
+		"druhy": {
+			"dub_zimni": "dub", "dub_letni": "dub", "buk": "buk", "habr": "habr", "lipa": "buk", "javor_klen": "buk",
+			"jasan": "dub", "olse": "olse", "vrba_bila": "olse", "jiva": "olse", "briza": "briza", "tresen_ptaci": "habr",
+			"akat": "dub", "topol": "olse", "smrk": "smrk", "borovice": "borovice", "modrin": "smrk", "jedle": "smrk",
+			"jablon": "jablon", "hrusen": "jablon", "svestka": "jablon", "tresen": "jablon", "orech": "dub"
+		},
+		"parametry": {
+			"buk": {"model": "kolonizace", "obalka": "kopule", "vyska_ref": 24.0, "vyska_mlady": 9.0, "koruna_od": 0.28, "koruna_od_mlady": 0.12,
+				"sirka": 0.3, "vodic": 0.6, "body": 1300, "krok": 0.5, "dosah": 3.4, "zabiti": 1.0, "tropismus": 0.3, "gravitace": 0.0,
+				"kroutivost": 0.1, "ohebnost": 0.85, "karta": 1.0, "hustota_listi": 0.9, "list": "vejcity", "kura": "hladka_seda", "tuhost": 1.0, "tloustka": 1.0},
+			"dub": {"model": "kolonizace", "obalka": "nepravidelna", "vyska_ref": 22.0, "vyska_mlady": 8.0, "koruna_od": 0.3, "koruna_od_mlady": 0.15,
+				"sirka": 0.38, "vodic": 0.3, "body": 1200, "krok": 0.55, "dosah": 3.0, "zabiti": 1.0, "tropismus": 0.08, "gravitace": 0.0,
+				"kroutivost": 0.32, "ohebnost": 0.7, "karta": 1.0, "hustota_listi": 0.75, "list": "lalocnaty", "kura": "brazdita", "tuhost": 1.15, "tloustka": 1.15},
+			"habr": {"model": "kolonizace", "obalka": "vejcita", "vyska_ref": 18.0, "vyska_mlady": 7.0, "koruna_od": 0.25, "koruna_od_mlady": 0.1,
+				"sirka": 0.3, "vodic": 0.4, "body": 1200, "krok": 0.45, "dosah": 3.2, "zabiti": 1.0, "tropismus": 0.35, "gravitace": 0.0,
+				"kroutivost": 0.16, "ohebnost": 0.9, "karta": 0.85, "hustota_listi": 0.9, "list": "pilovity", "kura": "zebrovana_seda", "tuhost": 1.0, "tloustka": 0.95},
+			"briza": {"model": "kolonizace", "obalka": "previsla", "vyska_ref": 20.0, "vyska_mlady": 8.0, "koruna_od": 0.35, "koruna_od_mlady": 0.15,
+				"sirka": 0.2, "vodic": 0.85, "body": 900, "krok": 0.45, "dosah": 3.2, "zabiti": 1.0, "tropismus": 0.2, "gravitace": 0.55,
+				"kroutivost": 0.12, "ohebnost": 1.0, "karta": 0.8, "hustota_listi": 0.65, "list": "trojuhelnik", "kura": "bila", "tuhost": 0.85, "tloustka": 0.8},
+			"olse": {"model": "kolonizace", "obalka": "vejcita", "vyska_ref": 20.0, "vyska_mlady": 8.0, "koruna_od": 0.3, "koruna_od_mlady": 0.12,
+				"sirka": 0.22, "vodic": 0.9, "body": 1000, "krok": 0.45, "dosah": 3.2, "zabiti": 1.0, "tropismus": 0.25, "gravitace": 0.0,
+				"kroutivost": 0.12, "ohebnost": 0.9, "karta": 0.85, "hustota_listi": 0.85, "list": "okrouhly", "kura": "tmava", "tuhost": 1.0, "tloustka": 0.9},
+			"jablon": {"model": "kolonizace", "obalka": "kulata", "vyska_ref": 6.5, "vyska_mlady": 3.5, "koruna_od": 0.25, "koruna_od_mlady": 0.25,
+				"sirka": 0.55, "vodic": 0.1, "body": 900, "krok": 0.22, "dosah": 3.2, "zabiti": 1.0, "tropismus": 0.12, "gravitace": 0.05,
+				"kroutivost": 0.3, "ohebnost": 0.8, "karta": 0.5, "hustota_listi": 0.85, "list": "ovalny", "kura": "supinata_seda", "tuhost": 1.3, "tloustka": 1.3},
+			"smrk": {"model": "presleny", "obalka": "kuzel", "vyska_ref": 24.0, "vyska_mlady": 8.0, "koruna_od": 0.3, "koruna_od_mlady": 0.04,
+				"sirka": 0.17, "presleny": {"rozestup": 0.95, "vetvi": 5, "uhel": 5.0, "previs": -28.0}, "kroutivost": 0.04,
+				"ohebnost": 0.8, "karta": 1.0, "hustota_listi": 1.0, "list": "jehlice_smrk", "kura": "cervenohneda", "tuhost": 1.3, "tloustka": 1.0},
+			"borovice": {"model": "presleny", "obalka": "destnik", "vyska_ref": 22.0, "vyska_mlady": 7.0, "koruna_od": 0.62, "koruna_od_mlady": 0.2,
+				"sirka": 0.24, "presleny": {"rozestup": 1.2, "vetvi": 4, "uhel": 32.0, "previs": 18.0}, "kroutivost": 0.14,
+				"ohebnost": 0.75, "karta": 1.5, "hustota_listi": 0.9, "list": "jehlice_borovice", "kura": "supinata_oranzova", "tuhost": 1.3, "tloustka": 1.0}
+		}
+	}
 }

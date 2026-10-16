@@ -2016,3 +2016,52 @@ dopravy, ne o regresi.
 - Nový nástroj `tools/shader_check.gd` (přeloží všechny prostorové shadery v okně na ~10 snímků); zapsán do
   `00_SPOLECNE.md` kap. 6 jako povinná kontrola pro změny shaderů. Ověřeno: před opravou hlásí 2 chyby, po ní 0
   (Mobile i Forward+).
+
+## 2026-10-16 – M8.8 Generátor stromů: tvary podle druhu, věku a vitality + LOD a impostory
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu a shaderů – ruční test čeká)
+- **Offline generátor `tools/treegen/`** (Python, numpy/scipy/Pillow, bez Blenderu, deterministický seed, `--help`,
+  `--preview`, `--only=`): `growth.py` – listnáče **space colonization** (Runions 2007; obálky kopule / vejčitá /
+  nepravidelná / převislá / kulatá, tropismus, gravitace, kroutivost, záložní růst přes mezery v obálce) + **pipe
+  model** (n = 2,4) škálovaný na dbh z Näslunda; jehličnany **přeslenový model** (přesleny + mezipřeslenové větve,
+  smrk kužel s převisem, borovice vyvětvený kmen, deštník, větve 2. řádu); vitalita → přírůstky, hustota, odumřelé
+  větve (max. 20 % uzlů), kroucení, nasazení koruny. `meshing.py` – zobecněné válce (paralelní přenos, zjednodušení
+  řetězců, strany podle poloměru) + karty listí (oboustranné, normály ohnuté ven z koruny), **barvy vrcholů podle
+  00_PRINCIPY kap. 4**, rozpočet trojúhelníků (kůra max. 35/45 %, zbytek karty – při přebytku méně a větších).
+  `textures.py` – atlas listí 4×2 × 512² (šedý jas, siluety buk/dub/habr/bříza/olše/jabloň, vějíř smrku, štětky
+  borovice, rozlití barvy do průhledna) a kůry (periodický FFT šum podle motivu). `bake.py` – impostory 8 pohledů
+  × 128² splattingem z LOD0 (barva, normála, maska listí, zimní silueta holých větví) a náhledy.
+- **Výstup (v gitu, vynuceně – `data/*.bin` je jinak ignorované; uživatel to povolil):** `data/tree_species_protos.bin`
+  (DBT2, 5,3 MB, 32 variant: 8 tvarů × 2 vitality × 2 věky; LOD0 272–4 200 tr, průměr ~1 650; LOD1 56–1 050 tr),
+  `assets/textures/trees/{listi,kura,impostor_barva,impostor_normala}.png` (~11 MB, import VRAM + mipmapy) – záznam
+  `vlastni-treegen` v `assets/LICENSES.md` + `licenses.json`. `data/dreviny.json` → nový oddíl `tvary` (parametry
+  8 tvarů + mapování 23 druhů → tvar), na konec souboru.
+- **Hra:** `scripts/vegetation/tree_gen.gd` `TreeGen` (`MapLoader.tree_gen`): načtení DBT2, materiály po tvaru
+  (tuhost jehličnanů 1,3 – řeší otevřený bod M8.4), varianta podle `tree_eco.bin` (čte se přímo; bez něj druh
+  z prototypu), výška × lerp(0,86; 1,04; vitalita), šířka modelu druhu (sx z ortofota ±25 %), impostory = jeden
+  MultiMesh na buňku 256 m (varianta v barvě instance), kolize kmenů stejně jako dřív.
+  `scripts/vegetation/tree_lod_streamer.gd` `TreeLodStreamer`: MultiMeshe LOD0/LOD1 jen pro buňky 128 m u kamery
+  (3D vzdálenost – dron nad lesem nestaví nic), stavba rozložená (1 ms/snímek), pokácené skryje při stavbě.
+  `map_loader.gd` (`build_trees(..., treegen)` + `tree_gen`), `world.gd` (1 řádek: přepínač), `tree_manager.gd`
+  (`_set_visible` umí `near_mm` = [LOD1, LOD0] / null), `planted_trees.gd` (sazenice podle druhu: mladý →
+  dospělý model, LOD0 bez pásma), `game_settings.gd` (`REALISM_ROWS` „Generované stromy“, `realism_saved()` –
+  přepínač čtený z disku při stavbě světa, protože klient načítá nastavení až v `attach`), `tests.gd` (scéna `les_leto`).
+- **Shadery:** `shaders/include/tree_gen.gdshaderinc` (LOD pásmo od `MAIN_CAM_INV_VIEW_MATRIX` i ve stínech, zhroucení
+  instance mimo pásmo, doplňkový dither mezi LOD, atlasy, alfa listí s korekcí mipů); `tree.gdshader` – `use_atlas`,
+  `lod_band`, `cull_disabled` (oboustranné karty, rub s normálou ven), kůra z atlasu, okluze z `COLOR.a`, vítr
+  přeskočen u zhroucených instancí; nový `tree_impostor.gdshader` (karta ke kameře, prolnutí sousedních pohledů,
+  sezóna jako `tree.gdshader`, zimní silueta větví, bez stínů).
+- Kontrola překladu (00_SPOLECNE kap. 6): prázdná u všech změněných `.gd`; `tools/shader_check.gd` prázdný v Mobile
+  i Forward+. Generátor doběhl (~70 s), náhledy zkontrolovány okem (druhy rozeznatelné).
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M8.md` → M8.8) a měření `--perfscene=les_leto`,
+  `les_rano_mlha`, `dron_200m` se zapnutými / vypnutými „Generovanými stromy“.
+- Varianty: 2 vitality místo 3 (prompt „Co udělat“) – kvůli počtu MultiMeshů v buňce; 3. třída = přidat hodnotu do
+  `VIT_LEVELS`/`VIT_SPLIT` v `treegen.py` (formát i hra to unesou, max. 64 variant).
+- Impostory jen 8 pohledů kolem osy Y (ne oktaedrické) – z dronu kolmo shora vypadají ploše; případně přidat pohled shora.
+- Alpha-to-coverage (MSAA) nepoužito – jen alfa test s korekcí mipů. Tvar druhů javor / lípa / modřín zatím přes
+  nejbližší tvar (javor → buk, modřín → smrk, opadávání modřínu chybí); přidat tvary = nové dlaždice atlasu (max. 8 v 4×2).
+- `INSTANCE_CUSTOM.a` = 1 (fenologický posun doplní M8.11); M8.11 růst může měnit variantu přes `TreeGen.variant_for`.
+- LOD vzdálenosti `TreeGen.L0_END` 55 m / `L1_END` 170 m a rozpočty `BUDGET` ladit podle měření (M8.19).
+- Ovoce v korunách (`TreeDecor`) dál podle výšky stromu, ne podle tvaru varianty – u jabloně sedí, ostatní neplodí.

@@ -374,7 +374,7 @@ func build() -> void:
 	trees = TreeManager.new()
 	add_child(trees)
 	trees.setup(self, terrain)
-	MapLoader.build_trees(map_root, water.drop_trees, terrain, trees)
+	MapLoader.build_trees(map_root, water.drop_trees, terrain, trees, realism_on("treegen") and GameSettings.realism_saved("treegen", args))   # M8.8
 	tree_eco = TreeEco.new()                 # M8.3: až po indexu stromů (fallback čte TreeManager)
 	tree_eco.setup(self)
 

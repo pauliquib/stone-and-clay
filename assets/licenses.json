@@ -82,5 +82,17 @@
     "upravy": "oříznuto, sesazeno, přepočteno (tools/export_map.py)",
     "pouziti": "textura terénu a minimapa",
     "v_titulcich": false
+  },
+  {
+    "id": "vlastni-treegen",
+    "soubory": ["textures/trees/listi.png", "textures/trees/kura.png", "textures/trees/impostor_barva.png", "textures/trees/impostor_normala.png"],
+    "nazev": "Atlasy listí, kůry a impostorů stromů (M8.8)",
+    "autor": "vlastní výroba – procedurálně (tools/treegen/treegen.py)",
+    "zdroj": "tools/treegen/ (numpy + Pillow, nic staženo)",
+    "licence": "CC0",
+    "stazeno": "2026-10-16 (vygenerováno)",
+    "upravy": "žádné – výstup generátoru",
+    "pouziti": "generované stromy (scripts/vegetation/tree_gen.gd, shaders/tree.gdshader, tree_impostor.gdshader)",
+    "v_titulcich": false
   }
 ]
