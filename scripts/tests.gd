@@ -2140,6 +2140,8 @@ const PERF_SCENES := {
 		"weather": "jasno", "popis": "M8.10: pole v říjnu za soumraku – zvěř vychází na pole, hejno špačků (murmurace), vrány táhnou na nocoviště"},
 	"pole_pulnoc": {"pos": Vector3(600.0, 0.0, 600.0), "yaw": 0.0, "date": [2026, 7, 15], "hour": 23.85,
 		"weather": "jasno", "popis": "M8.12: pole a zahrada těsně před půlnocí – denní krok plodin (255 polí po kouscích, záhony, stín) proběhne během měření"},
+	"pole_blato": {"pos": Vector3(600.0, 0.0, 600.0), "yaw": 0.0, "date": [2026, 10, 20], "hour": 12.0,
+		"weather": "dest", "popis": "M8.13: pole v říjnu v dešti – terramechanika a koleje (sednout do auta / traktoru a jet po poli; profil „car“)"},
 }
 
 

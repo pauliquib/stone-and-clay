@@ -32,6 +32,7 @@ const REALISM_ROWS: Array = [
 	["crops", "Plodiny podle počasí", "Zahrada a pole rostou podle sum teplot, vody v půdě a světla (stín): v suchu slabá úroda, mráz spálí rajčata, v teplém suchém létě se žne dřív; zálivka plní záhon (M8.12). Vypnuto = růstové dny a kalendář polí.", "~0,05 ms CPU"],
 	["micro", "Mikroklima", "Za jasné bezvětrné noci studený vzduch v údolích a kotlinách, ranní údolní mlha, rosa a jinovatka, teplé jižní svahy, chladný les, teplejší obec; HUD a tělo berou teplotu v místě (M8.9). Vypnuto = teplota všude stejná.", "~0,05 ms CPU, mlha ≈ 0 ms GPU"],
 	["phenology", "Fenologie a růst stromů", "Každý druh raší, kvete a barví se podle sumy teplot letošního roku a místa (bříza dřív než dub, kotlina jinak než jižní svah), pozdní mráz spálí květy a ubere ovoce, stromy rostou v letech (M8.11). Vypnuto = jednotný kalendář Seasons.", "≈ 0 ms CPU (denní krok), ≤ 0,1 ms GPU"],
+	["terramech", "Bláto a koleje", "Kola, boty a kopyta se boří do měkké půdy podle druhu půdy a vlhkosti: auto na rozmáčené louce zapadne, traktor projede a nechá koleje, které mizí deštěm; chůze blátem je pomalejší (M8.13). Vypnuto = přilnavost jen z počasí.", "~0,05 ms CPU (hráčovo vozidlo), ≈ 0,1 ms GPU"],
 ]
 
 var realism: Dictionary = {}

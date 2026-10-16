@@ -846,6 +846,8 @@ func _process_impl(delta: float) -> void:
 			elif world.weather and world.weather.snow_cover > 0.15:
 				sfx.play("step", randf_range(0.6, 0.75), -4.0)   # krupání sněhu
 				_snow_footprint()
+			elif player.mud.sink_m > Terramech.SQUELCH_SINK:
+				sfx.play("splash", randf_range(0.5, 0.65), -9.0)   # M8.13: čvachtání v blátě
 			else:
 				sfx.play("step", randf_range(0.85, 1.15), -6.0)
 	_update_water_sound(delta)

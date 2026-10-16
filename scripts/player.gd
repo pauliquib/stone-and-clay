@@ -285,6 +285,7 @@ var _exit_settle := 0             # fyzikální kroky po výstupu z vozidla, ne�
 var _say_label: Label3D           # co hráč řekl (T) – bublina nad hlavou, vidí ji ostatní
 var _say_t := 0.0
 var _floor_surf := "teren"        # povrch pod nohama (meta "surface" z kolize)
+var mud := Terramech.Probe.new()  # M8.13: bláto pod nohama (zaboření, zpomalení, přilnavost v místě; obnova po 0,25 s)
 var _safe_pos := Vector3.INF      # poslední místo, kde hráč stál volně (podlaha, žádný dotyk zdi) – záchrana při zaseknutí (U)
 var _safe_yaw := 0.0
 var _roof := false                # je nad hráčem střecha / strop (raycast)
@@ -1266,6 +1267,13 @@ func _physics_process_impl(delta: float) -> void:
 		target_speed = crouch_speed
 	if busy and _action != "smoke":
 		target_speed = minf(target_speed, BUSY_SPEED)
+	# M8.13: bota se v blátě boří – zpomalení podle zaboření (Terramech), otisk do deformační mapy
+	if Terramech.probe_foot(mud, delta, global_position, _floor_surf if not _roof else "budova", Terramech.FOOT_KPA,
+			Terramech.FOOT_B, Terramech.FOOT_SLOW_K, Terramech.FOOT_SLOW_MIN) and mud.sink_m > 0.005 and car == null:
+		if Terramech.world != null and Terramech.world.ruts != null and Vector2(velocity.x, velocity.z).length() > 0.5:
+			Terramech.world.ruts.stamp(global_position, 0.06, mud.sink_m)
+	if not _crouching:
+		target_speed *= mud.speed_k
 	if wade > 0.05:
 		# brodění potokem / řekou: voda brzdí (po kolena ~ poloviční rychlost)
 		target_speed *= lerpf(1.0, WADE_SLOW_MIN, clampf(wade / WADE_SLOW_DEPTH, 0.0, 1.0))
@@ -1360,6 +1368,8 @@ func _physics_process_impl(delta: float) -> void:
 			wall_touch = true
 		if c.get_normal().y > 0.6 and bdy is StaticBody3D:
 			_floor_surf = bdy.get_meta("surface", "teren")   # povrch pod nohama (asfalt / šterk / budova…)
+		if bdy is Car and hvel.length() > 0.5 and absf(c.get_normal().y) < 0.5:
+			(bdy as Car).push_by(-c.get_normal())            # M8.13: tlačení auta (vyproštění z bláta)
 		if bdy is RigidBody3D:
 			var push := -c.get_normal()
 			push.y = maxf(push.y, 0.0) * PUSH_UP_K
@@ -1437,6 +1447,8 @@ func _physics_process_impl(delta: float) -> void:
 func _ground_traction() -> float:
 	if weather == null or _roof:         # pod střechou / uvnitř budovy je sucho
 		return 1.0
+	if Terramech.enabled():              # M8.13: bláto v místě (SoilWater.mud_at), ne globální mokro
+		return lerpf(1.0, mud.grip_k, WALK_GRIP_MIX)
 	return lerpf(1.0, weather.grip_factor(_floor_surf), WALK_GRIP_MIX)
 
 

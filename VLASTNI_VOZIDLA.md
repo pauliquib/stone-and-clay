@@ -99,7 +99,8 @@ Ke každému záznamu patří (kromě fyziky):
 | `bed` | ložná plocha pickupu: `{"c": střed podlahy, "size": šířka × výška × délka}`; `Car.cargo_bed()` |
 | `boxy`, `single_row` | dodávková kabina (zasklení bez zadního okna, těžiště výš, tužší pružení); jen jedna řada sedadel |
 | `builder` | zvláštní stavitel modelu: `"tractor"` (`TractorModel`), u jednostopých `"jawa"`, `"moped"`, `"scooter"`, `"bicycle"`, `"armadka"` (vojenská), `"krosak"` (kroska) |
-| `susp`, `ai_vmax`, `tire_w` | tuhost pružení, strop rychlosti AI (m/s), šířka pneumatiky jednostopého |
+| `susp`, `ai_vmax`, `tire_w` | tuhost pružení, strop rychlosti AI (m/s), šířka pneumatiky (m; jednostopé ji kreslí, M8.13 z ní počítá zaboření v blátě – bez klíče platí výchozí šířka druhu z F3 → Vozidla/Terén a bláto) |
+| `tire_kpa`, `lug` | M8.13 terramechanika: tlak pneumatiky na zem (kPa ≈ huštění + tuhost kostry; auto 180, traktor 70, motorka 220, kolo 300) a dezén (× tažná síla v měkké půdě; traktorové drapáky 2,0). Široká měkká kola s dezénem projedou rozmáčenou louku, úzká a tvrdá se boří |
 | `grip`, `stab` | násobič přilnavosti pneu (výchozí 1,0) a tuhost samovyvažování jednostopého (výchozí 1,0) |
 | `steer_v`, `steer_hi`, `steer_rate` | útlum řízení s rychlostí: rychlost dosažení minima (m/s), minimální vytočení (rad), rychlost náběhu řízení |
 | `lean_max`, `lean_yaw` | jednostopá fyzika (motorky): `lean_max`>0 přepne vozidlo na 2 kola v ose a fyzikální náklon; `lean_max` = max. cílový náklon (rad, navíc omezený atan(mu) přilnavosti i počasím), `lean_yaw` = síla yaw momentu z náklonu (camber thrust, cílí na rovnovážnou zatáčku g·tan(roll)/v) |

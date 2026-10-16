@@ -130,6 +130,7 @@ var _torso: CollisionShape3D
 var _prev_xf := Transform3D()
 var _cur_xf := Transform3D()
 var _surf := "teren"                 # povrch pod kopyty (raycast, obnovuje se ~3×/s)
+var _mud := Terramech.Probe.new()     # M8.13: bláto pod kopyty (obnova po 0,25 s)
 var _surf_t := 0.0
 var fed := 0.75                      # sytost 0..1 (krmení u žlabu)
 var watered := 0.75                  # napojení 0..1
@@ -339,6 +340,12 @@ func _physics_process(delta: float) -> void:
 	if _surf_t <= 0.0:
 		_surf_t = 0.3
 		_surf = _surface_under()
+	# M8.13: kopyto se v blátě boří (Terramech, lokální bláto) – zpomalení a otisk do deformační mapy
+	if Terramech.probe_foot(_mud, delta, global_position, _surf, Terramech.HOOF_KPA, Terramech.HOOF_B,
+			Terramech.HOOF_SLOW_K, Terramech.HOOF_SLOW_MIN) and _mud.sink_m > 0.01 and absf(speed) > 0.5:
+		if Terramech.world != null and Terramech.world.ruts != null:
+			Terramech.world.ruts.stamp(global_position, 0.25, _mud.sink_m)
+	want *= _mud.speed_k
 	var grip := _hoof_grip()
 	want *= lerpf(1.0, SLIP_SLOW, 1.0 - grip)        # na kluzkém podkladu nerozjede plný chod
 	# --- rychlost (zrychlení / brzdění podle hmotnosti; na kluzku horší)
@@ -485,6 +492,8 @@ func _hoof_grip() -> float:
 	var w := fauna.weather
 	if w == null:
 		return 1.0
+	if Terramech.enabled():                    # M8.13: bláto v místě, ne globální mokro
+		return lerpf(1.0, _mud.grip_k, HORSE_SLIP)
 	return lerpf(1.0, w.grip_factor(_surf), HORSE_SLIP)
 
 

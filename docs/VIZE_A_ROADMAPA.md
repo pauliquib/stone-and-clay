@@ -562,7 +562,7 @@ Start: `prompts/roadmapa/M8_realismus/00_START_M8.md` (orchestrátor, 8 vln), sp
 - [x] **M8.10 Lokomoce zvířat 2 a let ptáků** – přechody chodů, páteř, sekundární pohyb, aerodynamika letu, termika, hejna.
 - [x] **M8.11 Fenologie a růst** – sumy teplot, každý druh raší a barví se jinak, pozdní mrazy, stromy rostou a stárnou v letech.
 - [x] **M8.12 Plodiny a zahrada** – růstový model (GDD, záření, voda, mráz), výnos podle roku.
-- [ ] **M8.13 Terramechanika** – zaboření, zapadlé auto, trvalé koleje a stopy.
+- [x] **M8.13 Terramechanika** – zaboření, zapadlé auto, trvalé koleje a stopy.
 - [ ] **M8.14 Přízemní vegetace** – louky podle stanoviště, podrost podle druhu, seč a seno, sukcese, interaktivní tráva a pěšiny.
 - [ ] **M8.15 Ekologie zvěře** – stanoviště, denní a roční cyklus, populace, semenné roky, škody.
 - [ ] **M8.16 Tělo 2** – tepelná bilance (MET, clo, vítr, mokro, slunce), žízeň, spánkový dluh, zranění pádem.

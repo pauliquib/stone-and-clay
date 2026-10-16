@@ -992,10 +992,11 @@ func _grip_update(id: int, delta: float) -> void:
 	var k := clampf(1.0 - total / CART_SPEED_KG, CART_SPEED_MIN, CART_SPEED_MAX)
 	if grade > 0.0:
 		k *= clampf(1.0 - grade * (CART_GRADE_K + total / CART_GRADE_KG), CART_GRADE_MIN, 1.0)   # do kopce pomalu (DOPLNIT: ladění podle pocitu)
+	k *= cart.mud.speed_k                                     # M8.13: úzká kola v blátě (Terramech)
 	p.set_speed_mod(MOD_CART, {"walk_k": k, "no_sprint": true, "jump": JUMP_CARRIED})
 	var hv := Vector2(p.velocity.x, p.velocity.z).length()
 	if hv > 0.5:
-		p.drain_stamina(delta * CART_STAMINA_K * (total / 60.0) * (1.0 + maxf(grade, 0.0) * CART_STAMINA_GRADE))
+		p.drain_stamina(delta * CART_STAMINA_K * (total / 60.0) * (1.0 + maxf(grade, 0.0) * CART_STAMINA_GRADE + cart.mud.resist_k * CART_STAMINA_GRADE))
 	if p.stamina <= 0.01:
 		_msg(id, "Došly ti síly – pustil jsi vozík.", 3.0)
 		grip_release(id, false)

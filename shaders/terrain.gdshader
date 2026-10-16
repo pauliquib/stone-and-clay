@@ -41,6 +41,14 @@ global uniform float grass_green;  // svěžest trávy 0..1 (zima / sucho → hn
 global uniform float micro_dew;    // M8.9: rosa na trávě 0..1 (Microclimate → MicroFx)
 global uniform float micro_frost;  // M8.9: 1 = rosa na dně údolí je zmrzlá (jinovatka)
 global uniform float micro_frost_y; // M8.9: svět Y, pod kterým je zem zmrzlá
+// M8.13: koleje a stopy v blátě (RutMap) – hloubka v m, okno 3 × 3 dlaždic kolem hráče jako kruhový buffer
+// (uv = fract(svět / šířka okna), proto repeat_enable); rut_rect.z = 0 → vypnuto
+uniform sampler2D rut_tex : filter_linear, repeat_enable;
+uniform vec4 rut_rect = vec4(0.0);    // x0, z0, šířka, výška platného okna (m)
+uniform float rut_dark = 0.55;        // ztmavení v koleji
+uniform float rut_normal = 0.6;       // posun normál (svahy koleje)
+uniform float rut_puddle = 1.0;       // louže v hlubších kolejích za mokra
+uniform float rut_vis = 120.0;        // do jaké vzdálenosti od kamery (m)
 uniform vec2 north_xz = vec2(-0.98, -0.20);   // světový směr severu (z map.json north_angle; pro sněhové jazyky)
 
 varying vec3 wpos;
@@ -327,6 +335,28 @@ void fragment() {
 		snow = clamp((snow_cover * 1.35 + hold - (1.0 - dt) * 0.40 - (1.0 - d2) * 0.20
 			- (1.0 - d1) * 0.10) * 1.8, 0.0, 1.0) * smoothstep(0.55, 0.85, n.y);
 	}
+	// M8.13: vyjeté koleje a stopy v blátě – tmavá mokrá hlína, svahy koleje v normále, v hlubších louže
+	float rdep = 0.0;
+	float rpud = 0.0;
+	if (rut_rect.z > 0.0 && dist < rut_vis) {
+		vec2 rl = wpos.xz - rut_rect.xy;
+		if (rl.x > 0.0 && rl.y > 0.0 && rl.x < rut_rect.z && rl.y < rut_rect.w) {
+			vec2 ruv = wpos.xz / rut_rect.z;
+			float px = 0.25 / rut_rect.z;          // 1 px okna (0,25 m)
+			rdep = texture(rut_tex, ruv).r;
+			if (rdep > 0.002) {
+				float rx = texture(rut_tex, ruv + vec2(px, 0.0)).r - texture(rut_tex, ruv - vec2(px, 0.0)).r;
+				float rz = texture(rut_tex, ruv + vec2(0.0, px)).r - texture(rut_tex, ruv - vec2(0.0, px)).r;
+				float rfade = 1.0 - smoothstep(rut_vis * 0.7, rut_vis, dist);
+				n = normalize(n + vec3(rx, 0.0, rz) / 0.5 * rut_normal * 4.0 * rfade);
+				float rd = smoothstep(0.004, 0.05, rdep) * rfade * (1.0 - snow * 0.8);
+				vec3 mudc = vec3(0.23, 0.17, 0.11) * (0.85 + 0.3 * d1);
+				col = mix(col, mudc, rd * rut_dark);
+				rut = max(rut, rd);
+				rpud = smoothstep(0.04, 0.12, rdep) * smoothstep(0.35, 0.8, wetness) * rut_puddle * rfade * (1.0 - snow);
+			}
+		}
+	}
 	// mokro: tmavší a lesklejší povrch; v kolejích polních cest drží voda déle
 	float wet = min(wetness * (1.0 + rut * 0.6), 1.0) * (1.0 - snow);
 	// M8.9: jinovatka pod mrazovou hranicí (rovina, rozbitá šumem), rosa nad ní – lesk jako mokro, slabší
@@ -336,9 +366,10 @@ void fragment() {
 	col *= 1.0 - 0.32 * wet;
 	col = mix(col, vec3(0.9, 0.92, 0.96) * (0.92 + 0.08 * d1), snow);
 	col = mix(col, vec3(0.80, 0.84, 0.88) * (0.9 + 0.1 * d1), rime * (0.35 + 0.35 * d2));   // M8.9 jinovatka
+	col = mix(col, col * 0.55 + vec3(0.02, 0.025, 0.03), rpud);     // M8.13: voda v koleji
 	ALBEDO = col * 1.05;
-	ROUGHNESS = mix(mix(0.93, 0.5, wet), 0.75, snow);
-	SPECULAR = mix(0.25, 0.45, wet);
+	ROUGHNESS = mix(mix(mix(0.93, 0.5, wet), 0.75, snow), 0.06, rpud);
+	SPECULAR = mix(mix(0.25, 0.45, wet), 0.5, rpud);
 	// drobná detailní normála z šumu
 	float e = 0.02;
 	float nx = texture(detail_noise, (wpos.xz + vec2(e * 8.0, 0.0)) * 0.23).r - d1;

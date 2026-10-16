@@ -2485,3 +2485,42 @@ dopravy, ne o regresi.
 - Nové zahradní plodiny (okurka, fazole, jahody) nejsou – vyžadují předměty a semena v obchodě (ItemsDB).
 - Stín bere jen stromy z mapy (`Fauna.trees_near`), ne sazenice hráče (`PlantedTrees`).
 - Velký skok času (> 30 dní, jeden hrubý `eco_day`) pole dožene podle normálu (bez skutečného počasí).
+## 2026-10-16 – M8.13 Terramechanika: bláto, zaboření, koleje
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu a shaderů – ruční test čeká)
+- **`Terramech`** (`scripts/eko/terramech.gd`, statické funkce, `bind(world)`): půda v bodě (`sample_soil` – `Site.soil` →
+  Bekker n/k_c/k_φ + Mohr–Coulomb c/φ pro sucho a rozmáčeno po 6 půdních třídách, Wong tab. 2.3 zjednodušeně; rozmáčenost
+  z `SoilWater.moisture_at` / `mud_at`, mráz `SoilWater.frost`, sníh `snow_at` jako vrstva), kolo (`wheel_contact`: zaboření
+  min(tuhé kolo, pneu jako deska), kompakční odpor, tažná síla, `slip_k`), deska (bota, kopyto), `Probe` pro chodce / koně /
+  vozík (obnova po 0,25 s), `contact_at` (kontrakt `{sinkage_m, roll_resist_n, max_traction_n, slip_k}`), ladicí vrstva
+  `unosnost`. Kalibrace offline výpočtem (Python, stejné vzorce): sucho → auto R ≈ 0,05 W, projede; glej / fluvizem
+  rozmáčené (≥ 0,6–0,8) → osobní auto čistá tažná síla < 0 (zapadne), traktor (0,38 m, 70 kPa, drapáky 2×) > 0 (projede,
+  kolej 5–11 cm); hnědozem rozmáčená → auto na hraně.
+- **Auto / traktor / motorka / kolo** (`car.gd`, za přepínačem `terramech`): kola na povrchu „teren“ – zaboření (kolo a
+  podvozek níž přes pružení), odpor valení jako brzda, tah / brzda / boční síla omezené smykem půdy × dezén, prokluz →
+  vyhrabaná díra (hlouběji), kývání (změna směru tahu) a jízda díru zarovnají, hláška „Zapadl jsi v blátě…“ (přes
+  `Terramech.notify` → `World.notify`), tlačení hráčem (`Car.push_by` z kolize chůze, auto bez řidiče na neutrál).
+  LOD: půda po `TM_DT` 0,2 s, AI auta jen do `TM_AI_R` 80 m od hráče, za snímek jen pár `pow` na kolo, žádné alokace.
+  Pneu podle druhu v `Car.Tune` (`tm_tire_w`, `tm_tire_kpa`, `tm_lug`), model přepíše klíči `tire_w`, `tire_kpa`, `lug`
+  (`VLASTNI_VOZIDLA.md`). Systém laditelnosti M8.D zachován (nic nevráceno na `const`).
+- **Koleje** (`RutMap`, `scripts/priroda/rut_map.gd`, `World.ruts`): deformační mapa 0,25 m/px, dlaždice 64 m (vznikají
+  až při otisku, ZSTD odkládání, uložení klíč `ruts` ≤ 2 MB, zapomenutí po 60 dnech), shader terénu čte okno 3 × 3
+  dlaždic jako kruhový buffer → tmavá vyjetá kolej, posun normál, louže v hlubších kolejích za mokra. Mizení přes
+  `eco_hour` (déšť rozmáčí, sucho drží dny, mráz drží). Zapisují kola, boty a kopyta.
+- **Chodec a kůň** (`player.gd`, `fauna/horse.gd` – malé hunky): lokální bláto (`Weather.surface_grip_at` v místě místo
+  globálního `wetness`), zaboření → zpomalení, otisky; čvachtání kroků (`local_client.gd`). **Ruční vozík**
+  (`hand_cart.gd` + hunk `cargo.gd`): odpor úzkých kol jako síla, pomalejší chůze a vyšší spotřeba výdrže.
+- Sdílené soubory jen minimálně: `world.gd` (instance `ruts`, vrstva `unosnost`), `save_game.gd` (klíč `ruts`),
+  `game_settings.gd` (řádek Realismu „Bláto a koleje“), `tests.gd` (měřicí scéna `pole_blato`).
+- **F3:** 133 parametrů v `scripts/dev/tune_m8_13.gd` (Vozidla/Terén a bláto 108 – půdy 60, stav půdy / sníh / kolo 14,
+  vozík 5, auto v blátě 17, pneu 4 druhy × 3; Člověk/Pohyb hráče 6; Zvěř/Hospodářská zvířata 4; Příroda/Louže, stopy 15).
+- Kontrola překladu (`--check-only` všech změněných a nových skriptů) a `tools/shader_check.gd`: výstup prázdný.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist `docs/testy_M8.md` → M8.13) a měření `--perfscene=pole_blato` / `pole_leto`.
+- Traktor táhne zapadlé auto (lano jako `attach_trailer`) – nehotovo, vyproštění jen kýváním a tlačením.
+- Koleje zvyšují louže jen vizuálně (shader); do `SoilWater` (hydrologie prohlubní) se nezapisují.
+- Vertex posun nejbližší dlaždice terénu na předvolbě Vysoká – nehotovo (jen normály).
+- Zablácené boty (barva v `humanoid`) – volitelné, nehotovo. Stopy zvěře v blátě (srnec, divočák) – nehotovo, jen hráč a kůň.
+- Měřicí scéna `pole_blato` neposadí hráče do auta automaticky – jízdu dělá uživatel ručně.
+- Kalibrace půd je odhad z literatury → doladit v F3 podle pocitu (M8.19).

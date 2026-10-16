@@ -170,6 +170,14 @@ spálí rajčata venku, skleník je ochrání; v teplém suchém létě pole dř
 Zálivka plní „kyblík“ záhonu (+ půdní buňku). Prohlídka záhonu: „Brambory kvetou, půda je suchá.“ + odhad úrody
 (přesnější se Zahradničením). Deník J → Počasí: „Letošní úroda: suchý červen, …, obilí se začalo žnout 12. 7.“
 Vypnuto = původní růstové dny a kalendář polí. Měřicí scéna `--perfscene=pole_pulnoc` (denní krok během měření).
+**M8.13 Terramechanika – bláto, zaboření, koleje** (`scripts/eko/terramech.gd` `Terramech`, `scripts/priroda/rut_map.gd`
+`World.ruts`, přepínač `terramech` v Realismu): kola na terénu se boří podle půdy (`Site`), vlhkosti a bláta (`SoilWater`),
+mrazu a sněhu (Bekker + Mohr–Coulomb) – po týdnu deště osobní auto na louce v nivě zapadne (hrabe na místě, hláška
+„Zapadl jsi v blátě“; kývání dopředu-dozadu, tlačení pěšky), traktůrek s širokými koly a drapáky projede a nechá koleje.
+Koleje a stopy bot / kopyt jsou v deformační mapě (0,25 m/px) a terén je kreslí tmavé a vyjeté, za mokra s loužemi;
+déšť je zarovná, v suchu vydrží dny. Chodec a kůň v blátě zpomalí a kloužou podle bláta v místě, bota čvachtá, ruční
+vozík s úzkými koly jde těžko. Ladicí vrstva mapy `unosnost`, měřicí scéna `--perfscene=pole_blato`, parametry F3 →
+Vozidla/Terén a bláto (133 parametrů celkem, `scripts/dev/tune_m8_13.gd`).
 **M8.10 Lokomoce zvířat 2 a let ptáků** (přepínač `animal_gait`): zvěř, kůň i hospodářská zvířata mění chod podle
 Froudova čísla (krok → klus → cval plynule, s hysterezí), ohýbají páteř v zatáčce a ve cvalu, dýchají, uši a ocas
 dopruží za pohybem a uši se natočí za zvukem; vyplašený srnec rozevře bílé zrcátko a v obilí / vysoké trávě skáče.
