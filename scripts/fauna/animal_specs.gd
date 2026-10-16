@@ -62,6 +62,25 @@ const DEFAULT := {
 	"max_slope": 40.0,          # nejprudší svah, kam vyleze (°)
 	"step_k": 1.0,              # násobič kmitočtu kroků (menší zvíře = rychlejší kroky)
 	"bob": 0.03,                # pohupování trupu v chůzi (m)
+	# ---------------- M8.10 lokomoce 2 (QuadrupedRig, přepínač realismu „animal_gait“)
+	# Froudovo číslo Fr = v² / (g·L), L = výška ramenního kloubu (≈ délka nohy): prahy krok→klus, klus→cval,
+	# cval→trysk (nahoru); dolů se přechází až pod práh × (1 − froude_hyst) – hystereze, ať chod nekmitá.
+	"froude": [0.5, 2.5, 6.0],
+	"froude_hyst": 0.2,
+	"spine": [0.16, 0.05],      # páteř: boční ohyb v zatáčce (rad na rad/s) a flexe ve cvalu (podíl délky trupu)
+	"lean_k": 0.5,              # náklon do zatáčky (násobek atan(v·ω/g))
+	"surge_pitch": 0.02,        # zvednutí předku při rozjezdu (rad na m/s² zrychlení, strop 0,12)
+	"head_stab": 0.5,           # stabilizace hlavy (0 = hlava jede s trupem, 1 = drží sklon)
+	"neck_reach": 0.05,         # natažení krku při pastvě (podíl délky krku)
+	"breath": [0.35, 0.012],    # dech v klidu: kmitočet (Hz) a rozšíření boků (podíl); po běhu rychlejší
+	"ear_spring": [3.5, 0.35],  # uši: vlastní kmitočet (Hz) a útlum ζ tlumeného oscilátoru
+	"ear_turn": 0.9,            # jak daleko se ucho natočí ke zdroji zvuku (rad)
+	"ear_flop": 0.012,          # jak moc uši „plandají“ při pohupu trupu (ustálená výchylka, rad na m/s²)
+	"tail_spring": [2.2, 0.3],  # ocas: kmitočet (Hz) a útlum
+	"tail_flop": 0.015,
+	"rump_flare": [],           # zrcátko, které se při útěku rozevře: [rx, ry (m), zvětšení] – [] = nemá
+	"run_head_low": 0.0,        # hlava níž v klusu a cvalu (divočák „buldozer“, rad)
+	"pronk_tall": 1.3,          # ve vysoké trávě / obilí: výška odrazových skoků × tohle (a častěji)
 	# ---------------- smysly a chování
 	"behaviour": "grazer",      # grazer (spásá), rooter (ryje), hare (zajíc)
 	"habitat": "forest",        # forest, edge (okraj lesa, louky), field (pole)
@@ -104,6 +123,9 @@ const SPECIES := {
 		"active": [4.5, 9.5, 17.5, 23.0], "graze_angle": 1.3,
 		"sounds": {"alarm": "deer_bark"},
 		"antlers": 0.18,          # parůžky srnce (délka; srny nemají) – shazuje v listopadu, nové v březnu
+		# M8.10: pružný cval se silnou flexí páteře, bílé zrcátko se při útěku rozevře, velké pohyblivé uši
+		"spine": [0.18, 0.07], "rump_flare": [0.075, 0.085, 1.7], "ear_spring": [3.0, 0.3], "ear_turn": 1.0,
+		"pronk_tall": 1.45,
 	},
 	# ------------------------------------------------------------------ prase divoké (Sus scrofa)
 	# 50–150 kg (bachař až 200), v kohoutku 70–90 cm; tmavé štětiny, hřbetní hříva, klínovitá hlava.
@@ -132,6 +154,9 @@ const SPECIES := {
 		"active": [19.0, 24.0, 0.0, 6.0], "graze_angle": 0.75,
 		"sounds": {"alarm": "boar_grunt", "idle": "boar_grunt", "attack": "boar_squeal"},
 		"young": "sele",          # druh mláďat ve skupině
+		# M8.10: „buldozer“ – nízká hlava v klusu, tuhá páteř, ocas při útěku vztyčený, malé tuhé uši
+		"spine": [0.08, 0.025], "run_head_low": 0.28, "tail_up": 1.5, "ear_spring": [5.0, 0.5],
+		"froude": [0.45, 2.2, 5.0], "lean_k": 0.35,
 	},
 	# sele – pruhované mládě divočáka (do ~5 měsíců)
 	"sele": {
@@ -143,10 +168,12 @@ const SPECIES := {
 		"ears": [0.045, 0.03, 0.9], "tail": [0.08, 0.008, 1.3],
 		"leg_r": [0.03, 0.012], "hoof": [0.012, 0.02],
 		"coat": Color(0.45, 0.33, 0.2), "belly_col": Color(0.5, 0.4, 0.3), "stripes": Color(0.78, 0.66, 0.46),
-		"mane": 0.0, "tusks": 0.0, "mass": 8.0, "step_k": 1.6,
+		"mane": 0.0, "tusks": 0.0, "mass": 8.0,
 		"gaits": {"walk": 1.0, "trot": 2.8, "canter": 5.0, "gallop": 8.0},
 		"flee_speed": 5.0,
 		"young": "",
+		# M8.10: selata cupitají – kratší krok, vyšší kadence (a dřív přejdou do klusu)
+		"froude": [0.4, 2.0, 5.0], "step_k": 1.8,
 	},
 	# ------------------------------------------------------------------ zajíc polní (Lepus europaeus)
 	# 3,5–5 kg, dlouhé uši s černou špičkou, silné zadní nohy. Přes den leží ve „pelechu“ a spoléhá na
@@ -174,6 +201,9 @@ const SPECIES := {
 		"flee_speed": 9.0, "calm": 0.4,
 		"active": [17.0, 24.0, 0.0, 8.0], "graze_angle": 0.5,
 		"sounds": {},
+		# M8.10: skoky s velkou flexí páteře, kličky s výrazným náklonem, dlouhé měkké uši
+		"spine": [0.22, 0.09], "lean_k": 0.9, "froude": [0.5, 2.5, 7.0], "ear_spring": [2.4, 0.25],
+		"ear_flop": 0.02, "breath": [0.8, 0.018],
 	},
 	# ------------------------------------------------------------------ kůň (dopravní prostředek)
 	# Teplokrevník ~550 kg, v kohoutku 1,62 m. Chody: krok ~1,7 m/s, klus ~4, cval ~7, trysk až 15 m/s.
@@ -202,6 +232,8 @@ const SPECIES := {
 		"active": [0.0, 24.0], "graze_angle": 1.2,
 		"sounds": {"idle": "snort", "call": "neigh"},
 		"tack": true,             # sedlo, uzdečka, otěže, třmeny
+		# M8.10: chody pod jezdcem přechází podle Froudova čísla (krok→klus ~2,4 m/s, klus→cval ~5,3, trysk ~8,2)
+		"spine": [0.1, 0.03], "breath": [0.25, 0.008], "tail_spring": [1.6, 0.25],
 	},
 	# ------------------------------------------------------------------ M2.6 hospodářská zvířata (výběh u usedlosti)
 	# Rozměry a barvy jsou odhad (DOPLNIT – nebyly vidět okem), model a chody sdílí s divokou zvěří beze změny;

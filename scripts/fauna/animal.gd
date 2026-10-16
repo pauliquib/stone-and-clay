@@ -54,6 +54,11 @@ const LIMP_SPEED_K := 0.55
 const BLOOD_STEP_M := 2.5            # krvavá kapka každých tolik m běhu
 const STAND_HEIGHT_M := 3.0          # hráč výš než tolik m nad terénem (posed) je zvěři hůř vidět a cítit
 const STAND_SIGHT_K := 0.6
+## M8.10: kde je „vysoká tráva“ (srnec v ní skáče odrazovými skoky): třída plochy `Fields.class_at`
+## (1 orná půda, 2 louka) → měsíce, kdy porost stojí (obilí do žní, louka do první seče). Hrubé, než M8.12 dá
+## skutečnou výšku plodin.
+const TALL_VEG_MONTHS := {1: [5, 6, 7], 2: [5, 6]}
+const TALL_VEG_CHECK_S := 0.5
 
 var spec: Dictionary
 var species := ""
@@ -116,6 +121,8 @@ var _crouch := 0.0
 var _sit := 0.0                     # zajíc „panáček" (sedí na zadních a rozhlíží se)
 var _pronk_t := 0.0                 # odstup času do příštího odrazového skoku při útěku
 var _anim_dt := 0.0                 # akumulace času pro animaci ve vzdáleném LOD
+var _tall := false                   # M8.10: stojí ve vysoké trávě / obilí (zjišťuje se 2× za s)
+var _tall_t := 0.0
 var _charged := false
 var _noise_pos := Vector3.ZERO         # odkud zazněl výstřel / hluk (M2.8), odtud zvíře prchá
 var _noise_t := 0.0                    # do kdy (s) zvíře prchá před hlukem
@@ -706,10 +713,15 @@ func _physics_move(delta: float) -> void:
 	# odrazové skoky při útěku (srnec vyskakuje i bez překážky)
 	_pronk_t -= delta
 	var pronk := float(spec.get("pronk", 0.0))
-	if pronk > 0.0 and state == "flee" and speed > float(spec["gaits"]["canter"]) * 0.7 \
-			and is_on_floor() and _pronk_t <= 0.0:
-		vy = sqrt(2.0 * GRAVITY * (pronk * 0.6 + 0.1))
-		_pronk_t = rng.randf_range(0.8, 1.6)
+	# M8.10: ve vysoké trávě / obilí skáče srnec výš, častěji a už od klusu (bounding přes porost)
+	var tall := pronk > 0.0 and state == "flee" and QuadrupedRig.v2 and _tall_veg(delta)
+	var min_v := float(spec["gaits"]["canter"]) * (0.4 if tall else 0.7)
+	if pronk > 0.0 and state == "flee" and speed > min_v and is_on_floor() and _pronk_t <= 0.0:
+		var ph := pronk * 0.6 + 0.1
+		if tall:
+			ph *= float(spec.get("pronk_tall", 1.3))
+		vy = sqrt(2.0 * GRAVITY * ph)
+		_pronk_t = rng.randf_range(0.45, 0.8) if tall else rng.randf_range(0.8, 1.6)
 	velocity = fwd * speed + Vector3(0, vy, 0)
 	move_and_slide()
 	var ground: float = fauna.terrain.height_at(global_position.x, global_position.z)
@@ -804,7 +816,35 @@ func _animate(delta: float) -> void:
 	if _soil:
 		_soil.emitting = _lod == Lod.FULL and rig.rooting and _graze > 0.5
 	rig.airborne = clampf(absf(velocity.y) / 4.0, 0.0, 1.0) if _lod == Lod.FULL and not is_on_floor() else 0.0
+	# M8.10: uši ke zdroji zvuku (hrozba z vnímání, nebo výstřel / hluk), útěk (ocas, zrcátko), dráha skoku
+	rig.flee = 1.0 if state == "flee" else 0.0
+	rig.vy = velocity.y if _lod == Lod.FULL else 0.0
+	var src := Vector3.INF
+	if threat and aware > 0.15:
+		src = threat.global_position
+	elif _noise_t > 0.0:
+		src = _noise_pos
+	if src != Vector3.INF:
+		rig.listen = 1.0
+		rig.listen_yaw = wrapf(atan2(src.x - global_position.x, src.z - global_position.z) - yaw, -PI, PI)
+	else:
+		rig.listen = 0.0
 	rig.animate(delta)
+
+
+## M8.10: stojí zvíře ve vysoké trávě / obilí? (`TALL_VEG_MONTHS`, dotaz do `World.fields` jen 2× za s)
+func _tall_veg(delta: float) -> bool:
+	_tall_t -= delta
+	if _tall_t > 0.0:
+		return _tall
+	_tall_t = TALL_VEG_CHECK_S
+	_tall = false
+	var f: Fields = fauna.world.fields if fauna.world else null
+	if f == null:
+		return false
+	var months: Array = TALL_VEG_MONTHS.get(f.class_at(global_position.x, global_position.z), [])
+	_tall = fauna.clock.month() in months
+	return _tall
 
 
 ## Hrudebníček hlíny u rypáku divočáka při rytí (drobné částice letí dozadu).

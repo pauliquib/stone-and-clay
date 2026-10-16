@@ -2130,6 +2130,8 @@ const PERF_SCENES := {
 		"weather": "jasno", "popis": "M8.5: otevřená louka při západu slunce v červnu – fyzikální obloha, pás Venuše, modrá hodina"},
 	"zahrady_zari": {"pos": Vector3(20.0, 0.0, -10.0), "yaw": 0.0, "date": [2026, 9, 15], "hour": 11.0,
 		"weather": "jasno", "popis": "M8.3: zahrady u domu v září – ovoce v korunách jen na ovocných druzích (TreeDecor + TreeEco)"},
+	"pole_rijen_vecer": {"pos": Vector3(600.0, 0.0, 600.0), "yaw": 0.0, "date": [2026, 10, 12], "hour": 17.9,
+		"weather": "jasno", "popis": "M8.10: pole v říjnu za soumraku – zvěř vychází na pole, hejno špačků (murmurace), vrány táhnou na nocoviště"},
 }
 
 

@@ -26,6 +26,7 @@ const REALISM_ROWS: Array = [
 	["gait", "Pohyb člověka", "Fázová chůze/běh, chodidla na terénu, kymácení pánve (M8.6)", "~0,05 ms/postava"],
 	["species", "Dřeviny a porosty", "Druh, věk a vitalita stromů podle stanoviště: cena dřeva při kácení, „Prohlédnout strom“, ovoce jen na ovocných druzích (M8.3). Vypnuto = staré chování.", "≈ 0 ms (data offline)"],
 	["wind", "Pole větru", "Nárazy běžící krajinou, závětří a hřebeny, ohyb stromů po úrovních, vlny přes obilí; létání, kouř a čich zvěře podle větru v místě (M8.4). Vypnuto = jedno číslo a sinusovka.", "≤ 0,3 ms GPU"],
+	["animal_gait", "Lokomoce zvířat a let ptáků", "Chody podle Froudova čísla s plynulými přechody, ohyb páteře, uši a ocas jako pružiny (uši ke zvuku), skoky srnce v obilí; ptáci mávají / kloužou / plachtí v termice, přistávají s brzděním, létají proti větru; podzimní hejna špačků (M8.10). Vypnuto = dřívější pohyb.", "~0,1–0,3 ms CPU"],
 	["soil_water", "Vodní bilance", "Vlhkost půdy, tání sněhu, odtok, potoky stoupají a kalní po bouřce, v suchu vysychají; bláto a louže podle místa (M8.7). Vypnuto = jedno globální mokro.", "~0,1 ms CPU"],
 ]
 
