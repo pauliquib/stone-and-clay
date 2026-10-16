@@ -16,8 +16,11 @@ const HEADER := 28                   # magic(4) + verze(4) + x0, z0, cell (12) +
 ## s lineární interpolací mezi řádky (barvy v sRGB, do shaderu jdou převedené na lineární).
 ## Ozimé plodiny (`winter`) jsou na jaře už zelené; `sown` = barva vzcházejících semínek na podzim.
 ## Žně a další termíny se u každého pole posouvají o ±`DATE_SPREAD` dní.
-const DATE_SPREAD := 6
-const CROPS := {
+## M8.D2c: `static var` (F3 → Příroda/Pole a louky – váhy osevního postupu, posun termínů, setí ozimů), výchozí beze změny.
+static var DATE_SPREAD := 6
+static var SOW_FROM_DOY := 275.0     # po podmítce se od tohoto dne zelenají vzcházející ozimy
+static var SOW_TO_DOY := 305.0       # … naplno
+static var CROPS := {
 	"psenice": {"name": "ozimá pšenice", "weight": 0.35, "winter": true, "sown": Color(0.30, 0.46, 0.20, 0.85), "cal": [
 		[1, Color(0.30, 0.46, 0.20, 0.85)], [70, Color(0.30, 0.46, 0.20, 0.85)],
 		[100, Color(0.30, 0.52, 0.18, 0.9)], [150, Color(0.32, 0.55, 0.20, 0.9)],
@@ -196,11 +199,11 @@ static func field_state(id: int, doy: float, year: int) -> PackedFloat32Array:
 	var shift := float(_hash(id, year + 7) % (2 * DATE_SPREAD + 1) - DATE_SPREAD)
 	var s := _sample(spec["cal"], clampf(doy - shift, 1.0, 366.0))
 	# na podzim se po podmítce zelenají vzcházející ozimy příští plodiny
-	if doy > 275.0:
+	if doy > SOW_FROM_DOY:
 		var nspec: Dictionary = CROPS[crop_of(id, year + 1)]
 		if nspec.get("winter", false):
 			var sown: Color = nspec["sown"]
-			var t := smoothstep(275.0, 305.0, doy)
+			var t := smoothstep(SOW_FROM_DOY, SOW_TO_DOY, doy)
 			s[0] = lerpf(s[0], sown.r, t)
 			s[1] = lerpf(s[1], sown.g, t)
 			s[2] = lerpf(s[2], sown.b, t)

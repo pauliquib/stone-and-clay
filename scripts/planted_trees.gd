@@ -15,34 +15,36 @@
 class_name PlantedTrees
 extends Node3D
 
-const START_SCALE := 0.15                 # velikost čerstvé sazenice (~1 m)
+## M8.D2c: růst a chování = `static var` (F3 → Příroda/Dřeviny a les), výchozí beze změny.
+static var START_SCALE := 0.15            # velikost čerstvé sazenice (~1 m)
 ## DOPLNIT: rychlost růstu – herní roky jsou dlouhé, proto 6× rychleji než realita (výchozí z promptu); ladit podle pocitu
-const GROWTH_SPEEDUP := 6.0
-const ESTABLISH_DAYS := 60                # tolik dní po výsadbě strom potřebuje vláhu; potom se ujme
+static var GROWTH_SPEEDUP := 6.0
+static var ESTABLISH_DAYS := 60           # tolik dní po výsadbě strom potřebuje vláhu; potom se ujme
 const DORMANT_MONTHS := [11, 12, 1, 2]    # zimní klid: strom neroste a nevysychá
-const WATER_DAYS := 4.0                   # dní vláhy po zalití
-const RAIN_DAYS := 3.0                    # dní vláhy po dešti
+static var WATER_DAYS := 4.0              # dní vláhy po zalití
+static var RAIN_DAYS := 3.0               # dní vláhy po dešti
 const TREE_CAN_COST := 2                  # kolik „záhonů“ vody z konve spotřebuje zalití stromu
-const DRY_DAMAGE := 0.06                  # ztráta zdraví za suchý den v prvních ESTABLISH_DAYS
-const HEAL_WET := 0.05                    # zotavení zdraví za den s vláhou
-const HEAL_SLOW := 0.02                   # zotavení ujatého stromu
-const DRY_GROWTH := 0.5                   # násobek růstu v suchu
-const SKIP_RAIN_BASE := 0.15              # šance deště za přeskočený den = základ + K × vlhko posledních dní
-const SKIP_RAIN_K := 0.35
+static var DRY_DAMAGE := 0.06             # ztráta zdraví za suchý den v prvních ESTABLISH_DAYS
+static var HEAL_WET := 0.05               # zotavení zdraví za den s vláhou
+static var HEAL_SLOW := 0.02              # zotavení ujatého stromu
+static var DRY_GROWTH := 0.5              # násobek růstu v suchu
+static var HEALTH_GROWTH_MIN := 0.4       # růst při nulovém zdraví (× ; při plném 1)
+static var SKIP_RAIN_BASE := 0.15         # šance deště za přeskočený den = základ + K × vlhko posledních dní
+static var SKIP_RAIN_K := 0.35
 const MAX_CATCHUP_DAYS := 4000
 const CHECK_S := 1.0
-const BROWSE_R := 60.0                    # m – srnec takhle blízko může sazenici ožrat
-const BROWSE_P := 0.15                    # šance za den
-const BROWSE_DAMAGE := 0.5
-const BROWSE_MAX_S := 0.5                 # ožírají se jen sazenice menší než tohle měřítko
-const GUARD_OUTGROWN := 0.55              # od této velikosti už obal nechrání a zmizí
-const MIN_TREE_DIST := 2.0                # m od jiného stromu
-const MIN_BUILDING_DIST := 2.0            # m od zdi
-const MIN_ROAD_DIST := 3.0                # m od silnice
+static var BROWSE_R := 60.0               # m – srnec takhle blízko může sazenici ožrat
+static var BROWSE_P := 0.15               # šance za den
+static var BROWSE_DAMAGE := 0.5
+static var BROWSE_MAX_S := 0.5            # ožírají se jen sazenice menší než tohle měřítko
+static var GUARD_OUTGROWN := 0.55         # od této velikosti už obal nechrání a zmizí
+static var MIN_TREE_DIST := 2.0           # m od jiného stromu
+static var MIN_BUILDING_DIST := 2.0       # m od zdi
+static var MIN_ROAD_DIST := 3.0           # m od silnice
 const PLOT_MARGIN := 1.0                  # m od záhonů
-const COLLIDE_MIN_H := 1.5                # kmen je pevný od této výšky stromu
-const FRUIT_MIN_S := 0.7                  # ovocný strom plodí od této velikosti
-const FRUIT_CAP := 10                     # ovoce na plně vzrostlém stromě v plné sezóně
+static var COLLIDE_MIN_H := 1.5           # kmen je pevný od této výšky stromu
+static var FRUIT_MIN_S := 0.7             # ovocný strom plodí od této velikosti
+static var FRUIT_CAP := 10                # ovoce na plně vzrostlém stromě v plné sezóně
 const MAX_FRUIT := 700
 const REWARD_DAYS := 60                   # po tolika dnech se strom „ujal“ → karma a pověst
 const REWARD_MAX_PER_YEAR := 5
@@ -50,7 +52,7 @@ const NEIGHBOR_RESPECT := -1.0            # sázení na cizím pozemku (zástavb
 
 ## Druhy: sazenice (ItemsDB), ovoce (ItemsDB), roky do plné velikosti (před zrychlením), výška a šířkové měřítko dospělého stromu
 ## (stejné jednotky jako trees.bin: sx, sy), prototypy modelu (0–2 listnáč, 3+ jehličnan), barva koruny, barva plodů.
-const SPECIES := {
+static var SPECIES := {
 	"jablon": {"name": "Jabloň", "item": "sazenice_jablon", "fruit": "jablko", "years": 4.0, "h": 6.5, "sx": 2.6,
 		"protos": [0, 1, 2], "leaf": Color(0.2, 0.36, 0.1), "fruit_color": Color(0.82, 0.1, 0.07)},
 	"slivon": {"name": "Slivoň", "item": "sazenice_slivon", "fruit": "svestka", "years": 4.0, "h": 5.5, "sx": 2.4,
@@ -73,7 +75,7 @@ const SPECIES_ORDER := ["jablon", "slivon", "hrusen", "tresen", "dub", "buk", "s
 const ECO_IDS := {"jablon": "jablon", "slivon": "svestka", "hrusen": "hrusen", "tresen": "tresen", "dub": "dub_letni",
 	"buk": "buk", "smrk": "smrk", "borovice": "borovice"}
 ## M8.3: růst zasazeného stromu × lerp(min, max, vitalita stanoviště) – na vhodném místě roste rychleji.
-const VIGOR_GROWTH := [0.6, 1.15]
+static var VIGOR_GROWTH := [0.6, 1.15]
 ## M8.8: generované stromy (MapLoader.tree_gen) – klíč skupiny MultiMeshe = GEN_KEY_BASE + varianta; sazenice menší
 ## než GEN_ADULT_SIZE dostane model „mladý“ (věk GEN_YOUNG_YEARS), větší „dospělý“.
 const GEN_KEY_BASE := 1000
@@ -573,8 +575,8 @@ func _grow(rec: Dictionary, rained: bool, month: int) -> void:
 		return
 	var thrive := wet or int(rec["cal"]) >= ESTABLISH_DAYS
 	var vig := float(rec.get("vig", -1.0))
-	var vk := lerpf(VIGOR_GROWTH[0], VIGOR_GROWTH[1], vig) if vig >= 0.0 else 1.0      # M8.3
-	rec["age"] = float(rec["age"]) + (1.0 if thrive else DRY_GROWTH) * lerpf(0.4, 1.0, clampf(float(rec["health"]), 0.0, 1.0)) * vk
+	var vk := lerpf(float(VIGOR_GROWTH[0]), float(VIGOR_GROWTH[1]), vig) if vig >= 0.0 else 1.0      # M8.3
+	rec["age"] = float(rec["age"]) + (1.0 if thrive else DRY_GROWTH) * lerpf(HEALTH_GROWTH_MIN, 1.0, clampf(float(rec["health"]), 0.0, 1.0)) * vk
 
 
 ## Strom se ujal: karma +1 a pověst +1 (nejvýš `REWARD_MAX_PER_YEAR`× za rok).

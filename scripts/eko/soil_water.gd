@@ -25,6 +25,9 @@ class_name SoilWater
 extends RefCounted
 
 # ------------------------------------------------------------------ laditelné konstanty
+# M8.D2c: chování = `static var` (F3 → Příroda/Voda a půda, `scripts/dev/tune_priroda.gd`), technické zůstaly `const`.
+# Parametry označené (stavba) se čtou jen při stavbě mřížky / topologie toků – projeví se po novém startu; CN, jílovitost,
+# holá půda, zápoj a nádrže toků se po změně přepočítají při nejbližším hodinovém kroku (`invalidate()`).
 
 const CELL := 32.0                     # m – hrubá mřížka bilance
 const CELL_AREA := CELL * CELL         # m²
@@ -36,38 +39,76 @@ const STREAMS_PER_FRAME := 24          # úseků toků za snímek při značení
 const MAX_WALK := 4000                 # nejdelší cesta po spádnici (ochrana proti cyklu)
 
 const LAT_DEG := 49.14                 # zeměpisná šířka (Clock) – extraterestrické záření
-const CLIMATE_DT_H := 24.0             # delší krok (dohánění) než tohle → srážky a teplota z klimatu, ne z okamžiku
+static var CLIMATE_DT_H := 24.0        # delší krok (dohánění) než tohle → srážky a teplota z klimatu, ne z okamžiku
 ## Měsíční srážky (mm, střední Morava ~550 mm/rok, normál 1991–2020 zjednodušeně) – rozběh a dlouhé skoky času.
-const PRECIP_MM := [26.0, 24.0, 29.0, 35.0, 62.0, 72.0, 80.0, 64.0, 48.0, 36.0, 35.0, 30.0]
+static var PRECIP_MM := [26.0, 24.0, 29.0, 35.0, 62.0, 72.0, 80.0, 64.0, 48.0, 36.0, 35.0, 30.0]
 
-const INTERCEPT_MM := 3.0              # zachycení v korunách za srážkovou událost (les, plné olistění)
-const INTERCEPT_LEAFLESS := 0.4        # podíl zachycení bez listí (jehličnany, větve)
-const DDF_MM := 3.0                    # tání sněhu mm/°C/den (sever, stín)
-const DDF_SOUTH_MM := 2.0              # + na jižních svazích (Site.insol_winter)
-const MELT_FOREST := 0.7               # v lese taje pomaleji (× DDF)
-const RAIN_ON_SNOW := 0.0125           # mm tání na mm deště a °C (teplý déšť do sněhu)
-const SNOW_DENSITY := 0.25             # hustota sněhu → výška = swe / 1000 / hustota
-const EVENT_GAP_H := 6.0               # hodin bez deště = konec srážkové události (SCS počítá po událostech)
-const EVENT_MIN_MM := 0.1              # méně za hodinu = suchá hodina
-const S_FROZEN_MM := 8.0               # retence zamrzlé půdy (téměř vše odteče)
-const FROST_RATE := 0.012              # zamrzání půdy na °C·h mrazu
-const THAW_RATE := 0.02                # tání půdy na °C·h nad nulou
-const SNOW_INSULATE_MM := 30.0         # víc sněhu (průměr) = půda pod ním rozmrzá
-const ET_BETA_FRAC := 0.5              # pod touto vlhkostí (× AWC) výpar klesá úměrně (stres suchem)
-const ET_SNOW := 0.1                   # výpar pod sněhem (× PET)
-const INSOL_MEAN := 5200.0             # MJ/m²/rok – průměr Site.insol (výpar svahu = insol / průměr)
-const DRAIN_FROM := 0.75               # od této vlhkosti (× AWC) voda pomalu prosakuje dál (polní kapacita)
-const K_DRAIN_H := 0.006               # rychlost prosakování (1/h × propustnost)
-const GW_FRAC := 0.35                  # podíl prosáklé vody do podzemní (pomalé) nádrže toku (× 0,5 + propustnost)
-const TWI_MED := 6.7                   # medián TWI (site.bin) – rozběh: vlhčí údolnice
-const TWI_K := 0.06                    # + vlhkost na 1 TWI nad mediánem (rozběh)
-const SPINUP_DAYS := 60                # 00/M8.7: „roztočení“ bilance z klimatu
-const SPINUP_AWC := 130.0
-const SPINUP_KC := 0.85
+static var INTERCEPT_MM := 3.0         # zachycení v korunách za srážkovou událost (les, plné olistění)
+static var INTERCEPT_LEAFLESS := 0.4   # podíl zachycení bez listí (jehličnany, větve)
+static var DDF_MM := 3.0               # tání sněhu mm/°C/den (sever, stín)
+static var DDF_SOUTH_MM := 2.0         # + na jižních svazích (Site.insol_winter)
+static var MELT_FOREST := 0.7          # v lese taje pomaleji (× DDF)
+static var RAIN_ON_SNOW := 0.0125      # mm tání na mm deště a °C (teplý déšť do sněhu)
+static var SNOW_DENSITY := 0.25        # hustota sněhu → výška = swe / 1000 / hustota
+static var EVENT_GAP_H := 6.0          # hodin bez deště = konec srážkové události (SCS počítá po událostech)
+static var EVENT_MIN_MM := 0.1         # méně za hodinu = suchá hodina
+static var S_FROZEN_MM := 8.0          # retence zamrzlé půdy (téměř vše odteče)
+static var FROST_RATE := 0.012         # zamrzání půdy na °C·h mrazu
+static var THAW_RATE := 0.02           # tání půdy na °C·h nad nulou
+static var SNOW_INSULATE_MM := 30.0    # víc sněhu (průměr) = půda pod ním rozmrzá
+static var SNOW_INSULATE_K := 0.3      # … zamrzá jen tímto podílem rychlosti
+static var ET_BETA_FRAC := 0.5         # pod touto vlhkostí (× AWC) výpar klesá úměrně (stres suchem)
+static var ET_SNOW := 0.1              # výpar pod sněhem (× PET)
+static var ET_SNOW_MM := 5.0           # „pod sněhem“ = víc než tolik mm v. e.
+static var INSOL_MEAN := 5200.0        # MJ/m²/rok – průměr Site.insol (výpar svahu = insol / průměr) (stavba)
+static var DRAIN_FROM := 0.75          # od této vlhkosti (× AWC) voda pomalu prosakuje dál (polní kapacita)
+static var K_DRAIN_H := 0.006          # rychlost prosakování (1/h × propustnost)
+static var GW_FRAC := 0.35             # podíl prosáklé vody do podzemní (pomalé) nádrže toku (× 0,5 + propustnost)
+static var GW_PERM_BASE := 0.5         # … ten „0,5 +“
+static var TWI_MED := 6.7              # medián TWI (site.bin) – rozběh: vlhčí údolnice (stavba)
+static var TWI_K := 0.06               # + vlhkost na 1 TWI nad mediánem (rozběh) (stavba)
+static var SPINUP_DAYS := 60           # 00/M8.7: „roztočení“ bilance z klimatu (stavba)
+static var SPINUP_AWC := 130.0
+static var SPINUP_KC := 0.85
+static var SPINUP_W0 := 0.75           # rozběh začíná na tomto podílu AWC
+static var SPINUP_RANGE_K := 0.75      # rozběh: denní rozkmit teploty (× klima)
+static var SPINUP_FROST_P := 0.3       # rozběh: v mrazu jde do půdy jen tento podíl srážek
+static var HARG_C := 0.0023            # Hargreaves: koeficient (často se kalibruje 0,0017–0,0030)
+static var HARG_T := 17.8              # Hargreaves: posun teploty (°C)
+static var AWC_MIN := 20.0             # nejmenší kapacita buňky (mm) (stavba)
+static var ETF_MIN := 0.6              # výpar svahu: nejméně (× průměr) (stavba)
+static var ETF_MAX := 1.3              # … nejvíc (stavba)
+static var SOUTH_FROM := 250.0         # jižní svah: zimní oslunění od (Site.insol_winter) (stavba)
+static var SOUTH_SPAN := 300.0         # … plně jižní o tolik výš (stavba)
+static var HOLLOW_FROM := 5.0          # prohlubeň (louže): TWI od (stavba)
+static var HOLLOW_TO := 11.0           # … naplno (stavba)
+static var SNOW0_MM := 30.0            # výchozí sníh: mm v. e. při pokrývce 1 (stavba)
+static var HSG_A := 0.7                # hydrologická skupina půdy podle propustnosti: A od
+static var HSG_B := 0.45               # … B od
+static var HSG_C := 0.3                # … C od (níž D)
+static var SCS_LAMBDA := 0.2           # SCS: počáteční ztráta Ia = λ · S
+static var AMC_DRY := 0.15             # AMC I (suchá půda) do vlhkosti
+static var AMC_MID := 0.5              # AMC II (normál)
+static var AMC_WET := 0.95             # AMC III (nasycená) od
+static var KC_FOREST := 1.1            # výpar lesa (koeficient)
+static var KC_ARABLE_BASE := 0.3       # orná půda: koeficient výparu mimo sezónu
+static var KC_ARABLE_GREEN := 0.8      # … přídavek × zeleň (Seasons.green)
+static var CLIMATE_CLOUD := 0.6        # dlouhý skok času: oblačnost z klimatu
+static var PET_CLOUD_DAMP := 0.6       # oblačnost tlumí denní rozkmit (× oblačnost) pro výpar
+static var MUD_FROST_DIM := 0.8        # zamrzlá půda: bláto ubývá (× zamrznutí)
+static var PUDDLE_FROST_DIM := 0.8     # zamrzlá půda: louže ubývají (× zamrznutí)
+static var PUDDLE_FLAT := 0.35         # louže mimo prohlubně (× nasycení); v prohlubni 1
+static var DROUGHT_MOIST_REF := 0.5    # index sucha: vlhkost půdy, pod kterou sucho roste
+static var DROUGHT_MOIST_SPAN := 0.3   # … plné sucho o tolik níž
+static var DROUGHT_FLOW_REF := 0.8     # … průtok (× normál), pod kterým sucho roste
+static var DROUGHT_FLOW_SPAN := 0.6    # … plné sucho o tolik níž
+static var DROUGHT_MOIST_W := 0.6      # váha vlhkosti (průtoky zbytek)
+static var RES0_LO := 0.15             # výchozí zásoba nádrží toků (× normál) při suchém rozběhu (stavba)
+static var RES0_HI := 1.3              # … při mokrém (stavba)
 
 ## Třídy povrchu (`SurfaceMap`: tráva, orná, sad, les, dvůr, břeh, skála, polní cesta).
 ## CN pro hydrologické skupiny A/B/C/D (TR-55, zjednodušeně).
-const CN2 := [
+static var CN2 := [
 	[39.0, 61.0, 74.0, 80.0],          # tráva / louka
 	[67.0, 78.0, 85.0, 89.0],          # orná půda
 	[43.0, 65.0, 76.0, 82.0],          # sad / zahrada
@@ -78,34 +119,36 @@ const CN2 := [
 	[72.0, 82.0, 87.0, 89.0],          # polní cesta
 ]
 ## Koeficient výparu podle povrchu (orná: -1 = podle sezóny `Seasons.green`).
-const KC := [0.9, -1.0, 0.95, 1.1, 0.35, 1.1, 0.15, 0.4]
+static var KC := [0.9, -1.0, 0.95, 1.1, 0.35, 1.1, 0.15, 0.4]
 ## Holá půda / cesta (bláto) 0..1 podle povrchu.
-const BARE := [0.45, 1.0, 0.55, 0.6, 0.5, 1.0, 0.05, 1.0]
-const BARE_FOREST := 0.6
+static var BARE := [0.45, 1.0, 0.55, 0.6, 0.5, 1.0, 0.05, 1.0]
+static var BARE_FOREST := 0.6
 ## Jílovitost (lepivost bláta) podle půdní třídy `Site.SOIL_*`.
-const CLAY := [0.75, 0.35, 0.2, 1.0, 0.9, 0.6]
-const MUD_FROM := 0.55                 # vlhkost (× AWC), od které je bláto
-const MUD_FULL := 0.95
-const PUDDLE_FROM := 0.8               # vlhkost, od které stojí v prohlubních louže
-const RUNOFF_PUDDLE := 2.0             # mm/h povrchového odtoku = plné louže
+static var CLAY := [0.75, 0.35, 0.2, 1.0, 0.9, 0.6]
+static var MUD_FROM := 0.55            # vlhkost (× AWC), od které je bláto
+static var MUD_FULL := 0.95
+static var PUDDLE_FROM := 0.8          # vlhkost, od které stojí v prohlubních louže
+static var RUNOFF_PUDDLE := 2.0        # mm/h povrchového odtoku = plné louže
 
 # toky – lineární nádrže
-const Q_SPEC := 4.0e-9                 # m³/s na m² povodí (4 l/s/km² – normál průtoku)
-const MIN_AREA_M2 := 2.0e5             # nejmenší povodí (normál malých strouh)
-const K_QUICK_H := {"river": 30.0, "canal": 20.0, "stream": 10.0, "ditch": 6.0, "drain": 6.0}
+static var Q_SPEC := 4.0e-9            # m³/s na m² povodí (4 l/s/km² – normál průtoku)
+static var MIN_AREA_M2 := 2.0e5        # nejmenší povodí (normál malých strouh)
+static var K_QUICK_H := {"river": 30.0, "canal": 20.0, "stream": 10.0, "ditch": 6.0, "drain": 6.0}
 ## Podzemní (pomalá) nádrž – malé potoky se v suchu vyprázdní za 2–3 týdny, řeka drží měsíce.
-const K_SLOW_H := {"river": 1500.0, "canal": 900.0, "stream": 300.0, "ditch": 150.0, "drain": 150.0}
-const DEPTH_N := {"river": 0.6, "canal": 0.4, "stream": 0.25, "ditch": 0.15, "drain": 0.15}
-## Povodí nad katastrem pro toky, které do mapy přitékají zvenku (začátek u okraje mřížky).
-const EXT_AREA_M2 := {"river": 6.0e7, "canal": 5.0e6, "stream": 3.0e6}
-const EDGE_M := 200.0
-const JOIN_M := 40.0                   # konec úseku blíž než tohle k jinému toku = vlévá se do něj
-const LEVEL_MAX := 0.4                 # m – nejvyšší vzestup hladiny (pás vody nevylézá z koryta)
-const LEVEL_EXP := 0.4                 # hladina ∝ Q^0,4 (měrná křivka koryta, zjednodušeně)
-const DRY_REL := 0.12                  # Q / normál pod tímhle = malý potok (téměř) vyschl
-const TURB_FROM := 1.6                 # Q / normál, od kterého voda kalní
-const TURB_FULL := 4.0
-const TURB_TAU_H := 14.0               # jak rychle se voda vyčistí (h)
+static var K_SLOW_H := {"river": 1500.0, "canal": 900.0, "stream": 300.0, "ditch": 150.0, "drain": 150.0}
+static var DEPTH_N := {"river": 0.6, "canal": 0.4, "stream": 0.25, "ditch": 0.15, "drain": 0.15}
+## Povodí nad katastrem pro toky, které do mapy přitékají zvenku (začátek u okraje mřížky). (stavba)
+static var EXT_AREA_M2 := {"river": 6.0e7, "canal": 5.0e6, "stream": 3.0e6}
+static var EDGE_M := 200.0             # (stavba)
+static var JOIN_M := 40.0              # konec úseku blíž než tohle k jinému toku = vlévá se do něj (stavba)
+static var LEVEL_MAX := 0.4            # m – nejvyšší vzestup hladiny (pás vody nevylézá z koryta)
+static var LEVEL_EXP := 0.4            # hladina ∝ Q^0,4 (měrná křivka koryta, zjednodušeně)
+static var DRY_REL := 0.12             # Q / normál pod tímhle = malý potok (téměř) vyschl
+static var TURB_FROM := 1.6            # Q / normál, od kterého voda kalní
+static var TURB_FULL := 4.0
+static var TURB_TAU_H := 14.0          # jak rychle se voda vyčistí (h)
+## M8.D2c: změna parametru buněk / toků v menu F3 → přepočet při nejbližším hodinovém kroku.
+static var _gen := 0
 
 # ------------------------------------------------------------------ stav
 
@@ -148,7 +191,7 @@ var _path := PackedInt32Array()        # jen pro stavbu (cesta po spádnici)
 ## bez slovníku a bilineáru na každý dotaz (stavba 84 tis. buněk musí být levná).
 var _lays: Array = []
 const LAY_CODES := ["AWC_", "TWI_", "SOIL", "INSW", "INSY", "ELEV", "DISW"]
-const LAY_DEFAULTS := [120.0, TWI_MED, 0.0, 360.0, INSOL_MEAN, 0.0, 9999.0]
+const LAY_DEFAULTS := [120.0, 6.7, 0.0, 360.0, 5200.0, 0.0, 9999.0]   # TWI a oslunění = výchozí TWI_MED, INSOL_MEAN
 
 # toky (index = pořadí v Water.streams)
 var m := 0
@@ -206,6 +249,14 @@ var mean_moist := 0.6
 var mean_swe := 0.0
 var mean_flow_rel := 1.0
 var _pending := {}                     # uložený stav, který čeká na dostavění mřížky
+var _soil := PackedByteArray()         # M8.D2c: půdní třída buňky (přepočet jílovitosti po změně v F3)
+var _tot := PackedFloat32Array()       # M8.D2c: m² celého povodí úseku (přepočet normálu po změně Q_SPEC)
+var _seen_gen := 0
+
+
+## M8.D2c: po změně parametru v menu F3 – přepočítat CN, bláto a nádrže toků (při nejbližší hodině).
+static func invalidate() -> void:
+	_gen += 1
 
 
 # ------------------------------------------------------------------ stavba
@@ -246,6 +297,8 @@ func setup(wd: World) -> void:
 	_elev.resize(n)
 	_disw.resize(n)
 	_cls.resize(n)
+	_soil.resize(n)
+	_seen_gen = _gen
 	_d8.resize(n)
 	_scell.resize(n)
 	_scell.fill(-1)
@@ -292,16 +345,16 @@ func _spinup_m0() -> float:
 	var doy := 180.0
 	if world != null and world.clock != null:
 		doy = world.clock.day_of_year()
-	var ww := SPINUP_AWC * 0.75
+	var ww := SPINUP_AWC * SPINUP_W0
 	for d in SPINUP_DAYS:
 		var dd := fposmod(doy - SPINUP_DAYS + d - 1.0, 365.0) + 1.0
 		var month := clampi(int((dd - 1.0) / 30.42), 0, 11)
 		var p: float = float(PRECIP_MM[month]) / 30.42
 		var t := Seasons.monthly(Seasons.TEMP_MEAN, dd)
-		var tr := Seasons.monthly(Seasons.TEMP_RANGE, dd) * 0.75
+		var tr := Seasons.monthly(Seasons.TEMP_RANGE, dd) * SPINUP_RANGE_K
 		var pet := hargreaves_mm_day(t, tr, dd)
 		if t < 0.0:
-			p *= 0.3                                     # v mrazu leží sníh, do půdy jde jen část
+			p *= SPINUP_FROST_P                          # v mrazu leží sníh, do půdy jde jen část
 		var beta := minf(ww / (ET_BETA_FRAC * SPINUP_AWC), 1.0)
 		ww = clampf(ww + p - pet * SPINUP_KC * beta, 0.0, SPINUP_AWC)
 	return clampf(ww / SPINUP_AWC, 0.1, 1.0)
@@ -309,7 +362,7 @@ func _spinup_m0() -> float:
 
 ## Hargreaves & Samani (1985): PET mm/den z průměrné teploty, denního rozkmitu a extraterestrického záření.
 static func hargreaves_mm_day(t_mean: float, t_range: float, doy: float) -> float:
-	return maxf(0.0023 * 0.408 * extraterrestrial_mj(doy) * (t_mean + 17.8) * sqrt(maxf(t_range, 0.0)), 0.0)
+	return maxf(HARG_C * 0.408 * extraterrestrial_mj(doy) * (t_mean + HARG_T) * sqrt(maxf(t_range, 0.0)), 0.0)
 
 
 ## FAO-56 rov. 21: extraterestrické záření Ra (MJ/m²/den) pro šířku `LAT_DEG` a den v roce.
@@ -370,7 +423,7 @@ func _init_chunk(c: int) -> void:
 			dw = _lay(6, sidx)
 		elif world.terrain != null:
 			el = world.terrain.height_at(x, z)
-		a = maxf(a, 20.0)
+		a = maxf(a, AWC_MIN)
 		# povrch: 4 vzorky po 16 m – podíl lesa a převládající ne-lesní třída
 		var fo := 0.0
 		var cls := SurfaceMap.GRASS
@@ -392,35 +445,65 @@ func _init_chunk(c: int) -> void:
 		cls = clampi(cls, 0, 7)
 		var props: Dictionary = Site.SOIL_PROPS.get(soil, Site.SOIL_PROPS[Site.SOIL_HNEDOZEM])
 		var perm: float = props["perm"]
-		var grp := 0 if perm >= 0.7 else (1 if perm >= 0.45 else (2 if perm >= 0.3 else 3))
-		var cn_open: float = CN2[cls][grp]
-		var cn_for: float = CN2[SurfaceMap.FOREST][grp]
-		var cn := lerpf(cn_open, cn_for, fo)
-		_s2[i] = 25400.0 / cn - 254.0
-		var cn1 := cn / (2.281 - 0.01281 * cn)
-		var cn3 := minf(cn / (0.427 + 0.00573 * cn), 99.0)
-		_s1[i] = 25400.0 / cn1 - 254.0
-		_s3[i] = 25400.0 / cn3 - 254.0
 		_perm[i] = perm
 		awc[i] = a
-		_etf[i] = clampf(insy / INSOL_MEAN, 0.6, 1.3)
-		_south[i] = clampf((insw - 250.0) / 300.0, 0.0, 1.0)
+		_etf[i] = clampf(insy / INSOL_MEAN, ETF_MIN, ETF_MAX)
+		_south[i] = clampf((insw - SOUTH_FROM) / SOUTH_SPAN, 0.0, 1.0)
 		_forest[i] = fo
 		_cls[i] = cls
-		var clay: float = CLAY[clampi(soil, 0, CLAY.size() - 1)]
-		_mudk[i] = clay * lerpf(float(BARE[cls]), BARE_FOREST, fo)
-		_twin[i] = smoothstep(5.0, 11.0, twi)
+		_soil[i] = clampi(soil, 0, 255)
+		_cell_params(i)
+		_twin[i] = smoothstep(HOLLOW_FROM, HOLLOW_TO, twi)
 		_elev[i] = el
 		_disw[i] = dw
 		var m_i := clampf(_m0 + TWI_K * (twi - TWI_MED), 0.05, 1.0)
 		w[i] = a * m_i
-		swe[i] = snow0 * 30.0 * (1.0 - 0.5 * _south[i]) if snow0 > 0.02 else 0.0
+		swe[i] = snow0 * SNOW0_MM * (1.0 - 0.5 * _south[i]) if snow0 > 0.02 else 0.0
 		mud[i] = smoothstep(MUD_FROM, MUD_FULL, m_i) * _mudk[i]
 	Tests.prof_add("soil_water", t0)
 	if i1 >= n:
 		world.eco.slice(ceili(float(m) / STREAMS_PER_FRAME), 1, _mark_streams_chunk)
 		if m == 0:
 			world.eco.slice(ceili(float(n) / CHUNK_D8), 1, _d8_chunk)
+
+
+## Parametry buňky z povrchu, propustnosti, půdy a zápoje: retence SCS (AMC I/II/III) a lepivost bláta.
+## Při stavbě a po změně CN / jílovitosti / holé půdy v menu F3 (`_refresh_chunk`).
+func _cell_params(i: int) -> void:
+	var cls: int = _cls[i]
+	var fo := _forest[i]
+	var perm := _perm[i]
+	var grp := 0 if perm >= HSG_A else (1 if perm >= HSG_B else (2 if perm >= HSG_C else 3))
+	var cn_open: float = CN2[cls][grp]
+	var cn_for: float = CN2[SurfaceMap.FOREST][grp]
+	var cn := lerpf(cn_open, cn_for, fo)
+	_s2[i] = 25400.0 / cn - 254.0
+	var cn1 := cn / (2.281 - 0.01281 * cn)
+	var cn3 := minf(cn / (0.427 + 0.00573 * cn), 99.0)
+	_s1[i] = 25400.0 / cn1 - 254.0
+	_s3[i] = 25400.0 / cn3 - 254.0
+	var clay: float = CLAY[clampi(_soil[i], 0, CLAY.size() - 1)]
+	_mudk[i] = clay * lerpf(float(BARE[cls]), BARE_FOREST, fo)
+
+
+## M8.D2c: přepočet po změně v menu F3 – buňky po kouscích, toky naráz (426 úseků).
+func _refresh_params() -> void:
+	for si in m:
+		var kind := String(water.streams[si]["kind"])
+		_kq[si] = float(K_QUICK_H.get(kind, 10.0))
+		_ks[si] = float(K_SLOW_H.get(kind, 300.0))
+		_depth[si] = float(DEPTH_N.get(kind, 0.25))
+		_qn_own[si] = Q_SPEC * maxf(_area_loc[si] + _area_ext[si], MIN_AREA_M2)
+		if _tot.size() == m:
+			st_qn[si] = Q_SPEC * maxf(_tot[si], MIN_AREA_M2)
+	world.eco.slice(ceili(float(n) / CHUNK_INIT), 1, _refresh_chunk)
+
+
+func _refresh_chunk(c: int) -> void:
+	var i0 := c * CHUNK_INIT
+	var i1 := mini(i0 + CHUNK_INIT, n)
+	for i in range(i0, i1):
+		_cell_params(i)
 
 
 ## Fáze 2: koryta toků do mřížky (buňka, kterou tok protéká, patří toku).
@@ -602,8 +685,9 @@ func _finish_topology() -> void:
 			tot[_down[si]] += tot[si]
 	for si in m:
 		st_qn[si] = Q_SPEC * maxf(tot[si], MIN_AREA_M2)
+	_tot = tot
 	# výchozí zásoby z rozběhové vlhkosti
-	var rel0 := lerpf(0.15, 1.3, _m0)
+	var rel0 := lerpf(RES0_LO, RES0_HI, _m0)
 	for si in m:
 		_ss[si] = rel0 * _qn_own[si] * 0.8 * _ks[si] * 3600.0
 		_sq[si] = rel0 * _qn_own[si] * 0.2 * _kq[si] * 3600.0
@@ -628,6 +712,9 @@ func _on_eco_hour(dt_h: float) -> void:
 	var wt: Weather = world.weather
 	if wt == null or world.clock == null:
 		return
+	if _seen_gen != _gen and ready:              # M8.D2c: změna v menu F3
+		_seen_gen = _gen
+		_refresh_params()
 	var p := 0.0
 	var temp := wt.temp
 	var cloud := wt.cloud
@@ -637,7 +724,7 @@ func _on_eco_hour(dt_h: float) -> void:
 		var month := clampi(int((doy - 1.0) / 30.42), 0, 11)
 		p = float(PRECIP_MM[month]) / 30.42 * dt_h / 24.0
 		temp = Seasons.monthly(Seasons.TEMP_MEAN, doy)
-		cloud = 0.6
+		cloud = CLIMATE_CLOUD
 	else:
 		p = wt.rain * Weather.RAIN_MM_H * dt_h
 	if _acc_h <= 0.0:
@@ -658,7 +745,7 @@ func _on_eco_hour(dt_h: float) -> void:
 			_event_p = 0.0
 	# zamrzlá půda (globálně): mráz ji zamrazí, teplo a sněhová peřina rozmrazí
 	if temp < 0.0:
-		frost += -temp * FROST_RATE * dt_h * (0.3 if mean_swe > SNOW_INSULATE_MM else 1.0)
+		frost += -temp * FROST_RATE * dt_h * (SNOW_INSULATE_K if mean_swe > SNOW_INSULATE_MM else 1.0)
 	else:
 		frost -= temp * THAW_RATE * dt_h
 	frost = clampf(frost, 0.0, 1.0)
@@ -675,7 +762,7 @@ func _start_sweep() -> void:
 	_f_snow = _acc_snow
 	_f_temp = _acc_temp_h / _acc_h
 	var cloud := _acc_cloud_h / _acc_h
-	var tr := Seasons.monthly(Seasons.TEMP_RANGE, doy) * (1.0 - 0.6 * cloud)
+	var tr := Seasons.monthly(Seasons.TEMP_RANGE, doy) * (1.0 - PET_CLOUD_DAMP * cloud)
 	_f_pet = hargreaves_mm_day(_f_temp, tr, doy) * _f_dt / 24.0
 	_f_event0 = _acc_event0
 	_f_frost = frost
@@ -683,7 +770,7 @@ func _start_sweep() -> void:
 	_f_fol = lerpf(INTERCEPT_LEAFLESS, 1.0, fol)
 	for c in 8:
 		var kc: float = KC[c]
-		_kc_now[c] = 0.3 + 0.8 * Seasons.green(doy) if kc < 0.0 else kc
+		_kc_now[c] = KC_ARABLE_BASE + KC_ARABLE_GREEN * Seasons.green(doy) if kc < 0.0 else kc
 	_acc_h = 0.0
 	_acc_rain = 0.0
 	_acc_snow = 0.0
@@ -701,10 +788,10 @@ func _start_sweep() -> void:
 
 
 static func _scs(p: float, s: float) -> float:
-	var ia := 0.2 * s
+	var ia := SCS_LAMBDA * s
 	if p <= ia:
 		return 0.0
-	return (p - ia) * (p - ia) / (p + 0.8 * s)
+	return (p - ia) * (p - ia) / (p - ia + s)            # = (P − Ia)² / (P + (1 − λ)·S)
 
 
 ## Jeden kus průchodu: kyblík každé buňky o `_f_dt` hodin (bez alokací).
@@ -736,7 +823,7 @@ func _step_chunk(c: int) -> void:
 		# 3. SCS-CN: retence podle předchozí vlhkosti (AMC), zamrzlá půda skoro nepropouští
 		var wi := w[i]
 		var mi := wi / a
-		var s := lerpf(_s1[i], _s2[i], smoothstep(0.15, 0.5, mi)) if mi < 0.5 else lerpf(_s2[i], _s3[i], smoothstep(0.5, 0.95, mi))
+		var s := lerpf(_s1[i], _s2[i], smoothstep(AMC_DRY, AMC_MID, mi)) if mi < AMC_MID else lerpf(_s2[i], _s3[i], smoothstep(AMC_MID, AMC_WET, mi))
 		s = lerpf(s, S_FROZEN_MM, _f_frost)
 		var q := 0.0
 		if p_in > 0.0:
@@ -745,9 +832,9 @@ func _step_chunk(c: int) -> void:
 		_inflow[i] = 0.0
 		# 4. výpar (Hargreaves × plodina/les × oslunění svahu × stres suchem)
 		var ck: int = _cls[i]
-		var kc := lerpf(_kc_now[ck], 1.1, fo)
+		var kc := lerpf(_kc_now[ck], KC_FOREST, fo)
 		var et := _f_pet * kc * _etf[i] * minf(wi / (ET_BETA_FRAC * a), 1.0)
-		if sw > 5.0:
+		if sw > ET_SNOW_MM:
 			et *= ET_SNOW
 		wi = maxf(wi - et, 0.0)
 		# 5. přetok nad AWC a pomalé prosakování nad polní kapacitou
@@ -761,7 +848,7 @@ func _step_chunk(c: int) -> void:
 			wi -= d
 			out += d
 		w[i] = wi
-		var rech := out * GW_FRAC * (0.5 + _perm[i])
+		var rech := out * GW_FRAC * (GW_PERM_BASE + _perm[i])
 		var inter := out - rech
 		# 6. kam voda teče: buňka u toku → do toku, jinak podpovrchově po spádnici
 		var sc := _scell[i]
@@ -778,7 +865,7 @@ func _step_chunk(c: int) -> void:
 				_inflow[r] += inter
 		mi = wi / a
 		runoff[i] = q / dt
-		mud[i] = smoothstep(MUD_FROM, MUD_FULL, mi) * _mudk[i] * (1.0 - 0.8 * _f_frost)
+		mud[i] = smoothstep(MUD_FROM, MUD_FULL, mi) * _mudk[i] * (1.0 - MUD_FROST_DIM * _f_frost)
 		_sum_m += mi
 		_sum_q += q
 		_sum_out += out
@@ -907,8 +994,8 @@ func puddle_at(x: float, z: float) -> float:
 		return 0.0
 	var i := _idx(x, z)
 	var mi := w[i] / awc[i]
-	var v := smoothstep(PUDDLE_FROM, 1.0, mi) * (0.35 + 0.65 * _twin[i]) + runoff[i] / RUNOFF_PUDDLE
-	return clampf(v * (1.0 - 0.8 * frost), 0.0, 1.0)
+	var v := smoothstep(PUDDLE_FROM, 1.0, mi) * (PUDDLE_FLAT + (1.0 - PUDDLE_FLAT) * _twin[i]) + runoff[i] / RUNOFF_PUDDLE
+	return clampf(v * (1.0 - PUDDLE_FROST_DIM * frost), 0.0, 1.0)
 
 
 ## TWI 0..1 v bodě (louže se drží v prohlubních).
@@ -930,9 +1017,9 @@ func add_water(x: float, z: float, mm: float, area_m2 := CELL_AREA) -> float:
 
 ## Index sucha 0..1 pro `Weather.drought` (vyhláška sucha M4.4): průměrná vlhkost půdy + průtoky.
 func drought_index() -> float:
-	var dm := clampf((0.5 - mean_moist) / 0.3, 0.0, 1.0)
-	var dq := clampf((0.8 - mean_flow_rel) / 0.6, 0.0, 1.0)
-	return clampf(dm * 0.6 + dq * 0.4, 0.0, 1.0)
+	var dm := clampf((DROUGHT_MOIST_REF - mean_moist) / DROUGHT_MOIST_SPAN, 0.0, 1.0)
+	var dq := clampf((DROUGHT_FLOW_REF - mean_flow_rel) / DROUGHT_FLOW_SPAN, 0.0, 1.0)
+	return clampf(dm * DROUGHT_MOIST_W + dq * (1.0 - DROUGHT_MOIST_W), 0.0, 1.0)
 
 
 # ------------------------------------------------------------------ ladění (F2 → Příroda – ladění)

@@ -12,12 +12,13 @@
 class_name Tracks
 extends Node3D
 
-const SNOW_MIN := 0.15            # od tolika sněhu se stopy zapisují
-const SNOW_HIDE := 0.08           # pod tolika sněhu se skryjí všechny (sníh roztál)
-const FADE_S := 15.0              # posledních tolik s života stopa bledne
+## M8.D2c: `static var` (F3 → Příroda/Louže, stopy – prahy sněhu, blednutí, životnost druhů), výchozí beze změny.
+static var SNOW_MIN := 0.15       # od tolika sněhu se stopy zapisují
+static var SNOW_HIDE := 0.08      # pod tolika sněhu se skryjí všechny (sníh roztál)
+static var FADE_S := 15.0         # posledních tolik s života stopa bledne
 const UPDATE_S := 0.5             # jak často se kontroluje stárnutí stop
 const LIFT := 0.03                # o kolik nad terénem leží (m)
-const KINDS := {
+static var KINDS := {
 	"boot": {"n": 200, "life": 150.0, "col": Color(0.16, 0.2, 0.32, 0.85),
 		"rects": [[0.0, 0.0, 0.14, 0.3]]},
 	"hoof": {"n": 160, "life": 240.0, "col": Color(0.15, 0.18, 0.28, 0.85),

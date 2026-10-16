@@ -7,7 +7,8 @@
 class_name SeasonFx
 extends Node
 
-const TICK_S := 0.5
+static var TICK_S := 0.5               # M8.D2c: laditelné (F3 → Příroda/Roční doby)
+static var SNOW_HIDES_BLOOM := 2.0     # květy na loukách mizí pod sněhem (× pokrývka; 0,5 sněhu = žádné květy)
 
 var world: World
 var player: Player
@@ -55,7 +56,7 @@ func _process_impl(delta: float) -> void:
 	if jd != _jd:
 		_jd = jd
 		_update_lut(doy, clock.year())
-	world.terrain.set_meadow_bloom(Seasons.bloom(doy) * (1.0 - clampf(snow * 2.0, 0.0, 1.0)))
+	world.terrain.set_meadow_bloom(Seasons.bloom(doy) * (1.0 - clampf(snow * SNOW_HIDES_BLOOM, 0.0, 1.0)))
 	var pos := player.car.global_position if player.car else player.global_position
 	flowers.update(pos, doy, snow, jd)
 	decor.update(pos, doy, snow, jd)

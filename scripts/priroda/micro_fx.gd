@@ -12,13 +12,14 @@
 class_name MicroFx
 extends RefCounted
 
-const FOG_H_DENS := 0.08              # 1/m – výšková mlha při plné vrstvě (20 m pod hranicí ≈ 80 % mlhy)
-const FOG_IN_DENS := 0.010            # hustota vzdálenostní mlhy, když je kamera uvnitř vrstvy (dohled ~200 m)
-const INSIDE_BAND_M := 12.0           # m pod hranicí, kde už je kamera „uvnitř“
-const ABOVE_BAND_M := 4.0             # m nad hranicí, kde přechod začíná
-const FLOOR_RATE := 6.0               # m/s – jak rychle se posouvá dno údolí pod kamerou (žádné skoky)
-const FLOOR_SNAP_M := 60.0            # větší rozdíl (teleport, let) → skočit rovnou
-const MIN_TOP_M := 1.0                # tenčí vrstva se nekreslí
+## M8.D2c: `static var` (F3 → Příroda/Mikroklima), výchozí beze změny.
+static var FOG_H_DENS := 0.08         # 1/m – výšková mlha při plné vrstvě (20 m pod hranicí ≈ 80 % mlhy)
+static var FOG_IN_DENS := 0.010       # hustota vzdálenostní mlhy, když je kamera uvnitř vrstvy (dohled ~200 m)
+static var INSIDE_BAND_M := 12.0      # m pod hranicí, kde už je kamera „uvnitř“
+static var ABOVE_BAND_M := 4.0        # m nad hranicí, kde přechod začíná
+static var FLOOR_RATE := 6.0          # m/s – jak rychle se posouvá dno údolí pod kamerou (žádné skoky)
+static var FLOOR_SNAP_M := 60.0       # větší rozdíl (teleport, let) → skočit rovnou
+static var MIN_TOP_M := 1.0           # tenčí vrstva se nekreslí
 
 var micro: Microclimate
 var _floor := NAN

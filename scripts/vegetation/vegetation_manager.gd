@@ -35,7 +35,8 @@ enum VegType {
 ## mesh = model z tools/gen_vegetation_meshes.gd; density_per_m2 ≈ efektivní hustota ve
 ## výchozím roce (rozmístění určuje tools/vegetation.py); view_range = dosah LOD (m);
 ## bend_k = citlivost na vítr; season_mode: 0 bylina, 1 keř, 2 plodina (field_lut).
-const VEG_CONFIG := {
+## M8.D2c: `static var` – `bend_k` laditelné v F3 → Příroda/Dřeviny a les (uniform materiálu, bez úpravy shaderu).
+static var VEG_CONFIG := {
 	VegType.GRASS_TALL: {"mesh": "res://assets/models/vegetation/grass_tall.res",
 		"density_per_m2": 0.004, "max_instances": 30000, "view_range": 95.0,
 		"bend_k": 1.5, "season_mode": 0, "shader_param": "wind_strength"},
@@ -59,9 +60,16 @@ const VEG_CONFIG := {
 		"bend_k": 1.0, "season_mode": 0, "shader_param": "wind_strength"},
 }
 
+## M8.D2c: stará cesta větru (`wind_strength` = vítr / WIND_FULL_MS, strop WIND_MAX) – laditelné.
+static var WIND_FULL_MS := 10.0
+static var WIND_MAX := 2.0
+## M8.D2c: změna `bend_k` v menu F3 → materiály se přenastaví při nejbližším ticku větru.
+static var _gen := 0
+
 var world: World
 var terrain: Terrain
 var loaded := false
+var _seen_gen := 0
 var total := 0
 var detail := 1.0                     # 0 = vypnuto, jinak násobek dosahu (Nastavení → Grafika)
 var multimeshes := {}                 # VegType → Array[MultiMeshInstance3D] (chunky)
@@ -165,6 +173,11 @@ func _load_vegetation() -> void:
 	loaded = true
 
 
+## M8.D2c: po změně `bend_k` v menu F3.
+static func invalidate() -> void:
+	_gen += 1
+
+
 ## ShaderMaterial typu – jeden na všechny chunky (uniform vítr/sezóna se nastavuje jednou).
 func _material(typ: int) -> ShaderMaterial:
 	if _mats.has(typ):
@@ -222,11 +235,15 @@ func _process_impl(delta: float) -> void:
 	if _wind_t > 0.0:
 		return
 	_wind_t = WIND_TICK
+	if _seen_gen != _gen:                         # M8.D2c: změna citlivosti na vítr v menu F3
+		_seen_gen = _gen
+		for typ in _mats:
+			(_mats[typ] as ShaderMaterial).set_shader_parameter("bend_k", VEG_CONFIG[typ]["bend_k"])
 	var wind := Vector2.ZERO
 	if world != null and world.weather != null:
 		var wv: Vector3 = world.weather.wind_vector()
 		wind = Vector2(wv.x, wv.z)
-	var s := clampf(wind.length() / 10.0, 0.0, 2.0)
+	var s := clampf(wind.length() / WIND_FULL_MS, 0.0, WIND_MAX)
 	for m in _mats.values():
 		var mat := m as ShaderMaterial
 		mat.set_shader_parameter("wind_strength", s)

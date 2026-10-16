@@ -28,7 +28,7 @@ const FL_LUH := 64
 
 ## Fallback bez dat: prototyp 0–5 → druh (0–2 listnáč, 3–5 jehličnan; stejně jako `PlantedTrees.SPECIES.protos`).
 const FALLBACK_PROTO := ["buk", "dub_zimni", "lipa", "smrk", "borovice", "smrk"]
-const FALLBACK_VIGOR := 0.7
+static var FALLBACK_VIGOR := 0.7          # M8.D2c: laditelné (F3 → Příroda/Dřeviny a les)
 const FALLBACK_CELL := 32.0             # m – mřížka dopočítaných vrstev bez dat
 ## Normalizace stanoviště pro vitalitu sazenic (shoda s tools/tree_species.py – mediány nad stromy mapy).
 const TWI_MED := 6.5
@@ -38,7 +38,12 @@ const ELEV_ABS0 := 330.0                # m n. m. počátku světa (odhad – ov
 const T_REF := 6.0
 const T_REF_ELEV := 330.0
 const T_LAPSE := 6.5                    # K/km
-const SAPLING_CLOSURE := 0.2            # sazenice stojí většinou na volné ploše
+static var SAPLING_CLOSURE := 0.2       # sazenice stojí většinou na volné ploše (M8.D2c: laditelné)
+## M8.D2c: čísla ze vzorců za běhu (sazenice, věk z výšky) – laditelné, výchozí = dřívější čísla.
+static var HEIGHT_VIG_BASE := 0.6       # stanovištní výška H = H_max × (BASE + (1 − BASE) × vitalita)
+static var SOLITARY_DBH_K := 1.3        # solitér má tlustší kmen (× dbh)
+static var SOIL_DEPTH_FULL_CM := 60.0   # vitalita sazenice: plná od hloubky půdy (cm)
+static var SOIL_DEPTH_MIN_F := 0.5      # … na mělké půdě nejméně tento násobek
 ## Přesnost odhadu věku podle úrovně dovednosti Dřevorubectví: [od úrovně, zaokrouhlení na roky].
 const AGE_STEPS := [[1, 20], [10, 10], [25, 5], [40, 1]]
 const INFO_DETAIL_LVL := 10             # od této úrovně „Prohlédnout strom“ ukáže i výšku, průměr a vitalitu
@@ -274,7 +279,7 @@ func _growth(id: String) -> Dictionary:
 ## Věk z výšky – inverze h(t) = H·(1−e^(−k·t))^p se stanovištním H = H_max·(0,6 + 0,4·vitalita).
 func age_from_height(id: String, h: float, vig: float) -> int:
 	var g := _growth(id)
-	var hs := float(g.get("H_max", 25.0)) * (0.6 + 0.4 * vig)
+	var hs := float(g.get("H_max", 25.0)) * (HEIGHT_VIG_BASE + (1.0 - HEIGHT_VIG_BASE) * vig)
 	var ratio := clampf(h / maxf(hs, 0.1), 0.02, 0.97)
 	var p := maxf(float(g.get("p", 1.3)), 0.1)
 	var k := maxf(float(g.get("k", 0.03)), 0.001)
@@ -285,7 +290,7 @@ func age_from_height(id: String, h: float, vig: float) -> int:
 ## Výška v daném věku (Chapman–Richards) – pro M8.11 růst.
 func height_at_age(id: String, years: float, vig: float) -> float:
 	var g := _growth(id)
-	var hs := float(g.get("H_max", 25.0)) * (0.6 + 0.4 * vig)
+	var hs := float(g.get("H_max", 25.0)) * (HEIGHT_VIG_BASE + (1.0 - HEIGHT_VIG_BASE) * vig)
 	return hs * pow(1.0 - exp(-float(g.get("k", 0.03)) * years), float(g.get("p", 1.3)))
 
 
@@ -296,7 +301,7 @@ func dbh_from_height(id: String, h: float, solitary := false) -> float:
 	var b := float(nl[1]) if nl.size() > 1 else 0.16
 	var s := sqrt(maxf(h - 1.3, 0.05))
 	var d := a * s / maxf(1.0 - b * s, 0.08)
-	return clampf(d * (1.3 if solitary else 1.0), 1.0, 180.0)
+	return clampf(d * (SOLITARY_DBH_K if solitary else 1.0), 1.0, 180.0)
 
 
 ## Vhodnost stanoviště 0..1 pro druh v bodě (Ellenberg × `Site`; stejné vzorce jako tools/tree_species.py).
@@ -339,7 +344,7 @@ func site_suitability(id: String, pos: Vector3, closure := SAPLING_CLOSURE) -> f
 ## Vitalita sazenice v místě výsadby: √vhodnost × hloubka půdy (bez náhody – hráč vidí příčinu).
 func site_vigor(id: String, pos: Vector3) -> float:
 	var st: Site = world.site if world != null else null
-	var depth := clampf(st.soil_depth(pos.x, pos.z) / 60.0, 0.5, 1.0) if st != null and st.loaded else 1.0
+	var depth := clampf(st.soil_depth(pos.x, pos.z) / SOIL_DEPTH_FULL_CM, SOIL_DEPTH_MIN_F, 1.0) if st != null and st.loaded else 1.0
 	return clampf(sqrt(site_suitability(id, pos)) * depth, 0.05, 1.0)
 
 

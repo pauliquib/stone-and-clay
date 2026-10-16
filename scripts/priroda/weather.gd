@@ -17,7 +17,8 @@ signal lightning(pos: Vector3)
 
 ## cloud: oblačnost 0..1, rain: intenzita srážek 0..1 (1 ≈ 25 mm/h), fog: mlha 0..1, wind: m/s,
 ## hours: [min, max] trvání situace (herní hodiny), showers: srážky přerušované, storm: blesky.
-const TYPES := {
+## M8.D2c: `static var` (laditelné v F3 → Příroda/Počasí, `scripts/dev/tune_priroda.gd`) – výchozí beze změny.
+static var TYPES := {
 	"jasno": {"name": "Jasno", "cloud": 0.04, "rain": 0.0, "fog": 0.0, "wind": 2.0, "hours": [6.0, 30.0]},
 	"polojasno": {"name": "Polojasno", "cloud": 0.35, "rain": 0.0, "fog": 0.0, "wind": 3.0, "hours": [4.0, 18.0]},
 	"oblacno": {"name": "Oblačno", "cloud": 0.7, "rain": 0.0, "fog": 0.0, "wind": 4.0, "hours": [3.0, 14.0]},
@@ -28,7 +29,7 @@ const TYPES := {
 	"bourka": {"name": "Bouřka", "cloud": 1.0, "rain": 0.95, "fog": 0.1, "wind": 12.0, "hours": [0.7, 2.5], "storm": true, "showers": true},
 }
 ## Přechody mezi situacemi (relativní váhy, dál je násobí roční období a denní doba).
-const NEXT := {
+static var NEXT := {
 	"jasno": {"jasno": 2.0, "polojasno": 5.0, "mlha": 1.0},
 	"polojasno": {"jasno": 3.0, "polojasno": 1.0, "oblacno": 4.0, "prehanky": 1.0, "bourka": 1.0},
 	"oblacno": {"polojasno": 3.0, "zatazeno": 3.0, "prehanky": 2.0, "dest": 1.5, "bourka": 1.0},
@@ -39,13 +40,92 @@ const NEXT := {
 	"bourka": {"prehanky": 2.0, "oblacno": 3.0, "polojasno": 2.0},
 }
 ## Časové konstanty přiblížení k cíli (herní hodiny).
-const TAU_CLOUD := 0.8
-const TAU_RAIN := 0.25
-const TAU_FOG := 0.7
-const TAU_WIND := 0.4
-const TAU_TEMP := 1.2
-const SNOW_BELOW := 0.8                # °C – pod touto teplotou sněží
-const RAIN_MM_H := 25.0                # rain = 1 odpovídá lijáku 25 mm/h
+static var TAU_CLOUD := 0.8
+static var TAU_RAIN := 0.25
+static var TAU_FOG := 0.7
+static var TAU_WIND := 0.4
+static var TAU_TEMP := 1.2
+static var SNOW_BELOW := 0.8           # °C – pod touto teplotou sněží
+static var RAIN_MM_H := 25.0           # rain = 1 odpovídá lijáku 25 mm/h
+
+## M8.D2c: čísla ze vzorců vytažená k ladění (F3 → Příroda/Počasí) – výchozí hodnoty = dřívější čísla ve vzorcích.
+static var WARMUP_H := 72.0            # kolik hodin se nasimuluje při startu / skoku v kalendáři
+static var SHOWER_NOISE_FREQ := 0.9    # přeháňky: frekvence šumu (přestávky ~po hodině)
+static var ANOM_NOISE_FREQ := 0.08     # teplotní / větrná odchylka: frekvence šumu (několik dní)
+static var RAIN_MIN := 0.02            # srážky slabší než tohle nemočí, nesněží a nesuší se
+static var LIGHTNING_STORM_MIN := 0.3  # blesky jen při bouřce silnější než…
+static var LIGHTNING_RAIN_MIN := 0.4   # … a dešti silnějším než
+static var LIGHTNING_GAP_MIN_S := 4.0  # rozestup blesků (reálné s, dělí se silou bouřky)
+static var LIGHTNING_GAP_MAX_S := 22.0
+static var LIGHTNING_DIST_MIN := 250.0 # vzdálenost úderu od hráče (m)
+static var LIGHTNING_DIST_MAX := 4000.0
+static var SHOWER_ON_LO := -0.05       # přeháňky: šum pod tímto prahem = přestávka
+static var SHOWER_ON_HI := 0.25        # … nad tímto prahem = plná přeháňka
+static var SHOWER_GAP_CLOUD := 0.7     # oblačnost v přestávce (× oblačnost situace)
+static var SHOWER_WIND_BASE := 0.6     # vítr v přestávce (× vítr situace)
+static var SHOWER_WIND_GAIN := 0.8     # přídavek větru při přeháňce
+static var FOG_BURN_FROM_H := 9.0      # mlha se rozpouští od (h)
+static var FOG_BURN_TO_H := 13.0       # … do (h)
+static var FOG_BURN_BASE := 0.3        # podíl mlhy, který se ve dne rozpustí v zimě
+static var FOG_BURN_SUMMER := 0.5      # přídavek rozpouštění v létě (× zeleň)
+static var HAZE_FOG := 0.25            # opar za jasných zimních rán (× (1 − zeleň))
+static var HAZE_MORNING_H := 9.0       # opar do (h)
+static var HAZE_EVENING_H := 21.0      # opar od (h)
+static var WIND_ANOM_BASE := 0.8       # vítr = vítr situace × (BASE + AMP × šum)
+static var WIND_ANOM_AMP := 0.4
+static var WIND_ANOM_RATE := 3.0       # rychlost změny šumu větru (× herní hodiny)
+static var WIND_BEARING_MEAN := 250.0  # převládající směr, odkud vane (° od severu)
+static var WIND_BEARING_SWING := 120.0 # rozkmit směru (±°)
+static var WIND_BEARING_RATE := 0.5    # rychlost stáčení směru (× herní hodiny)
+static var STORM_RATE_H := 2.0         # nástup / odeznění bouřky (za herní hodinu)
+static var RAIN_RECENT_GAIN := 0.25    # „vlhko z posledních dnů“: přírůstek za hodinu plného deště
+static var RAIN_RECENT_DECAY_D := 0.5  # … úbytek za den
+static var DROUGHT_BASE_D := 0.04      # sucho: přírůstek za den bez deště
+static var DROUGHT_HOT_C := 20.0       # … nad touto teplotou roste rychleji
+static var DROUGHT_HOT_D := 0.01       # … o tolik za den a stupeň
+static var DROUGHT_RAIN := 0.15        # … úbytek za hodinu plného deště
+static var FROST_HOLD_C := -2.0        # vynucené sněžení / náledí drží teplotu pod
+static var FORCED_FROST_C := -3.0      # vynucené sněžení / náledí: teplota hned po vynucení
+static var SUN_FULL_ELEV := 40.0       # slunce svítí naplno od výšky (°)
+static var SUN_CLOUD_DIM := 0.7        # oblačnost ubírá slunci (× oblačnost)
+static var SNOW_ACCUM := 0.35          # přírůstek pokrývky za hodinu plného sněžení
+static var MELT_ABOVE_C := 0.3         # sníh taje nad
+static var MELT_TEMP := 0.015          # tání za hodinu a °C
+static var MELT_RAIN := 0.25           # tání za hodinu plného deště
+static var MELT_SUN := 0.06            # tání za hodinu plného slunce
+static var MELT_WET_GAIN := 3.0        # mokro z tajícího sněhu (× pokrývka)
+static var MELT_WET_MAX := 0.7         # … nejvýš
+static var WET_RAIN := 4.0             # mokro za hodinu plného deště
+static var DRY_BASE := 0.05            # osychání za hodinu (základ)
+static var DRY_TEMP := 0.012           # … za °C nad nulou
+static var DRY_WIND := 0.02            # … za m/s větru
+static var DRY_SUN := 0.25             # … za plné slunce
+static var DRY_FROZEN := 0.35          # pod nulou osychá jen tento podíl
+static var TEMP_CLOUD_DAMP := 0.6      # oblačnost tlumí denní rozkmit teploty (× oblačnost)
+static var TEMP_ANOM_C := 5.0          # dlouhodobá odchylka teploty (±°C)
+static var TEMP_ANOM_RATE := 3.0       # rychlost změny odchylky (× herní dny)
+static var TEMP_MIN_H := 6.0           # minimum teploty (h)
+static var TEMP_MAX_H := 15.0          # maximum teploty (h)
+static var TEMP_RAIN_COOL := 2.5       # déšť ochlazuje (°C při plném dešti)
+static var TEMP_FOG_COOL := 1.0        # mlha ochlazuje (°C při plné mlze)
+static var WET_DAYS_REF := 8.0         # srážkové dny v měsíci, při kterých je váha deště 1
+static var STORM_W := 8.0              # váha bouřky (× podíl bouřek měsíce)
+static var STORM_DAY_MULT := 1.6       # … odpoledne (mezi STORM_FROM_H a STORM_TO_H)
+static var STORM_NIGHT_MULT := 0.3     # … jindy
+static var STORM_FROM_H := 11.0
+static var STORM_TO_H := 20.0
+static var FOG_W_BASE := 2.5           # váha mlhy = BASE − SUMMER × zeleň
+static var FOG_W_SUMMER := 2.0
+static var FOG_W_NIGHT := 1.5          # … ráno a večer
+static var FOG_W_DAY := 0.3            # … přes den
+static var FOG_W_MORNING_H := 9.0      # „ráno“ do (h)
+static var FOG_W_EVENING_H := 19.0     # „večer“ od (h)
+static var OVERCAST_W_WINTER := 2.0    # váha zataženo = WINTER − zeleň (zimní inverze)
+static var CLEAR_W_BASE := 0.6         # váha jasno / polojasno = BASE + SUMMER × zeleň
+static var CLEAR_W_SUMMER := 0.6
+static var FORECAST_TMAX_K := 0.35     # předpověď: maximum = průměr + K × denní rozkmit
+static var MUD_WET := 0.45             # bláto na terénu bez vodní bilance od mokra
+static var ICE_FULL_WET := 0.7         # náledí naplno při mokru
 
 ## Přilnavost povrchu podle počasí – jediná tabulka, čte ji auto (pneu), chodec (podrážky) i kůň
 ## (kopyta); každý ji u sebe zjemní svým podílem klouzavosti. Hodnoty = násobek suchého asfaltu.
@@ -82,7 +162,7 @@ var drought := 0.0                     # sucho 0..1 (roste bez deště, za horka
 ## M8.7: vodní bilance (`World.soil_water`, přiřadí World) – bláto v místě kola, sucho z vlhkosti půdy a průtoků.
 ## Null nebo vypnutý přepínač Realismus → dnešní globální chování (`wetness`, počítadlo sucha).
 var soil_water: SoilWater = null
-const DROUGHT_TAU_H := 24.0            # M8.7: jak rychle se `drought` přiblíží indexu z vodní bilance
+static var DROUGHT_TAU_H := 24.0            # M8.7: jak rychle se `drought` přiblíží indexu z vodní bilance
 static var MUD_STERK := 0.6            # M8.7: polní / štěrková cesta bere bláto z okolní půdy jen z části (M8.D: laditelné)
 
 ## Autorita nad počasím: true = simuluje se tady (singleplayer, server). Klient v multiplayeru ji vypne
@@ -99,6 +179,8 @@ var _last_min := -1.0
 var _noise := FastNoiseLite.new()
 var _anom_noise := FastNoiseLite.new()
 var _lightning_t := 5.0
+var _shower_f := -1.0                  # M8.D2c: frekvence šumu přeháněk, se kterou je nastavený (float, ne float32 šumu)
+var _anom_f := -1.0                    # … šumu odchylky
 
 
 func setup(c: Clock, north: float, forced_kind := "") -> void:
@@ -107,9 +189,11 @@ func setup(c: Clock, north: float, forced_kind := "") -> void:
 	var d := c.date()
 	rng.seed = int(d["year"]) * 1000 + int(d["month"]) * 40 + int(d["day"])
 	_noise.seed = rng.randi()
-	_noise.frequency = 0.9               # přeháňky: přestávky ~po hodině
+	_shower_f = SHOWER_NOISE_FREQ
+	_anom_f = ANOM_NOISE_FREQ
+	_noise.frequency = SHOWER_NOISE_FREQ # přeháňky: přestávky ~po hodině
 	_anom_noise.seed = rng.randi()
-	_anom_noise.frequency = 0.08          # teplotní odchylka se mění za několik dní
+	_anom_noise.frequency = ANOM_NOISE_FREQ   # teplotní odchylka se mění za několik dní
 	_warm_up()
 	if forced_kind != "":
 		force(forced_kind)
@@ -119,7 +203,7 @@ func setup(c: Clock, north: float, forced_kind := "") -> void:
 ## Nasimuluje předchozí 3 dny, aby na začátku odpovídala sněhová pokrývka, mokro a situace.
 func _warm_up() -> void:
 	var save := clock.minutes
-	clock.minutes = save - 72.0 * 60.0
+	clock.minutes = save - WARMUP_H * 60.0
 	kind = _pick_next("polojasno")
 	kind_left_h = rng.randf_range(2.0, 10.0)
 	temp = _temp_target()
@@ -153,10 +237,10 @@ func force(k: String) -> void:
 	wind = t["wind"]
 	storm = 1.0 if t.get("storm", false) else 0.0
 	if snow:
-		temp = -3.0
+		temp = FORCED_FROST_C
 		snow_cover = maxf(snow_cover, 0.6)
 	elif ice:
-		temp = -3.0
+		temp = FORCED_FROST_C
 		wetness = 0.8
 	elif rain > 0.0:
 		wetness = 0.8
@@ -206,10 +290,10 @@ func _process_impl(delta: float) -> void:
 		_last_min = clock.minutes
 	_advance()
 	# blesky – v reálném čase (bouřka je vidět a slyšet, i když herní čas běží 30×)
-	if storm > 0.3 and rain > 0.4:
+	if storm > LIGHTNING_STORM_MIN and rain > LIGHTNING_RAIN_MIN:
 		_lightning_t -= delta * storm
 		if _lightning_t <= 0.0:
-			_lightning_t = rng.randf_range(4.0, 22.0)
+			_lightning_t = rng.randf_range(LIGHTNING_GAP_MIN_S, LIGHTNING_GAP_MAX_S)
 			_strike()
 
 
@@ -218,6 +302,11 @@ func _advance() -> void:
 	_last_min = clock.minutes
 	if dt_h <= 0.0:
 		return
+	if _shower_f != SHOWER_NOISE_FREQ or _anom_f != ANOM_NOISE_FREQ:   # M8.D2c: změna z menu F3 (registr se nečte)
+		_shower_f = SHOWER_NOISE_FREQ
+		_anom_f = ANOM_NOISE_FREQ
+		_noise.frequency = SHOWER_NOISE_FREQ
+		_anom_noise.frequency = ANOM_NOISE_FREQ
 	if not forced:
 		kind_left_h -= dt_h
 		if kind_left_h <= 0.0:
@@ -233,48 +322,50 @@ func _advance() -> void:
 	if t.get("showers", false):
 		# přeháňky: srážky jen z části času, mezi nimi se protrhá oblačnost
 		var n := _noise.get_noise_1d(clock.minutes / 60.0)
-		var on := smoothstep(-0.05, 0.25, n)
+		var on := smoothstep(SHOWER_ON_LO, SHOWER_ON_HI, n)
 		r_t *= on
-		c_t = lerpf(c_t * 0.7, 1.0, on)
-		w_t *= 0.6 + on * 0.8
+		c_t = lerpf(c_t * SHOWER_GAP_CLOUD, 1.0, on)
+		w_t *= SHOWER_WIND_BASE + on * SHOWER_WIND_GAIN
 	# mlha se ve dne rozpouští (víc v létě, když svítí slunce)
 	if f_t > 0.0 and kind == "mlha":
-		f_t *= 1.0 - smoothstep(9.0, 13.0, h) * (0.3 + Seasons.green(doy) * 0.5)
+		f_t *= 1.0 - smoothstep(FOG_BURN_FROM_H, FOG_BURN_TO_H, h) * (FOG_BURN_BASE + Seasons.green(doy) * FOG_BURN_SUMMER)
 	# mírná mlha / opar za jasných podzimních a zimních rán
-	if kind in ["jasno", "polojasno"] and (h < 9.0 or h > 21.0):
-		f_t = maxf(f_t, 0.25 * (1.0 - Seasons.green(doy)))
+	if kind in ["jasno", "polojasno"] and (h < HAZE_MORNING_H or h > HAZE_EVENING_H):
+		f_t = maxf(f_t, HAZE_FOG * (1.0 - Seasons.green(doy)))
 	var k := 1.0 - exp(-dt_h / TAU_CLOUD)
 	cloud = lerpf(cloud, c_t, k)
 	rain = lerpf(rain, r_t, 1.0 - exp(-dt_h / TAU_RAIN))
 	if rain < 0.005 and r_t == 0.0:
 		rain = 0.0
 	fog = lerpf(fog, f_t, 1.0 - exp(-dt_h / TAU_FOG))
-	wind = lerpf(wind, w_t * (0.8 + 0.4 * _anom_noise.get_noise_1d(clock.minutes / 60.0 * 3.0 + 50.0)),
-		1.0 - exp(-dt_h / TAU_WIND))
-	wind_bearing = fposmod(250.0 + _anom_noise.get_noise_1d(clock.minutes / 60.0 * 0.5 + 200.0) * 120.0, 360.0)
-	storm = move_toward(storm, 1.0 if t.get("storm", false) else 0.0, dt_h * 2.0)
-	rain_recent = clampf(rain_recent + rain * dt_h * 0.25 - dt_h / 24.0 * 0.5, 0.0, 1.0)
-	drought = clampf(drought + dt_h / 24.0 * (0.04 + maxf(temp - 20.0, 0.0) * 0.01) - rain * dt_h * 0.15, 0.0, 1.0)
+	wind = lerpf(wind, w_t * (WIND_ANOM_BASE + WIND_ANOM_AMP * _anom_noise.get_noise_1d(
+		clock.minutes / 60.0 * WIND_ANOM_RATE + 50.0)), 1.0 - exp(-dt_h / TAU_WIND))
+	wind_bearing = fposmod(WIND_BEARING_MEAN + _anom_noise.get_noise_1d(clock.minutes / 60.0 * WIND_BEARING_RATE + 200.0)
+		* WIND_BEARING_SWING, 360.0)
+	storm = move_toward(storm, 1.0 if t.get("storm", false) else 0.0, dt_h * STORM_RATE_H)
+	rain_recent = clampf(rain_recent + rain * dt_h * RAIN_RECENT_GAIN - dt_h / 24.0 * RAIN_RECENT_DECAY_D, 0.0, 1.0)
+	drought = clampf(drought + dt_h / 24.0 * (DROUGHT_BASE_D + maxf(temp - DROUGHT_HOT_C, 0.0) * DROUGHT_HOT_D)
+		- rain * dt_h * DROUGHT_RAIN, 0.0, 1.0)
 	if soil_water != null and soil_water.active():   # M8.7: sucho z průměrné vlhkosti půdy a průtoků (API beze změny)
 		drought = lerpf(drought, soil_water.drought_index(), 1.0 - exp(-dt_h / DROUGHT_TAU_H))
 	temp = lerpf(temp, _temp_target(), 1.0 - exp(-dt_h / TAU_TEMP))
 	if forced and forced_frost:
-		temp = minf(temp, -2.0)
+		temp = minf(temp, FROST_HOLD_C)
 	if not is_nan(forced_temp):
 		temp = forced_temp
 	# sníh a mokro
-	var sun := clampf(clock.sun_elevation() / 40.0, 0.0, 1.0) * (1.0 - cloud * 0.7)
-	if rain > 0.02 and temp < SNOW_BELOW:
-		snow_cover = minf(snow_cover + rain * dt_h * 0.35, 1.0)
-	elif snow_cover > 0.0 and temp > 0.3:
-		var melt := (0.015 * temp + 0.25 * rain + 0.06 * sun) * dt_h
+	var sun := clampf(clock.sun_elevation() / SUN_FULL_ELEV, 0.0, 1.0) * (1.0 - cloud * SUN_CLOUD_DIM)
+	if rain > RAIN_MIN and temp < SNOW_BELOW:
+		snow_cover = minf(snow_cover + rain * dt_h * SNOW_ACCUM, 1.0)
+	elif snow_cover > 0.0 and temp > MELT_ABOVE_C:
+		var melt := (MELT_TEMP * temp + MELT_RAIN * rain + MELT_SUN * sun) * dt_h
 		snow_cover = maxf(snow_cover - melt, 0.0)
-		wetness = maxf(wetness, minf(snow_cover * 3.0, 0.7))
-	if rain > 0.02 and temp >= SNOW_BELOW:
-		wetness = minf(wetness + rain * dt_h * 4.0, 1.0)
+		wetness = maxf(wetness, minf(snow_cover * MELT_WET_GAIN, MELT_WET_MAX))
+	if rain > RAIN_MIN and temp >= SNOW_BELOW:
+		wetness = minf(wetness + rain * dt_h * WET_RAIN, 1.0)
 	else:
-		var dry := (0.05 + 0.012 * maxf(temp, 0.0) + 0.02 * wind + 0.25 * sun) * dt_h
-		wetness = maxf(wetness - dry * (0.35 if temp < 0.0 else 1.0), 0.0)
+		var dry := (DRY_BASE + DRY_TEMP * maxf(temp, 0.0) + DRY_WIND * wind + DRY_SUN * sun) * dt_h
+		wetness = maxf(wetness - dry * (DRY_FROZEN if temp < 0.0 else 1.0), 0.0)
 
 
 ## Teplota, ke které se vzduch blíží: měsíční průměr + dlouhodobá odchylka + denní chod
@@ -282,15 +373,16 @@ func _advance() -> void:
 func _temp_target() -> float:
 	var doy := clock.day_of_year()
 	var base := Seasons.monthly(Seasons.TEMP_MEAN, doy)
-	var rng_c := Seasons.monthly(Seasons.TEMP_RANGE, doy) * (1.0 - 0.6 * cloud)
-	var anomaly := _anom_noise.get_noise_1d(clock.minutes / 1440.0 * 3.0) * 5.0
+	var rng_c := Seasons.monthly(Seasons.TEMP_RANGE, doy) * (1.0 - TEMP_CLOUD_DAMP * cloud)
+	var anomaly := _anom_noise.get_noise_1d(clock.minutes / 1440.0 * TEMP_ANOM_RATE) * TEMP_ANOM_C
 	var h := clock.hour()
+	var rise := clampf(TEMP_MAX_H - TEMP_MIN_H, 0.5, 23.5)   # výchozí 9 h vzestup, 15 h pokles
 	var f: float
-	if h >= 6.0 and h <= 15.0:
-		f = -cos(PI * (h - 6.0) / 9.0)
+	if h >= TEMP_MIN_H and h <= TEMP_MAX_H:
+		f = -cos(PI * (h - TEMP_MIN_H) / rise)
 	else:
-		f = cos(PI * fposmod(h - 15.0, 24.0) / 15.0)
-	return base + anomaly + 0.5 * rng_c * f - 2.5 * rain - 1.0 * fog
+		f = cos(PI * fposmod(h - TEMP_MAX_H, 24.0) / (24.0 - rise))
+	return base + anomaly + 0.5 * rng_c * f - TEMP_RAIN_COOL * rain - TEMP_FOG_COOL * fog
 
 
 func _set_kind(k: String) -> void:
@@ -305,7 +397,7 @@ func _set_kind(k: String) -> void:
 ## Váhy možných pokračování situace `from` pro den v roce `doy` a hodinu `h` (klima + denní doba).
 ## Čte ji `_pick_next` (náhodná volba) i `forecast` (nejpravděpodobnější výsledek).
 func _weights(from: String, doy: float, h: float) -> Dictionary:
-	var wet := Seasons.monthly(Seasons.WET_DAYS, doy) / 8.0
+	var wet := Seasons.monthly(Seasons.WET_DAYS, doy) / WET_DAYS_REF
 	var storm_share := Seasons.monthly(Seasons.STORM_SHARE, doy)
 	var green := Seasons.green(doy)
 	var opts: Dictionary = NEXT.get(from, {})
@@ -316,13 +408,14 @@ func _weights(from: String, doy: float, h: float) -> Dictionary:
 			"dest", "prehanky":
 				w *= wet
 			"bourka":
-				w *= storm_share * 8.0 * (1.6 if h > 11.0 and h < 20.0 else 0.3)
+				w *= storm_share * STORM_W * (STORM_DAY_MULT if h > STORM_FROM_H and h < STORM_TO_H else STORM_NIGHT_MULT)
 			"mlha":
-				w *= (2.5 - green * 2.0) * (1.5 if h < 9.0 or h > 19.0 else 0.3)
+				w *= (FOG_W_BASE - green * FOG_W_SUMMER) * (FOG_W_NIGHT if h < FOG_W_MORNING_H or h > FOG_W_EVENING_H
+					else FOG_W_DAY)
 			"zatazeno":
-				w *= 2.0 - green      # zimní inverze
+				w *= OVERCAST_W_WINTER - green      # zimní inverze
 			"jasno", "polojasno":
-				w *= 0.6 + green * 0.6
+				w *= CLEAR_W_BASE + green * CLEAR_W_SUMMER
 		ws[k] = maxf(w, 0.0)
 	return ws
 
@@ -348,7 +441,7 @@ func _strike() -> void:
 	if w and w.has_method("player_anchor"):
 		center = w.player_anchor(rng.randi() % 8)
 	var a := rng.randf() * TAU
-	var d := rng.randf_range(250.0, 4000.0)
+	var d := rng.randf_range(LIGHTNING_DIST_MIN, LIGHTNING_DIST_MAX)
 	lightning.emit(center + Vector3(cos(a) * d, 0, sin(a) * d))
 
 
@@ -428,7 +521,7 @@ func forecast() -> Dictionary:
 		if float(ws[k]) > bw:
 			bw = float(ws[k])
 			best = k
-	var tmax := Seasons.monthly(Seasons.TEMP_MEAN, doy) + Seasons.monthly(Seasons.TEMP_RANGE, doy) * 0.35
+	var tmax := Seasons.monthly(Seasons.TEMP_MEAN, doy) + Seasons.monthly(Seasons.TEMP_RANGE, doy) * FORECAST_TMAX_K
 	var name_: String = TYPES[best]["name"]
 	if TYPES[best].get("rain", 0.0) > 0.0 and tmax <= SNOW_BELOW + 1.0:
 		name_ = "Sněžení"
@@ -445,13 +538,13 @@ func surface_grip(surf: String, mud := -1.0) -> float:
 			g = minf(g, lerpf(1.0, GRIP_MUD, mud))       # rozmočená hlína v místě (niva vs. kopec)
 		elif surf == "sterk":
 			g = minf(g, lerpf(1.0, GRIP_MUD, mud * MUD_STERK))
-	elif surf == "teren" and wetness > 0.45:
+	elif surf == "teren" and wetness > MUD_WET:
 		g = minf(g, lerpf(1.0, GRIP_MUD, wetness))   # rozmočená hlína
 	g *= lerpf(1.0, GRIP_WET, wetness)
 	if snow_cover > 0.02:
 		g = minf(g, lerpf(1.0, GRIP_SNOW, snow_cover))
 	if temp < 0.0 and wetness > ICE_WET:
-		g = minf(g, lerpf(1.0, GRIP_ICE, clampf(wetness / 0.7, 0.0, 1.0)))
+		g = minf(g, lerpf(1.0, GRIP_ICE, clampf(wetness / ICE_FULL_WET, 0.0, 1.0)))
 	return g
 
 

@@ -2221,3 +2221,50 @@ dopravy, ne o regresi.
 - Exportovaná hra: `res://config.json` musí být v exportním filtru (`*.json`), `export_presets.cfg` zatím není.
 - Kamera vozidel, zvuky, světla a stěrače nejsou registrované (nejsou „fyzika světa“); gravitace hráče patří do
   Člověk (M8.D2b), počasí / vítr / mikroklima do Příroda (M8.D2c) – povrchy a přilnavost už jsou ve Svět.
+
+## 2026-10-16 – M8.D2c Menu pro vývojáře: kategorie Příroda
+
+### Hotovo (staticky ověřeno čtením kódu a offline skriptem registru – ruční test čeká)
+- **Registrace** `scripts/dev/tune_priroda.gd` (bez `class_name`, `register_all` + `on_changed`; pomocník `_t` s automatickým
+  rozsahem 0–3× výchozí). **848 parametrů** v F3 → Příroda:
+  Počasí 70 · Počasí – situace a přechody 92 · Roční doby 112 · Obloha a světlo 72 · Vítr 37 · Voda a půda 186 ·
+  Mikroklima 83 · Dřeviny a les 47 · Pole a louky 73 · Louže, stopy 18 · Kouř a ostatní 58.
+- **Převod** `const` → `static var` (stejná hodnota) a čísla ze vzorců vytažená do pojmenovaných `static var`:
+  - `Weather`: `TYPES` (oblačnost, srážky, mlha, vítr, trvání každé situace), `NEXT` (váhy přechodů), časové konstanty,
+    sníh / tání / mokro / osychání, sucho, blesky, přeháňky, mlha a opar, kolísání a směr větru, denní chod teploty,
+    váhy podle ročního období a denní doby; frekvence šumů se přenastaví jen při změně (porovnání dvou float).
+  - `Seasons` (křivky olistění, zbarvení, zeleně, kvetení – hodnoty i dny bodů; měsíční teploty, rozkmit, srážkové dny,
+    podíl bouřek; tažní ptáci), `SeasonFx` (tick, sníh skryje květy – jedno id i pro `MeadowFlowers`).
+  - `Atmosphere` + `Atmosphere.SkyModel` (luxy, optická hloubka, zčervenání, oblačnost × slunce, expozice a adaptace,
+    Purkyně, mlha a výška, světlo prostředí, blesky / rychlost zvuku, listí v bouřce).
+  - `WindField` (nárazy, turbulence, profil, terén, drsnost z0 po třídách povrchu) – změna zahodí mezipaměť buněk a
+    případně přegeneruje texturu nárazů (`WindField.invalidate()`, čítač `_gen`); `VegetationManager.VEG_CONFIG[*].bend_k`
+    (uniform materiálu, bez úpravy shaderu) se přenastaví při nejbližším ticku větru.
+  - `SoilWater` (zachycení, sníh, SCS λ a AMC, CN tabulka 8×4, výpar Hargreaves, prosakování, bláto, louže, toky –
+    nádrže, hloubky, normál, sucho; měsíční srážky): CN / jílovitost / holá půda / nádrže toků se po změně přepočítají
+    při nejbližší eko-hodině (`_refresh_params`, po kouscích přes `EcoClock.slice`); parametry označené „(stavba)“
+    platí až po novém startu (vrstvy `Site` se po stavbě uvolní). `Water` (led, vlnky, vizuál hladin), `Studanka`.
+  - `Microclimate` (inverze, prahy slunce / větru / mraků, svahy, les, obec, voda, rosný bod, mlha, rosa, mráz;
+    `_diurnal` teď čte `Weather.TEMP_MIN_H / TEMP_MAX_H` – stejná čísla) – změna zahodí mezipaměť míst; `MicroFx`.
+  - `TreeEco` (vitalita bez dat, sazenice, výška × vitalita, solitér), `PlantedTrees` (růst, vláha, okus, obal, ovoce,
+    výsadba, roky a výška druhů); `Fields` (váhy osevního postupu, posun termínů, setí ozimů), `MeadowFlowers`,
+    `Garden` (vláha, plevel, vadnutí, teploty růstu, skleník, hnojení, plodiny: dny, vláha, mráz, min. teplota).
+  - `Puddles`, `Tracks` (prahy sněhu, blednutí, životnost druhů), `ChimneySmoke.SmokeRules` + fyzika kouře,
+    `VillageEvents` (dosah, hranice, masopust, zábava, hodiny událostí).
+- Za snímek se registr nečte: systémy čtou své `static var`; přidané kontroly jsou jedno porovnání `int` (WindField,
+  Microclimate, VegetationManager) nebo dvou `float` (Weather). Výchozí chování beze změny (offline: 0 parametrů
+  odlišných od kódu, zápis / reset do skriptu, vnitřní třídy `SkyModel`, slovníku i pole ověřen).
+- Kontrola překladu (kap. 6) všech změněných `.gd` a 27 závislých skriptů: prázdná. Shadery beze změny.
+
+### Otevřené body
+- Čeká na ruční test uživatele (`docs/testy_M8.md` → M8.D2c).
+- Síla ohybu stromů a trávy (`shaders/include/wind.gdshaderinc`: `0.045 · F`, `WIND_F_REF`, třepetání listů) je `const`
+  v shaderu – bez úpravy shaderu nejde ladit; až se bude shader měnit, dát je jako `global uniform` a zaregistrovat.
+  `WIND_GUST_TILE` (= `GUST_CELL × GUST_RES`) a velikost textury nárazů nejsou laditelné (shoda se shaderem).
+- `TreeEco.site_suitability` (Ellenberg × stanoviště) používá stejné normalizace jako offline `tools/tree_species.py`
+  – neregistrováno, aby se sazenice a mapové stromy nerozešly. Kalendáře barev plodin (`Fields.CROPS[*].cal`) jsou
+  vzhled – neregistrováno. `NatureSfx` je čistá syntéza zvuku (žádné chování), `TreeManager` / `TreeLodStreamer` jen
+  technika (mřížky, rozpočty, kolize kmene shodná s `MapLoader`).
+- Parametry „(stavba)“ v Voda a půda (oslunění, TWI, rozběh, povodí za mapou, soutoky) se projeví až po novém startu.
+- `DevTune.register` neumí vícerozměrné cíle ani „platí po restartu“ jako vlastnost řádku – zatím jen text v popisku.
+- Křivky ročních dob: den bodu jde posunout za sousední bod (interpolace pak přeskočí) – hlídat při ladění.

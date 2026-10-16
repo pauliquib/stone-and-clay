@@ -12,28 +12,67 @@
 class_name Atmosphere
 extends Node3D
 
-## Prahy a síly – ladění vzhledu
-const SUN_ENERGY := 1.3
-const MOON_ENERGY := 0.16
-const FOG_BASE := 0.00022
-const FOG_MIST := 0.012              # hustota v husté mlze
-const FOG_RAIN := 0.0022
+## Prahy a síly – ladění vzhledu (M8.D2c: `static var`, laditelné v F3 → Příroda/Obloha a světlo)
+static var SUN_ENERGY := 1.3
+static var MOON_ENERGY := 0.16
+static var FOG_BASE := 0.00022
+static var FOG_MIST := 0.012         # hustota v husté mlze
+static var FOG_RAIN := 0.0022
 const RAIN_DROPS := 12000
 const SNOW_FLAKES := 7000
 ## M8.4: vítr u kamery
 const LEAF_MAX := 300                # padající listí / jehličí v bouřce
-const LEAF_GUST_MS := 20.0           # od jaké rychlosti nárazu u kamery (m/s) padá listí naplno
-const WIND_SND_FOREST := 0.6         # o kolik hlasitěji šumí vítr v lese (koruny)
+static var LEAF_GUST_MS := 20.0      # od jaké rychlosti nárazu u kamery (m/s) padá listí naplno
+static var WIND_SND_FOREST := 0.6    # o kolik hlasitěji šumí vítr v lese (koruny)
 
 ## M8.5: expozice (adaptace oka) – cíl EV100 → vyhlazená `exposure_ev`, pak na tonemapping.
 ## `EXPOSURE_MID_EV` je kalibrována na jasné poledne (SkyModel), aby se tam `tonemap_exposure`
 ## chovalo jako dřív (≈1,0); v soumraku a v noci násobič roste, ať je scéna čitelná (Purkyně).
-const EXPOSURE_MID_EV := 15.5
-const EXPOSURE_DARK_GAIN := 0.07
-const EXPOSURE_MAX_MULT := 3.2
-const ADAPT_RATE_LIGHT := 10.0       # EV/s – adaptace do světla rychlá (~2 s na typický skok)
-const ADAPT_RATE_DARK := 1.0         # EV/s – adaptace do tmy pomalá (~20 s)
-const INDOOR_REF_LUX := 150.0        # hrubý odhad osvětlení uvnitř budovy (umělé světlo) – jen pro skok expozice při vstupu/výstupu
+static var EXPOSURE_MID_EV := 15.5
+static var EXPOSURE_DARK_GAIN := 0.07
+static var EXPOSURE_MAX_MULT := 3.2
+static var ADAPT_RATE_LIGHT := 10.0  # EV/s – adaptace do světla rychlá (~2 s na typický skok)
+static var ADAPT_RATE_DARK := 1.0    # EV/s – adaptace do tmy pomalá (~20 s)
+static var INDOOR_REF_LUX := 150.0   # hrubý odhad osvětlení uvnitř budovy (umělé světlo) – jen pro skok expozice při vstupu/výstupu
+
+## M8.D2c: čísla ze vzorců `update` vytažená k ladění – výchozí = dřívější čísla.
+static var INDOOR_FADE_RATE := 3.0   # přechod světla / zvuku při vstupu do budovy (1/s)
+static var CLOUD_DARK_RAIN := 1.4    # ztmavnutí mraků deštěm
+static var CLOUD_DARK_STORM := 0.5   # … bouřkou
+static var WARM_ELEV := 22.0         # pod touto výškou slunce teplé světlo a mlha (°)
+static var OVERCAST_FROM := 0.55     # zatažení (tlumí stíny, měsíc) od oblačnosti
+static var HAZE_FOG := 0.9           # opar = mlha × FOG + déšť × RAIN
+static var HAZE_RAIN := 0.35
+static var MOON_OVERCAST_DIM := 0.85 # zatažená obloha tlumí měsíc
+static var SHADOW_OVERCAST_DIM := 0.85   # zatažená obloha změkčí stíny
+static var CLOUD_DRIFT := 0.00035    # rychlost tahu mraků po větru (UV za m)
+static var LP_RATE := 0.4            # světelný smog obce: rychlost přechodu (1/s)
+static var AMBIENT_NIGHT := 0.3      # světlo prostředí v noci (ve dne 1)
+static var AMBIENT_DARK_DIM := 0.25  # tmavé mraky ubírají světlu prostředí
+static var AMBIENT_INDOOR := 0.4     # světlo prostředí uvnitř (×)
+static var FLASH_AMBIENT := 1.5      # záblesk blesku rozsvítí okolí
+static var HIGH_FROM_M := 150.0      # dohled ve výšce: mlha se ředí od výšky nad terénem
+static var HIGH_TO_M := 500.0        # … naplno
+static var FOG_HIGH_THIN := 0.7      # … o kolik se mlha zředí
+static var FOG_SKY_FOG := 0.8        # mlha zakryje oblohu (× mlha)
+static var FOG_SKY_RAIN := 0.3       # … (× déšť)
+static var FOG_SKY_HIGH := 0.25      # … (× výška)
+static var FOG_SKY_MAX := 0.9
+static var AERIAL_LOW := 0.5         # vzdušná perspektiva u země
+static var AERIAL_HIGH := 0.85       # … ve výšce
+static var EXPOSURE_OVERCAST := 0.08 # zatažená obloha přidá expozici (×)
+static var PURKINJE_EV := 8.0        # Purkyňův posun: plná desaturace při EV100 −hodnota
+static var PURKINJE_SAT := 0.35      # … sytost barev v hluboké tmě
+static var LEGACY_EXPOSURE_NIGHT := 1.7  # stará obloha (realismus „sky“ vypnut): expozice v noci
+static var LEGACY_EXPOSURE_OVERCAST := 0.12
+static var TREE_FAR_HIGH := 2.6      # ve výšce vidět stromy dál (×)
+static var GRASS_SNOW_DIM := 0.3     # sníh ubírá zeleň trávy (shader grass_green)
+static var WIND_STRENGTH_FULL := 12.0    # shader wind_strength = vítr / tato rychlost (m/s)
+static var LEAF_STORM_FROM := 0.7    # listí začne padat od podílu LEAF_GUST_MS
+static var LEAF_FOREST_BASE := 0.4   # listí mimo les (× bouřka); v lese 1
+static var SOUND_SPEED := 343.0      # rychlost zvuku – zpoždění hromu (m/s)
+static var FLASH_DECAY := 9.0        # dosvit záblesku (1/s)
+static var FLASH_POWER_DIST := 4000.0    # síla záblesku klesá se vzdáleností (m)
 
 var clock: Clock
 var weather: Weather
@@ -57,14 +96,29 @@ var exposure_ev := EXPOSURE_MID_EV   # M8.5 API: aktuální vyhlazená EV100 sc�
 ## (`Atmosphere.SkyModel.sun_illuminance_lux(...)`), takže je můžou číst i budoucí serverové kroky M8
 ## (8.9 mikroklima, 8.12 plodiny, 8.16 tělo, 8.18 zvuk), ne jen tento klientský vzhled.
 class SkyModel:
-	const SUN_LUX_ZENITH := 100000.0   # jasné nebe, slunce v zenitu
-	const SKY_LUX_CLEAR := 18000.0     # difuzní nebe jasného dne při slunci vysoko
-	const SKY_LUX_OVERCAST := 10000.0  # celé zatažené nebe (jen difuzní)
-	const SKY_LUX_TWILIGHT := 3.4      # konec občanského soumraku (elevace −6°)
-	const SKY_LUX_NIGHT := 0.0005      # konec nautického soumraku (elevace −12°) – jen zbytek difuze
-	const MOON_LUX_FULL := 0.25        # úplněk vysoko na obloze
-	const STARLIGHT_LUX := 0.001       # jasná bezměsíčná noc, jen hvězdy
-	const EV_REF_LUX := 2.5            # ISO: EV100 = log2(lux / 2,5)
+	# M8.D2c: `static var` (laditelné v F3 → Příroda/Obloha a světlo) – výchozí beze změny.
+	static var SUN_LUX_ZENITH := 100000.0   # jasné nebe, slunce v zenitu
+	static var SKY_LUX_CLEAR := 18000.0     # difuzní nebe jasného dne při slunci vysoko
+	static var SKY_LUX_OVERCAST := 10000.0  # celé zatažené nebe (jen difuzní)
+	static var SKY_LUX_TWILIGHT := 3.4      # konec občanského soumraku (elevace −6°)
+	static var SKY_LUX_NIGHT := 0.0005      # konec nautického soumraku (elevace −12°) – jen zbytek difuze
+	static var MOON_LUX_FULL := 0.25        # úplněk vysoko na obloze
+	static var STARLIGHT_LUX := 0.001       # jasná bezměsíčná noc, jen hvězdy
+	static var EV_REF_LUX := 2.5            # ISO: EV100 = log2(lux / 2,5)
+	static var TAU_CLEAR := 0.10            # optická hloubka jasné oblohy (Rayleigh + ozon)
+	static var TAU_HAZE := 0.5              # … přídavek při plném oparu / mlze (Mie)
+	static var TINT_R := 0.55               # zčervenání slunce: útlum červené (× optická hloubka)
+	static var TINT_G := 0.9                # … zelené
+	static var TINT_B := 1.6                # … modré
+	static var CLOUD_DIRECT_MIN := 0.08     # přímé slunce pod plnou oblačností (podíl)
+	static var CLOUD_DIRECT_FROM := 0.2     # oblačnost začne zakrývat slunce od
+	static var CLOUD_DIRECT_TO := 0.9       # … zakryje naplno při
+	static var OVERCAST_SKY_FROM := 0.3     # difuzní jas: přechod na zataženo od oblačnosti
+	static var OVERCAST_SKY_TO := 0.9       # … do
+	static var HAZE_SKY_DIM := 0.3          # opar tlumí difuzní jas
+	static var HORIZON_SUNSET := 0.05       # jas u obzoru při západu (× jasná obloha)
+	static var LIGHT_POLLUTION_LUX := 0.05  # světelný smog obce při plné intenzitě (lux)
+	static var LUMINOUS_EFFICACY := 110.0   # světelná účinnost slunce (lm/W) pro W/m²
 
 	## Kasten & Young 1989 – vzdušná hmota podle zenitového úhlu (zjednodušeně, bez tlakové korekce).
 	static func air_mass(elev_deg: float) -> float:
@@ -74,7 +128,7 @@ class SkyModel:
 
 	## Rayleigh + ozon (optická hloubka ~0,10 jasná obloha) + Mie podle oparu / mlhy (0..1 → +0,5).
 	static func _extinction(am: float, haze: float) -> float:
-		var tau := 0.10 + 0.5 * clampf(haze, 0.0, 1.0)
+		var tau := TAU_CLEAR + TAU_HAZE * clampf(haze, 0.0, 1.0)
 		return exp(-tau * am)
 
 	## Barva slunce a jeho přímého světla podle vzdušné hmoty – Rayleigh ~ 1/λ⁴, nízko nad obzorem
@@ -83,10 +137,10 @@ class SkyModel:
 		if elev_deg <= -5.0:
 			return Color(1.0, 0.55, 0.3)
 		var am := air_mass(maxf(elev_deg, 0.2))
-		var tau := 0.10 + 0.5 * clampf(haze, 0.0, 1.0)
-		var r := exp(-tau * am * 0.55)
-		var g := exp(-tau * am * 0.9)
-		var b := exp(-tau * am * 1.6)
+		var tau := TAU_CLEAR + TAU_HAZE * clampf(haze, 0.0, 1.0)
+		var r := exp(-tau * am * TINT_R)
+		var g := exp(-tau * am * TINT_G)
+		var b := exp(-tau * am * TINT_B)
 		var c := Color(r, g, b)
 		return c / maxf(c.g, 0.001)   # normalizovat na zelenou, ať je slunce v poledne bílé, ne přitmavené
 
@@ -98,7 +152,7 @@ class SkyModel:
 		var trans := _extinction(am, haze)
 		var geo := clampf(sin(deg_to_rad(elev_deg)), 0.0, 1.0)
 		var direct := SUN_LUX_ZENITH * trans * geo
-		direct *= lerpf(1.0, 0.08, smoothstep(0.2, 0.9, clampf(cloud_cover, 0.0, 1.0)))
+		direct *= lerpf(1.0, CLOUD_DIRECT_MIN, smoothstep(CLOUD_DIRECT_FROM, CLOUD_DIRECT_TO, clampf(cloud_cover, 0.0, 1.0)))
 		return direct
 
 	## Difuzní osvětlenost oblohy (bez přímého slunce) – ve dne podle výšky slunce a zatažení
@@ -109,9 +163,9 @@ class SkyModel:
 		if elev_deg >= 0.0:
 			var clear := SKY_LUX_CLEAR * clampf(sin(deg_to_rad(elev_deg)), 0.05, 1.0)
 			var overcast := SKY_LUX_OVERCAST * clampf(sin(deg_to_rad(elev_deg)) * 0.6 + 0.4, 0.1, 1.0)
-			return lerpf(clear, overcast, smoothstep(0.3, 0.9, cc)) * (1.0 - haze * 0.3)
+			return lerpf(clear, overcast, smoothstep(OVERCAST_SKY_FROM, OVERCAST_SKY_TO, cc)) * (1.0 - haze * HAZE_SKY_DIM)
 		if elev_deg >= -6.0:
-			var t0 := SKY_LUX_CLEAR * 0.05        # jas u obzoru v okamžiku západu (elev = 0)
+			var t0 := SKY_LUX_CLEAR * HORIZON_SUNSET   # jas u obzoru v okamžiku západu (elev = 0)
 			var t := clampf((-elev_deg) / 6.0, 0.0, 1.0)
 			return lerpf(t0, SKY_LUX_TWILIGHT, t)
 		if elev_deg >= -12.0:
@@ -129,7 +183,7 @@ class SkyModel:
 			moon_elev_deg: float, light_pollution01: float) -> float:
 		var lux := sun_illuminance_lux(elev_deg, cloud_cover, haze) + sky_illuminance_lux(elev_deg, cloud_cover, haze)
 		lux += moon_illuminance_lux(moon_phase01, moon_elev_deg) + STARLIGHT_LUX
-		lux += clampf(light_pollution01, 0.0, 1.0) * 0.05
+		lux += clampf(light_pollution01, 0.0, 1.0) * LIGHT_POLLUTION_LUX
 		return lux
 
 	## EV100 = log2(lux / 2,5) (ISO 12232) – vstup pro expozici / adaptaci oka.
@@ -146,7 +200,7 @@ class SkyModel:
 		if elev_deg <= 0.0:
 			return 0.0
 		var lux := sun_illuminance_lux(elev_deg, cloud_cover, haze) + sky_illuminance_lux(elev_deg, cloud_cover, haze)
-		return lux / 110.0
+		return lux / LUMINOUS_EFFICACY
 
 var sky_mat: ShaderMaterial
 var _rain: GPUParticles3D
@@ -347,7 +401,7 @@ func _sky_on() -> bool:
 func _haze_now() -> float:
 	var fog := weather.fog if weather else 0.0
 	var rain := weather.rain if weather else 0.0
-	return clampf(fog * 0.9 + rain * 0.35, 0.0, 1.0)
+	return clampf(fog * HAZE_FOG + rain * HAZE_RAIN, 0.0, 1.0)
 
 
 ## Přímá sluneční osvětlenost vodorovné plochy právě teď (lux) – vždy fyzikální (SkyModel), nezávisle
@@ -383,14 +437,14 @@ func is_civil_twilight() -> bool:
 
 func update(delta: float) -> void:
 	_t += delta
-	_indoor_s = move_toward(_indoor_s, 1.0 if indoor else 0.0, delta * 3.0)
+	_indoor_s = move_toward(_indoor_s, 1.0 if indoor else 0.0, delta * INDOOR_FADE_RATE)
 	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
 	var day := clock.daylight()
 	var cloud := weather.cloud if weather else 0.3
 	var rain := weather.rain if weather else 0.0
 	var fog := weather.fog if weather else 0.0
 	var wind := weather.wind if weather else 2.0
-	var dark := clampf(rain * 1.4 + (weather.storm if weather else 0.0) * 0.5, 0.0, 1.0)
+	var dark := clampf(rain * CLOUD_DARK_RAIN + (weather.storm if weather else 0.0) * CLOUD_DARK_STORM, 0.0, 1.0)
 
 	# --- slunce a měsíc
 	var sd := Clock.enu_to_world(clock.sun_enu(), north_deg)
@@ -398,8 +452,8 @@ func update(delta: float) -> void:
 	_aim(sun, sd)
 	_aim(moon, md)
 	var elev := clock.sun_elevation()
-	var warm := 1.0 - clampf(elev / 22.0, 0.0, 1.0)
-	var overcast := smoothstep(0.55, 1.0, cloud)
+	var warm := 1.0 - clampf(elev / WARM_ELEV, 0.0, 1.0)
+	var overcast := smoothstep(OVERCAST_FROM, 1.0, cloud)
 	var haze := _haze_now()
 	var moon_elev := rad_to_deg(asin(clampf(md.y, -1.0, 1.0)))
 	var sky_on := _sky_on()
@@ -410,7 +464,7 @@ func update(delta: float) -> void:
 	var sun_lux := SkyModel.sun_illuminance_lux(elev, cloud, haze)
 	var sky_lux := SkyModel.sky_illuminance_lux(elev, cloud, haze)
 	var moon_lux := SkyModel.moon_illuminance_lux(clock.moon_illumination(), moon_elev)
-	var total_lux := sun_lux + sky_lux + moon_lux + SkyModel.STARLIGHT_LUX + _lp * 0.05
+	var total_lux := sun_lux + sky_lux + moon_lux + SkyModel.STARLIGHT_LUX + _lp * SkyModel.LIGHT_POLLUTION_LUX
 	var target_ev := lerpf(SkyModel.ev100_from_lux(total_lux), SkyModel.ev100_from_lux(INDOOR_REF_LUX), _indoor_s)
 	var adapt_rate := ADAPT_RATE_LIGHT if target_ev > exposure_ev else ADAPT_RATE_DARK
 	exposure_ev = move_toward(exposure_ev, target_ev, delta * adapt_rate)
@@ -420,19 +474,19 @@ func update(delta: float) -> void:
 	if sky_on:
 		sun.light_color = SkyModel.sun_tint(elev, haze)
 		sun.light_energy = SUN_ENERGY * clampf(sun_lux / SkyModel.SUN_LUX_ZENITH, 0.0, 1.0) * sun_up
-		moon.light_energy = MOON_ENERGY * clampf(moon_lux / SkyModel.MOON_LUX_FULL, 0.0, 1.0) * moon_up * (1.0 - day) * (1.0 - overcast * 0.85)
+		moon.light_energy = MOON_ENERGY * clampf(moon_lux / SkyModel.MOON_LUX_FULL, 0.0, 1.0) * moon_up * (1.0 - day) * (1.0 - overcast * MOON_OVERCAST_DIM)
 	else:
 		sun.light_color = Color(1.0, 0.96, 0.9).lerp(Color(1.0, 0.58, 0.32), warm)
 		sun.light_energy = SUN_ENERGY * sun_up * (1.0 - overcast * 0.78) * (1.0 - fog * 0.5)
-		moon.light_energy = MOON_ENERGY * moon_up * (0.25 + 0.75 * clock.moon_illumination()) * (1.0 - day) * (1.0 - overcast * 0.85)
+		moon.light_energy = MOON_ENERGY * moon_up * (0.25 + 0.75 * clock.moon_illumination()) * (1.0 - day) * (1.0 - overcast * MOON_OVERCAST_DIM)
 	sun.visible = sun.light_energy > 0.01
-	sun.shadow_opacity = 1.0 - overcast * 0.85
+	sun.shadow_opacity = 1.0 - overcast * SHADOW_OVERCAST_DIM
 	moon.visible = moon.light_energy > 0.005 and not sun.visible
 
 	# --- obloha
 	# mraky táhnou po větru (ve výšce fouká víc, minimálně pomalý posun i za bezvětří)
 	var wv0 := weather.wind_vector() if weather else Vector3(-2.0, 0, 0.5)
-	_cloud_off += (Vector2(wv0.x, wv0.z) * 0.00035 + Vector2(-0.0004, 0.0001)) * delta
+	_cloud_off += (Vector2(wv0.x, wv0.z) * CLOUD_DRIFT + Vector2(-0.0004, 0.0001)) * delta
 	sky_mat.set_shader_parameter("sun_dir", sd)
 	sky_mat.set_shader_parameter("moon_dir", md)
 	sky_mat.set_shader_parameter("moon_light", clock.moon_illumination())
@@ -441,13 +495,14 @@ func update(delta: float) -> void:
 	sky_mat.set_shader_parameter("cloud_offset", _cloud_off)
 	sky_mat.set_shader_parameter("haze", haze)
 	sky_mat.set_shader_parameter("sky_on", sky_on)   # M8.5: Pás Venuše při soumraku jen v nové obloze
-	_lp = move_toward(_lp, light_pollution, delta * 0.4)
+	_lp = move_toward(_lp, light_pollution, delta * LP_RATE)
 	sky_mat.set_shader_parameter("light_pollution", _lp)
 	_update_flash(delta)
 	sky_mat.set_shader_parameter("flash", _flash)
 
 	# --- světlo prostředí a mlha
-	env.ambient_light_energy = lerpf(0.3, 1.0, day) * (1.0 - dark * 0.25) * lerpf(1.0, 0.4, _indoor_s) + _flash * 1.5 * (1.0 - _indoor_s)
+	env.ambient_light_energy = (lerpf(AMBIENT_NIGHT, 1.0, day) * (1.0 - dark * AMBIENT_DARK_DIM) * lerpf(1.0, AMBIENT_INDOOR, _indoor_s)
+		+ _flash * FLASH_AMBIENT * (1.0 - _indoor_s))
 	env.ambient_light_sky_contribution = 1.0
 	var fog_col := Color(0.72, 0.8, 0.9).lerp(Color(0.7, 0.72, 0.75), overcast)
 	fog_col = fog_col.lerp(Color(0.04, 0.05, 0.08), 1.0 - day).lerp(Color(0.9, 0.6, 0.45), warm * day * 0.45 * (1.0 - overcast))
@@ -457,26 +512,26 @@ func update(delta: float) -> void:
 	var high := 0.0
 	if cam != null:
 		var ground := terrain.height_at(cam.global_position.x, cam.global_position.z) if terrain else 0.0
-		high = smoothstep(150.0, 500.0, cam.global_position.y - ground)
-	env.fog_density = (FOG_BASE + FOG_MIST * fog * fog + FOG_RAIN * rain) * (1.0 - 0.7 * high)
-	env.fog_sky_affect = clampf(fog * 0.8 + rain * 0.3 + high * 0.25, 0.0, 0.9)
-	env.fog_aerial_perspective = lerpf(0.5, 0.85, high) * (1.0 - fog)
+		high = smoothstep(HIGH_FROM_M, HIGH_TO_M, cam.global_position.y - ground)
+	env.fog_density = (FOG_BASE + FOG_MIST * fog * fog + FOG_RAIN * rain) * (1.0 - FOG_HIGH_THIN * high)
+	env.fog_sky_affect = clampf(fog * FOG_SKY_FOG + rain * FOG_SKY_RAIN + high * FOG_SKY_HIGH, 0.0, FOG_SKY_MAX)
+	env.fog_aerial_perspective = lerpf(AERIAL_LOW, AERIAL_HIGH, high) * (1.0 - fog)
 	_micro_fx_update(cam, delta)          # M8.9: údolní mlha (výšková) a rosa / jinovatka podle World.micro
 	if sky_on:
 		# M8.5: expozice z vyhlazené EV100 (SkyModel) – kalibrováno, ať je jasné poledne ≈ jako dřív (1,0),
 		# v soumraku a v noci násobič roste (oko se roztáhne), ať zůstane scéna čitelná (Purkyně).
 		var exp_mult := 1.0 + EXPOSURE_DARK_GAIN * maxf(EXPOSURE_MID_EV - exposure_ev, 0.0)
-		env.tonemap_exposure = clampf(exp_mult, 1.0, EXPOSURE_MAX_MULT) * (1.0 + overcast * 0.08)
+		env.tonemap_exposure = clampf(exp_mult, 1.0, EXPOSURE_MAX_MULT) * (1.0 + overcast * EXPOSURE_OVERCAST)
 		env.adjustment_enabled = true
 		env.adjustment_brightness = 1.0
 		env.adjustment_contrast = 1.0
 		# Purkyňův posun: pod cca 1 lx ztrácí oko barvocit (tyčinkové vidění) – postupná desaturace do ~8 EV tmy
-		var purkinje := clampf(-exposure_ev / 8.0, 0.0, 1.0)
-		env.adjustment_saturation = lerpf(1.0, 0.35, purkinje)
+		var purkinje := clampf(-exposure_ev / PURKINJE_EV, 0.0, 1.0)
+		env.adjustment_saturation = lerpf(1.0, PURKINJE_SAT, purkinje)
 	else:
-		env.tonemap_exposure = lerpf(1.7, 1.0, day) * (1.0 + overcast * 0.12)
+		env.tonemap_exposure = lerpf(LEGACY_EXPOSURE_NIGHT, 1.0, day) * (1.0 + overcast * LEGACY_EXPOSURE_OVERCAST)
 		env.adjustment_enabled = false
-	MapLoader.set_tree_far_mult(lerpf(1.0, 2.6, high))      # M6.2: ve výšce vidět stromy dál
+	MapLoader.set_tree_far_mult(lerpf(1.0, TREE_FAR_HIGH, high))      # M6.2: ve výšce vidět stromy dál
 
 	# --- srážky kolem kamery
 	var snowing := weather != null and weather.is_snowing()
@@ -508,7 +563,7 @@ func update(delta: float) -> void:
 		var forest := clampf(wind_field.roughness_at(cp2), 0.0, 1.0)
 		wind_amt = clampf((gs - 3.0) / 12.0, 0.0, 1.0) * (1.0 + WIND_SND_FOREST * forest)
 		wind_amt = minf(wind_amt, 1.0)
-		var storm_k := smoothstep(LEAF_GUST_MS * 0.7, LEAF_GUST_MS, gs) * (0.4 + 0.6 * forest)
+		var storm_k := smoothstep(LEAF_GUST_MS * LEAF_STORM_FROM, LEAF_GUST_MS, gs) * (LEAF_FOREST_BASE + (1.0 - LEAF_FOREST_BASE) * forest)
 		var fol := Seasons.foliage(clock.day_of_year())
 		_leaves.emitting = storm_k > 0.02 and _indoor_s < 0.5
 		_leaves.amount_ratio = clampf(storm_k, 0.05, 1.0)
@@ -528,10 +583,10 @@ func update(delta: float) -> void:
 	var rs := RenderingServer
 	rs.global_shader_parameter_set("snow_cover", weather.snow_cover if weather else 0.0)
 	rs.global_shader_parameter_set("wetness", weather.wetness if weather else 0.0)
-	rs.global_shader_parameter_set("grass_green", Seasons.green(doy) * (1.0 - (weather.snow_cover if weather else 0.0) * 0.3))
+	rs.global_shader_parameter_set("grass_green", Seasons.green(doy) * (1.0 - (weather.snow_cover if weather else 0.0) * GRASS_SNOW_DIM))
 	rs.global_shader_parameter_set("foliage", Seasons.foliage(doy))
 	rs.global_shader_parameter_set("autumn", Seasons.autumn(doy))
-	rs.global_shader_parameter_set("wind_strength", clampf(wind / 12.0, 0.0, 1.0))   # zpětná kompatibilita (M8.4: = speed/12)
+	rs.global_shader_parameter_set("wind_strength", clampf(wind / WIND_STRENGTH_FULL, 0.0, 1.0))   # zpětná kompatibilita (M8.4: = speed/12)
 	_set_wind_globals()
 
 
@@ -589,7 +644,7 @@ func _loop(p: AudioStreamPlayer, name_: String, amount: float, db_min: float, db
 func _on_lightning(pos: Vector3) -> void:
 	var cam := get_viewport().get_camera_3d()
 	var dist := cam.global_position.distance_to(pos) if cam else 1500.0
-	var power := clampf(1.3 - dist / 4000.0, 0.25, 1.0)
+	var power := clampf(1.3 - dist / FLASH_POWER_DIST, 0.25, 1.0)
 	# 2–4 záblesky těsně po sobě (zpětné výboje)
 	_flash_seq.clear()
 	var t := 0.0
@@ -597,7 +652,7 @@ func _on_lightning(pos: Vector3) -> void:
 		_flash_seq.append([t, power * randf_range(0.6, 1.0)])
 		t += randf_range(0.06, 0.18)
 	# hrom se zpožděním podle rychlosti zvuku, vzdálený je tišší a hlubší
-	var delay := dist / 343.0
+	var delay := dist / SOUND_SPEED
 	get_tree().create_timer(delay).timeout.connect(_play_thunder.bind(dist))
 
 
@@ -612,7 +667,7 @@ func _play_thunder(dist: float) -> void:
 
 
 func _update_flash(delta: float) -> void:
-	_flash = move_toward(_flash, 0.0, delta * 9.0)
+	_flash = move_toward(_flash, 0.0, delta * FLASH_DECAY)
 	for i in range(_flash_seq.size() - 1, -1, -1):
 		_flash_seq[i][0] -= delta
 		if _flash_seq[i][0] <= 0.0:
