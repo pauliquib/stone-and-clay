@@ -14,10 +14,23 @@ const CELL := 32.0                    # mřížka pro hledání nejbližšího �
 const VIS_RANGE := 1100.0
 const FLOW := {"river": 0.55, "canal": 0.3, "stream": 0.9, "ditch": 0.4, "drain": 0.4}
 ## M8.7: normální průtok (m³/s) bez vodní bilance (fallback `flow_at`) a vizuál hladiny.
-const FLOW_NOMINAL := {"river": 1.2, "canal": 0.3, "stream": 0.03, "ditch": 0.01, "drain": 0.01}
-const STREAM_VIS_S := 1.0             # jak často se přepočte vzhled hladin toků (s)
-const STREAM_VIS_RATE := 0.08         # m za tick – plynulý posun hladiny (vizuál)
+## M8.D2c: chování = `static var` (F3 → Příroda/Voda a půda), výchozí beze změny.
+static var FLOW_NOMINAL := {"river": 1.2, "canal": 0.3, "stream": 0.03, "ditch": 0.01, "drain": 0.01}
+static var STREAM_VIS_S := 1.0        # jak často se přepočte vzhled hladin toků (s)
+static var STREAM_VIS_RATE := 0.08    # m za tick – plynulý posun hladiny (vizuál)
 const BROOK_DB_MAX := 6.0             # o kolik dB hlasitější šumění při velké vodě
+static var STREAM_NEAR_M := 30.0      # flow_at / level_at: nejbližší tok do (m)
+static var POND_FREEZE_C := 1.0       # rybník začne zamrzat pod −tolik °C
+static var POND_FREEZE_SPAN := 4.0    # … úplně zamrzlý o tolik °C níž
+static var STREAM_FREEZE_C := 5.0     # tekoucí voda začne zamrzat pod −tolik °C
+static var STREAM_FREEZE_SPAN := 6.0  # … úplně zamrzlá o tolik °C níž
+static var ICE_RATE_H := 0.08         # rychlost zamrzání / tání rybníka (za herní hodinu)
+static var ICE_FLOW_RATE_H := 0.05    # … tekoucí vody
+static var WAVES_RAIN := 0.8          # vlnky: přídavek při plném dešti
+static var WAVES_WIND := 0.7          # … při plném větru
+static var WAVES_WIND_FULL := 10.0    # … „plný vítr“ (m/s)
+static var TURB_VIS_RATE := 0.05      # vizuál: přiblížení kalnosti za tick
+static var FLOW_VIS_RATE := 0.1       # vizuál: přiblížení rychlosti proudu za tick
 
 var world: World
 var terrain: Terrain
@@ -302,7 +315,7 @@ func _stream_near(x: float, z: float, r: float) -> int:
 
 ## M8.7: průtok (m³/s) nejbližšího toku do 30 m (0 = žádný tok / vyschlý). Bez bilance normál podle druhu.
 func flow_at(x: float, z: float) -> float:
-	var si := _stream_near(x, z, 30.0)
+	var si := _stream_near(x, z, STREAM_NEAR_M)
 	if si < 0:
 		return 0.0
 	var sw: SoilWater = world.soil_water if world != null else null
@@ -313,7 +326,7 @@ func flow_at(x: float, z: float) -> float:
 
 ## M8.7: hladina nejbližšího toku do 30 m vůči normálu (m; + velká voda, − sucho). Bez bilance 0.
 func level_at(x: float, z: float) -> float:
-	var si := _stream_near(x, z, 30.0)
+	var si := _stream_near(x, z, STREAM_NEAR_M)
 	var sw: SoilWater = world.soil_water if world != null else null
 	if si < 0 or sw == null or not sw.active() or si >= sw.st_level.size():
 		return 0.0
@@ -333,8 +346,8 @@ func _update_streams_vis() -> void:
 		var fl := clampf(sqrt(sw.st_q[si] / maxf(sw.st_qn[si], 1e-6)), 0.3, 2.0) if on else 1.0
 		var dry := on and sw.st_dry[si] == 1
 		var nl := move_toward(level_ofs[si], lv, STREAM_VIS_RATE)
-		var nt := move_toward(_turb_vis[si], tb, 0.05)
-		var nf := move_toward(_flow_vis[si], fl, 0.1)
+		var nt := move_toward(_turb_vis[si], tb, TURB_VIS_RATE)
+		var nf := move_toward(_flow_vis[si], fl, FLOW_VIS_RATE)
 		if absf(nl - level_ofs[si]) > 0.002 or absf(nt - _turb_vis[si]) > 0.005 or absf(nf - _flow_vis[si]) > 0.01:
 			level_ofs[si] = nl
 			_turb_vis[si] = nt
@@ -375,18 +388,18 @@ func _process_impl(delta: float) -> void:
 	if _last_min < 0.0:
 		_last_min = now
 		var t0: float = world.micro.temp_valley() if world.micro != null else world.weather.temp   # M8.9: nádrže leží v údolí
-		ice = clampf((-t0 - 1.0) / 4.0, 0.0, 1.0)
-		ice_flow = clampf((-t0 - 5.0) / 6.0, 0.0, 1.0)
+		ice = clampf((-t0 - POND_FREEZE_C) / POND_FREEZE_SPAN, 0.0, 1.0)
+		ice_flow = clampf((-t0 - STREAM_FREEZE_C) / STREAM_FREEZE_SPAN, 0.0, 1.0)
 	var dh := clampf((now - _last_min) / 60.0, 0.0, 48.0)
 	_last_min = now
 	var temp: float = world.micro.temp_valley() if world.micro != null else world.weather.temp   # M8.9: teplota u vody (inverze)
-	ice = move_toward(ice, clampf((-temp - 1.0) / 4.0, 0.0, 1.0), dh * 0.08)
-	ice_flow = move_toward(ice_flow, clampf((-temp - 5.0) / 6.0, 0.0, 1.0), dh * 0.05)
+	ice = move_toward(ice, clampf((-temp - POND_FREEZE_C) / POND_FREEZE_SPAN, 0.0, 1.0), dh * ICE_RATE_H)
+	ice_flow = move_toward(ice_flow, clampf((-temp - STREAM_FREEZE_C) / STREAM_FREEZE_SPAN, 0.0, 1.0), dh * ICE_FLOW_RATE_H)
 	_vis_tick += 0.2
 	if _vis_tick >= STREAM_VIS_S:
 		_vis_tick = 0.0
 		_update_streams_vis()                     # M8.7: hladina, kalnost, proud podle průtoku
-	var waves := 1.0 + world.weather.rain * 0.8 + clampf(world.weather.wind / 10.0, 0.0, 1.0) * 0.7
+	var waves := 1.0 + world.weather.rain * WAVES_RAIN + clampf(world.weather.wind / WAVES_WIND_FULL, 0.0, 1.0) * WAVES_WIND
 	for m in _mats:
 		var ic := ice_flow if m.get_meta("flowing") else ice
 		m.set_shader_parameter("ice", ic)

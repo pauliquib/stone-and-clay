@@ -24,51 +24,89 @@
 class_name Microclimate
 extends RefCounted
 
-# --- laditelné konstanty (ladění M8.19)
-const LAPSE_K_M := 0.0065             # K/m – vertikální gradient (−6,5 K/km)
-const INV_MAX_K := 7.0                # K – nejsilnější přízemní inverze (dno kotliny vs. střední výška)
-const INV_RATE_K_H := 1.5             # K/h – nárůst inverze za jasné bezvětrné noci (zpomaluje se k maximu)
-const INV_MIX_H := 1.5                # h – rozmíchání inverze větrem / oblačností / deštěm (časová konstanta)
-const INV_BREAK_H := 1.2              # h – rozpouštění inverze sluncem (při výšce slunce ≥ 30°)
-const INV_DEPTH_M := 50.0             # m – mocnost „jezera“ studeného vzduchu nad dnem údolí (HAND)
-const W_LOW := 0.65                   # podíl inverze podle výšky nad vodou (HAND = 0 → plně)
-const W_POOL := 0.6                   # podíl inverze v mrazové kotlině (Site.cold_pool = 1)
-const BELT_K := 0.15                  # teplý svahový pás: hřbet nad inverzí je o I × BELT_K tepleji
-const TPI_RIDGE_M := 30.0             # TPI (m), od kterého je místo „hřbet“
-const CALM_FROM_MS := 1.5             # m/s – do této rychlosti větru plné radiační ochlazování
-const CALM_TO_MS := 5.0               # m/s – od této rychlosti vítr vrstvu promíchá (žádná inverze)
-const CLEAR_FROM := 0.25              # oblačnost, od které ubývá vyzařování
-const CLEAR_TO := 0.85                # … a při které už inverze nevzniká
-const SOUTH_K := 3.0                  # K – přehřátí jižního svahu proti průměru (plné slunce)
-const INSOL_MEAN := 5150.0            # MJ/m²/rok – průměrné Site.insol katastru (tools/site.py)
-const INSOL_SPAN := 900.0             # MJ/m²/rok – rozdíl insol pro plné přehřátí / ochlazení svahu
-const FOREST_DAY_K := 2.5             # K – v olistěném lese ve dne chladněji
-const FOREST_NIGHT_K := 1.0           # K – v lese za jasné noci tepleji (koruny brání vyzařování)
-const URBAN_DAY_K := 0.5              # K – tepelný ostrov obce ve dne
-const URBAN_NIGHT_K := 1.5            # K – … za jasné bezvětrné noci
-const URBAN_R_M := 30.0               # m – poloměr vzorku zástavby (SurfaceMap.YARD)
-const WATER_NEAR_M := 80.0            # m – do této vzdálenosti od vody voda zjemňuje výkyvy a vlhčí vzduch
-const WATER_DAMP := 0.15              # o kolik voda tlumí inverzi a přehřátí
-const GROUND_K := 3.0                 # K – o kolik je přízemní teplota (tráva) za jasné noci níž než ve 2 m
-const DEP_K := 3.5                    # K – deficit rosného bodu pod očekávaným minimem v suchém vzduchu
-const TD_TAU_H := 6.0                 # h – jak rychle se rosný bod vzduchové hmoty mění
-const TMEAN_TAU_H := 24.0             # h – klouzavý průměr teploty (denní střed)
-const TD_WATER_K := 1.0               # K – vyšší rosný bod u vody
-const TD_FOREST_K := 0.7              # K – … v lese (transpirace)
-const TD_SOIL_K := 1.5                # K – … nad mokrou půdou (SoilWater, vlhkost − 0,5)
-const FOG_MARGIN_K := 0.5             # K – mlha, když teplota ≤ rosný bod + tohle
-const FOG_TAU_UP_H := 1.5             # h – mlžná vrstva roste
-const FOG_TAU_DOWN_H := 1.0           # h – … a ráno se rozpouští (od okrajů – horní hranice klesá)
-const FOG_EDGE_M := 8.0               # m – měkký horní okraj vrstvy (fog_at)
-const FOG_SCAN_M := 5.0               # m – krok hledání horní hranice mlhy / mrazu v profilu údolí
+# --- laditelné konstanty (ladění M8.19; M8.D2c: `static var` → F3 → Příroda/Mikroklima, výchozí beze změny)
+static var LAPSE_K_M := 0.0065        # K/m – vertikální gradient (−6,5 K/km)
+static var INV_MAX_K := 7.0           # K – nejsilnější přízemní inverze (dno kotliny vs. střední výška)
+static var INV_RATE_K_H := 1.5        # K/h – nárůst inverze za jasné bezvětrné noci (zpomaluje se k maximu)
+static var INV_MIX_H := 1.5           # h – rozmíchání inverze větrem / oblačností / deštěm (časová konstanta)
+static var INV_BREAK_H := 1.2         # h – rozpouštění inverze sluncem (při výšce slunce ≥ 30°)
+static var INV_DEPTH_M := 50.0        # m – mocnost „jezera“ studeného vzduchu nad dnem údolí (HAND)
+static var W_LOW := 0.65              # podíl inverze podle výšky nad vodou (HAND = 0 → plně)
+static var W_POOL := 0.6              # podíl inverze v mrazové kotlině (Site.cold_pool = 1)
+static var BELT_K := 0.15             # teplý svahový pás: hřbet nad inverzí je o I × BELT_K tepleji
+static var TPI_RIDGE_M := 30.0        # TPI (m), od kterého je místo „hřbet“
+static var CALM_FROM_MS := 1.5        # m/s – do této rychlosti větru plné radiační ochlazování
+static var CALM_TO_MS := 5.0          # m/s – od této rychlosti vítr vrstvu promíchá (žádná inverze)
+static var CLEAR_FROM := 0.25         # oblačnost, od které ubývá vyzařování
+static var CLEAR_TO := 0.85           # … a při které už inverze nevzniká
+static var SOUTH_K := 3.0             # K – přehřátí jižního svahu proti průměru (plné slunce)
+static var INSOL_MEAN := 5150.0       # MJ/m²/rok – průměrné Site.insol katastru (tools/site.py)
+static var INSOL_SPAN := 900.0        # MJ/m²/rok – rozdíl insol pro plné přehřátí / ochlazení svahu
+static var FOREST_DAY_K := 2.5        # K – v olistěném lese ve dne chladněji
+static var FOREST_NIGHT_K := 1.0      # K – v lese za jasné noci tepleji (koruny brání vyzařování)
+static var URBAN_DAY_K := 0.5         # K – tepelný ostrov obce ve dne
+static var URBAN_NIGHT_K := 1.5       # K – … za jasné bezvětrné noci
+static var URBAN_R_M := 30.0          # m – poloměr vzorku zástavby (SurfaceMap.YARD)
+static var WATER_NEAR_M := 80.0       # m – do této vzdálenosti od vody voda zjemňuje výkyvy a vlhčí vzduch
+static var WATER_DAMP := 0.15         # o kolik voda tlumí inverzi a přehřátí
+static var GROUND_K := 3.0            # K – o kolik je přízemní teplota (tráva) za jasné noci níž než ve 2 m
+static var DEP_K := 3.5               # K – deficit rosného bodu pod očekávaným minimem v suchém vzduchu
+static var TD_TAU_H := 6.0            # h – jak rychle se rosný bod vzduchové hmoty mění
+static var TMEAN_TAU_H := 24.0        # h – klouzavý průměr teploty (denní střed)
+static var TD_WATER_K := 1.0          # K – vyšší rosný bod u vody
+static var TD_FOREST_K := 0.7         # K – … v lese (transpirace)
+static var TD_SOIL_K := 1.5           # K – … nad mokrou půdou (SoilWater, vlhkost − 0,5)
+static var FOG_MARGIN_K := 0.5        # K – mlha, když teplota ≤ rosný bod + tohle
+static var FOG_TAU_UP_H := 1.5        # h – mlžná vrstva roste
+static var FOG_TAU_DOWN_H := 1.0      # h – … a ráno se rozpouští (od okrajů – horní hranice klesá)
+static var FOG_EDGE_M := 8.0          # m – měkký horní okraj vrstvy (fog_at)
+static var FOG_SCAN_M := 5.0          # m – krok hledání horní hranice mlhy / mrazu v profilu údolí
 const FOG_SCAN_N := 40                # kroků (do 200 m nad dnem)
-const DEW_RATE_H := 0.35              # rosa přibývá za hodinu (plná kondenzace)
-const DEW_DRY_H := 0.6                # rosa ubývá za hodinu (× (0,1 + 3 · slunce² + 0,05 · vítr))
-const FROST_TAU_UP_H := 0.5           # h – mrazová hranice stoupá (ochlazování)
-const FROST_TAU_DOWN_H := 1.0         # h – … a ráno klesá (jinovatka taje zespodu nahoru jen pomalu)
+static var DEW_RATE_H := 0.35         # rosa přibývá za hodinu (plná kondenzace)
+static var DEW_DRY_H := 0.6           # rosa ubývá za hodinu (× (0,1 + 3 · slunce² + 0,05 · vítr))
+static var FROST_TAU_UP_H := 0.5      # h – mrazová hranice stoupá (ochlazování)
+static var FROST_TAU_DOWN_H := 1.0    # h – … a ráno klesá (jinovatka taje zespodu nahoru jen pomalu)
 const NO_FROST_M := -20.0             # frost_top_m(): na dně údolí nemrzne (hranice pod dnem)
 const ALL_FROST_M := 220.0            # frost_top_m(): mrzne i na hřebenech (nad profilem)
-const SNAP_HOURS := 18                # rozběh po skoku času: kolik hodin zpět se nasimuluje
+static var SNAP_HOURS := 18           # rozběh po skoku času: kolik hodin zpět se nasimuluje
+## M8.D2c: čísla ze vzorců vytažená k ladění – výchozí = dřívější čísla.
+static var CLOUD_RANGE_DAMP := 0.6    # oblačnost tlumí denní rozkmit (rozběh, rosný bod)
+static var MOIST_BASE := 0.35         # vlhkost vzduchové hmoty: základ
+static var MOIST_CLOUD := 0.35        # … + × oblačnost
+static var MOIST_RAIN := 0.8          # … + × déšť
+static var MOIST_FOG := 0.4           # … + × mlha (Weather)
+static var MOIST_RECENT := 0.3        # … + × vlhko z posledních dnů
+static var MOIST_DROUGHT := 0.35      # … − × sucho
+static var TD_OFFSET_K := 0.3         # rosný bod ještě o tolik níž (K)
+static var RAIN_DRY_K := 4.0          # déšť ruší radiační noc (sucho = 1 − déšť × tohle)
+static var NIGHT_ELEV_TO := 12.0      # radiační noc slábne do této výšky slunce (°)
+static var SUN_FULL_ELEV := 45.0      # ohřev sluncem naplno od výšky (°)
+static var SUN_CLOUD_K := 0.75        # oblačnost ubírá ohřevu (× oblačnost)
+static var INV_BUILD_ELEV_FROM := -2.0    # inverze roste pod touto výškou slunce (°)…
+static var INV_BUILD_ELEV_TO := 8.0       # … a přestává nad touto
+static var INV_BREAK_ELEV_FROM := 5.0     # slunce začne rozpouštět inverzi od výšky (°)…
+static var INV_BREAK_ELEV_TO := 30.0      # … naplno od
+static var INV_BREAK_BASE := 0.3      # rozpouštění sluncem i pod mraky (podíl; za jasna 1)
+static var INV_FOREST_DAMP := 0.5     # les tlumí inverzi v bodě
+static var INV_URBAN_DAMP := 0.5      # zástavba tlumí inverzi v bodě
+static var POOL_DEPTH_M := 15.0       # profil údolí: kotlina sahá do výšky nad dnem (m)
+static var POOL_K := 0.8              # … síla kotliny u dna
+static var FOG_DENS_SPAN_K := 2.0     # hustota mlhy plná při T o tolik K pod rosným bodem + okraj
+static var FOREST_CLASS_CANOPY := 0.8 # třída povrchu „les“ = aspoň takový zápoj
+static var GROUND_FOREST_DAMP := 0.7  # les tlumí přízemní ochlazení
+static var DEW_RAIN_MIN := 0.05       # za deště silnějšího než tohle žádná rosa
+static var DEW_SPAN_K := 2.0          # rosa plnou rychlostí o tolik K pod rosným bodem
+static var DEW_DRY_BASE := 0.1        # vysychání rosy: základ
+static var DEW_DRY_SUN := 3.0         # … × slunce²
+static var DEW_DRY_WIND := 0.05       # … × vítr (m/s)
+static var DEW_UPLAND := 0.6          # rosa mimo údolí (podíl; u dna 1)
+static var DEW_FOREST_DAMP := 0.8     # les ubírá rosu na zemi
+static var DEW_URBAN_DAMP := 0.7      # zástavba ubírá rosu
+static var FROST_FROM_C := 1.0        # přízemní mráz: začíná u přízemní teploty (°C)
+static var FROST_FULL_C := -1.5       # … plný
+static var SNOW_BAND_K := 1.0         # sníh / déšť: přechodový pás ± kolem Weather.SNOW_BELOW (K)
+## M8.D2c: změna parametru vlastností místa v menu F3 → zahodit mezipaměť (`invalidate()`).
+static var _gen := 0
 const MAGNUS_A := 17.62
 const MAGNUS_B := 243.12
 const HUD_MS := 500                   # ms – jak často se přepočítá řádek počasí v HUD
@@ -123,6 +161,12 @@ var _e_frac := 0.0
 var _hud_ms := -100000
 var _hud_pos := Vector3(1.0e9, 0.0, 0.0)
 var _hud_txt := ""
+var _seen_gen := 0
+
+
+## M8.D2c: po změně parametru v menu F3 – zahodit mezipaměť vlastností míst.
+static func invalidate() -> void:
+	_gen += 1
 
 
 func setup(w: World) -> void:
@@ -209,7 +253,7 @@ func _snap() -> void:
 	var now := clock.minutes
 	var doy := clock.day_of_year()
 	var tm := Seasons.monthly(Seasons.TEMP_MEAN, doy)
-	var rngc := Seasons.monthly(Seasons.TEMP_RANGE, doy) * (1.0 - 0.6 * weather.cloud)
+	var rngc := Seasons.monthly(Seasons.TEMP_RANGE, doy) * (1.0 - CLOUD_RANGE_DAMP * weather.cloud)
 	var off := weather.temp - (tm + 0.5 * rngc * _diurnal(clock.hour()))   # dnešní odchylka od klimatu
 	t_mean = tm + off
 	td_air = _td_target(weather.cloud, weather.rain)
@@ -231,20 +275,21 @@ func _snap() -> void:
 	_step(_a, _b, 1.0, now + 30.0, weather.temp, weather.cloud, weather.wind, weather.rain, false)
 
 
-## Denní chod teploty jako `Weather._temp_target` (−1 před východem slunce … +1 v 15 h).
+## Denní chod teploty jako `Weather._temp_target` (−1 před východem slunce … +1 v 15 h) – stejné laditelné hodiny.
 func _diurnal(h: float) -> float:
-	if h >= 6.0 and h <= 15.0:
-		return -cos(PI * (h - 6.0) / 9.0)
-	return cos(PI * fposmod(h - 15.0, 24.0) / 15.0)
+	var rise := clampf(Weather.TEMP_MAX_H - Weather.TEMP_MIN_H, 0.5, 23.5)
+	if h >= Weather.TEMP_MIN_H and h <= Weather.TEMP_MAX_H:
+		return -cos(PI * (h - Weather.TEMP_MIN_H) / rise)
+	return cos(PI * fposmod(h - Weather.TEMP_MAX_H, 24.0) / (24.0 - rise))
 
 
 ## Rosný bod, ke kterému se vzduchová hmota blíží: očekávané noční minimum − deficit podle vlhkosti situace.
 func _td_target(cloud: float, rain: float) -> float:
 	var doy := clock.day_of_year()
-	var rngc := Seasons.monthly(Seasons.TEMP_RANGE, doy) * (1.0 - 0.6 * cloud)
-	var moist := clampf(0.35 + 0.35 * cloud + 0.8 * rain + 0.4 * weather.fog + 0.3 * weather.rain_recent
-		- 0.35 * weather.drought, 0.0, 1.0)
-	return t_mean - 0.5 * rngc - DEP_K * (1.0 - moist) - 0.3
+	var rngc := Seasons.monthly(Seasons.TEMP_RANGE, doy) * (1.0 - CLOUD_RANGE_DAMP * cloud)
+	var moist := clampf(MOIST_BASE + MOIST_CLOUD * cloud + MOIST_RAIN * rain + MOIST_FOG * weather.fog
+		+ MOIST_RECENT * weather.rain_recent - MOIST_DROUGHT * weather.drought, 0.0, 1.0)
+	return t_mean - 0.5 * rngc - DEP_K * (1.0 - moist) - TD_OFFSET_K
 
 
 ## Jeden krok stavu `src` → `dst` o `dt` hodin; `m` = herní minuta středu kroku (poloha slunce).
@@ -253,16 +298,18 @@ func _step(src: PackedFloat32Array, dst: PackedFloat32Array, dt: float, m: float
 	var elev := _sun_elev_at(m)
 	var clear := 1.0 - smoothstep(CLEAR_FROM, CLEAR_TO, cloud)
 	var calm := 1.0 - smoothstep(CALM_FROM_MS, CALM_TO_MS, wind)
-	var dry := 1.0 - clampf(rain * 4.0, 0.0, 1.0)
-	var nightc := clear * calm * dry * (1.0 - smoothstep(0.0, 12.0, elev))
-	var sunf := clampf(elev / 45.0, 0.0, 1.0) * (1.0 - 0.75 * cloud)
+	var dry := 1.0 - clampf(rain * RAIN_DRY_K, 0.0, 1.0)
+	var nightc := clear * calm * dry * (1.0 - smoothstep(0.0, NIGHT_ELEV_TO, elev))
+	var sunf := clampf(elev / SUN_FULL_ELEV, 0.0, 1.0) * (1.0 - SUN_CLOUD_K * cloud)
 	# vzduchová hmota
 	t_mean = lerpf(t_mean, t_ref, 1.0 - exp(-dt / TMEAN_TAU_H))
 	td_air = minf(lerpf(td_air, _td_target(cloud, rain), 1.0 - exp(-dt / TD_TAU_H)), t_ref)
 	# inverze: radiační ochlazování (noc, jasno, bezvětří) − promíchání − rozpouštění sluncem
 	var inv := src[S_INV]
-	var build := INV_RATE_K_H * clear * calm * dry * (1.0 - smoothstep(-2.0, 8.0, elev)) * (1.0 - inv / INV_MAX_K)
-	var decay := (1.0 - clear * calm * dry) / INV_MIX_H + smoothstep(5.0, 30.0, elev) * (0.3 + 0.7 * clear) / INV_BREAK_H
+	var build := INV_RATE_K_H * clear * calm * dry * (1.0 - smoothstep(INV_BUILD_ELEV_FROM, INV_BUILD_ELEV_TO, elev)) \
+		* (1.0 - inv / INV_MAX_K)
+	var decay := (1.0 - clear * calm * dry) / INV_MIX_H + smoothstep(INV_BREAK_ELEV_FROM, INV_BREAK_ELEV_TO, elev) \
+		* (INV_BREAK_BASE + (1.0 - INV_BREAK_BASE) * clear) / INV_BREAK_H
 	inv = clampf(inv + build * dt - inv * (1.0 - exp(-decay * dt)), 0.0, INV_MAX_K)
 	dst[S_INV] = inv
 	# profil údolí: horní hranice mlhy (T ≤ Td + okraj) a zmrzlé země (Tg ≤ 0) od dna nahoru
@@ -273,13 +320,13 @@ func _step(src: PackedFloat32Array, dst: PackedFloat32Array, dt: float, m: float
 	var frost_ok := true
 	for i in FOG_SCAN_N + 1:
 		var hh := i * FOG_SCAN_M
-		var cold := clampf(1.0 - hh / 15.0, 0.0, 1.0) * 0.8
+		var cold := clampf(1.0 - hh / POOL_DEPTH_M, 0.0, 1.0) * POOL_K
 		var near := 1.0 if hh < 5.0 else 0.0
 		var ta := _t_model(valley_elev + hh, hh, cold, 0.0, 0.0, 0.0, 0.0, near, t_ref, inv, sunf, nightc)
 		var td := td_air + TD_WATER_K * near
 		var tg := ta - GROUND_K * nightc
 		if i == 0:
-			fog_dens_t = clampf((td + FOG_MARGIN_K - ta) / 2.0, 0.0, 1.0) * calm * dry
+			fog_dens_t = clampf((td + FOG_MARGIN_K - ta) / FOG_DENS_SPAN_K, 0.0, 1.0) * calm * dry
 		if fog_ok:
 			if ta <= td + FOG_MARGIN_K:
 				fog_t = maxf(hh, 1.0)
@@ -307,12 +354,13 @@ func _step(src: PackedFloat32Array, dst: PackedFloat32Array, dt: float, m: float
 	var ta10 := _t_model(valley_elev + 10.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, t_ref, inv, sunf, nightc)
 	var tg10 := ta10 - GROUND_K * nightc
 	var dew := src[S_DEW]
-	if rain > 0.05:
+	if rain > DEW_RAIN_MIN:
 		dew = 0.0                                     # za deště je mokro z deště (Weather.wetness), ne rosa
 	elif tg10 < td_air:
-		dew = minf(dew + DEW_RATE_H * clampf((td_air - tg10) / 2.0, 0.0, 1.0) * dt, 1.0)
+		dew = minf(dew + DEW_RATE_H * clampf((td_air - tg10) / DEW_SPAN_K, 0.0, 1.0) * dt, 1.0)
 	else:
-		var dry_r := DEW_DRY_H * (0.1 + 3.0 * sunf * sunf + 0.05 * wind) * clampf((tg10 - td_air) / 2.0 + 0.3, 0.3, 1.0)
+		var dry_r := DEW_DRY_H * (DEW_DRY_BASE + DEW_DRY_SUN * sunf * sunf + DEW_DRY_WIND * wind) \
+			* clampf((tg10 - td_air) / 2.0 + 0.3, 0.3, 1.0)
 		dew = maxf(dew - dry_r * dt, 0.0)
 	dst[S_DEW] = dew
 	if track:
@@ -354,7 +402,7 @@ func _sun_elev_at(m: float) -> float:
 func _t_model(elev: float, hand: float, cold: float, ridge: float, south: float, forest: float, urban: float,
 		near: float, t_ref: float, inv: float, sunf: float, nightc: float) -> float:
 	var low := clampf(1.0 - hand / INV_DEPTH_M, 0.0, 1.0)
-	var v := clampf(W_LOW * low + W_POOL * cold, 0.0, 1.0) * (1.0 - 0.5 * forest) * (1.0 - 0.5 * urban) \
+	var v := clampf(W_LOW * low + W_POOL * cold, 0.0, 1.0) * (1.0 - INV_FOREST_DAMP * forest) * (1.0 - INV_URBAN_DAMP * urban) \
 		* (1.0 - WATER_DAMP * near)
 	var t := t_ref - LAPSE_K_M * (elev - ref_elev)
 	t -= inv * v
@@ -372,6 +420,9 @@ func _env() -> void:
 		return
 	_e_frame = f
 	_e_on = enabled()
+	if _seen_gen != _gen:                             # M8.D2c: změna v menu F3 (jedno porovnání za snímek)
+		_seen_gen = _gen
+		_ck.fill(-1)
 	if weather == null or clock == null:
 		return
 	var el := clock.minutes - _t_a
@@ -383,9 +434,9 @@ func _env() -> void:
 	var elev := clock.sun_elevation()
 	var clear := 1.0 - smoothstep(CLEAR_FROM, CLEAR_TO, weather.cloud)
 	var calm := 1.0 - smoothstep(CALM_FROM_MS, CALM_TO_MS, weather.wind)
-	var dry := 1.0 - clampf(weather.rain * 4.0, 0.0, 1.0)
-	_e_nightc = clear * calm * dry * (1.0 - smoothstep(0.0, 12.0, elev))
-	_e_sunf = clampf(elev / 45.0, 0.0, 1.0) * (1.0 - 0.75 * weather.cloud)
+	var dry := 1.0 - clampf(weather.rain * RAIN_DRY_K, 0.0, 1.0)
+	_e_nightc = clear * calm * dry * (1.0 - smoothstep(0.0, NIGHT_ELEV_TO, elev))
+	_e_sunf = clampf(elev / SUN_FULL_ELEV, 0.0, 1.0) * (1.0 - SUN_CLOUD_K * weather.cloud)
 	_e_fol = Seasons.foliage(clock.day_of_year())
 
 
@@ -425,7 +476,7 @@ func _fill(i: int, x: float, z: float) -> void:
 	if world != null and world.tree_eco != null:
 		forest = world.tree_eco.canopy_at(x, z)
 	if sm != null and sm.class_at(x, z) == SurfaceMap.FOREST:
-		forest = maxf(forest, 0.8)
+		forest = maxf(forest, FOREST_CLASS_CANOPY)
 	_cv[i + 5] = clampf(forest, 0.0, 1.0)
 	var urban := 0.0
 	if sm != null:
@@ -474,7 +525,7 @@ func ground_temp_at(pos: Vector3) -> float:
 	if not _e_on:
 		return weather.temp
 	var i := _slot(pos.x, pos.z)
-	return _t_slot(i) - GROUND_K * _e_nightc * (1.0 - 0.7 * _cv[i + 5])
+	return _t_slot(i) - GROUND_K * _e_nightc * (1.0 - GROUND_FOREST_DAMP * _cv[i + 5])
 
 
 ## Rosný bod v bodě (°C, Magnus) – nejvýš teplota vzduchu (přebytek zkondenzuje do mlhy / rosy).
@@ -515,7 +566,7 @@ func fog_at(pos: Vector3) -> float:
 
 ## Přízemní mráz 0..1 (0,5 ≈ tráva na 0 °C, 1 = −1,5 °C a míň) – květy, plodiny, jinovatka.
 func frost_at(pos: Vector3) -> float:
-	return smoothstep(1.0, -1.5, ground_temp_at(pos))
+	return smoothstep(FROST_FROM_C, FROST_FULL_C, ground_temp_at(pos))
 
 
 ## Rosa / jinovatka na trávě 0..1 (ráno, mizí sluncem). Vypnuto = 0 (jako dřív).
@@ -527,7 +578,8 @@ func dew_at(pos: Vector3) -> float:
 		return 0.0
 	var i := _slot(pos.x, pos.z)
 	var low := clampf(1.0 - _cv[i + 1] / INV_DEPTH_M, 0.0, 1.0)
-	return clampf(_sv(S_DEW) * (0.6 + 0.4 * low) * (1.0 - 0.8 * _cv[i + 5]) * (1.0 - 0.7 * _cv[i + 6]), 0.0, 1.0)
+	return clampf(_sv(S_DEW) * (DEW_UPLAND + (1.0 - DEW_UPLAND) * low) * (1.0 - DEW_FOREST_DAMP * _cv[i + 5])
+		* (1.0 - DEW_URBAN_DAMP * _cv[i + 6]), 0.0, 1.0)
 
 
 ## Je rosa v bodě zmrzlá (jinovatka)? 0..1 podle přízemní teploty.
@@ -539,7 +591,7 @@ func hoarfrost_at(pos: Vector3) -> float:
 func snow_at(pos: Vector3) -> float:
 	if weather == null:
 		return 0.0
-	return smoothstep(Weather.SNOW_BELOW + 1.0, Weather.SNOW_BELOW - 1.0, temp_at(pos))
+	return smoothstep(Weather.SNOW_BELOW + SNOW_BAND_K, Weather.SNOW_BELOW - SNOW_BAND_K, temp_at(pos))
 
 
 ## Výška (svět Y), nad kterou srážky padají jako sníh (za srážek inverze není → jen gradient).

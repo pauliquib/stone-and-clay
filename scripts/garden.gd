@@ -47,39 +47,45 @@ const FIELD_R0 := 40.0                   # hledání pole: od … do (m od dveř
 const FIELD_R1 := 1600.0
 const FIELD_MAX_DH := 2.0
 const CAN_CHARGES := 8                   # kolik záhonů zalije jedna plná konev
-const MOIST_WATER := 2.0                 # dní vláhy po zalití
-const MOIST_RAIN := 3.0                  # dní vláhy po dešti
-const DRY_GROWTH := 0.35                 # násobek růstu v suchu
-const WEED_WET := 0.08                   # přírůstek plevele za den (vlhko) …
-const WEED_DRY := 0.04                   # … a v suchu
-const WEED_GROWTH_K := 0.5               # plevel 100 % ubere tolik růstu
-const WILT_DAMAGE := 0.15                # ztráta zdraví za den vadnutí
-const HEAL_WET := 0.1                    # zotavení zdraví za den s vláhou
-const OVER_PENALTY := 0.02               # ztráta kvality úrody za den po dozrání (nejvýš OVER_MAX)
-const OVER_MAX := 0.6
-const COLD_GROWTH := 0.3                 # růst „zimních“ plodin (česnek) v chladu
-const NIGHT_DROP := 3.0                  # °C – denní krok mimo noc počítá s ranním minimem o tolik nižším
+## M8.D2c: růst = `static var` (F3 → Příroda/Pole a louky), výchozí beze změny.
+static var MOIST_WATER := 2.0            # dní vláhy po zalití
+static var MOIST_RAIN := 3.0             # dní vláhy po dešti
+static var DRY_GROWTH := 0.35            # násobek růstu v suchu
+static var WEED_WET := 0.08              # přírůstek plevele za den (vlhko) …
+static var WEED_DRY := 0.04              # … a v suchu
+static var WEED_GROWTH_K := 0.5          # plevel 100 % ubere tolik růstu
+static var WILT_DAMAGE := 0.15           # ztráta zdraví za den vadnutí
+static var HEAL_WET := 0.1               # zotavení zdraví za den s vláhou
+static var OVER_PENALTY := 0.02          # ztráta kvality úrody za den po dozrání (nejvýš OVER_MAX)
+static var OVER_MAX := 0.6
+static var COLD_GROWTH := 0.3            # růst „zimních“ plodin (česnek) v chladu
+static var NIGHT_DROP := 3.0             # °C – denní krok mimo noc počítá s ranním minimem o tolik nižším
+static var DAY_WARM := 3.0               # °C – krok v noci počítá s průměrem dne o tolik vyšším
+static var COLD_BELOW_C := 5.0           # pod touto teplotou rostou jen „zimní“ plodiny (COLD_GROWTH)
+static var GROW_BASE_C := 3.0            # růst = (t − BASE) / SPAN …
+static var GROW_SPAN_C := 12.0
+static var GROW_MIN_F := 0.35            # … nejméně (nad COLD_BELOW_C)
 const MAX_CATCHUP_DAYS := 400
 const AIM_RANGE := 4.0
 const CHECK_S := 1.0                     # jak často kontrolovat mráz / déšť (s)
-const RAIN_SKIP_BASE := 0.12             # šance deště za přeskočený den = základ + K × vlhko posledních dní
-const RAIN_SKIP_K := 0.35
+static var RAIN_SKIP_BASE := 0.12        # šance deště za přeskočený den = základ + K × vlhko posledních dní
+static var RAIN_SKIP_K := 0.35
 const DIG_MOD := {"lopata": 1.0, "motyka": 0.7}   # násobek doby rytí podle nástroje
 const ROMAN := ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"]
 # ---- Fáze 8: výbava zahrady (§11 plánu)
 const GH_SIZE := Vector2i(3, 2)      # skleník (m = záhony) v zadním pravém rohu zahrady
-const GH_BONUS := 10.0               # °C navíc uvnitř skleníku (mráz pod ním nezabíjí)
+static var GH_BONUS := 10.0          # °C navíc uvnitř skleníku (mráz pod ním nezabíjí)
 const GH_WALL_H := 1.9               # výška skleníku u okapu (m)
 const GH_RIDGE_H := 2.45             # výška hřebene střechy (m)
 const COMPOST_MAX := 6               # dávek hnoje v kompostu; doplňuje se 1 za herní den
 const FERT_MAX := 1.0                # plné pohnojení záhonu (klíč `f`)
-const FERT_K := 0.4                  # +40 % růstu při plném hnojení
-const FERT_DECAY := 0.1              # úbytek hnojiva za den (účinek ~10 dní)
+static var FERT_K := 0.4             # +40 % růstu při plném hnojení
+static var FERT_DECAY := 0.1         # úbytek hnojiva za den (účinek ~10 dní)
 
 ## Plodiny. sow_months = měsíce výsevu, days = růstové dny do zralosti (při plném růstu), water_need = kolik dní bez vláhy snese,
 ## frost_kill = pod touto teplotou (°C) zmrzne, yield = [min, max] kusů, xp = XP Zahradničení za sklizeň, feed = hodnota jako krmivo (M2.6),
 ## cold_ok = roste i v chladu (česnek), min_temp = pod ní neroste vůbec, h = výška dospělé rostliny (m), wid/lean = tvar listů.
-const CROPS := {
+static var CROPS := {
 	"brambory": {"name": "Brambory", "item": "brambory", "seed": "semena_brambory", "sow_months": [4, 5], "days": 100,
 		"water_need": 3, "frost_kill": -1.0, "yield": [6, 12], "xp": 12.0, "feed": 1.0, "min_temp": 5.0,
 		"leaf": Color(0.26, 0.5, 0.2), "ripe": Color(0.55, 0.55, 0.25), "h": 0.5, "wid": 0.11, "lean": 0.18},
@@ -1095,7 +1101,7 @@ func _advance_days(n: int) -> void:
 	var w: Weather = world.weather
 	var t := _teplota()
 	var hour := world.clock.hour()
-	var day_t := t + (3.0 if hour < 9.0 or hour > 19.0 else 0.0)     # průměr dne je teplejší než noc
+	var day_t := t + (DAY_WARM if hour < 9.0 or hour > 19.0 else 0.0)     # průměr dne je teplejší než noc
 	var min_t := t - (NIGHT_DROP if hour >= 9.0 else 0.0)
 	var raining_now := w != null and w.is_raining()
 	var recent := w.rain_recent if w != null else 0.0
@@ -1120,9 +1126,9 @@ func _advance_days(n: int) -> void:
 func _temp_factor(spec: Dictionary, t: float) -> float:
 	if t < float(spec["min_temp"]):
 		return 0.0
-	if t < 5.0:
+	if t < COLD_BELOW_C:
 		return COLD_GROWTH if bool(spec.get("cold_ok", false)) else 0.0
-	return clampf((t - 3.0) / 12.0, 0.35, 1.0)
+	return clampf((t - GROW_BASE_C) / GROW_SPAN_C, GROW_MIN_F, 1.0)
 
 
 ## Denní krok jedné plochy; vrací počet uschlých rostlin. Záhony pod skleníkem počítají s teplotou

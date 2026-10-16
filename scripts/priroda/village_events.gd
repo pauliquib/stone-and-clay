@@ -14,17 +14,18 @@ class_name VillageEvents
 extends Node3D
 
 const CHECK_S := 5.0
-const NEAR_R := 600.0
+## M8.D2c: chování = `static var` (F3 → Příroda/Kouř a ostatní), výchozí beze změny.
+static var NEAR_R := 600.0
 ## Posvícení: n-tá neděle v měsíci (weekday 6 = neděle) a sobota před ní
 const HODY_WEEKEND := {"month": 10, "nth": 3, "weekday": 6}
 ## Hranice čarodějnic: střed fotbalového hřiště u hospody (OSM leisure=pitch, souřadnice scény)
 const BONFIRE_POS := Vector2(440.6, 198.6)
-const BONFIRE_LIT_HOUR := 20.0
-const BONFIRE_CROWD := 10
-const MASOPUST_N := 9
-const MASOPUST_SPEED := 1.1           # m/s
-const MASOPUST_SPACING := 1.9         # m mezi maskami
-const MASOPUST_OFFSET := 2.6          # m od osy silnice (auta jezdí blíž ose)
+static var BONFIRE_LIT_HOUR := 20.0
+static var BONFIRE_CROWD := 10
+static var MASOPUST_N := 9
+static var MASOPUST_SPEED := 1.1      # m/s
+static var MASOPUST_SPACING := 1.9    # m mezi maskami
+static var MASOPUST_OFFSET := 2.6     # m od osy silnice (auta jezdí blíž ose)
 const FIREWORK_POOL := 6
 const FIREWORK_COLORS := [Color(1.0, 0.25, 0.2), Color(1.0, 0.8, 0.2), Color(0.3, 0.6, 1.0), Color(0.4, 1.0, 0.45),
 	Color(1.0, 0.45, 0.9), Color(1.0, 1.0, 1.0)]
@@ -36,15 +37,15 @@ const ZABAVA_WEEKDAY := 5                   # sobota (jd % 7; 0 = pondělí)
 const ZABAVA_NTH := [1, 3]
 const ZABAVA_MONTHS := [1, 2, 3, 4, 5, 9, 10, 11]
 const ZABAVA_BANDS := ["Traktor Blues", "Zlatá Kovadlina", "Vesnický Expres", "Kulatá Šestka"]
-const ZABAVA_VISITORS := 14
-const ZABAVA_PLAY_S := 40.0                 # reálné sekundy hraní (~20 herních minut)
-const ZABAVA_PAUSE_S := 20.0                # reálné sekundy pauzy mezi sety (~10 herních minut)
+static var ZABAVA_VISITORS := 14
+static var ZABAVA_PLAY_S := 40.0            # reálné sekundy hraní (~20 herních minut)
+static var ZABAVA_PAUSE_S := 20.0           # reálné sekundy pauzy mezi sety (~10 herních minut)
 const ZABAVA_LIGHTS := [Color(1.0, 0.25, 0.3), Color(0.3, 0.6, 1.0), Color(1.0, 0.85, 0.3), Color(0.5, 1.0, 0.4)]
 const NASTENKA_POS_DIST := [5.0, 7.0, 9.0]
 
 ## Události. hours = [od, do] hodin dne události (u silvestra řeší okno `_active_at`);
 ## place_hours = úprava otevírací doby míst v „dnech události“ (viz `_place_day`), 26 = 2:00.
-const EVENTS := {
+static var EVENTS := {
 	"vanoce": {"name": "Vánoční čas", "hours": [0.0, 24.0], "place": "urad",
 		"place_hours": {"hospoda": [10, 14], "obchod": [6, 12]}},     # Štědrý den
 	"masopust": {"name": "Masopust", "hours": [10.0, 15.0], "place": "urad", "place_hours": {}},

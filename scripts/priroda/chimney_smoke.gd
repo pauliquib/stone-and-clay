@@ -10,7 +10,8 @@ class_name ChimneySmoke
 extends Node3D
 
 ## Laditelná pravidla. DOPLNIT: hodnoty jsou výchozí odhad z promptu M1.3, ladit vizuálně.
-const SmokeRules := {
+## M8.D2c: `static var` – laditelné v F3 → Příroda/Kouř a ostatní (výchozí beze změny).
+static var SmokeRules := {
 	## [teplota °C, pravděpodobnost topení] – lineárně mezi body (řazeno od nejteplejší).
 	"p_curve": [[16.0, 0.03], [12.0, 0.15], [8.0, 0.35], [3.0, 0.65], [0.0, 0.85], [-5.0, 1.0]],
 	"morning": [5.0, 9.0, 1.2],        # [od h, do h, násobek] – zatápění
@@ -26,6 +27,16 @@ const SmokeRules := {
 const POOL := 24
 const NEAR_R := 350.0
 const TICK_S := 2.0
+## M8.D2c: fyzika kouře vytažená ze vzorců (výchozí = dřívější čísla).
+static var BUOYANCY := 0.28            # vztlak teplého kouře (m/s², ve větru slábne)
+static var BUOY_WIND_DAMP := 0.7       # … ve vichru ubude o tento podíl
+static var WIND_DRIFT := 0.2           # unášení větrem (× vítr) – normálně
+static var INV_WIND_DRIFT := 0.06      # … při inverzi (kouř leží)
+static var INV_FROM_H := 4.0           # ranní inverze z mrazu za bezvětří od (h)
+static var INV_TO_H := 10.0            # … do (h)
+static var INV_LIFE_K := 1.4           # při inverzi kouř vydrží déle (×)
+static var RAIN_LIFE_K := 0.4          # déšť zkracuje život kouře (× déšť)
+static var WIND_LIFE_K := 0.4          # vichr zkracuje život kouře
 
 var world: World
 var player: Player
@@ -176,14 +187,14 @@ func _apply(s: Dictionary, w: Weather, hour: float, clock: Clock) -> void:
 	var windy := clampf((w.wind - gale) / gale, 0.0, 1.0)
 	var inversion: bool = w.fog > float(SmokeRules["fog_inversion"]) or (
 		t_loc < float(SmokeRules["frost_calm_temp"]) and w.wind < float(SmokeRules["frost_calm_wind"])
-		and hour >= 4.0 and hour < 10.0) or (mc != null and mc.inversion() >= float(SmokeRules["inversion_k"]))
-	var life: float = SmokeRules["life"] * (1.0 - 0.4 * clampf(w.rain, 0.0, 1.0)) * (1.0 - 0.4 * windy)
+		and hour >= INV_FROM_H and hour < INV_TO_H) or (mc != null and mc.inversion() >= float(SmokeRules["inversion_k"]))
+	var life: float = float(SmokeRules["life"]) * (1.0 - RAIN_LIFE_K * clampf(w.rain, 0.0, 1.0)) * (1.0 - WIND_LIFE_K * windy)
 	# vítr: zrychlení po větru (částice za život urazí zhruba polovinu rychlosti větru × život)
 	var wv := w.wind_vector()
 	if world != null and world.wind_field != null:
 		wv = world.wind_field.wind_at(s["key"], 8.0)   # M8.4: vítr u komína (expozice, náraz v okamžiku obnovy)
 		wv.y = 0.0
-	var buoy := 0.28 * (1.0 - 0.7 * windy)
+	var buoy := BUOYANCY * (1.0 - BUOY_WIND_DAMP * windy)
 	if inversion:
 		m.direction = Vector3.UP
 		m.spread = 75.0
@@ -191,8 +202,8 @@ func _apply(s: Dictionary, w: Weather, hour: float, clock: Clock) -> void:
 		m.initial_velocity_max = 2.4
 		m.damping_min = 0.8
 		m.damping_max = 1.1
-		m.gravity = Vector3(wv.x * 0.06, 0.0, wv.z * 0.06)
-		life *= 1.4
+		m.gravity = Vector3(wv.x * INV_WIND_DRIFT, 0.0, wv.z * INV_WIND_DRIFT)
+		life *= INV_LIFE_K
 	else:
 		m.direction = Vector3.UP
 		m.spread = 10.0 + 25.0 * windy
@@ -200,7 +211,7 @@ func _apply(s: Dictionary, w: Weather, hour: float, clock: Clock) -> void:
 		m.initial_velocity_max = (1.5 + 0.9 * strength) * (1.0 - 0.4 * windy)
 		m.damping_min = 0.0
 		m.damping_max = 0.15
-		m.gravity = Vector3(wv.x * 0.2, buoy, wv.z * 0.2)
+		m.gravity = Vector3(wv.x * WIND_DRIFT, buoy, wv.z * WIND_DRIFT)
 	m.turbulence_enabled = windy > 0.0
 	m.turbulence_noise_strength = 1.0 + 3.0 * windy
 	m.turbulence_influence_min = 0.05

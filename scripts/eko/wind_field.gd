@@ -17,29 +17,36 @@
 class_name WindField
 extends Node
 
-## --- laditelné konstanty
+## --- laditelné konstanty (M8.D2c: `static var` → F3 → Příroda/Vítr; technické zůstaly `const`)
 const SEED := 8404
 const GUST_RES := 256                 # textura nárazů GUST_RES × GUST_RES (L8)
-const GUST_CELL := 4.0                # m na texel → dlaždice 1 024 m
-const GUST_FREQ := 0.045              # frekvence šumu v texelech (≈ chuchvalce 60–100 m)
-const GUST_GAIN := 2.2                # náraz: u × (1 + GAIN · I · (2g − 1))
-const GUST_ADVECT := 1.0              # posun pole nárazů = střední vítr × tohle (Taylor)
-const Z0_REF := 0.03                  # m – drsnost referenční louky, ke které se vztahuje Weather.wind (10 m)
-const REF_M := 10.0                   # m – výška měření Weather.wind
-const BLEND_M := 60.0                 # m – směšovací výška (nad ní drsnost povrchu „zapomenuta“)
-const TOP_M := 300.0                  # m – strop profilu (mezní vrstva)
-const TERRAIN_FADE_M := 200.0         # m – vliv expozice a svahu slábne s výškou nad zemí
-const EXP_MIN := 0.6                  # násobek rychlosti v závětří (wind_exp = 0)
-const EXP_MAX := 1.4                  # násobek na hřebeni (wind_exp = 1); wind_exp 0,5 → 1,0
-const I_MIN := 0.15                   # intenzita turbulence nad hladkým povrchem
-const I_MAX := 0.30                   # … nad lesem / zástavbou
-const I_STORM := 0.05                 # přídavek za bouřky (strop 0,35)
-const LEE_GAIN := 1.5                 # turbulence v závětří hrany / lesa
+const GUST_CELL := 4.0                # m na texel → dlaždice 1 024 m (shader: WIND_GUST_TILE – neladit zvlášť)
+static var GUST_FREQ := 0.045         # frekvence šumu v texelech (≈ chuchvalce 60–100 m)
+static var GUST_OCTAVES := 3          # oktávy šumu nárazů (jemné víry v chuchvalcích)
+static var GUST_FRACTAL_GAIN := 0.5   # síla vyšších oktáv
+static var GUST_GAIN := 2.2           # náraz: u × (1 + GAIN · I · (2g − 1))
+static var GUST_MIN_MULT := 0.05      # náraz nikdy nezastaví vítr úplně (nejmenší násobek)
+static var GUST_ADVECT := 1.0         # posun pole nárazů = střední vítr × tohle (Taylor)
+static var Z0_REF := 0.03             # m – drsnost referenční louky, ke které se vztahuje Weather.wind (10 m)
+static var REF_M := 10.0              # m – výška měření Weather.wind
+static var BLEND_M := 60.0            # m – směšovací výška (nad ní drsnost povrchu „zapomenuta“)
+static var TOP_M := 300.0             # m – strop profilu (mezní vrstva)
+static var TERRAIN_FADE_M := 200.0    # m – vliv expozice a svahu slábne s výškou nad zemí
+static var EXP_MIN := 0.6             # násobek rychlosti v závětří (wind_exp = 0)
+static var EXP_MAX := 1.4             # násobek na hřebeni (wind_exp = 1); wind_exp 0,5 → 1,0
+static var I_MIN := 0.15              # intenzita turbulence nad hladkým povrchem
+static var I_MAX := 0.30              # … nad lesem / zástavbou
+static var I_STORM := 0.05            # přídavek za bouřky (strop 0,35)
+static var LEE_GAIN := 1.5            # turbulence v závětří hrany / lesa
+static var LEE_SLOPE_K := 4.0         # závětří: sklon po větru × tohle = plné závětří
+static var LEGACY_ALPHA := 0.14       # vypnutý realismus „wind“: mocninný profil (h/10)^α
 const GRID_CELL := 24.0               # m – buňka mezipaměti terénu a drsnosti
 const GRID_HALF := 6000.0             # m – mezipaměť pokrývá ±GRID_HALF kolem počátku
-const SLOPE_D := 24.0                 # m – krok pro gradient terénu (hřbet, ne kamínek)
+static var SLOPE_D := 24.0            # m – krok pro gradient terénu (hřbet, ne kamínek)
 ## drsnost z0 (m) podle třídy povrchu `SurfaceMap` (GRASS, ARABLE, ORCHARD, FOREST, YARD, BANK, ROCK, TRACK)
-const Z0_BY_CLASS := [0.03, 0.1, 0.5, 1.0, 0.8, 0.1, 0.05, 0.03]
+static var Z0_BY_CLASS := [0.03, 0.1, 0.5, 1.0, 0.8, 0.1, 0.05, 0.03]
+## M8.D2c: změna parametru, ze kterého je mezipaměť buněk / textura nárazů → `invalidate()` (volá registr menu F3).
+static var _gen := 0
 
 const _STRIDE := 7                    # h, gx, gz, exp_mult, z0, 1/ln(BLEND/z0), i0
 const _EMPTY := -1.0e9
@@ -59,27 +66,46 @@ var _dir := Vector2(0.8, 0.5)         # jednotkový směr, KAM fouká (svět xz)
 var _u10 := 0.0                       # m/s, Weather.wind
 var _u_blend := 0.0                   # m/s ve směšovací výšce nad referenční loukou
 var _i_storm := 0.0
+var _seen_gen := 0
+var _gust_key := Vector3.ZERO         # parametry, ze kterých je současná textura nárazů
+
+
+## M8.D2c: po změně parametru v menu F3 – zahodit mezipaměť buněk (a případně přegenerovat nárazy).
+static func invalidate() -> void:
+	_gen += 1
 
 
 func setup(w: World) -> void:
 	world = w
 	weather = w.weather
+	_build_gust()
+	_gn = int(ceil(GRID_HALF * 2.0 / GRID_CELL))
+	_cache.resize(_gn * _gn * _STRIDE)
+	_cache.fill(_EMPTY)
+	_seen_gen = _gen
+	_tick(0.0)
+
+
+func _build_gust() -> void:
+	var key := Vector3(GUST_FREQ, GUST_OCTAVES, GUST_FRACTAL_GAIN)
+	if gust_image != null and key == _gust_key:
+		return
+	_gust_key = key
 	var n := FastNoiseLite.new()
 	n.seed = SEED
 	n.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n.frequency = GUST_FREQ
 	n.fractal_type = FastNoiseLite.FRACTAL_FBM
-	n.fractal_octaves = 3
-	n.fractal_gain = 0.5
+	n.fractal_octaves = GUST_OCTAVES
+	n.fractal_gain = GUST_FRACTAL_GAIN
 	gust_image = n.get_seamless_image(GUST_RES, GUST_RES, false, false, 0.1, true)
 	if gust_image.get_format() != Image.FORMAT_L8:
 		gust_image.convert(Image.FORMAT_L8)
 	_gust = gust_image.get_data()
-	gust_texture = ImageTexture.create_from_image(gust_image)
-	_gn = int(ceil(GRID_HALF * 2.0 / GRID_CELL))
-	_cache.resize(_gn * _gn * _STRIDE)
-	_cache.fill(_EMPTY)
-	_tick(0.0)
+	if gust_texture == null:
+		gust_texture = ImageTexture.create_from_image(gust_image)
+	else:
+		gust_texture.update(gust_image)             # stejná velikost i formát – shader vidí nová data hned
 
 
 func _process(delta: float) -> void:
@@ -89,6 +115,10 @@ func _process(delta: float) -> void:
 ## Jednou za snímek: střední vítr z Weather, posun pole nárazů (integrovaný – změna rychlosti neskočí).
 func _tick(delta: float) -> void:
 	_on = world == null or world.realism_on("wind")
+	if _seen_gen != _gen:                            # M8.D2c: změna v menu F3 (jedno porovnání int za snímek)
+		_seen_gen = _gen
+		_cache.fill(_EMPTY)
+		_build_gust()
 	time = fmod(time + delta, 3600.0)
 	if weather == null:
 		_u10 = 0.0
@@ -150,7 +180,7 @@ func wind_at(pos: Vector3, agl: float = -1.0) -> Vector3:
 	var fade := exp(-maxf(agl, 0.0) / TERRAIN_FADE_M)
 	var u := _u_blend * log(z / z0) * il * lerpf(1.0, em, fade)
 	var g := _gust_sample(pos.x, pos.z)
-	u *= maxf(1.0 + GUST_GAIN * (i0 + _i_storm) * (2.0 * g - 1.0), 0.05)
+	u *= maxf(1.0 + GUST_GAIN * (i0 + _i_storm) * (2.0 * g - 1.0), GUST_MIN_MULT)
 	var w := u * (gx * _dir.x + gz * _dir.y) * fade
 	return Vector3(_dir.x * u, w, _dir.y * u)
 
@@ -171,7 +201,7 @@ func turbulence_at(pos: Vector3, agl: float = -1.0) -> float:
 	if ci >= 0:
 		h = _cache[ci]
 		i0 = _cache[ci + 6]
-		lee = clampf(-(_cache[ci + 1] * _dir.x + _cache[ci + 2] * _dir.y) * 4.0, 0.0, 1.0)
+		lee = clampf(-(_cache[ci + 1] * _dir.x + _cache[ci + 2] * _dir.y) * LEE_SLOPE_K, 0.0, 1.0)
 	if agl < 0.0:
 		agl = pos.y - h
 	var fade := exp(-maxf(agl, 0.0) / TERRAIN_FADE_M)
@@ -197,7 +227,7 @@ func debug_layer(x: float, z: float) -> Color:
 func _legacy(agl: float) -> Vector3:
 	var wv := weather.wind_vector()
 	if agl >= 0.0:
-		wv *= pow(maxf(agl, 1.0) / 10.0, 0.14)
+		wv *= pow(maxf(agl, 1.0) / 10.0, LEGACY_ALPHA)
 	return wv
 
 

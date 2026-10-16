@@ -13,10 +13,13 @@ const CELL := 1.7                     # m – jedna buňka = nejvýš jeden kvě
 const MAX_FLOWERS := 4000
 const FRAME_BUDGET_US := 1500          # nejvýš ~1,5 ms přestavby za snímek
 const REBUILD_DIST := 25.0
-const ROAD_HALF := 3.2                # m od osy silnice/cesty bez květů
+## M8.D2c: `static var` (F3 → Příroda/Pole a louky), výchozí beze změny; projeví se při příští přestavbě květů.
+static var ROAD_HALF := 3.2           # m od osy silnice/cesty bez květů
 ## Podíl buněk s květem při plném kvetení podle třídy plochy (2 louka, 3 sad, 4 zahrádky)
-const DENSITY := {2: 0.34, 3: 0.3, 4: 0.16}
-const SETTLE_MAX := 0.7               # v husté zástavbě na louce květy nejsou
+static var DENSITY := {2: 0.34, 3: 0.3, 4: 0.16}
+static var SETTLE_MAX := 0.7          # v husté zástavbě na louce květy nejsou
+static var BLOOM_MIN := 0.03          # slabší kvetení = žádné květy
+static var SNOW_HIDES_BLOOM := 2.0    # květy mizí pod sněhem (× pokrývka) – stejné id jako SeasonFx
 ## Barvy: bílá, žlutá, fialová, růžová; na jaře (kolem dne 100) víc bílé a žluté, v létě fialové a růžové
 const PALETTE := [Color(0.95, 0.95, 0.92), Color(0.98, 0.85, 0.15), Color(0.6, 0.35, 0.8), Color(0.95, 0.55, 0.7)]
 
@@ -71,8 +74,8 @@ func update(pos: Vector3, doy: float, snow: float, jd: int) -> void:
 		return
 	if _busy:
 		return
-	var bloom := Seasons.bloom(doy) * (1.0 - clampf(snow * 2.0, 0.0, 1.0))
-	if bloom < 0.03 or detail <= 0.0:
+	var bloom := Seasons.bloom(doy) * (1.0 - clampf(snow * SNOW_HIDES_BLOOM, 0.0, 1.0))
+	if bloom < BLOOM_MIN or detail <= 0.0:
 		_mmi.visible = false
 		_last_bloom = bloom
 		return

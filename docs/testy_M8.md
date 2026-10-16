@@ -443,3 +443,18 @@ před krokem.
    „Balistika – gravitace střel“ 0 → šíp letí rovně.
 6. Činnosti → Oheň a požáry: „Zapálení – základní šance“ 0,9 → 0,05 → oheň skoro nechytne; „Ohniště – teplo končí v“
    3 → 10 m → hřeje z dálky. Těžba a řemesla: „Kácení – doba: základ“ 0,8 → 0,1 → kácení výrazně kratší. Výchozí (vše) → zpět.
+### M8.D2c – Příroda
+
+1. Režim vývojáře zapnout, F3 → Příroda: 11 podskupin (Počasí, Počasí – situace a přechody, Roční doby, Obloha a světlo,
+   Vítr, Voda a půda, Mikroklima, Dřeviny a les, Pole a louky, Louže, stopy, Kouř a ostatní); konzole bez chyb `tune_priroda`.
+2. Vítr: F2 → Počasí → Bouřka, F3 → Vítr „Nárazy – síla“ 2,2 → 5 → stromy a tráva se v nárazech ohýbají víc; „Nárazy –
+   velikost chuchvalců“ 0,045 → 0,15 → vlny přes obilí drobnější. Dřeviny a les „Ohyb vegetace – citlivost: vysoká tráva“ 0 →
+   vysoká tráva stojí (do 0,2 s).
+3. Mikroklima: jasná bezvětrná noc (F2 → Datum, 3:00, Počasí Jasno), „Inverze – nejsilnější“ 7 → 15 → za herní hodinu
+   ukáže HUD v údolí (u potoka) výrazně nižší teplotu než na kopci; F2 → Příroda – ladění → vrstva „teplota“ modřejší kotliny.
+4. Obloha a světlo: „Expozice – adaptace do tmy“ 1 → 10 → při vstupu z poledne do tmy (F2 → čas 22:00) se oko „roztáhne“ hned;
+   „Mlha – hustota v husté mlze“ ×3 při Počasí Mlha → dohled znatelně kratší.
+5. Počasí: „Sníh – přírůstek pokrývky“ 0,35 → 2 a F2 → Počasí Sníh → pokrývka (HUD „sníh N cm“) roste rychle, stopy ve sněhu
+   se objeví (Louže, stopy „Stopy – zapisují se od sněhu“). „Situace Jasno – vítr“ 2 → 15 při Jasnu → HUD „silný vítr“.
+6. Voda a půda: déšť (F2 → Počasí Déšť) + „Odtok – CN: orná půda, skupina C“ 85 → 98 → po herní hodině F2 → Příroda – ladění
+   → Průtoky ukáže vyšší Q a kalnost; ↺ vrátí. Výchozí (vše) → vše zpět, nic zvýrazněné.

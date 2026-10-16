@@ -9,16 +9,18 @@
 class_name Puddles
 extends Node3D
 
-const WET_MIN := 0.7          # od této vlhkosti se louže objevují
-const WET_FULL := 0.9         # plný kryt alphy
+## M8.D2c: chování = `static var` (F3 → Příroda/Louže, stopy), výchozí beze změny.
+static var WET_MIN := 0.7     # od této vlhkosti se louže objevují
+static var WET_FULL := 0.9    # plný kryt alphy
 const COUNT := 9              # kolik louží se drží kolem hráče
-const RADIUS := 110.0         # dosah hledání uzlů vozovky (m)
-const SPACING := 14.0         # min. rozestup dvou louží (m)
-const RESP_DIST := 30.0       # posun hráče, při kterém se louže přerozdělí
-const FADE_STEP := 0.25       # nárust alphy za tick SeasonFx (~0,5 s) → fade ~2 s
+static var RADIUS := 110.0    # dosah hledání uzlů vozovky (m)
+static var SPACING := 14.0    # min. rozestup dvou louží (m)
+static var RESP_DIST := 30.0  # posun hráče, při kterém se louže přerozdělí
+static var FADE_STEP := 0.25  # nárust alphy za tick SeasonFx (~0,5 s) → fade ~2 s
 const TEX_S := 64
-const LOCAL_MIN := 0.08       # M8.7: méně lokální vláhy = louže se tu nerozhodí
-const LOCAL_FADE := 0.04      # M8.7: posun alphy za tick (vysychání ~12 s, objevení ~6 s)
+static var LOCAL_MIN := 0.08  # M8.7: méně lokální vláhy = louže se tu nerozhodí
+static var LOCAL_FADE := 0.04 # M8.7: posun alphy za tick (vysychání ~12 s, objevení ~6 s)
+static var RAIN_FLAT := 0.3   # za deště: louže mimo prohlubně (× mokro z deště); v prohlubni 1
 
 var world: World
 var alpha := 0.0              # aktuální viditelnost louží 0..1 (čte i test)
@@ -32,7 +34,7 @@ var _rain_wet := 0.0          # M8.7: mokro z právě padajícího deště 0..1
 var _alphas := PackedFloat32Array()
 var _placed := 0              # M8.7: kolik louží z poolu je rozhozených
 var _since_scatter := 0       # M8.7: ticků od posledního rozhození (doplnění, když hráč stojí)
-const RESCATTER_TICKS := 20   # M8.7: ~10 s – zkusit doplnit louže na místě (když jich je málo)
+static var RESCATTER_TICKS := 20   # M8.7: ~10 s – zkusit doplnit louže na místě (když jich je málo)
 
 
 func setup(w: World) -> void:
@@ -96,7 +98,7 @@ func _update_local(pos: Vector3, rain_wet: float) -> void:
 func _local_wet(x: float, z: float) -> float:
 	if _sw == null:
 		return 0.0
-	return maxf(_sw.puddle_at(x, z), _rain_wet * (0.3 + 0.7 * _sw.hollow_at(x, z)))
+	return maxf(_sw.puddle_at(x, z), _rain_wet * (RAIN_FLAT + (1.0 - RAIN_FLAT) * _sw.hollow_at(x, z)))
 
 
 ## Rozhodí louže na náhodné uzly vozovky (RoadGraph.CAR_KINDS) v okolí hráče;
