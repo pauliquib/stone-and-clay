@@ -13,11 +13,12 @@
 class_name Bird
 extends Node3D
 
-const G := 9.8
+## M8.D2d: `SPECIES` a konstanty jsou `static var` – ladí je menu pro vývojáře (F3 → Zvěř/Ptáci a let).
+static var G := 9.8
 
 ## length: délka těla (m), span: rozpětí, cruise: cestovní rychlost (m/s), flap_hz: mávání,
 ## bank: max. náklon (rad), climb: max. stoupání (rad), ground: walk / hop / none
-const SPECIES := {
+static var SPECIES := {
 	"vrana": {"name": "Vrána obecná", "length": 0.46, "span": 0.95, "body": Color(0.07, 0.07, 0.08),
 		"wing": Color(0.05, 0.05, 0.06), "belly": Color(0.09, 0.09, 0.1), "head": Color(0.05, 0.05, 0.06),
 		"beak": Color(0.05, 0.05, 0.05), "legs": Color(0.05, 0.05, 0.05), "grey_morph": Color(0.42, 0.42, 0.44),
@@ -41,8 +42,38 @@ const SPECIES := {
 }
 
 ## Klidová animace na bidýlku: otáčení hlavy do stran a občasné probírání peří
-const REST_LOOK := 0.8               # největší pootočení hlavy (rad)
-const PREEN_TIME := 0.6              # jak dlouho trvá probírání peří (s)
+static var REST_LOOK := 0.8          # největší pootočení hlavy (rad)
+static var PREEN_TIME := 0.6         # jak dlouho trvá probírání peří (s)
+## --- M8.D2d: čísla dřív zapsaná přímo ve vzorcích (stejné hodnoty)
+static var REST_LOOK_EVERY := [1.0, 3.0]   # s – pootočení hlavy na bidýlku jednou za (od–do)
+static var PREEN_P := 0.18          # šance, že se při pootočení probere v peří
+static var PREEN_PITCH := 0.7       # rad – hlava dolů k boku při probírání
+static var HEAD_BLEND := 6.0        # 1/s – otáčení hlavy na bidýlku
+static var FLAP_AMP := 0.85         # rad – rozkmit mávání (vrána, kos, vlaštovka)
+static var FLAP_AMP_SOAR := 0.45    # rad – rozkmit mávání káně
+static var TAKEOFF_FLAP_HZ := 0.3   # vzlet: kmitočet mávání × (1 + tohle)
+static var TAKEOFF_FLAP_AMP := 0.2  # vzlet: rozkmit × (1 + tohle)
+static var FLARE_FLAP_HZ := 0.5     # přistání: kmitočet × (1 + tohle)
+static var FLARE_FLAP_AMP := 0.45   # přistání: rozkmit × (1 − tohle)
+static var GLIDE_DIHEDRAL := 0.08   # rad – vzepětí křídel v klouzání
+static var GLIDE_DIHEDRAL_SOAR := 0.14   # rad – vzepětí křídel káně
+static var FOLD_RATE_FLY := 8.0     # 1/s – skládání křídel za letu (kos)
+static var FOLD_RATE := 4.0         # 1/s – skládání křídel po přistání
+static var BOUND_FOLD := 0.85       # kos: složení křídel mezi mávnutími
+static var GLIDE_BLEND := 4.0       # 1/s – přechod do klouzání
+static var FLICK_DECAY := 1.6       # 1/s – ocas zpět po škubnutí
+static var FLICK_EVERY := [0.8, 2.4]   # s – kos na zemi škubne ocasem jednou za (od–do)
+static var PECK_EVERY := [0.8, 3.5] # s – klovnutí jednou za (od–do)
+static var PECK_DECAY := 3.0        # 1/s
+static var HOP_EVERY := [0.35, 1.2] # s – kos poskočí jednou za (od–do)
+static var HOP_S := 0.18            # s – délka skoku
+static var HOP_SPEED := 1.6         # m/s – skok dopředu
+static var HOP_YAW := 0.3           # rad – odchylka směru skoku
+static var WALK_TURN := 3.0         # 1/s – otáčení při chůzi
+static var OLD_THRUST := 6.0        # starý let (bez letového modelu): tah mávání (m/s²)
+static var OLD_DRAG_K := 3.0        # starý let: odpor × (v / cestovní)²
+static var OLD_CLEAR := 3.0         # starý let: drží se aspoň tak vysoko nad terénem (m)
+static var OLD_SOAR_K := 0.5        # starý let: káně – stoupavý proud dohání rychlost (1/s)
 
 static var _cache := {}
 
@@ -259,25 +290,25 @@ func fly_step(delta: float, want_speed: float) -> float:
 	var diff := wrapf(want_yaw - yaw, -PI, PI)
 	var v := maxf(speed, 2.0)
 	var max_rate := G * tan(float(spec["bank"])) / v
-	var rate := clampf(diff * 2.5, -max_rate, max_rate)
+	var rate := clampf(diff * FlightModel.TURN_GAIN, -max_rate, max_rate)
 	yaw = wrapf(yaw + rate * delta, -PI, PI)
 	bank = lerpf(bank, atan(rate * v / G), 1.0 - exp(-delta * 6.0))
 	var climb := clampf(atan2(to.y, maxf(hd, 0.5)), -float(spec["climb"]) * 1.4, float(spec["climb"]))
 	# drž se nad terénem (a nad korunami)
 	var ground := terrain.height_at(global_position.x + sin(yaw) * v, global_position.z + cos(yaw) * v)
-	if land_on == "" and global_position.y < ground + 3.0:
+	if land_on == "" and global_position.y < ground + OLD_CLEAR:
 		climb = maxf(climb, 0.35)
 	pitch = lerpf(pitch, climb, 1.0 - exp(-delta * 3.0))
 	# energie: tah mávání, odpor, tíha
 	var cruise: float = spec["cruise"]
 	var ws := minf(want_speed, float(spec["max_speed"]))
 	_flapping = speed < ws * 0.95 or pitch > 0.08 or (species == "vlastovka" and fmod(Time.get_ticks_msec() * 0.001 + get_instance_id() % 7, 2.2) < 1.3)
-	var thrust := 6.0 if _flapping else 0.0
-	var drag := 0.5 * speed * speed / (cruise * cruise) * 3.0
+	var thrust := OLD_THRUST if _flapping else 0.0
+	var drag := 0.5 * speed * speed / (cruise * cruise) * OLD_DRAG_K
 	speed += (thrust - drag - G * sin(pitch)) * delta
 	speed = clampf(speed, 1.0, float(spec["max_speed"]))
 	if species == "kane" and not _flapping:
-		speed = lerpf(speed, ws, delta * 0.5)     # stoupavý proud nese
+		speed = lerpf(speed, ws, delta * OLD_SOAR_K)     # stoupavý proud nese
 	var dir := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch))
 	vel = dir * speed
 	global_position += vel * delta
@@ -302,31 +333,31 @@ func _process(delta: float) -> void:
 	# kos v klouzavé fázi vlnovitého letu přitiskne křídla k tělu
 	var fold_t := 0.0 if flying else 1.0
 	if flying and model and not _flapping and fm.style == "bound":
-		fold_t = 0.85
-	_fold = move_toward(_fold, fold_t, delta * (8.0 if flying and model else 4.0))
+		fold_t = BOUND_FOLD
+	_fold = move_toward(_fold, fold_t, delta * (FOLD_RATE_FLY if flying and model else FOLD_RATE))
 	# klouzavý let: vlaštovka a vrána zahnete špičky křídel dozadu (káně drží roztažené kruhy)
 	var want_g := 1.0 if flying and not _flapping and species != "kane" else 0.0
-	_glide = lerpf(_glide, want_g, minf(delta * 4.0, 1.0))
+	_glide = lerpf(_glide, want_g, minf(delta * GLIDE_BLEND, 1.0))
 	# dopad / škleb: kos (i ostatní) hned po přistání ocas vykloní vzhůru
 	if not flying and _was_fly:
 		_flick = 1.0
 	_was_fly = flying
-	_flick = move_toward(_flick, 0.0, delta * 1.6)
+	_flick = move_toward(_flick, 0.0, delta * FLICK_DECAY)
 	if species == "kos" and not flying:
 		_flick_t -= delta
 		if _flick_t <= 0.0:
-			_flick_t = rng.randf_range(0.8, 2.4)
+			_flick_t = rng.randf_range(FLICK_EVERY[0], FLICK_EVERY[1])
 			_flick = 1.0
 	var amp := 0.0
 	if flying and _flapping:
 		# vzlet: silnější a rychlejší mávání; přistání: rychlé krátké brzdné záběry
-		_flap += delta * float(spec["flap_hz"]) * TAU * (1.0 + 0.3 * tko + 0.5 * fl)
-		amp = (0.85 if species != "kane" else 0.45) * (1.0 + 0.2 * tko) * (1.0 - 0.45 * fl)
+		_flap += delta * float(spec["flap_hz"]) * TAU * (1.0 + TAKEOFF_FLAP_HZ * tko + FLARE_FLAP_HZ * fl)
+		amp = (FLAP_AMP if species != "kane" else FLAP_AMP_SOAR) * (1.0 + TAKEOFF_FLAP_AMP * tko) * (1.0 - FLARE_FLAP_AMP * fl)
 	elif flying:
 		_flap = lerp_angle(_flap, 0.0, delta * 3.0)
 	var a := sin(_flap) * amp
 	var b := sin(_flap - 0.6) * amp * 0.6
-	var glide_dihedral := 0.08 if species != "kane" else 0.14
+	var glide_dihedral := GLIDE_DIHEDRAL if species != "kane" else GLIDE_DIHEDRAL_SOAR
 	for i in 2:
 		var s := 1.0 if i == 0 else -1.0
 		var inner := _wings[i * 2]
@@ -341,26 +372,26 @@ func _process(delta: float) -> void:
 		_tail.scale = Vector3(tail_fan, 1.0, 1.0)
 	_head.position.z = _head_z + sin(_walk_p) * float(spec["length"]) * 0.06 * _moving
 	# na bidýlku: hlava se plynule otáčí do stran, občas se pták probere v peří (hlava dolů k boku)
-	var kk := 1.0 - exp(-delta * 6.0)
+	var kk := 1.0 - exp(-delta * HEAD_BLEND)
 	var want_ry := 0.0
 	var want_rp := 0.0
 	if state == "perch":
 		_look_t -= delta
 		if _look_t <= 0.0:
-			_look_t = rng.randf_range(1.0, 3.0)
+			_look_t = rng.randf_range(REST_LOOK_EVERY[0], REST_LOOK_EVERY[1])
 			_look_to = rng.randf_range(-REST_LOOK, REST_LOOK)
-			if _preen_t <= 0.0 and rng.randf() < 0.18:
+			if _preen_t <= 0.0 and rng.randf() < PREEN_P:
 				_preen_t = PREEN_TIME
 				_look_to = REST_LOOK * (1.0 if _look_to >= 0.0 else -1.0)
 		if _preen_t > 0.0:
 			_preen_t -= delta
-			want_rp = 0.7
+			want_rp = PREEN_PITCH
 		want_ry = _look_to
 	_rest_yaw = lerpf(_rest_yaw, want_ry, kk)
 	_rest_pitch = lerpf(_rest_pitch, want_rp, kk)
 	_head.rotation.y = _rest_yaw
 	_head.rotation.x = _peck * 1.1 + cos(_walk_p) * 0.18 * _moving + _rest_pitch
-	_body.position.y = sin(clampf(_hop_y / 0.18, 0.0, 1.0) * PI) * float(spec["length"]) * 0.25 if _hop_y > 0.0 else 0.0
+	_body.position.y = sin(clampf(_hop_y / HOP_S, 0.0, 1.0) * PI) * float(spec["length"]) * 0.25 if _hop_y > 0.0 else 0.0
 
 
 ## Chůze / poskakování po zemi (vrána kráčí, kos skáče a zastavuje), občas klovne.
@@ -369,22 +400,22 @@ func ground_step(delta: float, dest: Vector3) -> void:
 	to.y = 0.0
 	_peck_t -= delta
 	if _peck_t <= 0.0:
-		_peck_t = rng.randf_range(0.8, 3.5)
+		_peck_t = rng.randf_range(PECK_EVERY[0], PECK_EVERY[1])
 		_peck = 1.0
-	_peck = move_toward(_peck, 0.0, delta * 3.0)
+	_peck = move_toward(_peck, 0.0, delta * PECK_DECAY)
 	if spec["ground"] == "hop":
 		_hop_t -= delta
 		if _hop_t <= 0.0 and to.length() > 0.3:
-			_hop_t = rng.randf_range(0.35, 1.2)
-			yaw = atan2(to.x, to.z) + rng.randf_range(-0.3, 0.3)
+			_hop_t = rng.randf_range(HOP_EVERY[0], HOP_EVERY[1])
+			yaw = atan2(to.x, to.z) + rng.randf_range(-HOP_YAW, HOP_YAW)
 			_hop_y = 0.001
 		if _hop_y > 0.0:
 			_hop_y += delta
-			var t := _hop_y / 0.18
-			global_position += Vector3(sin(yaw), 0, cos(yaw)) * 1.6 * delta
+			var t := _hop_y / HOP_S
+			global_position += Vector3(sin(yaw), 0, cos(yaw)) * HOP_SPEED * delta
 			_hop_y = 0.0 if t >= 1.0 else _hop_y
 	elif to.length() > 0.3:
-		yaw = lerp_angle(yaw, atan2(to.x, to.z), 1.0 - exp(-delta * 3.0))
+		yaw = lerp_angle(yaw, atan2(to.x, to.z), 1.0 - exp(-delta * WALK_TURN))
 		global_position += Vector3(sin(yaw), 0, cos(yaw)) * float(spec["walk_speed"]) * delta
 		# kráčivá chůze: fáze kroků pohání kývání hlavy (vrána)
 		_walk_p += delta * float(spec["walk_speed"]) * TAU / maxf(float(spec["length"]) * 0.45, 0.05)

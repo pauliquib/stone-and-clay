@@ -6,7 +6,14 @@ class_name AntHill
 extends Node3D
 
 const N_ANTS := 220
-const ANT_SPEED := 0.05              # m/s (skutečnost 3–5 cm/s)
+## M8.D2d: chování mravenců ladí menu pro vývojáře (F3 → Zvěř/Ostatní).
+static var ANT_SPEED := 0.05         # m/s (skutečnost 3–5 cm/s)
+static var ACTIVE_TEMP := 6.0        # °C – mravenci venku nad touto teplotou …
+static var ACTIVE_SNOW := 0.1        # … a pod touto sněhovou pokrývkou
+static var SIM_R := 25.0             # m – mravenci se hýbou (a jsou vidět) jen do této vzdálenosti
+static var BITE_MARGIN := 0.15       # m – kousnou, kdo stojí na kupě (poloměr + tohle)
+static var BITE_S := 2.5             # s mezi kousnutími
+static var BITE_DMG := 0.4           # zranění za kousnutí
 const ANT_SCALE := 1.6               # zvětšení proti skutečnosti (~9 mm), ať jsou vidět
 
 var fauna: Fauna
@@ -139,14 +146,14 @@ func _physics_process_impl(delta: float) -> void:
 	var p: Player = w.nearest_player(global_position)
 	var d := p.global_position.distance_to(global_position) if p else INF
 	var weather: Weather = fauna.weather
-	var active := weather == null or (weather.temp > 6.0 and weather.snow_cover < 0.1)
-	_mmi.visible = d < 25.0 and active
+	var active := weather == null or (weather.temp > ACTIVE_TEMP and weather.snow_cover < ACTIVE_SNOW)
+	_mmi.visible = d < SIM_R and active
 	# mravenci v botách
-	if p and active and d < radius + 0.15 and p.get("car") == null and p.get("horse") == null:
+	if p and active and d < radius + BITE_MARGIN and p.get("car") == null and p.get("horse") == null:
 		_bite_t -= delta
 		if _bite_t <= 0.0:
-			_bite_t = 2.5
-			p.body.hurt(0.4, "kousnutí mravenců")
+			_bite_t = BITE_S
+			p.body.hurt(BITE_DMG, "kousnutí mravenců")
 			w.emit_game_event(p.id, "ant_bite", {})
 	if not _mmi.visible:
 		return

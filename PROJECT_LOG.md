@@ -2258,3 +2258,53 @@ dopravy, ne o regresi.
 - Rozměry kolize stroje (kvádr) a nová plná nádrž se po změně `gear_h` / `tank_l` projeví až u nově postaveného stroje.
 - Neregistrováno záměrně: kamera, zvuk, vario HUD (`FlightHud`), hlášky a jejich prodlevy, bubliny spolujezdce,
   odměny (přátelství, pověst), geometrie letiště a modelů.
+## 2026-10-16 – M8.D2d Menu pro vývojáře: kategorie Zvěř
+
+### Hotovo (staticky ověřeno – kontrola překladu a offline skript registru; ruční test čeká)
+- **Zvěř** (`scripts/dev/tune_zver.gd`): **1257 parametrů** – Pohyb a rig 210 · Smysly a útěk 74 · Druhy 414 (podskupina
+  na druh: Srnec obecný 53, Prase divoké 52, Sele 52, Zajíc polní 52, Kůň 39, Prase domácí 34, Koza domácí 33,
+  Ovce domácí 33, Kráva domácí 33, Králík domácí 33) · Ptáci a let 130 · Hejna a murmurace 114 · Hospodářská zvířata 145 ·
+  Ostatní 170. Bez dvojí registrace (každé id má jeden cíl), s registry Svět a Vozidla celkem 1776.
+- **Převod konstant** (`const` → `static var`, stejné hodnoty) a **čísla ze vzorců vytažená do `static var`**:
+  - `QuadrupedRig`: `GAITS` (střída, kmitočet, posuny fází nohou všech 5 chodů), `IK_W`, M8.10 konstanty + ~90 čísel
+    z `animate` (přešlapování, zvednutí nohy, houpání, brzdění, rozjezd, lehání / vstávání, sed, přikrčení, páteř, dech,
+    hlava, uši, ocas, zrcátko, pružiny, starý výběr chodu).
+  - `Animal`: LOD a takt rozhodování, pastva a přesuny, vnímání (zrak / sluch / čich, návyk), útěk a pozor, kličky
+    zajíce, útok bachyně, směr útěku, překážky a skok, odrazové skoky, zaseknutí, postřelení, srážka s autem, uhynutí.
+  - `AnimalSpecs`: druhové hodnoty pohybu, rigu (Froude, páteř, dech, pružiny uší / ocasu, ohnutí nohou při přenosu)
+    a smyslů (zrak, sluch, úniková vzdálenost, klid, okrsek, velikost skupiny) – podle toho, co který druh čte
+    (divoká zvěř vše, kůň pohyb pod jezdcem, chov jen rig). `get_spec` vrací sdílenou laditelnou kopii `AnimalSpecs.LIVE`
+    (dřív nová kopie na každé zvíře; nikdo ji nemění) → změna platí hned pro všechna zvířata druhu.
+  - `Horse` (péče, výdrž, opilý jezdec, přivolání, náraz, hrom, rychlosti chodů pod jezdcem `GAIT_V_K`, póza jezdce),
+    `Paddock` (péče), `Farm` / `FarmAnimal` / `FarmSpecs.DATA` (hlad, žízeň, růst, produkty, maso, zanedbání,
+    množení, pohyb po výběhu).
+  - `Bird` (`SPECIES` – cestovní / max. rychlost, mávání, náklon, stoupání; animace křídel, bidýlka, chůze; starý let),
+    `FlightModel` (konstanty, `SPECIES` aerodynamika, ~20 čísel z kroku letu a přistání).
+  - `BirdFlock` (časy režimů, vyrušení, boidy, vrány / kos / vlaštovky / káně), `Murmuration` (dvojice Vector2 →
+    `_MIN` / `_MAX`), `Herd` (rozestavení), `Fauna` (rozmístění, setkání, váhy druhů, skóre stanovišť, bidýlka),
+    `AntHill`, `Apiary` (aktivita, rozzlobené včely), `Hunter` (krmelce, vyzvednutí zvěře), `Gamekeeper` (pohyb, sluch,
+    kontroly).
+- **Bez ceny za snímek**: systémy čtou své `static var` / sdílené slovníky, registr ne. Odvozená data se přepočítají
+  jen po změně: `tune_zver.on_changed` zvedne `AnimalSpecs.tune_gen` (rig → `_prep` znovu, kůň → rychlosti chodů)
+  nebo `FlightModel.tune_gen` (pták → `_derive`: pádová rychlost, klouzavost, odpor) – za snímek porovnání celého čísla,
+  rig dál bez alokací. Dvojice `[od, do]` jsou pole (čtení prvku nealokuje).
+- Duplicitní lov vlaštovek (server / klient) sloučen do `BirdFlock._hunt_step` (stejný kód, stejné pořadí náhody).
+- Ověřeno offline skriptem (`godot --headless -s`, bez hry): počty po podskupinách, žádná dvojí registrace, zápis
+  do `static var` / pole / slovníku druhu, zvednutí `tune_gen`, reset. Kontrola překladu (kap. 6) všech změněných
+  `.gd` + skriptů, které na ně odkazují (world, tests, hunting, quests, game_menu, computer, zoo, fence_manager): prázdná.
+
+### Otevřené body
+- Čeká na ruční test (`docs/testy_M8.md` → M8.D2d). Řádek M8.D v roadmapách neodškrtnut (po všech M8.D2).
+- `hunting.gd` (M8.D2b) čte u obnoveného kusu `AnimalSpecs.SPECIES[…]["mass"]` (konstanta, ne `get_spec`) – laděná
+  hmotnost druhu se tam neprojeví; živé zvíře (`a.spec`) ano.
+- Jen u nově vzniklých / po novém startu: rozmístění zvěře a ptáků, velikosti hejn a skupin, `max_slope` (kolize
+  `floor_max_angle`), kolizní tvary, `Murmuration.FLAP_HZ` / počty ptáků, `Apiary.FORAGE_R`.
+- Registr neumí složky `Vector2` / `Vector3` → dvojice převedeny na pole `[od, do]` (`BirdFlock`, `Animal`, `Horse`…)
+  nebo `_MIN` / `_MAX` (`Murmuration`), `BOID_K` na pole tří vah.
+- Neregistrováno (záměrně): tvar a rozměry modelů (`AnimalSpecs` tělo, `front_rest` / `hind_rest`, polohy vleže,
+  barvy), zvuky (výšky, intervaly hlasů), kamera koně, síť (`REMOTE_*`, `PUPPET_BUF`), technické (`CELL`, `HASH`,
+  `SLICES`, `PERCH_RAYS`, `N_ANTS`, `N_BEES` – velikosti polí), ekonomika (ceny zvířat, poplatky a zkoušky hajného),
+  umístění při stavbě světa (`Paddock` / `Pen` `SPOT_*`, krmelce a posed), doby aktivity druhů (`active` – proměnný
+  počet intervalů), `TALL_VEG_MONTHS`.
+- Ověřit `--perfscene` se zvěří (kategorie `animal`, `flock`) – čtení `static var` místo vložené konstanty by mělo
+  být zanedbatelné.

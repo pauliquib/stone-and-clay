@@ -3,6 +3,11 @@
 class_name Herd
 extends RefCounted
 
+## M8.D2d: rozestavení skupiny (ladí menu pro vývojáře F3 → Zvěř/Hejna a murmurace).
+static var SLOT_SIDE := 1.6         # m – člen do strany od vůdce …
+static var SLOT_SIDE_ROW := 0.6     # m – … + tolik za každou další řadu
+static var SLOT_BACK := 2.4         # m – řady za vůdcem po tolika
+
 var members: Array = []              # Array[Animal]
 var leader: Node = null
 var home := Vector3.ZERO
@@ -50,4 +55,4 @@ func slot(i: int) -> Vector3:
 		return Vector3.ZERO
 	var row := (i + 1) / 2
 	var side := 1.0 if i % 2 == 1 else -1.0
-	return Vector3(side * (1.6 + row * 0.6), 0.0, -row * 2.4)
+	return Vector3(side * (SLOT_SIDE + row * SLOT_SIDE_ROW), 0.0, -row * SLOT_BACK)

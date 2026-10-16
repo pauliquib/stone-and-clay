@@ -410,3 +410,17 @@ snímek nečte); s otevřeným menu F3 jen cena UI.
    „Baterie – výdrž“ 720 → 60 → brzy varování a návrat domů.
 5. Termika: „Ladění – pevná bublina nad hráčem“ 0 → 150 (léto, jasno) → paramotor / letadlo nad hráčem stoupá (vario pípá);
    „Bublina – nejsilnější stoupání v ose“ 3 → 6 → stoupá rychleji. Výchozí (skupina) vše vrátí, konzole bez chyb.
+### M8.D2d – Zvěř
+
+1. Režim vývojáře, F3 → Zvěř: podskupiny Pohyb a rig, Smysly a útěk, Druh – … (10 druhů), Ptáci a let, Hejna
+   a murmurace, Hospodářská zvířata, Ostatní. Hledání „Froude“ najde prahy chodů všech druhů, „útěk“ útěk a pozor.
+2. Kůň (nasednout F): Druh – Kůň „Chody – trysk: horní mez rychlosti“ 15 → 25 → v trysku hned znatelně rychleji;
+   Hospodářská zvířata „Výdrž – úbytek v trysku“ ×4 → kůň se vyčerpá za pár sekund. ↺ vrátí výchozí.
+3. Srnci (F2 → setkání se zvěří): Druh – Srnec obecný „Smysly – úniková vzdálenost“ 28 → 80 → utečou mnohem dřív;
+   „Odrazové skoky – výška při útěku“ 0,95 → 2 → vysoké skoky. Smysly a útěk „Zrak – v noci ×“ 0,3 → 1 → v noci tě vidí jako ve dne.
+4. Pohyb a rig (zvíře blízko kamery): „Páteř – největší boční ohyb“ 0,35 → 1 a Druh „Páteř – boční ohyb v zatáčce“ ×3 →
+   v zatáčce se zřetelně prohne; „Chody – krok: podíl stojné fáze“ 0,64 → 0,9 → šourá se; „Uši – škubnutí“ 0,35 → 1.
+5. Ptáci: Ptáci a let „Vrána – cestovní rychlost“ 11 → 25 → vrány létají výrazně rychleji; Hejna a murmurace „Boidy –
+   váha soudržnosti“ 0,15 → 2 → letící hejno vran se drží v chumlu; „Vyrušení – vrány na zemi do“ 18 → 50.
+6. Výchozí (vše) → vše zpět; konzole bez chyb; s desítkami zvířat v okolí výkon jako před krokem (F2 výkon /
+   `--perfscene`, kategorie `animal`, `flock`).

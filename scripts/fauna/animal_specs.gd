@@ -325,12 +325,29 @@ const SPECIES := {
 }
 
 
-## Úplný popis druhu: DEFAULT ← případný základní druh ("base") ← vlastní hodnoty.
+## M8.D2d: laditelné kopie popisů druhů (id → slovník) – sdílí je všechna zvířata druhu, menu pro vývojáře
+## (F3 → Zvěř/Druh – …) do nich zapisuje přímo, takže se změna projeví hned (chování čte `spec` za běhu,
+## rig si data druhu připraví znovu při změně `tune_gen`). Výchozí hodnoty = DEFAULT ← base ← SPECIES.
+static var LIVE := {}
+## Zvedne se při každé změně parametru zvěře v menu F3 (`scripts/dev/tune_zver.gd`) → rig / kůň přepočítají
+## odvozená data (porovnání celého čísla za snímek, žádné čtení registru).
+static var tune_gen := 0
+
+
+## Úplný popis druhu: DEFAULT ← případný základní druh ("base") ← vlastní hodnoty. M8.D2d: vrací sdílenou
+## laditelnou kopii (`LIVE`) – volající ji nesmí měnit (jen číst).
 static func get_spec(id: String) -> Dictionary:
+	if not LIVE.has(id):
+		LIVE[id] = _merged(id).duplicate(true)
+	return LIVE[id]
+
+
+## Popis druhu poskládaný z konstant (bez ladění).
+static func _merged(id: String) -> Dictionary:
 	var own: Dictionary = SPECIES[id]
 	var s := DEFAULT.duplicate(true)
 	if own.has("base"):
-		s.merge(get_spec(own["base"]), true)
+		s.merge(_merged(own["base"]), true)
 	s.merge(own, true)
 	s["id"] = id
 	return s

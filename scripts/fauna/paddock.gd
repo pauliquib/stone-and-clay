@@ -13,8 +13,9 @@ extends Node3D
 
 const SIZES := [Vector2(20.0, 15.0), Vector2(16.0, 12.0), Vector2(13.0, 10.0)]   # šířka × hloubka (m)
 const GATE_W := 3.4                  # šířka branky (m) – mezera v plotu od FenceManageru, uprostřed strany k domu
-const CARE_R := 12.0                 # kůň musí být takhle blízko žlabu / napáječky (m)
-const GROOM_S := 3.0                 # délka čištění (s)
+## M8.D2d: péči ladí menu pro vývojáře (F3 → Zvěř/Hospodářská zvířata).
+static var CARE_R := 12.0            # kůň musí být takhle blízko žlabu / napáječky (m)
+static var GROOM_S := 3.0            # délka čištění (s)
 const SPOT_R0 := 14.0                # hledání místa: nejblíž k domu (m)
 const SPOT_R1 := 90.0                # … nejdál od domu (m)
 const SPOT_TRIES := 240

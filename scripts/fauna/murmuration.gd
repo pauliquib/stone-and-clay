@@ -17,33 +17,45 @@ class_name Murmuration
 extends Node3D
 
 const MONTHS := [9, 10, 11]
-const SUN_EL := Vector2(-4.0, 6.0)   # ° – okno výšky slunce (večer); pod spodní mezí hejno zapadne na nocoviště
-const CHANCE_DAYS := 3               # (jd·7919) % CHANCE_DAYS != 0 → ten večer hejno je (2 ze 3 večerů)
-const MAX_BIRDS := 400
-const MIN_BIRDS := 180
-const SPAWN_DIST := Vector2(150.0, 380.0)   # m od hráče
-const SIM_R := 700.0                 # m – dál od hráče se nesimuluje ani nekreslí
-const GONE_R := 1200.0               # m – dál od hráče hejno zmizí
-const WIND_MAX := 9.0                # m/s
-const ALT := Vector2(25.0, 70.0)     # m nad terénem – výška oblaku (střed se v tom rozmezí vlní)
-const WANDER_R := 60.0               # m – jak daleko od bodu nad polem střed oblaku bloudí
-const SPEED := Vector2(9.0, 14.0)    # m/s – rychlost špačka
-const NEIGH := 7                     # topologičtí sousedé
+## M8.D2d: konstanty chování jsou `static var` – ladí je menu pro vývojáře (F3 → Zvěř/Hejna a murmurace).
+## Dvojice (dřív Vector2) jsou rozdělené na _MIN / _MAX.
+static var SUN_EL_MIN := -4.0        # ° – okno výšky slunce (večer); pod spodní mezí hejno zapadne na nocoviště
+static var SUN_EL_MAX := 6.0
+static var CHANCE_DAYS := 3          # (jd·7919) % CHANCE_DAYS != 0 → ten večer hejno je (2 ze 3 večerů)
+static var MAX_BIRDS := 400
+static var MIN_BIRDS := 180
+static var SPAWN_DIST_MIN := 150.0   # m od hráče
+static var SPAWN_DIST_MAX := 380.0
+static var SIM_R := 700.0            # m – dál od hráče se nesimuluje ani nekreslí
+static var GONE_R := 1200.0          # m – dál od hráče hejno zmizí
+static var WIND_MAX := 9.0           # m/s
+static var ALT_MIN := 25.0           # m nad terénem – výška oblaku (střed se v tom rozmezí vlní)
+static var ALT_MAX := 70.0
+static var WANDER_R := 60.0          # m – jak daleko od bodu nad polem střed oblaku bloudí
+static var SPEED_MIN := 9.0          # m/s – rychlost špačka
+static var SPEED_MAX := 14.0
+static var NEIGH := 7                # topologičtí sousedé
 const CELL := 5.0                    # m – buňka mřížky sousedů (x, z)
 const HASH := 1024                   # počet buněk hashe (mocnina 2)
 const SLICES := 4                    # za kolik snímků se přepočte celé hejno
-const SEP_R := 1.6                   # m – blíž se ptáci odpuzují
-const W_SEP := 6.0
-const W_ALI := 1.4
-const W_COH := 0.9
-const W_HOME := 0.025                # přitažlivost ke středu oblaku (vodorovně, 1/s² na m)
-const W_ALT := 0.5                   # přitažlivost k výšce oblaku (1/s² na m)
-const HAWK_EVERY := Vector2(6.0, 14.0)   # s – jak často proletí dravec (vlna v hejnu)
-const HAWK_R := 14.0                 # m – dosah strachu z dravce
-const W_HAWK := 40.0
-const ROOST_S := 25.0                # s – sestup na nocoviště, pak hejno zmizí
+static var NEIGH_R := 10.0           # m – soused jen blíž než tohle (a v 3×3 buňkách mřížky)
+static var SEP_R := 1.6              # m – blíž se ptáci odpuzují
+static var W_SEP := 6.0
+static var W_ALI := 1.4
+static var W_COH := 0.9
+static var W_HOME := 0.025           # přitažlivost ke středu oblaku (vodorovně, 1/s² na m)
+static var W_ALT := 0.5              # přitažlivost k výšce oblaku (1/s² na m)
+static var HAWK_EVERY_MIN := 6.0     # s – jak často proletí dravec (vlna v hejnu)
+static var HAWK_EVERY_MAX := 14.0
+static var HAWK_R := 14.0            # m – dosah strachu z dravce
+static var W_HAWK := 40.0
+static var HAWK_START_D := 60.0      # m – dravec nalétává z takové vzdálenosti od středu oblaku
+static var HAWK_SPEED := 22.0        # m/s
+static var HAWK_S := 5.0             # s – průlet dravce
+static var ROOST_S := 25.0           # s – sestup na nocoviště, pak hejno zmizí
+static var ROOST_SLOW_K := 0.4       # při sestupu nejmenší rychlost × tohle
 const SIZE := 1.2                    # měřítko modelu (rozpětí ~0,4 m × tohle)
-const FLAP_HZ := 11.0
+static var FLAP_HZ := 11.0           # mávání (shader; projeví se u nového hejna)
 
 var fauna: Fauna
 var center := Vector3.ZERO           # bod nad polem, kolem kterého oblak krouží (y = terén)
@@ -81,7 +93,7 @@ static func tick(f: Fauna, current: Murmuration) -> Murmuration:
 	if not (c.month() in MONTHS) or c.hour() < 12.0:
 		return null
 	var el := c.sun_elevation()
-	if el < SUN_EL.x + 1.0 or el > SUN_EL.y:
+	if el < SUN_EL_MIN + 1.0 or el > SUN_EL_MAX:
 		return null
 	if f.weather.rain > 0.05 or f.weather.wind > WIND_MAX:
 		return null
@@ -98,7 +110,7 @@ static func tick(f: Fauna, current: Murmuration) -> Murmuration:
 	r.seed = c.jd() * 31 + 7
 	for i in 10:
 		var a := r.randf() * TAU
-		var d := r.randf_range(SPAWN_DIST.x, SPAWN_DIST.y)
+		var d := r.randf_range(SPAWN_DIST_MIN, SPAWN_DIST_MAX)
 		var x := p.global_position.x + cos(a) * d
 		var z := p.global_position.z + sin(a) * d
 		if f.score("field", x, z) > 0.35:
@@ -121,12 +133,12 @@ func _ready() -> void:
 	_head.resize(HASH)
 	_buf.resize(_n * 16)
 	_ground = center.y
-	var alt := (ALT.x + ALT.y) * 0.5
+	var alt := (ALT_MIN + ALT_MAX) * 0.5
 	var dir0 := Vector3(rng.randf_range(-1.0, 1.0), 0.0, rng.randf_range(-1.0, 1.0)).normalized()
 	for i in _n:
 		var o := Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-0.4, 0.4), rng.randf_range(-1.0, 1.0)) * 25.0
 		_pos[i] = center + Vector3(0.0, alt, 0.0) + o
-		_vel[i] = (dir0 + Vector3(rng.randf_range(-0.3, 0.3), 0.0, rng.randf_range(-0.3, 0.3))).normalized() * SPEED.x
+		_vel[i] = (dir0 + Vector3(rng.randf_range(-0.3, 0.3), 0.0, rng.randf_range(-0.3, 0.3))).normalized() * SPEED_MIN
 		_last[i] = 0.0
 	_mm = MultiMesh.new()
 	_mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -191,7 +203,7 @@ func _step(delta: float) -> void:
 		return
 	_time += delta
 	# konec okna (slunce pod obzorem) → sestup na nocoviště
-	if _roost < 0.0 and fauna.clock.sun_elevation() < SUN_EL.x:
+	if _roost < 0.0 and fauna.clock.sun_elevation() < SUN_EL_MIN:
 		_roost = 0.0
 	if _roost >= 0.0:
 		_roost += delta
@@ -201,12 +213,12 @@ func _step(delta: float) -> void:
 	# dravec: jednou za čas proletí oblakem → vlna
 	_hawk_t -= delta
 	if _hawk_t <= 0.0 and _roost < 0.0:
-		_hawk_t = rng.randf_range(HAWK_EVERY.x, HAWK_EVERY.y)
+		_hawk_t = rng.randf_range(HAWK_EVERY_MIN, HAWK_EVERY_MAX)
 		var a := rng.randf() * TAU
 		var c := _cloud_center()
-		_hawk_p = c + Vector3(cos(a), 0.0, sin(a)) * 60.0
-		_hawk_v = (c - _hawk_p).normalized() * 22.0
-		_hawk_left = 5.0
+		_hawk_p = c + Vector3(cos(a), 0.0, sin(a)) * HAWK_START_D
+		_hawk_v = (c - _hawk_p).normalized() * HAWK_SPEED
+		_hawk_left = HAWK_S
 	if _hawk_left > 0.0:
 		_hawk_left -= delta
 		_hawk_p += _hawk_v * delta
@@ -231,7 +243,7 @@ func _step(delta: float) -> void:
 
 ## Střed oblaku: bloudí kolem bodu nad polem a vlní se ve výšce; při sestupu klesá k zemi.
 func _cloud_center() -> Vector3:
-	var alt := lerpf(ALT.x, ALT.y, 0.5 + 0.5 * sin(_time * 0.11))
+	var alt := lerpf(ALT_MIN, ALT_MAX, 0.5 + 0.5 * sin(_time * 0.11))
 	if _roost >= 0.0:
 		alt = lerpf(alt, 1.0, clampf(_roost / (ROOST_S * 0.7), 0.0, 1.0))
 	return center + Vector3(sin(_time * 0.07) * WANDER_R, alt, cos(_time * 0.053) * WANDER_R)
@@ -273,7 +285,7 @@ func _boid(i: int, cc: Vector3) -> void:
 					var q := _pos[j] + _vel[j] * (_time - _last[j])
 					var dd := p - q
 					var l2 := dd.length_squared()
-					if l2 < 100.0:
+					if l2 < NEIGH_R * NEIGH_R:
 						cnt += 1
 						ali += _vel[j]
 						coh += q
@@ -294,9 +306,9 @@ func _boid(i: int, cc: Vector3) -> void:
 			acc += dh / l * W_HAWK * (1.0 - l / HAWK_R)
 	v += acc * dt
 	var spd := v.length()
-	var lo := SPEED.x * (0.4 if _roost >= 0.0 else 1.0)
-	if spd > SPEED.y:
-		v *= SPEED.y / spd
+	var lo := SPEED_MIN * (ROOST_SLOW_K if _roost >= 0.0 else 1.0)
+	if spd > SPEED_MAX:
+		v *= SPEED_MAX / spd
 	elif spd < lo and spd > 0.001:
 		v *= lo / spd
 	_pos[i] = p

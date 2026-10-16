@@ -19,18 +19,29 @@
 class_name Farm
 extends Node3D
 
-const MAX_ANIMALS := 24
+## M8.D2d: chov (růst, hlad, produkty, zanedbání, množení) ladí menu pro vývojáře (F3 → Zvěř/Hospodářská zvířata).
+static var MAX_ANIMALS := 24
 const CHECK_S := 1.0
-const MAX_CATCHUP_DAYS := 60
+static var MAX_CATCHUP_DAYS := 60
 const BUTCHER_PRICE := 800           # Kč za řezníka, když není přítel na pomoc se zabijačkou
-const HELPER_FRIEND := 40.0          # potřebné přátelství (Persona) pro pomoc souseda zdarma
-const STARVE_NEGLECT_H := 48.0       # od kolika hodin hladu / žízně jde o zanedbání (M4.4 háček)
-const NEGLECT_KARMA := -2.0
-const NEGLECT_OFFENSE_P := 0.2       # šance na přestupek za den zanedbání (sousedé / veterina si všimnou)
-const BREED_CHANCE := 0.05           # šance na vyvedení kuřat za jarní den
+static var HELPER_FRIEND := 40.0     # potřebné přátelství (Persona) pro pomoc souseda zdarma
+static var STARVE_NEGLECT_H := 48.0  # od kolika hodin hladu / žízně jde o zanedbání (M4.4 háček)
+static var NEGLECT_KARMA := -2.0
+static var NEGLECT_OFFENSE_P := 0.2  # šance na přestupek za den zanedbání (sousedé / veterina si všimnou)
+static var BREED_CHANCE := 0.05      # šance na vyvedení kuřat za jarní den
 const BREED_MONTHS := [3, 4, 5]
-const BREED_MIN_HENS := 3
-const FLOCK_CAP := 20                # nejvýš tolik slepic + kuřat dohromady (proti nekonečnému množení)
+static var BREED_MIN_HENS := 3
+static var FLOCK_CAP := 20           # nejvýš tolik slepic + kuřat dohromady (proti nekonečnému množení)
+## --- M8.D2d: čísla dřív zapsaná přímo ve vzorcích (stejné hodnoty)
+static var GRAZE_SELF_K := 0.15      # pasoucí se zvíře mimo zimu: úbytek sytosti × tohle
+static var STARVE_HEALTH := 0.12     # hladové / žíznivé zvíře ztratí tolik zdraví za den
+static var HEAL_DAY := 0.04          # nasycené zvíře se tolik zdraví za den uzdraví
+static var LOW_FEED := 0.3           # sytost / napojení pod tolik → méně produktů
+static var LOW_EGG_K := 0.4          # … šance na vejce × tohle
+static var LOW_MILK_K := 0.5         # … mléko × tohle
+static var MILK_CAP_K := 2.0         # nesebrané mléko nejvýš denní maximum × tohle
+static var MEAT_HEALTH_MIN := 0.4    # maso: podíl rozsahu kg při nulovém zdraví (plné zdraví = horní mez)
+static var CHICKS := [3, 6]          # kuřat z jedné snůšky (od–do)
 const SHELTER_SPECIES := {"kurnik": ["slepice", "kralik"], "chlivek": ["prase"], "pristresek": ["koza", "ovce", "krava"]}
 const SHELTER_TITLE := {"kurnik": "Kurník – slepice, králíci", "chlivek": "Chlívek – prase",
 	"pristresek": "Přístřešek – koza, ovce, kráva"}
@@ -363,12 +374,12 @@ func _slaughter_go(id: int, a: FarmAnimal, free_helper: bool) -> void:
 	if not is_instance_valid(p) or not is_instance_valid(a):     # za dobu zatemnění mohl hráč odejít nebo zvíře zmizet (A3-09)
 		return
 	var kg_r: Array = spec["meat_kg"]
-	var kg := roundi(lerpf(float(kg_r[0]), float(kg_r[1]), 0.4 + 0.6 * a.health))
+	var kg := roundi(lerpf(float(kg_r[0]), float(kg_r[1]), MEAT_HEALTH_MIN + (1.0 - MEAT_HEALTH_MIN) * a.health))
 	p.add_item(String(spec["meat_item"]), maxi(1, kg))
 	var extra := "%d× %s" % [kg, ItemsDB.name_of(String(spec["meat_item"]))]
 	if spec.has("fat_item"):
 		var fat_r: Array = spec["fat_kg"]
-		var fkg := roundi(lerpf(float(fat_r[0]), float(fat_r[1]), 0.4 + 0.6 * a.health))
+		var fkg := roundi(lerpf(float(fat_r[0]), float(fat_r[1]), MEAT_HEALTH_MIN + (1.0 - MEAT_HEALTH_MIN) * a.health))
 		p.add_item(String(spec["fat_item"]), maxi(1, fkg))
 		extra += ", %d× %s" % [fkg, ItemsDB.name_of(String(spec["fat_item"]))]
 	if species == "prase":
@@ -432,15 +443,15 @@ func _day_tick(fa: FarmAnimal, winter: bool, died: Array) -> void:
 	fa.scale = Vector3.ONE * fa.age_scale()
 	var hd: float = float(spec.get("hunger_day", 0.4))
 	if bool(spec.get("graze", false)) and not winter:
-		hd *= 0.15         # pasoucí se zvíře se přes den mimo zimu částečně sytí samo
+		hd *= GRAZE_SELF_K         # pasoucí se zvíře se přes den mimo zimu částečně sytí samo
 	fa.hunger = clampf(fa.hunger - hd, 0.0, 1.0)
 	fa.thirst = clampf(fa.thirst - float(spec.get("thirst_day", 0.4)), 0.0, 1.0)
 	if fa.hunger <= 0.0 or fa.thirst <= 0.0:
 		fa.starve_h += 24.0
-		fa.health = clampf(fa.health - 0.12, 0.0, 1.0)
+		fa.health = clampf(fa.health - STARVE_HEALTH, 0.0, 1.0)
 	else:
 		fa.starve_h = 0.0
-		fa.health = clampf(fa.health + 0.04, 0.0, 1.0)
+		fa.health = clampf(fa.health + HEAL_DAY, 0.0, 1.0)
 	if fa.starve_h >= STARVE_NEGLECT_H:
 		for pid in world.players.keys():
 			var rep: Reputation = world.reputations.get(pid)
@@ -456,8 +467,8 @@ func _day_tick(fa: FarmAnimal, winter: bool, died: Array) -> void:
 		var chance: float = float(spec.get("product_chance", 0.7))
 		if winter:
 			chance *= float(spec.get("winter_mult", 1.0))
-		if fa.hunger < 0.3 or fa.thirst < 0.3:
-			chance *= 0.4
+		if fa.hunger < LOW_FEED or fa.thirst < LOW_FEED:
+			chance *= LOW_EGG_K
 		if randf() < chance:
 			eggs_ready += 1
 	elif prod == "mleko" and fa.is_adult() and (not bool(spec.get("milk_female_only", true)) or fa.sex == "f"):
@@ -465,9 +476,9 @@ func _day_tick(fa: FarmAnimal, winter: bool, died: Array) -> void:
 		var amt := randf_range(float(amr[0]), float(amr[1]))
 		if winter:
 			amt *= float(spec.get("winter_mult", 1.0))
-		if fa.hunger < 0.3:
-			amt *= 0.5
-		fa.milk_l = minf(fa.milk_l + amt, float(amr[1]) * 2.0)
+		if fa.hunger < LOW_FEED:
+			amt *= LOW_MILK_K
+		fa.milk_l = minf(fa.milk_l + amt, float(amr[1]) * MILK_CAP_K)
 
 
 func _breed_check(winter: bool) -> void:
@@ -483,7 +494,7 @@ func _breed_check(winter: bool) -> void:
 			else:
 				rooster = true
 	if hens >= BREED_MIN_HENS and rooster and randf() < BREED_CHANCE:
-		var n := randi_range(3, 6)
+		var n := randi_range(CHICKS[0], CHICKS[1])
 		for i in n:
 			if animals.size() >= FLOCK_CAP:
 				break

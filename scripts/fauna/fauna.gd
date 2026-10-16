@@ -24,33 +24,35 @@ extends Node3D
 const CELL := 32.0
 
 ## druh → [počet skupin, min. rozestup skupin (m)] ; velikost skupiny je v AnimalSpecs.group
-const POPULATION := {
+## M8.D2d: konstanty jsou `static var` – ladí je menu pro vývojáře (F3 → Zvěř/Ostatní). Počty a rozmístění při stavbě
+## světa se projeví až po novém startu (hodnoty z config.json / ladeni.cfg se načtou před stavbou světa).
+static var POPULATION := {
 	"srnec": [13, 260.0],
 	"divocak": [5, 500.0],
 	"zajic": [18, 150.0],
 }
-const APIARIES := 7                 # včelnice (u zahrad a na lesních loukách)
-const ANTHILLS := 45                # mraveniště v lesích
-const CROW_FLOCKS := 4
-const BLACKBIRDS := 16
-const SWALLOW_FLOCKS := 4
-const BUZZARDS := 3
+static var APIARIES := 7            # včelnice (u zahrad a na lesních loukách)
+static var ANTHILLS := 45           # mraveniště v lesích
+static var CROW_FLOCKS := 4
+static var BLACKBIRDS := 16
+static var SWALLOW_FLOCKS := 4
+static var BUZZARDS := 3
 
 # procedurální setkání u hráče (les / okraj / pole / louka / zahrada)
-const ENCOUNTER_T := 3.0          # jak často se skenuje okolí hráčů (s)
-const ENCOUNTER_R := 220.0        # v tomto okruhu už je zvěř → novou negenerovat
-const ENCOUNTER_NEAR := 2         # tolik živých (neprchajících) kusů v okruhu stačí
-const SPAWN_MIN := 70.0           # nová skupina nejméně tak daleko od hráče (m)
-const SPAWN_MAX := 170.0
-const HABITAT_MIN := 0.2          # nejmenší score stanoviště, kde se ještě generuje
-const NEAR_RING := [90.0, 250.0]  # ve vesnici: kde se hledá nejbližší vhodné stanoviště (m)
-const VIEW_HALF_ANGLE := 40.0     # zorný kužel hráče (± °), v něm se blízko nespawnuje
-const VIEW_CLEAR := 120.0         # do této vzdálenosti se nespawnuje před očima hráče (m)
-const BIRD_CHANCE := 0.5          # pravděpodobnost hejna při jednom skenu
-const TRANSIENT_MAX := 10         # strop skupin vygenerovaných kvůli hráčům
-const TRANSIENT_GONE := 750.0     # dál od všech hráčů → skupina/hejno zmizí
+static var ENCOUNTER_T := 3.0     # jak často se skenuje okolí hráčů (s)
+static var ENCOUNTER_R := 220.0   # v tomto okruhu už je zvěř → novou negenerovat
+static var ENCOUNTER_NEAR := 2    # tolik živých (neprchajících) kusů v okruhu stačí
+static var SPAWN_MIN := 70.0      # nová skupina nejméně tak daleko od hráče (m)
+static var SPAWN_MAX := 170.0
+static var HABITAT_MIN := 0.2     # nejmenší score stanoviště, kde se ještě generuje
+static var NEAR_RING := [90.0, 250.0]  # ve vesnici: kde se hledá nejbližší vhodné stanoviště (m)
+static var VIEW_HALF_ANGLE := 40.0     # zorný kužel hráče (± °), v něm se blízko nespawnuje
+static var VIEW_CLEAR := 120.0    # do této vzdálenosti se nespawnuje před očima hráče (m)
+static var BIRD_CHANCE := 0.5     # pravděpodobnost hejna při jednom skenu
+static var TRANSIENT_MAX := 10    # strop skupin vygenerovaných kvůli hráčům
+static var TRANSIENT_GONE := 750.0     # dál od všech hráčů → skupina/hejno zmizí
 ## kde hráč stojí → [[druh, váha], …] (druh se ještě snaží sednout svému stanovišti)
-const ENCOUNTER_SPECIES := {
+static var ENCOUNTER_SPECIES := {
 	"forest": [["divocak", 0.55], ["srnec", 0.45]],
 	"edge": [["srnec", 0.7], ["divocak", 0.15], ["zajic", 0.15]],
 	"field": [["zajic", 0.6], ["srnec", 0.4]],
@@ -414,15 +416,15 @@ func score(hab: String, x: float, z: float) -> float:
 	var rd := _sample(road, x, z)
 	match hab:
 		"forest":
-			return f - st * 2.0 - rd * 0.3
+			return f - st * SC_FOREST_SETTLE - rd * SC_FOREST_ROAD
 		"edge":
-			return clampf(fw * 2.2, 0.0, 1.0) * (1.0 - f * 0.55) - st * 2.0 - rd * 0.4
+			return clampf(fw * SC_EDGE_WIDE, 0.0, 1.0) * (1.0 - f * SC_EDGE_FOREST) - st * SC_EDGE_SETTLE - rd * SC_EDGE_ROAD
 		"field":
-			return (1.0 - f) * (1.0 - fw * 0.4) - st * 2.2 - rd * 0.6
+			return (1.0 - f) * (1.0 - fw * SC_FIELD_WIDE) - st * SC_FIELD_SETTLE - rd * SC_FIELD_ROAD
 		"garden":            # okraj zástavby (zahrady, sady)
-			return clampf(st * 3.0, 0.0, 1.0) * (1.0 - clampf(st * 1.5 - 0.6, 0.0, 1.0)) * (1.0 - f * 0.5)
+			return clampf(st * SC_GARDEN_SETTLE, 0.0, 1.0) * (1.0 - clampf(st * SC_GARDEN_CORE - SC_GARDEN_CORE_OFF, 0.0, 1.0)) * (1.0 - f * SC_GARDEN_FOREST)
 		"meadow":            # louka u lesa (včely, kosi)
-			return clampf(fw * 2.5, 0.0, 1.0) * (1.0 - f) - st * 1.5
+			return clampf(fw * SC_MEADOW_WIDE, 0.0, 1.0) * (1.0 - f) - st * SC_MEADOW_SETTLE
 	return 0.0
 
 
@@ -434,7 +436,7 @@ func random_point(center: Vector3, radius: float, hab: String, r: RandomNumberGe
 		var a := r.randf() * TAU
 		var d := sqrt(r.randf()) * radius
 		var p := center + Vector3(cos(a) * d, 0, sin(a) * d)
-		var s := score(hab, p.x, p.z) + r.randf() * 0.15
+		var s := score(hab, p.x, p.z) + r.randf() * RANDOM_JITTER
 		if s > bs:
 			bs = s
 			best = p
@@ -466,8 +468,42 @@ func trees_near(p: Vector3, r: float, max_n := 40) -> Array:
 # ------------------------------------------------------------------ bidýlka ptáků
 
 const PERCH_RAYS := 24            # nejvýš tolik paprsků na jedno volání perch_spots
-const PERCH_NORMAL_Y := 0.45      # nejmenší normála.y plochy, na kterou pták sedne (ne svislá zeď)
-const RIDGE_STEP := 1.5           # vzdálenost pomocných paprsků kolem zásahu (hřeben střechy)
+static var PERCH_NORMAL_Y := 0.45 # nejmenší normála.y plochy, na kterou pták sedne (ne svislá zeď)
+static var RIDGE_STEP := 1.5      # vzdálenost pomocných paprsků kolem zásahu (hřeben střechy)
+## --- M8.D2d: čísla dřív zapsaná přímo ve vzorcích (stejné hodnoty)
+# skóre stanovišť (les, okraj, pole, zahrada, louka) – váhy lesa, okolí lesa, zástavby a silnic
+static var SC_FOREST_SETTLE := 2.0   # les: − zástavba × tohle
+static var SC_FOREST_ROAD := 0.3     # les: − silnice × tohle
+static var SC_EDGE_WIDE := 2.2       # okraj: les v okolí × tohle (strop 1)
+static var SC_EDGE_FOREST := 0.55    # okraj: × (1 − les × tohle)
+static var SC_EDGE_SETTLE := 2.0
+static var SC_EDGE_ROAD := 0.4
+static var SC_FIELD_WIDE := 0.4      # pole: × (1 − les v okolí × tohle)
+static var SC_FIELD_SETTLE := 2.2
+static var SC_FIELD_ROAD := 0.6
+static var SC_GARDEN_SETTLE := 3.0   # zahrada: zástavba × tohle (strop 1) …
+static var SC_GARDEN_CORE := 1.5     # … × (1 − clamp(zástavba × tohle − SC_GARDEN_CORE_OFF)) – ne střed vesnice
+static var SC_GARDEN_CORE_OFF := 0.6
+static var SC_GARDEN_FOREST := 0.5   # zahrada: × (1 − les × tohle)
+static var SC_MEADOW_WIDE := 2.5     # louka u lesa: les v okolí × tohle (strop 1)
+static var SC_MEADOW_SETTLE := 1.5
+static var RANDOM_JITTER := 0.15     # náhodný bod: k skóre se přičte náhoda do tolika
+# skupiny a setkání
+static var HERD_SPREAD := 4.0        # m – členové skupiny se objeví do tolika od středu
+static var WINTER_GROUP_ADD := [1, 4]   # srnci se v zimě sdružují: + tolik kusů (od–do)
+static var PIGLETS := [3, 6]         # selat u bachyně (od–do)
+static var LONER_MALE_P := 0.6       # samotářský divočák (skupina do 2) je kňour s touto šancí
+static var VILLAGE_SETTLE := 0.3     # hráč ve vesnici = zástavba nad tolik
+static var FLOCK_EXIST_R := 500.0    # m – nové hejno, jen když v tomto okruhu žádné není
+static var FLOCK_MIN := 80.0         # m – hejno přiletí nejblíž (ve vesnici / vynucené FLOCK_NEAR_MIN)
+static var FLOCK_NEAR_MIN := 40.0
+static var FLOCK_MAX := 250.0        # m – nejdál (ve vesnici FLOCK_VILLAGE_MAX, vynucené FLOCK_FORCE_MAX)
+static var FLOCK_VILLAGE_MAX := 150.0
+static var FLOCK_FORCE_MAX := 120.0
+static var SITE_R := 80.0            # m – místo setkání se dolaďuje v tomto okruhu
+static var SITE_SCORE := 0.35        # nejmenší skóre místa setkání
+static var FORCE_MIN := 60.0         # m – vynucené setkání (F2) nejblíž …
+static var FORCE_MAX := 110.0        # … nejdál
 const PERCH_MASK := 1 | 8         # statika (terén, budovy) + rekvizity, auta ne
 
 var _rays_left := 0
@@ -643,7 +679,7 @@ func _make_herd(id: String, site: Vector3) -> Herd:
 	var gs: Array = spec["group"]
 	var size := rng.randi_range(gs[0], gs[1])
 	if id == "srnec" and winter:
-		size += rng.randi_range(1, 4)               # v zimě se srnci sdružují do tlup
+		size += rng.randi_range(WINTER_GROUP_ADD[0], WINTER_GROUP_ADD[1])               # v zimě se srnci sdružují do tlup
 	var members := []
 	for i in size:
 		var mid: String = id
@@ -651,15 +687,15 @@ func _make_herd(id: String, site: Vector3) -> Herd:
 		if id == "srnec":
 			male = i == 1 or (size == 1 and rng.randf() < 0.5)
 		elif id == "divocak":
-			male = size <= 2 and rng.randf() < 0.6    # samotář = kňour
+			male = size <= 2 and rng.randf() < LONER_MALE_P    # samotář = kňour
 		members.append([mid, male])
 	if id == "divocak" and piglets and size >= 3:
 		herd.has_young = true
-		for k in rng.randi_range(3, 6):
+		for k in rng.randi_range(PIGLETS[0], PIGLETS[1]):
 			members.append(["sele", false])
 	for i in members.size():
 		var a := Animal.new()
-		var off := Vector3(rng.randf_range(-4, 4), 0, rng.randf_range(-4, 4))
+		var off := Vector3(rng.randf_range(-HERD_SPREAD, HERD_SPREAD), 0, rng.randf_range(-HERD_SPREAD, HERD_SPREAD))
 		var p: Vector3 = site + off
 		p.y = terrain.height_at(p.x, p.z)
 		var variant := {"male": members[i][1], "winter": winter, "tint": rng.randf_range(0.88, 1.1)}
@@ -746,7 +782,7 @@ func _encounter_for(p: Player) -> void:
 	var anchor := Vector3.INF          # ve vesnici: kde je nejbližší vhodné stanoviště
 	var village := false
 	if hab == "":
-		village = settle_at(pos.x, pos.z) > 0.3
+		village = settle_at(pos.x, pos.z) > VILLAGE_SETTLE
 		var hn := _habitat_near(pos)
 		if not hn.is_empty():
 			hab = hn[0]
@@ -765,7 +801,7 @@ func _encounter_for(p: Player) -> void:
 	var fopts: Array = ENCOUNTER_BIRDS.get(key, [])
 	if not fopts.is_empty() and rng.randf() < BIRD_CHANCE:
 		for fl in root_birds.get_children():
-			if fl.spot.distance_to(pos) < 500.0:
+			if fl.spot.distance_to(pos) < FLOCK_EXIST_R:
 				return
 		_spawn_flock(fopts, pos, p, village, false)
 
@@ -786,8 +822,8 @@ func _spawn_flock(fopts: Array, pos: Vector3, p: Player, village: bool, force: b
 	var fid: String = fopts[rng.randi() % fopts.size()]
 	if fid == "vlastovka" and not Seasons.swallows_present(clock.day_of_year()):
 		fid = "vrana"
-	var dmin := 40.0 if (village or force) else 80.0
-	var dmax := 120.0 if force else (150.0 if village else 250.0)
+	var dmin := FLOCK_NEAR_MIN if (village or force) else FLOCK_MIN
+	var dmax := FLOCK_FORCE_MAX if force else (FLOCK_VILLAGE_MAX if village else FLOCK_MAX)
 	var site := _encounter_site(pos, FLOCK_HAB[fid], dmin, dmax, p)
 	if site == Vector3.INF and (village or force):
 		site = _encounter_site(pos, FLOCK_HAB[fid], dmin, dmax, p, -2.0)
@@ -803,12 +839,14 @@ func _spawn_flock(fopts: Array, pos: Vector3, p: Player, village: bool, force: b
 
 ## Místo pro novou skupinu `dist_min..dist_max` od hráče, ve stanovišti `hab` (INF = nenašlo se).
 ## Blíž než VIEW_CLEAR m se nesmí objevit v zorném kuželu hráče `p` (pop-in před očima).
-func _encounter_site(pos: Vector3, hab: String, dist_min: float, dist_max: float, p: Player = null, min_score := 0.35) -> Vector3:
+func _encounter_site(pos: Vector3, hab: String, dist_min: float, dist_max: float, p: Player = null, min_score := NAN) -> Vector3:
+	if is_nan(min_score):
+		min_score = SITE_SCORE
 	for i in 12:
 		var a := rng.randf() * TAU
 		var d := rng.randf_range(dist_min, dist_max)
 		var c := pos + Vector3(cos(a) * d, 0, sin(a) * d)
-		var pt := random_point(c, 80.0, hab, rng, 6)
+		var pt := random_point(c, SITE_R, hab, rng, 6)
 		var dd := Vector2(pt.x - pos.x, pt.z - pos.z).length()
 		if dd < dist_min or dd > TRANSIENT_GONE or not terrain.contains(pt.x, pt.z, 60.0):
 			continue
@@ -830,7 +868,7 @@ func _spawn_encounter(id: String, pos: Vector3, p: Player, anchor := Vector3.INF
 			site = Vector3.INF
 	elif force:
 		var sh: String = AnimalSpecs.get_spec(id)["habitat"]
-		site = _encounter_site(pos, sh, 60.0, 110.0, p, -2.0)
+		site = _encounter_site(pos, sh, FORCE_MIN, FORCE_MAX, p, -2.0)
 	else:
 		var sh: String = AnimalSpecs.get_spec(id)["habitat"]
 		site = _encounter_site(pos, sh, SPAWN_MIN, SPAWN_MAX, p)
@@ -863,7 +901,7 @@ func spawn_encounter_near(pos: Vector3, p: Player) -> String:
 
 ## Vynucené hejno ptáků 40–120 m od hráče (menu F2). Vrací popis pro hlášku.
 func spawn_flock_near(pos: Vector3, p: Player) -> String:
-	var village := _habitat_at(pos) == "" and settle_at(pos.x, pos.z) > 0.3
+	var village := _habitat_at(pos) == "" and settle_at(pos.x, pos.z) > VILLAGE_SETTLE
 	var opts: Array = ["kos", "vlastovka", "vrana"] if village else ["vrana", "kos", "vlastovka", "kane"]
 	var fid := _spawn_flock(opts, pos, p, village, true)
 	if fid == "":
