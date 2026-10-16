@@ -21,6 +21,7 @@ const SmokeRules := {
 	"frost_calm_temp": 0.0,            # mráz za bezvětří ráno = inverze
 	"frost_calm_wind": 1.5,
 	"life": 8.0,                       # s – životnost částice v klidu
+	"inversion_k": 2.5,                # M8.9: přízemní inverze (Microclimate, K) od této síly drží kouř nízko
 }
 const POOL := 24
 const NEAR_R := 350.0
@@ -167,13 +168,15 @@ func _release_all() -> void:
 func _apply(s: Dictionary, w: Weather, hour: float, clock: Clock) -> void:
 	var node: GPUParticles3D = s["node"]
 	var m: ParticleProcessMaterial = s["mat"]
-	var frost := clampf((16.0 - w.temp) / 21.0, 0.0, 1.0)         # 0 v teple … 1 při −5 °C
+	var mc: Microclimate = world.micro if world != null else null    # M8.9: teplota u komína a síla inverze
+	var t_loc := mc.temp_at(s["key"]) if mc != null else w.temp
+	var frost := clampf((16.0 - t_loc) / 21.0, 0.0, 1.0)         # 0 v teple … 1 při −5 °C
 	var strength := 0.25 + 0.75 * frost
 	var gale: float = SmokeRules["gale"]
 	var windy := clampf((w.wind - gale) / gale, 0.0, 1.0)
 	var inversion: bool = w.fog > float(SmokeRules["fog_inversion"]) or (
-		w.temp < float(SmokeRules["frost_calm_temp"]) and w.wind < float(SmokeRules["frost_calm_wind"])
-		and hour >= 4.0 and hour < 10.0)
+		t_loc < float(SmokeRules["frost_calm_temp"]) and w.wind < float(SmokeRules["frost_calm_wind"])
+		and hour >= 4.0 and hour < 10.0) or (mc != null and mc.inversion() >= float(SmokeRules["inversion_k"]))
 	var life: float = SmokeRules["life"] * (1.0 - 0.4 * clampf(w.rain, 0.0, 1.0)) * (1.0 - 0.4 * windy)
 	# vítr: zrychlení po větru (částice za život urazí zhruba polovinu rychlosti větru × život)
 	var wv := w.wind_vector()

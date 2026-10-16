@@ -805,6 +805,9 @@ func _journal_bbcode() -> String:
 		var f := w.forecast()
 		if not f.is_empty():
 			s += "   –   zítra: [color=#9cf]%s, nejtepleji %d °C[/color]" % [f["name"], f["temp"]]
+		var mcj = game.get("micro")       # M8.9: „V údolí ráno mrzlo, na kopci ne.“
+		if mcj != null and String(mcj.journal_line()) != "":
+			s += "\n" + String(mcj.journal_line())
 		s += "\n\n"
 	var nl = game.get("nature_log")
 	if nl:
@@ -1427,7 +1430,11 @@ func _process_impl(delta: float) -> void:
 		if ev_names != "":
 			_clock.text += "\n" + ev_names
 	if game.weather:
-		_clock.text += "\n%s  %s" % [game.weather.icon(), game.weather.describe()]
+		var mc = game.get("micro")        # M8.9: teplota v místě hráče (+ mlha v údolí / přízemní mráz)
+		if mc != null:
+			_clock.text += "\n" + String(mc.hud_line(player.global_position))
+		else:
+			_clock.text += "\n%s  %s" % [game.weather.icon(), game.weather.describe()]
 	_stamina.max_value = 1.0
 	_stamina.value = player.stamina
 	_cross.visible = ((player.first_person or player.scope > 0.5 or player.aim_k > 0.5) and player.car == null \

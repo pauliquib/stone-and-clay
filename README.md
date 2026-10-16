@@ -144,6 +144,14 @@ v suchém létě malé potoky vyschnou; bláto pro auta a louže podle místa, `
 vrstvy mapy `vlhkost`, `snih`, `odtok` a F2 → Příroda – ladění → „Průtoky toků“. Žádný nový offline nástroj (vše
 se počítá z `site.bin`, `surface.bin` a `water.json` při startu, po kouscích).
 
+**M8.9 Mikroklima** (`World.micro`, `scripts/eko/microclimate.gd`, přepínač `micro` v Realismu): teplota v místě –
+za jasné bezvětrné noci stéká studený vzduch do údolí a kotlin (dno o 3–8 °C chladnější než hřeben), ráno leží
+v údolí mlha s viditelným horním okrajem („moře mlhy“ z kopce), tráva je orosená nebo ojíněná a do 10:00 oschne;
+ve dne jižní svahy tepleji, les chladněji, obec o kousek tepleji. HUD a tělo hráče berou teplotu v místě, deník J
+píše „V údolí v noci mrzlo, na kopci ne“, rybníky zamrzají podle teploty v údolí, kouř z komínů se za inverze drží
+nízko. Ladicí vrstvy mapy `teplota`, `mlha`, `mraz` a F2 → Příroda – ladění → „Mikroklima“; měřicí scéna
+`--perfscene=kopec_inverze`. Bez nového offline nástroje (bere `site.bin`).
+
 ## Dokumentace
 
 - [`GAME_DESIGN.md`](GAME_DESIGN.md) – vize, pilíře, herní smyčka, cílové parametry

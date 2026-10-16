@@ -2128,6 +2128,8 @@ const PERF_SCENES := {
 		"weather": "jasno", "agl": 200.0, "popis": "volná kamera 200 m nad návsí – dohlednost, impostory, obloha"},
 	"zapad_slunce": {"pos": Vector3(900.0, 0.0, -500.0), "yaw": 0.0, "date": [2026, 6, 21], "hour": 20.5,
 		"weather": "jasno", "popis": "M8.5: otevřená louka při západu slunce v červnu – fyzikální obloha, pás Venuše, modrá hodina"},
+	"kopec_inverze": {"pos": Vector3(1339.0, 0.0, -2666.0), "yaw": -0.85, "date": [2026, 10, 12], "hour": 6.5,
+		"weather": "jasno", "popis": "M8.9: hřbet ~180 m nad údolím na JV, říjnové ráno za jasna – moře mlhy v údolí (výšková mlha), jinovatka"},
 	"zahrady_zari": {"pos": Vector3(20.0, 0.0, -10.0), "yaw": 0.0, "date": [2026, 9, 15], "hour": 11.0,
 		"weather": "jasno", "popis": "M8.3: zahrady u domu v září – ovoce v korunách jen na ovocných druzích (TreeDecor + TreeEco)"},
 	"les_leto": {"pos": Vector3(-383.0, 0.0, -1010.0), "yaw": PI, "date": [2026, 7, 15], "hour": 12.0,

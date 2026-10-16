@@ -2065,3 +2065,45 @@ dopravy, ne o regresi.
 - `INSTANCE_CUSTOM.a` = 1 (fenologický posun doplní M8.11); M8.11 růst může měnit variantu přes `TreeGen.variant_for`.
 - LOD vzdálenosti `TreeGen.L0_END` 55 m / `L1_END` 170 m a rozpočty `BUDGET` ladit podle měření (M8.19).
 - Ovoce v korunách (`TreeDecor`) dál podle výšky stromu, ne podle tvaru varianty – u jabloně sedí, ostatní neplodí.
+
+## 2026-10-16 – M8.9 Mikroklima: inverze, mrazové kotliny, údolní mlha, rosa a jinovatka
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu a shaderů – ruční test čeká)
+- **`scripts/eko/microclimate.gd` `Microclimate` → `World.micro`** (API z 00_PRINCIPY kap. 3, s fallbackem): vrstva nad
+  `Weather` bez vlastní mřížky. Stav = síla přízemní inverze, rosný bod vzduchové hmoty, horní hranice a hustota
+  radiační mlhy nad dnem údolí, rosa, mrazová hranice; krok přes `World.eco_hour` (hodnota na konec příští hodiny,
+  dotazy prolínají), po skoku času rozběh 18 hodinových kroků. Bod: gradient −6,5 K/km, inverze × (HAND / jezero 50 m
+  + `Site.cold_pool`), teplý pás na hřbetech (TPI), jižní svahy (`insol`), les (zápoj `TreeEco` / `SurfaceMap`), obec
+  (`YARD`), voda; rosný bod + voda / les / vlhkost půdy (`SoilWater`), Magnus; přízemní teplota −3 K za jasné noci.
+  API: `temp_at`, `ground_temp_at`, `humidity_at`, `dewpoint_at`, `fog_at`, `frost_at`, `dew_at`, `hoarfrost_at`,
+  `snow_at`, `snow_line_y`, `wind_speed_at`, `wind_chill_at` (JAG/TI), `inversion`, `fog_top_m`, `fog_layer`,
+  `frost_top_m`, `dew_amount`, `floor_y_at`, `temp_valley`, `temp_ridge`, `hud_line`, `journal_line`, `debug_text`.
+  Dotazy bez alokací (mezipaměť vlastností místa 32 × 8 m, počasí jednou za snímek). Vypnuto = `Weather.temp` /
+  `Weather.fog`, rosa 0. Kalibrace ověřena portem modelu do Pythonu (scratch, ne v repu): říjen jasno/bezvětří →
+  v 6 h údolí ~1 °C vs. hřbet ~6 °C, mlha do ~18 m nad dnem, rosa 1,0 a v 9 h pryč; leden → údolí −8 °C vs. hřbet
+  −3 °C; vítr 6 m/s nebo oblačno → inverze ~0, bez mlhy.
+- **Vzhled `scripts/priroda/micro_fx.gd` `MicroFx`** (z `Atmosphere.update`, 1 řádek + funkce): výšková mlha
+  `fog_height` = dno údolí pod kamerou (`Site.elev − hand`, plynule) + `fog_top_m`, `fog_height_density` podle hustoty;
+  kamera uvnitř vrstvy → výšková mlha slábne, houstne vzdálenostní (dohled ~200 m). Globální uniformy `micro_dew`,
+  `micro_frost`, `micro_frost_y` (`project.godot`) → `terrain.gdshader` (lesk rosy přes `wet`, bělavá jinovatka pod
+  mrazovou hranicí) a `vegetation.gdshader` (lesk, bělavé špičky). `tree.gdshader` nedotčen (M8.8).
+- **Napojení:** `player.gd` (tělo: teplota v místě, venku vítr z `WindField`), `hud.gd` (řádek počasí = teplota
+  v místě + „mlha v údolí / přízemní mráz / jinovatka / rosa“, deník J věta údolí vs. kopec), `water.gd` (zamrzání
+  podle `temp_valley`), `chimney_smoke.gd` (teplota u komína, inverze ≥ 2,5 K = nízký kouř, `SmokeRules.inversion_k`),
+  `world.gd` (proměnná + 2 řádky v `build`), `save_game.gd` (klíč `micro`), `game_settings.gd` (`REALISM_ROWS`
+  „Mikroklima“), `game_menu.gd` (F2 → Příroda – ladění → „Mikroklima (M8.9)“), ladicí vrstvy `teplota`, `mlha`, `mraz`,
+  měřicí scéna `kopec_inverze` (`udoli_noc`, `les_rano_mlha` už byly z M8.1).
+- Kontrola překladu (00_SPOLECNE kap. 6): prázdná u všech změněných / nových `.gd`; `tools/shader_check.gd` prázdný
+  (Mobile i Forward+). `--import` doběhl na časový limit 300 s (třídy `Microclimate`/`MicroFx` v cache jsou).
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M8.md` → M8.9) a měření `--perfscene=kopec_inverze,30`,
+  `udoli_noc,30` (očekávání tamtéž).
+- Mlžná vrstva je jedna rovina pod kamerou (dno údolí `elev − hand` v místě kamery) – v jiném údolí s jiným dnem může
+  být vrstva viditelně výš/níž; volumetrická mlha (Vysoká) nevyzkoušena – jen výšková mlha.
+- Nedotaženo: namrzlé sklo auta (`window_glass.gdshader`), tetelení nad asfaltem, sníh vs. déšť podle výšky ve vizuálu
+  srážek (API `snow_at` / `snow_line_y` je připravené), zamrzání po jednotlivých nádržích (dnes globálně `temp_valley`),
+  srnci výš na svazích za mrazu (→ M8.15), strop stoupání kouře podle výšky inverze (dnes jen „nízký kouř“).
+- Tělo používá svůj vzorec chladu s větrem; `wind_chill_at` je připravené pro M8.16 (aby se vítr nezapočítal dvakrát).
+- Kalibrace (M8.19): `DEP_K`, `INV_RATE_K_H`, `INV_DEPTH_M`, `GROUND_K`, `FOG_H_DENS`, rosa `DEW_*`; vrstva `teplota` ukazuje
+  odchylku od `Weather.temp`.

@@ -565,6 +565,30 @@
   `odtok`, F2 → Příroda – ladění → „Průtoky toků (M8.7)“. Uložení: klíč `soil_water` (vlhkost a sníh po bajtech v
   base64, zásoby toků float32). Mřížka se po startu staví po kouscích (~30–40 s), do té doby platí staré
   globální chování.
+- **Mikroklima (M8.9)**: `World.micro` (`Microclimate`, `scripts/eko/microclimate.gd`), přepínač Realismus `micro`;
+  vrstva **nad** `Weather` (nic v něm nemění) bez vlastní mřížky – stav je pár čísel: síla přízemní inverze `I` (K),
+  rosný bod vzduchové hmoty, výška a hustota radiační mlhy nad dnem údolí, rosa, mrazová hranice. Krok jednou za herní
+  hodinu (`World.eco_hour`) počítá hodnoty na konec příští hodiny, dotazy mezi nimi lineárně prolínají; po skoku času
+  levný rozběh (18 hodinových kroků). Model: gradient −6,5 K/km od střední výšky katastru; inverze roste za jasné
+  bezvětrné noci (1,5 K/h k max. 7 K), promíchá ji vítr / oblačnost / déšť, ráno ji rozpustí slunce; studený vzduch
+  podle výšky nad vodou (`Site.hand`, jezero 50 m) a mrazové kotliny (`Site.cold_pool`), teplý svahový pás na hřbetech
+  (`Site.tpi`); ve dne přehřátí jižních svahů (`Site.insol`), les ve dne −2,5 K / v noci +1 K (zápoj `TreeEco` /
+  `SurfaceMap`), obec +0,5…1,5 K (dvory `SurfaceMap.YARD`), voda tlumí. Rosný bod = očekávané noční minimum − deficit
+  podle vlhkosti situace (oblačnost, déšť, mlha, `rain_recent`, sucho) + voda / les / mokrá půda (`SoilWater`);
+  vlhkost Magnusem. Radiační mlha = profil údolí, kde T ≤ Td + 0,5 K (horní hranice roste v noci, ráno klesá);
+  přízemní teplota za jasné noci o 3 K níž → mráz, rosa (přibývá pod rosným bodem, vysychá sluncem² a větrem).
+  API (00_PRINCIPY kap. 3): `temp_at`, `ground_temp_at`, `humidity_at`, `dewpoint_at`, `fog_at`, `frost_at`, `dew_at`,
+  `hoarfrost_at`, `snow_at` (podíl srážek jako sníh), `snow_line_y`, `wind_speed_at` (WindField), `wind_chill_at`
+  (JAG/TI), `inversion`, `fog_top_m`, `fog_layer`, `frost_top_m`, `dew_amount`, `floor_y_at`, `temp_valley/ridge`,
+  `hud_line`, `journal_line`. Fallback vypnuto: `temp_at` = `Weather.temp`, `fog_at` = `Weather.fog`, rosa 0. Dotazy bez
+  alokací (vlastnosti místa v mezipaměti 32 slotů po 8 m). Napojení: tělo hráče (teplota a vítr v místě),
+  HUD řádek počasí (teplota v místě + mlha / mráz / rosa), deník J (údolí vs. kopec minulou noc), zamrzání vody
+  (`temp_valley`), kouř z komínů (teplota u komína, inverze ≥ 2,5 K = nízký kouř). Vzhled `MicroFx`
+  (`scripts/priroda/micro_fx.gd`, z `Atmosphere`): výšková mlha `fog_height` = dno údolí pod kamerou (`elev − hand`)
+  + `fog_top_m`, uvnitř vrstvy místo ní hustší vzdálenostní mlha; globální uniformy `micro_dew`, `micro_frost`,
+  `micro_frost_y` → `terrain.gdshader` / `vegetation.gdshader` (lesk rosy, jinovatka pod mrazovou hranicí). Ladění:
+  vrstvy mapy `teplota` (odchylka od Weather), `mlha`, `mraz`, F2 → Příroda – ladění → „Mikroklima (M8.9)“; měřicí
+  scéna `kopec_inverze`. Uložení: klíč `micro`.
 - **Fyzikální obloha, světlo a expozice (M8.5)**: `Atmosphere.SkyModel` (vnořená třída v `scripts/priroda/atmosphere.gd`)
   – zjednodušený Rayleigh + Mie + ozon model (à la Hillaire 2020 / Preetham, `00_PRINCIPY.md` kap. 8), čisté
   statické funkce volatelné odkudkoli (`Atmosphere.SkyModel.sun_illuminance_lux(elev, cloud, haze)`), ne jen
