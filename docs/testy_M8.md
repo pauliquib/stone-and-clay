@@ -197,6 +197,10 @@ běhu nepočítá navíc), `villager`/`humanoid` v PERF kategorii by měly klesn
 ověření, že 33 vs. 39 volání byla skutečně jen variace hustoty dopravy (zkusit běh se stejným počtem
 aut, pokud launcher umí fixovat seed/hustotu).
 
+**Stav 16. 10. 2026 (po vlně 3 + opravě shaderů `64bbb05`):** uživatel potvrdil, že hra běží a shadery
+větru fungují, ale **stále se lehce laguje** (bez čísel). Rozhodnutí uživatele: ruční testy i měření a
+ladění výkonu **až po vlně 8 (M8.19)**, ne po každé vlně – čísla a příčiny se dohledají tam.
+
 ## M8.3 – Dřeviny a porosty podle stanoviště
 
 Nejdřív vygeneruj data (v hlavním checkoutu, po `tools/site.py`):
