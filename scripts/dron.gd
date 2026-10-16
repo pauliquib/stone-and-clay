@@ -16,27 +16,64 @@
 class_name Drone
 extends RigidBody3D
 
-const MAX_ALT := 120.0                 # nejvýš dovolená výška AGL (m) – přestupek + odepření stoupání
-const TAKEOFF_H := 2.0                 # vzlet na tuto výšku (m nad bod startu)
-const VLOS_M := 500.0                  # vizuální dohled – varování / po VLOS_OFF_S přestupek
-const VLOS_OFF_S := 60.0               # jak dlouho mimo dohled = přestupek (s letu)
-const PRIVACY_AGL := 30.0              # soukromí: pod touto výškou nad cizím pozemkem…
-const PRIVACY_S := 30.0                # …déle než tolik sekund vrtění = přestupek
-const PERSON_R := 25.0                 # „nad lidmi“ – vodorovná vzdálenost osoby pod dronem (m)
-const CRASH_V := 4.0                   # náraz rychlejší než tolik = nehoda (m/s)
-const BUMP_V := 1.6                    # menší ťuknutí = jen poškrábání + odraz
-const CRASH_DMG := 55.0                # poškození (%), od kterého už dron nemůže vzlétnout (oprava)
-const DMG_PER_V := 9.0                 # poškození za m/s nárazu
-const STUCK_S := 6.0                   # jak dlouho visí dron ve stromu, než spadne
-const BAT_WARN := 0.15                 # varování nízké baterie
-const BAT_RTH := 0.05                  # automatický návrat při 5 %
-const DRAIN_SPORT := 1.4               # sportovní režim = −40 % výdrže
-const DRAIN_COLD := 1.43               # mráz (<0 °C) = −30 % výdrže
-const ACCEL := 22.0                    # jak rychle dron mění rychlost (m/s²) – odezva vrtulí
-const ACCEL_RTH := 10.0                # jemnější při návratu
-const SCARE_S := 1.6                   # bzučení plaší zvěř každých tolik sekund
-const LAW_S := 1.0                     # právní kontroly (výška, lidé, dohled, soukromí) za tolik s
-const OFF_CD := 120.0                  # stejný přestupek se hlásí nejdřív po tolika s letu
+static var MAX_ALT := 120.0                 # nejvýš dovolená výška AGL (m) – přestupek + odepření stoupání
+static var TAKEOFF_H := 2.0                 # vzlet na tuto výšku (m nad bod startu)
+static var VLOS_M := 500.0                  # vizuální dohled – varování / po VLOS_OFF_S přestupek
+static var VLOS_OFF_S := 60.0               # jak dlouho mimo dohled = přestupek (s letu)
+static var PRIVACY_AGL := 30.0              # soukromí: pod touto výškou nad cizím pozemkem…
+static var PRIVACY_S := 30.0                # …déle než tolik sekund vrtění = přestupek
+static var PERSON_R := 25.0                 # „nad lidmi“ – vodorovná vzdálenost osoby pod dronem (m)
+static var CRASH_V := 4.0                   # náraz rychlejší než tolik = nehoda (m/s)
+static var BUMP_V := 1.6                    # menší ťuknutí = jen poškrábání + odraz
+static var CRASH_DMG := 55.0                # poškození (%), od kterého už dron nemůže vzlétnout (oprava)
+static var DMG_PER_V := 9.0                 # poškození za m/s nárazu
+static var STUCK_S := 6.0                   # jak dlouho visí dron ve stromu, než spadne
+static var BAT_WARN := 0.15                 # varování nízké baterie
+static var BAT_RTH := 0.05                  # automatický návrat při 5 %
+static var DRAIN_SPORT := 1.4               # sportovní režim = −40 % výdrže
+static var DRAIN_COLD := 1.43               # mráz (<0 °C) = −30 % výdrže
+static var ACCEL := 22.0                    # jak rychle dron mění rychlost (m/s²) – odezva vrtulí
+static var ACCEL_RTH := 10.0                # jemnější při návratu
+static var SCARE_S := 1.6                   # bzučení plaší zvěř každých tolik sekund
+static var LAW_S := 1.0                     # právní kontroly (výška, lidé, dohled, soukromí) za tolik s
+static var OFF_CD := 120.0                  # stejný přestupek se hlásí nejdřív po tolika s letu
+# M8.D2a: čísla dřív zapsaná přímo ve vzorcích (stejné hodnoty) – laditelné z menu F3 (`tune_letani.gd`)
+static var STICK_YAW_RATE := 2.6            # rad/s – otáčení pravou páčkou ovladače
+static var STICK_PITCH_RATE := 1.8          # rad/s – naklápění kamery pravou páčkou
+static var GUST_K := 0.35                   # nárazy kolem středního driftu (× vítr × wind_k)
+static var GUST_STEP := 0.016               # posun fáze nárazů za fyzikální krok
+static var TAKEOFF_GAIN := 2.5              # 1/s – stoupání při vzletu × chybějící výška
+static var TAKEOFF_VMAX := 2.2              # m/s – nejrychlejší stoupání při vzletu
+static var WIND_START_K := 0.3              # unášení větrem při vzletu (× wind_k)
+static var WIND_FLY_K := 0.6                # unášení větrem v letu (× wind_k)
+static var WIND_RTH_K := 0.5                # unášení větrem při návratu (× wind_k)
+static var WIND_LAND_K := 0.25              # unášení větrem při přistání (× wind_k)
+static var DMG_SINK := 0.004                # m/s klesání za 1 % poškození
+static var RTH_HOME_R := 3.0                # m – návrat: nad domovem začne klesat
+static var RTH_ALT := 22.0                  # m – návrat: cestovní výška nad bodem vzletu
+static var RTH_SPD_K := 0.7                 # návrat: podíl běžné rychlosti
+static var RTH_VGAIN := 0.8                 # 1/s – návrat: srovnání výšky × odchylka
+static var RTH_DESC_MAX := 1.5              # m/s – návrat: nejrychlejší klesání na cestovní výšku
+static var RTH_CLIMB_K := 0.8               # návrat: podíl běžného stoupání
+static var RTH_LAND_VS := 2.0               # m/s – návrat: klesání nad domovem
+static var LAND_AGL := 0.22                 # m – dosednutí pod touto výškou nad terénem
+static var LAND_DESC_K := 0.9               # 1/s – přistání: klesání × výška
+static var LAND_VS_MIN := 0.9               # m/s – přistání: nejpomalejší klesání
+static var LAND_VS_MAX := 5.0               # m/s – přistání: nejrychlejší klesání
+static var LAND_NEAR_M := 3.5               # m – F u pilota = přistát (dál = návrat domů)
+static var PICKUP_R := 2.5                  # m – pilot blíž = dron rovnou do batohu
+static var XP_PER_M := 0.04                 # XP letectví za metr letu
+static var SIG_TICK := 0.4                  # s – perioda kontroly signálu a hranic
+static var CROWD_S := 2.0                   # s nad lidmi = přestupek
+static var SETTLED_MIN := 0.4               # zástavba (registrace, soukromí) od hustoty osídlení
+static var PRIVACY_V := 2.0                 # m/s – pomalejší let nad pozemkem = „vrtění“
+static var SCARE_R := 45.0                  # m – dosah plašení zvěře bzučením
+static var SCARE_LOUD := 8.0                # hlasitost bzučení pro zvěř (jako výstřel)
+static var BUMP_DMG_K := 1.5                # % poškození na 1 m/s ťuknutí
+static var KNOCK_K := 0.4                   # náraz do člověka: odhození (× rychlost dronu)
+static var KNOCK_UP := 0.2                  # náraz do člověka: nadhození (× náraz)
+static var KNOCK_MAX := 8.0                 # náraz do člověka: strop síly
+static var REST_V := 1.2                    # m/s – spadlý dron se pod touto rychlostí uloží
 const VIS_TURN := Basis(Vector3.UP, PI)   # model drona má nos na +Z, fyzika letí do −Z → vizuál otočit
 
 var world: World
@@ -139,6 +176,14 @@ func setup(w: World, pid: int, model_id: String) -> void:
 	add_child(snd)
 	_prev_pos = global_position
 	_cur_pos = global_position
+	DevTune.hub().changed.connect(_on_tune)   # M8.D2a: hmotnost tělesa po změně v menu F3
+
+
+## M8.D2a: změna parametru v menu F3 – hmotnost tělesa (volný pád, kolize). Ostatní hodnoty
+## (`spec`, `static var`) se čtou živě.
+func _on_tune(id: String, _v: Variant) -> void:
+	if id == "drone.%s.kg" % model:
+		mass = maxf(float(spec["kg"]), 0.15)
 
 
 ## Zaparkovat na `pos` (inventář → zem, načtení save). Režim "zemi", zamrznuté.
@@ -240,7 +285,7 @@ func pilot_dist() -> float:
 func request_land() -> void:
 	match mode:
 		"let", "start":
-			if pilot_dist() < 3.5:
+			if pilot_dist() < LAND_NEAR_M:
 				mode = "pristat"
 				world.notify(owner_pid, "show_message", ["Dron přistává.", 1.5])
 			else:
@@ -283,7 +328,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	state.transform = Transform3D(Basis(Vector3.UP, _yaw), _cur_pos)
 	_sig_t -= dt
 	if _sig_t <= 0.0:
-		_sig_t = 0.4
+		_sig_t = SIG_TICK
 		_signal_check()
 		_bounds_check()
 	_law_t -= dt
@@ -302,8 +347,8 @@ func _read_sticks(dt: float) -> void:
 		return
 	var la := pilot.input.look_axis          # pravá páčka ovladače (hráčova je při letu uzamčená)
 	if la.length() > 0.15:
-		_yaw -= la.x * 2.6 * dt
-		_cam_pitch = clampf(_cam_pitch - la.y * 1.8 * dt, -1.4, 0.9)
+		_yaw -= la.x * STICK_YAW_RATE * dt
+		_cam_pitch = clampf(_cam_pitch - la.y * STICK_PITCH_RATE * dt, -1.4, 0.9)
 	var rel := pilot.input.take_look()
 	var sens := pilot.mouse_sensitivity
 	_yaw -= rel.x * sens
@@ -322,24 +367,24 @@ func _wish() -> Vector3:
 		wv = world.wind_field.wind_at(global_position)   # M8.4: vítr v místě dronu (výška, závětří, nárazy)
 		wv.y = 0.0
 	var wk: float = spec["wind_k"]
-	_gust_t += 0.016
-	var gust := wv * wk * 0.35 * (sin(_gust_t * 2.1) * sin(_gust_t * 0.63 + 1.7))   # turbulence kolem středního driftu
+	_gust_t += GUST_STEP
+	var gust := wv * wk * GUST_K * (sin(_gust_t * 2.1) * sin(_gust_t * 0.63 + 1.7))   # turbulence kolem středního driftu
 	match mode:
 		"start":
-			var up := clampf((_hover_y - global_position.y) * 2.5, 0.0, 2.2)
+			var up := clampf((_hover_y - global_position.y) * TAKEOFF_GAIN, 0.0, TAKEOFF_VMAX)
 			if global_position.y >= _hover_y - 0.05:
 				mode = "let"
 				world.emit_game_event(owner_pid, "drone_launch", {"model": model})
 				world.notify(owner_pid, "show_message", [
 					"Dron nahoře – WASD let, myš natáčení, Mezerník/Ctrl výška, Shift sport, V pohled, F přistát, O foto", 6.0])
-			return Vector3(wv.x * wk * 0.3, up, wv.z * wk * 0.3)
+			return Vector3(wv.x * wk * WIND_START_K, up, wv.z * wk * WIND_START_K)
 		"let":
 			if pilot == null:
 				return Vector3.ZERO
 			var mv: Vector2 = pilot.input.move
 			var dir := Basis(Vector3.UP, _yaw) * Vector3(mv.x, 0.0, mv.y)
 			var top: float = spec["sport"] if pilot.input.sprint else spec["spd"]
-			var wish := dir * top + wv * wk * 0.6 + gust
+			var wish := dir * top + wv * wk * WIND_FLY_K + gust
 			var vz := 0.0
 			if pilot.input.jump:
 				vz += float(spec["climb"])
@@ -347,27 +392,27 @@ func _wish() -> Vector3:
 				vz -= float(spec["climb"])
 			if vz > 0.0 and agl() >= MAX_ALT:
 				vz = 0.0
-			wish.y = vz - dmg * 0.004            # poškozený dron lehce klesá
+			wish.y = vz - dmg * DMG_SINK         # poškozený dron lehce klesá
 			return wish + _fly_push              # M6.2: protivítr od hranice letu / dolů od stropu
 		"rth":
 			var to := Vector3(home_pos.x - global_position.x, 0, home_pos.z - global_position.z)
 			var hd := to.length()
 			var wish2 := Vector3.ZERO
-			if hd > 3.0:
-				var cruise := home_ground + 22.0
-				wish2 = to.normalized() * minf(float(spec["spd"]) * 0.7, hd * 0.5 + 1.0)
-				wish2.y = clampf((cruise - global_position.y) * 0.8, -1.5, float(spec["climb"]) * 0.8)
+			if hd > RTH_HOME_R:
+				var cruise := home_ground + RTH_ALT
+				wish2 = to.normalized() * minf(float(spec["spd"]) * RTH_SPD_K, hd * 0.5 + 1.0)
+				wish2.y = clampf((cruise - global_position.y) * RTH_VGAIN, -RTH_DESC_MAX, float(spec["climb"]) * RTH_CLIMB_K)
 			else:
-				wish2.y = -2.0
-			if hd < 3.0 and agl() < 0.22:
+				wish2.y = -RTH_LAND_VS
+			if hd < RTH_HOME_R and agl() < LAND_AGL:
 				_land()
 				return Vector3.ZERO
-			return wish2 + wv * wk * 0.5
+			return wish2 + wv * wk * WIND_RTH_K
 		"pristat":
-			if agl() < 0.22:
+			if agl() < LAND_AGL:
 				_land()
 				return Vector3.ZERO
-			return Vector3(0, -clampf(agl() * 0.9, 0.9, 5.0), 0) + wv * wk * 0.25   # rychlost klesání podle výšky (rychle nahoře, jemně u země)
+			return Vector3(0, -clampf(agl() * LAND_DESC_K, LAND_VS_MIN, LAND_VS_MAX), 0) + wv * wk * WIND_LAND_K   # rychlost klesání podle výšky (rychle nahoře, jemně u země)
 	return Vector3.ZERO
 
 
@@ -384,7 +429,7 @@ func _land() -> void:
 	pad.visible = false
 	world.emit_game_event(owner_pid, "drone_land", {})
 	_flush_xp()
-	if pilot and pilot.global_position.distance_to(global_position) < 2.5:
+	if pilot and pilot.global_position.distance_to(global_position) < PICKUP_R:
 		world.drone_pickup(owner_pid)
 	else:
 		release()
@@ -395,7 +440,7 @@ func _land() -> void:
 func _flush_xp() -> void:
 	if _xp_d <= 0.5 or world == null:
 		return
-	world.give_xp(owner_pid, "letectvi", _xp_d * 0.04, "let dronem")
+	world.give_xp(owner_pid, "letectvi", _xp_d * XP_PER_M, "let dronem")
 	_xp_d = 0.0
 
 
@@ -468,20 +513,20 @@ func _legal_check() -> void:
 	# lidé pod dronem (v obci rychle odhalí policie i sousedi)
 	if world.drone_person_under(global_position, PERSON_R):
 		_crowd_t += LAW_S
-		if _crowd_t > 2.0:
+		if _crowd_t > CROWD_S:
 			_offense("dron_nad_lidmi", {})
 	else:
 		_crowd_t = 0.0
 	# registrace a kvalifikace (jen v zástavbě to reálně kontrolují)
 	var settled: float = world.fauna.settle_at(global_position.x, global_position.z) if world.fauna else 0.0
-	if settled > 0.4:
+	if settled > SETTLED_MIN:
 		if not world.has_permit(owner_pid, "dron_provozovatel", global_position):
 			_offense("dron_bez_registrace", {})
 		if bool(spec["needs_a1a3"]) and not world.has_permit(owner_pid, "dron_a1a3", global_position):
 			_offense("dron_bez_kvalifikace", {})
 	# soukromí: vrtění nízko nad cizím zastavěným pozemkem
-	if settled > 0.4 and a < PRIVACY_AGL and world.forestry and world.forestry.zone_at(global_position, owner_pid) == "settled" \
-			and Vector2(linear_velocity.x, linear_velocity.z).length() < 2.0:
+	if settled > SETTLED_MIN and a < PRIVACY_AGL and world.forestry and world.forestry.zone_at(global_position, owner_pid) == "settled" \
+			and Vector2(linear_velocity.x, linear_velocity.z).length() < PRIVACY_V:
 		_privacy_t += LAW_S
 		if _privacy_t > PRIVACY_S:
 			_offense("narusovani_soukromi_dron", {})
@@ -506,8 +551,8 @@ func _scare_wildlife() -> void:
 	if world.fauna == null:
 		return
 	for a in world.fauna.animals:
-		if is_instance_valid(a) and not a.dead and a.global_position.distance_to(global_position) < 45.0:
-			a.hear_shot(global_position, 8.0)
+		if is_instance_valid(a) and not a.dead and a.global_position.distance_to(global_position) < SCARE_R:
+			a.hear_shot(global_position, SCARE_LOUD)
 
 
 # ------------------------------------------------------------------ nárazy
@@ -527,7 +572,7 @@ func _physics_process_impl(delta: float) -> void:
 			gravity_scale = 1.0
 			mode = "spadl"
 			world.notify(owner_pid, "show_message", ["Dron se uvolnil ze stromu a padá!", 3.0])
-	elif mode == "spadl" and not freeze and get_contact_count() > 0 and linear_velocity.length() < 1.2:
+	elif mode == "spadl" and not freeze and get_contact_count() > 0 and linear_velocity.length() < REST_V:
 		# dopadl a přestal se kutálet
 		mode = "zemi"
 		freeze = true
@@ -565,7 +610,7 @@ func _on_body(b: Node) -> void:
 
 ## Ťuknutí bez havárie: poškrábání + krátké „cuknutí“ servo (ztratí část rychlosti přes solver).
 func _bump(impact: float) -> void:
-	dmg = minf(dmg + impact * 1.5, 100.0)
+	dmg = minf(dmg + impact * BUMP_DMG_K, 100.0)
 	world.emit_game_event(owner_pid, "sfx", {"name": "thud", "delay": 0.0})
 
 
@@ -574,7 +619,7 @@ func _hit_person(b: Node, impact: float) -> void:
 	if impact <= BUMP_V:
 		return
 	if b.has_method("knock"):
-		b.knock(linear_velocity * 0.4 + Vector3.UP * impact * 0.2, minf(impact, 8.0))
+		b.knock(linear_velocity * KNOCK_K + Vector3.UP * impact * KNOCK_UP, minf(impact, KNOCK_MAX))
 	if impact > CRASH_V:
 		# zraněný je sám svědek – přestupek bez ohledu na okolí
 		if _life_t - float(_off_cd.get("dron_zraneni", -1000.0)) >= OFF_CD:
@@ -652,7 +697,7 @@ func status() -> Dictionary:
 		"rth": w.append("NÁVRAT DOMŮ%s" % (" – %s" % _rth_reason if _rth_reason != "" else ""))
 		"pristat": w.append("PŘISTÁVÁM…")
 	if mode == "let":
-		if pilot_dist() < 3.5:
+		if pilot_dist() < LAND_NEAR_M:
 			w.append("[F] přistát")
 		else:
 			w.append("[F] návrat domů")

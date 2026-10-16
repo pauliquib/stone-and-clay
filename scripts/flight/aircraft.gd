@@ -15,38 +15,76 @@
 class_name Aircraft
 extends RigidBody3D
 
-const RHO := 1.225                 # hustota vzduchu (kg/m³)
-const G := 9.81                    # tíhové zrychlení (m/s²)
-const CL_STALL := 0.45             # podíl CL_max po přetáčení
-const NEG_A_CL := -0.15            # minimální CL při záporném náběhu (záchrana padáku)
-const TURB_BASE := 0.35            # základní turbulence (m/s²)
-const TURB_STORM := 2.5            # příspěvek bouřky (násobek storm 0..1)
-const TURB_FOREST := 0.9           # příspěvek letu nad lesem (násobek forest_at)
-const TURB_LEE := 12.0             # příspěvek závětrné strany kopce (násobek sklonu)
-const HARD_LAND_VY := 3.0          # m/s sestupu – tvrdé přistání (poškození + zranění)
-const CRASH_LAND_VY := 8.0         # m/s sestupu – havárie
-const CRASH_SPD := 9.0             # m/s nárazu do překážky – havárie
-const MU_GRASS := 0.045            # valivý odpor na trávě (mokro ×1,3)
-const BRAKE_DECEL := 4.0           # brzda na zemi (Mezerník), m/s²
-const GROUND_STEER := 0.9          # rad/s zatáčení na zemi při plné rychlosti
-const ROLL_RATE := 2.0             # rad/s přibližování banku
-const PITCH_RATE := 1.6            # rad/s přibližování pitchi
-const OFF_CD := 60.0               # s mezi stejným přestupkem
-const XP_PER_M := 0.04             # XP letectví za metr vzdušní dráhy
-const DRUNK_DELAY := 0.1           # s zpoždění vstupu na promile (vzor Car)
+static var RHO := 1.225                 # hustota vzduchu (kg/m³)
+static var G := 9.81                    # tíhové zrychlení (m/s²)
+static var CL_STALL := 0.45             # podíl CL_max po přetáčení
+static var NEG_A_CL := -0.15            # minimální CL při záporném náběhu (záchrana padáku)
+static var TURB_BASE := 0.35            # základní turbulence (m/s²)
+static var TURB_STORM := 2.5            # příspěvek bouřky (násobek storm 0..1)
+static var TURB_FOREST := 0.9           # příspěvek letu nad lesem (násobek forest_at)
+static var TURB_LEE := 12.0             # příspěvek závětrné strany kopce (násobek sklonu)
+static var HARD_LAND_VY := 3.0          # m/s sestupu – tvrdé přistání (poškození + zranění)
+static var CRASH_LAND_VY := 8.0         # m/s sestupu – havárie
+static var CRASH_SPD := 9.0             # m/s nárazu do překážky – havárie
+static var MU_GRASS := 0.045            # valivý odpor na trávě (mokro ×1,3)
+static var BRAKE_DECEL := 4.0           # brzda na zemi (Mezerník), m/s²
+static var GROUND_STEER := 0.9          # rad/s zatáčení na zemi při plné rychlosti
+static var ROLL_RATE := 2.0             # rad/s přibližování banku
+static var PITCH_RATE := 1.6            # rad/s přibližování pitchi
+static var OFF_CD := 60.0               # s mezi stejným přestupkem
+static var XP_PER_M := 0.04             # XP letectví za metr vzdušní dráhy
+static var DRUNK_DELAY := 0.1           # s zpoždění vstupu na promile (vzor Car)
 const CAM_DIST := 6.0              # chase kamera – vzdálenost (m)
 const CAM_UP := 2.4                # chase kamera – výška nad zemí pod strojem (vizuál stojí na y = 0)
 const ENGINE_BASE_PITCH := 0.7
-const THRUST_DROP := 0.5           # tah T = T0·plyn·(1 − 0,5·(v/v_max)²) – stejná křivka na zemi i ve vzduchu
-const THRUST_MIN := 0.15           # spodní mez poměru tahu (nad v_max)
-const ROT_ALPHA_K := 0.6           # náběh při rotaci na vzlet = 0,6·a_crit (vzlet ~1,2·v_pádová)
-const ELEV_PITCH := 0.18           # rad – výchylka pitche výškovkou (Mezerník / Ctrl)
-const TRIM_ELEV_V := 0.3           # výškovka posune cílovou rychlost auto-trimu o ±30 % v_trim
-const TRIM_W := 0.5                # rad/s – vlastní frekvence držáku rychlosti (perioda ~13 s)
-const TRIM_ZETA := 0.8             # tlumení držáku rychlosti (bez fugoidního houpání)
-const LAND_GRACE := 0.5            # s po odlepení, kdy se dosednutí nepočítá (hystereze)
-const LAND_VY := -0.1              # m/s – dosednutí jen při klesání vůči terénu
-const LAND_GAP := 0.05             # m – dosednutí až pod gear_h − LAND_GAP
+static var THRUST_DROP := 0.5           # tah T = T0·plyn·(1 − 0,5·(v/v_max)²) – stejná křivka na zemi i ve vzduchu
+static var THRUST_MIN := 0.15           # spodní mez poměru tahu (nad v_max)
+static var ROT_ALPHA_K := 0.6           # náběh při rotaci na vzlet = 0,6·a_crit (vzlet ~1,2·v_pádová)
+static var ELEV_PITCH := 0.18           # rad – výchylka pitche výškovkou (Mezerník / Ctrl)
+static var TRIM_ELEV_V := 0.3           # výškovka posune cílovou rychlost auto-trimu o ±30 % v_trim
+static var TRIM_W := 0.5                # rad/s – vlastní frekvence držáku rychlosti (perioda ~13 s)
+static var TRIM_ZETA := 0.8             # tlumení držáku rychlosti (bez fugoidního houpání)
+static var LAND_GRACE := 0.5            # s po odlepení, kdy se dosednutí nepočítá (hystereze)
+static var LAND_VY := -0.1              # m/s – dosednutí jen při klesání vůči terénu
+static var LAND_GAP := 0.05             # m – dosednutí až pod gear_h − LAND_GAP
+# M8.D2a: čísla dřív zapsaná přímo ve vzorcích (stejné hodnoty) – laditelné z menu F3 (`tune_letani.gd`)
+static var THR_RESP := 4.0              # 1/s – jak rychle tah sleduje páku plynu
+static var THR_BRAKE_CUT := 0.3         # S (brzda) ubírá plyn o tolik
+static var DRUNK_DELAY_MAX := 0.45      # s – strop zpoždění vstupu v opilosti
+static var WIND_PROFILE_EXP := 0.14     # exponent výškového profilu větru (jen bez WindField)
+static var TURB_XZ := 0.05              # prostorová frekvence turbulence vodorovně (1/m)
+static var TURB_Y := 0.1                # prostorová frekvence turbulence svisle (1/m)
+static var TURB_T := 1.0                # rychlost změny turbulence v čase (×)
+static var TURB_LEE_DIST := 60.0        # m – jak daleko proti větru se měří převýšení závětří
+static var TURB_LEE_AGL := 200.0        # m AGL – závětrná turbulence jen pod touto výškou
+static var TURB_LEE_WIND := 6.0         # m/s – vítr, od kterého závětří působí naplno
+static var WRECK_FRICTION := 3.0        # 1/s – útlum dojezdu vraku po zemi
+static var TRIM_ALPHA_MIN := -0.1       # rad – nejmenší náběh auto-trimu
+static var TRIM_BANK_COS_MIN := 0.5     # strop navýšení vztlaku v zatáčce (1 / cos φ ≤ 1 / tohle)
+static var GROUND_SLOPE_MAX := 0.4      # strop sklonu terénu pro náběh a pitch na zemi (tan)
+static var GROUND_SLOPE_K := 0.5        # podíl složky tíhy ze sklonu při pojíždění
+static var GROUND_STEER_V := 6.0        # m/s – od této rychlosti plné zatáčení na zemi
+static var GROUND_BANK := 0.05          # rad – náklon na zemi při plném řízení
+static var GROUND_ATT_RATE := 3.0       # 1/s – jak rychle se pitch / bank na zemi srovná
+static var ROT_V_K := 0.9               # rotace na vzlet od tolika × v_min
+static var LIFTOFF_V_K := 0.95          # odlepení od tolika × v_min (vůči vzduchu)
+static var LIFTOFF_MIN_GS := 1.0        # m/s – odlepení jen když se stroj valí aspoň tak rychle
+static var LIFTOFF_VY := 0.2            # m/s – svislá rychlost při odlepení
+static var MU_WET_K := 1.3              # násobek valivého odporu na mokré trávě
+static var MU_WET_GRIP := 0.9           # mokro = přilnavost terénu pod touto hodnotou
+static var STALL_RECOVER_K := 0.75      # zotavení z přetažení pod tolika × a_crit
+static var CL_MAX_ABS := 3.0            # strop součinitele vztlaku ve vzduchu
+static var BANK_YAW_MAX := 1.2          # rad – strop banku pro výpočet zatáčení
+static var STALL_NOSE_DROP := 0.06      # rad – o kolik nos padá pod dráhu při přetažení
+static var PITCH_MIN := -0.9            # rad – nejnižší pitch ve vzduchu
+static var PITCH_MAX := 0.7             # rad – nejvyšší pitch ve vzduchu
+static var CRASH_SLIDE_K := 0.3         # podíl vodorovné rychlosti, se kterou vrak dojíždí
+static var HARD_DMG_K := 12.0           # % poškození na 1 m/s nad tvrdým přistáním
+static var HARD_HURT_K := 8.0           # zranění na 1 m/s nad tvrdým přistáním
+static var CRASH_HURT := 60.0           # zranění pilota při havárii
+static var BUMP_MIN_V := 2.0            # m/s – pomalejší dotek překážky se nepočítá
+static var BUMP_DMG_K := 2.0            # % poškození na 1 m/s šrámu o překážku
+static var LAW_TICK := 3.0              # s – perioda kontroly létání pod vlivem
 
 ## Katalog strojů: hodnoty „létající bedna“ = lehký motorový paraglide (tříkolka + padák).
 ## klíče: name, kg (prázdný), S (m²), AR (poměr stran), e, CL0, CL_A (1/rad), a_crit (°),
@@ -54,7 +92,8 @@ const LAND_GAP := 0.05             # m – dosednutí až pod gear_h − LAND_GA
 ## roll_max (rad), glide (klouzavost 1:x – podle ní je CD0 kalibrované)
 ## Kalibrace (vlna 0d, PROJECT_LOG): CL_trim = 2·m·g/(ρ·S·v_trim²) při plné nádrži,
 ## CD0 = CL_trim/glide − CL_trim²/(π·AR·e); auto-trim drží rychlost v_trim (`_trim_alpha`).
-const SPECS := {
+## M8.D2a: `static var` (dřív const) – menu F3 ladí hodnoty živě (`spec` stroje je stejný slovník).
+static var SPECS := {
 	"test_letoun": {"name": "Testovací letoun „Létající bedna“", "kg": 62.0, "S": 25.0, "AR": 3.0,
 		"e": 0.85, "CL0": 0.35, "CL_A": 2.8, "a_crit": 16.0, "CD0": 0.022, "thrust": 760.0,
 		"v_min": 9.0, "v_trim": 13.0, "v_max": 18.0, "tank_l": 12.0, "dojezd_min": 30.0,
@@ -83,8 +122,8 @@ static func make(model_id: String) -> Aircraft:
 		return Trike.new()
 	return Aircraft.new()
 
-const PILOT_KG := 85.0             # hmotnost pilota (zjednodušení)
-const FUEL_KG_L := 0.72            # hustota benzinu (kg/l)
+static var PILOT_KG := 85.0             # hmotnost pilota (zjednodušení)
+static var FUEL_KG_L := 0.72            # hustota benzinu (kg/l)
 
 var world: World
 var owner_id := 0
@@ -346,6 +385,14 @@ func setup(w: World, pid: int, model_id: String) -> void:
 	_prev_xf = global_transform
 	_cur_xf = global_transform
 	_build_chart()                       # Fáze 4: stavový automat letu (on_ground / _stalled)
+	DevTune.hub().changed.connect(_on_tune)   # M8.D2a: hmotnost tělesa po změně v menu F3
+
+
+## M8.D2a: změna parametru v menu F3 – hmotnost tělesa (jen pro kolize; let počítá `total_kg()` živě).
+## Ostatní parametry se čtou přímo ze `static var` / `spec` při každém kroku.
+func _on_tune(id: String, _v: Variant) -> void:
+	if id == "aircraft.pilot_kg" or id == "aircraft.%s.kg" % model:
+		mass = float(spec["kg"]) + PILOT_KG
 
 
 ## Póza sedícího pilota pro `Humanoid.ride` z bodů ve `vis` (−Z vpřed): převod do souřadnic
@@ -557,7 +604,7 @@ func wind_at(pos: Vector3) -> Vector3:
 			w = world.wind_field.wind_at(pos, agl)     # M8.4: profil podle drsnosti, expozice hřebenů, nárazy, vzestup u svahu
 		else:
 			w = world.weather.wind_vector()
-			w *= pow(agl / 10.0, 0.14)
+			w *= pow(agl / 10.0, WIND_PROFILE_EXP)
 		if world.thermals:
 			w.y += world.thermals.lift_at(pos)
 	return w
@@ -574,19 +621,19 @@ func _turbulence(pos: Vector3) -> Vector3:
 		var wd := world.weather.wind_vector()
 		if wd.length() > 0.5:
 			var w2 := Vector2(wd.x, wd.z).normalized()
-			var h_up := _gh(pos.x - w2.x * 60.0, pos.z - w2.y * 60.0)
+			var h_up := _gh(pos.x - w2.x * TURB_LEE_DIST, pos.z - w2.y * TURB_LEE_DIST)
 			var h_here := _gh(pos.x, pos.z)
-			if pos.y - h_here < 200.0:                   # závětří působí jen nízko
-				amp += maxf((h_up - h_here) / 60.0, 0.0) * TURB_LEE * minf(wd.length() / 6.0, 1.0)
-	var t := Time.get_ticks_msec() * 0.001
-	return Vector3(_turb.get_noise_2d(pos.x * 0.05 + t, pos.z * 0.05),
-		_turb.get_noise_2d(pos.y * 0.1 + t, pos.x * 0.05),
-		_turb.get_noise_2d(pos.z * 0.05, pos.y * 0.1 - t)) * amp
+			if pos.y - h_here < TURB_LEE_AGL:            # závětří působí jen nízko
+				amp += maxf((h_up - h_here) / TURB_LEE_DIST, 0.0) * TURB_LEE * minf(wd.length() / TURB_LEE_WIND, 1.0)
+	var t := Time.get_ticks_msec() * 0.001 * TURB_T
+	return Vector3(_turb.get_noise_2d(pos.x * TURB_XZ + t, pos.z * TURB_XZ),
+		_turb.get_noise_2d(pos.y * TURB_Y + t, pos.x * TURB_XZ),
+		_turb.get_noise_2d(pos.z * TURB_XZ, pos.y * TURB_Y - t)) * amp
 
 
 ## Opožděný vstup v opilosti (stejný princip jako Car): [thr, steer, elev]
 func _delayed_input(dt: float) -> Array:
-	var thr := clampf(pilot_input.throttle - pilot_input.brake * 0.3, 0.0, 1.0) if pilot_input else 0.0
+	var thr := clampf(pilot_input.throttle - pilot_input.brake * THR_BRAKE_CUT, 0.0, 1.0) if pilot_input else 0.0
 	var steer := -pilot_input.steer if pilot_input else 0.0            # A = bank vlevo
 	var elev := 0.0
 	if pilot_input:
@@ -594,7 +641,7 @@ func _delayed_input(dt: float) -> Array:
 			elev += 1.0                                              # zatáhnout / na zemi brzda
 		if pilot_input.crouch:
 			elev -= 1.0                                              # přiklonit
-	var delay := clampf(body_state.promile() * DRUNK_DELAY, 0.0, 0.45) if body_state else 0.0
+	var delay := clampf(body_state.promile() * DRUNK_DELAY, 0.0, DRUNK_DELAY_MAX) if body_state else 0.0
 	_hist.append([_life_t, [thr, steer, elev]])
 	while _hist.size() > 1 and _life_t - float(_hist[1][0]) >= delay:
 		_hist.pop_front()
@@ -633,7 +680,7 @@ func _wreck_step(dt: float) -> void:
 	if pos.y <= floor_y:
 		pos.y = floor_y
 		v.y = maxf(v.y, 0.0)
-		var k := exp(-3.0 * dt)
+		var k := exp(-WRECK_FRICTION * dt)
 		v.x *= k
 		v.z *= k
 	_xf = Transform3D(Basis.from_euler(Vector3(_pitch, _yaw, _bank)), pos)
@@ -649,7 +696,7 @@ func _fly_step(dt: float) -> void:
 	var thr_in: float = inp[0]
 	var steer_in: float = inp[1]
 	var elev_in: float = inp[2]
-	throttle = lerpf(throttle, thr_in, minf(dt * 4.0, 1.0))
+	throttle = lerpf(throttle, thr_in, minf(dt * THR_RESP, 1.0))
 	# hranice letu (M6.2): „protivítr“ zpět nad katastr / dolů pod strop – přičte se k větru
 	# (m/s proudění, ne zrychlení – A2-12); na zemi se neuplatní
 	var fb: Dictionary = world.flight_bounds(pos)
@@ -700,9 +747,9 @@ func _trim_alpha(va: float, vdot: float, gamma: float, t_norm: float, elev_in: f
 	var v_t := float(spec["v_trim"]) * (1.0 - TRIM_ELEV_V * clampf(elev_in, -1.0, 1.0))
 	var vv := maxf(va, 1.0)
 	var gdot := (TRIM_W * TRIM_W * (vv - v_t) + 2.0 * TRIM_ZETA * TRIM_W * vdot) / G
-	var lift := total_kg() * (G * cos(gamma) / maxf(cos(_bank), 0.5) + vv * gdot) - t_norm   # v zatáčce víc vztlaku
+	var lift := total_kg() * (G * cos(gamma) / maxf(cos(_bank), TRIM_BANK_COS_MIN) + vv * gdot) - t_norm   # v zatáčce víc vztlaku
 	var cl := lift / (0.5 * RHO * vv * vv * float(spec["S"]))
-	return clampf((cl - float(spec["CL0"])) / float(spec["CL_A"]), -0.1, _rot_alpha())
+	return clampf((cl - float(spec["CL0"])) / float(spec["CL_A"]), TRIM_ALPHA_MIN, _rot_alpha())
 
 
 ## Aerodynamika na zemi (A2-03): rychlost je vodorovná, náběh = pitch − sklon terénu.
@@ -711,7 +758,7 @@ func _trim_alpha(va: float, vdot: float, gamma: float, t_norm: float, elev_in: f
 func _ground_aero(pos: Vector3, fwd: Vector3, v_ground: float, slope: float, wing := 1.0) -> Dictionary:
 	var wind := wind_at(pos)
 	var vf := v_ground - fwd.dot(Vector3(wind.x, 0.0, wind.z))     # protivítr přidává
-	var alpha := _pitch - atan(clampf(slope, -0.4, 0.4))
+	var alpha := _pitch - atan(clampf(slope, -GROUND_SLOPE_MAX, GROUND_SLOPE_MAX))
 	var cl := _cl_of(alpha) * _lift_scale() * wing
 	var qs := 0.5 * RHO * vf * absf(vf) * float(spec["S"])
 	return {"va": maxf(vf, 0.0), "lift": maxf(qs, 0.0) * cl, "drag": qs * _cd_of(cl) * wing}
@@ -728,12 +775,12 @@ func _slope_at(pos: Vector3, fwd: Vector3) -> float:
 ## počátek gear_h nad zemí, rychlost vodorovně ve směru yaw.
 func _ground_move(pos: Vector3, gy: float, slope: float, v_ground: float, va: float,
 		steer_in: float, dt: float, can_rotate := true) -> void:
-	_yaw -= steer_in * GROUND_STEER * clampf(v_ground / 6.0, 0.0, 1.0) * dt
-	_bank = lerpf(_bank, -steer_in * 0.05, minf(dt * 3.0, 1.0))
-	var pitch_tgt := atan(clampf(slope, -0.4, 0.4))
-	if can_rotate and va >= float(spec["v_min"]) * 0.9:
+	_yaw -= steer_in * GROUND_STEER * clampf(v_ground / GROUND_STEER_V, 0.0, 1.0) * dt
+	_bank = lerpf(_bank, -steer_in * GROUND_BANK, minf(dt * GROUND_ATT_RATE, 1.0))
+	var pitch_tgt := atan(clampf(slope, -GROUND_SLOPE_MAX, GROUND_SLOPE_MAX))
+	if can_rotate and va >= float(spec["v_min"]) * ROT_V_K:
 		pitch_tgt += _rot_alpha()                                  # rotace na vzlet
-	_pitch = lerpf(_pitch, pitch_tgt, minf(dt * 3.0, 1.0))
+	_pitch = lerpf(_pitch, pitch_tgt, minf(dt * GROUND_ATT_RATE, 1.0))
 	pos.y = gy + float(spec["gear_h"])
 	_xf = Transform3D(Basis.from_euler(Vector3(_pitch, _yaw, _bank)), pos)
 	_v = Vector3(-sin(_yaw), 0.0, -cos(_yaw)) * v_ground
@@ -742,11 +789,11 @@ func _ground_move(pos: Vector3, gy: float, slope: float, v_ground: float, va: fl
 
 ## Odlepení: vztlak převáží tíhu při rychlosti vůči vzduchu ≥ 0,95·v_min (a stroj se už valí).
 func _try_liftoff(lift: float, va: float, v_ground: float) -> bool:
-	if lift <= total_kg() * G or va < float(spec["v_min"]) * 0.95 or v_ground < 1.0:
+	if lift <= total_kg() * G or va < float(spec["v_min"]) * LIFTOFF_V_K or v_ground < LIFTOFF_MIN_GS:
 		return false
 	on_ground = false
 	_air_t = _life_t
-	_v.y = 0.2
+	_v.y = LIFTOFF_VY
 	return true
 
 
@@ -761,9 +808,9 @@ func _on_ground(xf: Transform3D, gy: float,
 	var m := total_kg()
 	var ae := _ground_aero(pos, fwd, v_ground, slope)
 	var t := _thrust(float(ae["va"]))
-	var mu := _mu_ground() * (1.3 if world.weather and world.weather.surface_grip("teren") < 0.9 else 1.0)
+	var mu := _mu_ground() * (MU_WET_K if world.weather and world.weather.surface_grip("teren") < MU_WET_GRIP else 1.0)
 	var wload := maxf(m * G - float(ae["lift"]), 0.0)
-	var a := (t - float(ae["drag"]) - mu * wload) / m - G * slope * 0.5
+	var a := (t - float(ae["drag"]) - mu * wload) / m - G * slope * GROUND_SLOPE_K
 	if elev_in > 0.0:                                            # Mezerník na zemi = brzda
 		a -= BRAKE_DECEL
 	v_ground = maxf(v_ground + a * dt, 0.0)
@@ -787,13 +834,13 @@ func _in_air(xf: Transform3D, wind: Vector3, v: Vector3,
 	var a_crit := deg_to_rad(float(spec["a_crit"]))
 	if not _stalled and alpha > a_crit:
 		_stav_event(&"pretazeni")
-	elif _stalled and alpha < a_crit * 0.75:
+	elif _stalled and alpha < a_crit * STALL_RECOVER_K:
 		_stav_event(&"zotaveni")
 	var cl: float
 	if _stalled:
 		cl = (float(spec["CL0"]) + float(spec["CL_A"]) * a_crit) * CL_STALL * signf(alpha)
 	else:
-		cl = clampf(float(spec["CL0"]) + float(spec["CL_A"]) * alpha, NEG_A_CL, 3.0)
+		cl = clampf(float(spec["CL0"]) + float(spec["CL_A"]) * alpha, NEG_A_CL, CL_MAX_ABS)
 	cl *= _lift_scale()
 	var q := 0.5 * RHO * va * va * float(spec["S"])
 	var air_dir := air_v / va if va > 0.05 else -basis.z
@@ -815,14 +862,14 @@ func _in_air(xf: Transform3D, wind: Vector3, v: Vector3,
 	v += (f / m + Vector3(0, -G, 0)) * dt
 	# orientace: bank ze steer, zatáčka z banku, pitch = dráha + auto-trim + výškovka
 	_bank = move_toward(_bank, _bank_target(steer_in), ROLL_RATE * dt)
-	var yaw_rate := G * tan(clampf(_bank, -1.2, 1.2)) / maxf(va, float(spec["v_min"]))
+	var yaw_rate := G * tan(clampf(_bank, -BANK_YAW_MAX, BANK_YAW_MAX)) / maxf(va, float(spec["v_min"]))
 	_yaw += yaw_rate * dt
 	air_v = v - wind
 	var gamma := atan2(air_v.y, maxf(Vector3(air_v.x, 0, air_v.z).length(), 1.0))
 	var pitch_tgt := gamma + _trim_alpha(air_v.length(), vdot, gamma, t_norm, elev_in) + elev_in * ELEV_PITCH
 	if _stalled or va < float(spec["v_min"]):
-		pitch_tgt = minf(pitch_tgt, gamma - 0.06)        # přetáčení: nos padá dolů
-	_pitch = move_toward(_pitch, clampf(pitch_tgt, -0.9, 0.7), PITCH_RATE * dt)
+		pitch_tgt = minf(pitch_tgt, gamma - STALL_NOSE_DROP)   # přetáčení: nos padá dolů
+	_pitch = move_toward(_pitch, clampf(pitch_tgt, PITCH_MIN, PITCH_MAX), PITCH_RATE * dt)
 	var new_basis := Basis.from_euler(Vector3(_pitch, _yaw, _bank))
 	# dotyk země (A2-04 hystereze): pod gear_h − 5 cm, klesání vůči terénu, ≥ 0,5 s po odlepení;
 	# jinak stroj nad terénem jen podržíme (terén nekoliduje – A2-07)
@@ -846,7 +893,7 @@ func _touchdown(pos: Vector3, gy: float, v: Vector3, impact: float) -> void:
 	if impact > CRASH_LAND_VY:
 		pos.y = gy + float(spec["gear_h"])
 		_xf = Transform3D(Basis.from_euler(Vector3(_pitch, _yaw, _bank)), pos)
-		_v = hg * 0.3
+		_v = hg * CRASH_SLIDE_K
 		_crash(pos, "Tvrdá havárie při přistání")
 		return
 	on_ground = true
@@ -857,9 +904,9 @@ func _touchdown(pos: Vector3, gy: float, v: Vector3, impact: float) -> void:
 	_bank = 0.0
 	var flared := _flare_ok()
 	if impact > HARD_LAND_VY and not flared:
-		dmg = minf(dmg + (impact - HARD_LAND_VY) * 12.0, 100.0)
+		dmg = minf(dmg + (impact - HARD_LAND_VY) * HARD_DMG_K, 100.0)
 		if body_state:
-			body_state.hurt((impact - HARD_LAND_VY) * 8.0, "tvrdé přistání letounem")
+			body_state.hurt((impact - HARD_LAND_VY) * HARD_HURT_K, "tvrdé přistání letounem")
 		world.play_sfx(owner_id, "land", 0.7, 0.0)
 		_notify("Tvrdé přistání (%.1f m/s) – podvozek dostal zabrat." % impact, 3.0)
 	elif flared:
@@ -928,7 +975,7 @@ func _xp_flush() -> void:
 ## Létání pod vlivem: svědek ~150 m (sdílíme droní svědectví), přestupek nejdřív po OFF_CD.
 func _law_check(dt: float) -> void:
 	_law_t += dt
-	if _law_t < 3.0:
+	if _law_t < LAW_TICK:
 		return
 	_law_t = 0.0
 	if body_state == null or body_state.promile() < 0.01:
@@ -949,7 +996,7 @@ func _crash(pos: Vector3, why: String) -> void:
 		return
 	dmg = 100.0
 	if body_state:
-		body_state.hurt(60.0, "havárie letounu")
+		body_state.hurt(CRASH_HURT, "havárie letounu")
 	world.play_sfx(owner_id, "crash", 0.9, 0.0)
 	_notify("%s – stroj je na odpis." % why, 5.0)
 	world.emit_game_event(owner_id, "aircraft_crash", {"model": model, "pos": pos})
@@ -961,14 +1008,14 @@ func _crash(pos: Vector3, why: String) -> void:
 ## Náraz do překážky (strom, budova, prop, postava): nad práh = havárie, jinak jen šrám.
 func _on_body(b: Node) -> void:
 	var spd := linear_velocity.length()
-	if dmg >= 100.0 or spd < 2.0:
+	if dmg >= 100.0 or spd < BUMP_MIN_V:
 		return
 	if b and String(b.get_meta("surface", "")) == "teren":
 		return                           # terén řeší analytické dosednutí (A2-07), ne „náraz“
 	if spd >= CRASH_SPD:
 		_crash(global_position, "Náraz do překážky (%s)" % (b.name if b else "?"))
 	elif not on_ground:
-		dmg = minf(dmg + spd * 2.0, 99.0)
+		dmg = minf(dmg + spd * BUMP_DMG_K, 99.0)
 		world.play_sfx(owner_id, "thud", 0.8, -4.0)
 
 

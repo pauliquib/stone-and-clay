@@ -8,20 +8,26 @@ class_name Thermals
 extends Node
 
 ## Laditelné parametry termiky (čísla zjednodušená – hratelnost před fyzikální přesností).
-const SPAWN_EVERY_MIN := 8.0       # jak často se zkouší nová bublina (herní minuty)
-const MAX_BUBBLES := 10            # strop počtu živých bublin
-const LIFE_MIN := [5.0, 15.0]      # životnost bubliny (herní minuty)
-const RADIUS := [60.0, 140.0]      # poloměr bubliny (m)
-const STRENGTH := [0.5, 3.0]       # stoupání v ose (m/s), sílí k poledni
-const TOP_AGL := [350.0, 900.0]    # strop termiky nad zemí (m AGL)
-const SPAWN_DIST := [300.0, 1500.0]# jak daleko od hráče bublina vzniká (m)
-const SEASON_M := [5, 9]           # měsíce, kdy termika létá (květen–září)
-const HOURS := [11.0, 17.0]        # denní okno termiky
-const T_MIN := 18.0                # minimální teplota vzduchu (°C)
-const FOREST_MAX := 0.35           # nad touto pokryvností lesa termika nevzniká
-const SINK_RING := 1.4             # do tohoto násobku poloměru kolem bubliny slabě klesá (−0,3 m/s)
-const STORM_LIFT := 4.0            # max stoupání / sestup pod bouřkou (m/s), šumově
-const DEBUG_R := 0.0               # >0: ladění – fixní bublina nad hráčem o poloměru (m)
+static var SPAWN_EVERY_MIN := 8.0       # jak často se zkouší nová bublina (herní minuty)
+static var MAX_BUBBLES := 10            # strop počtu živých bublin
+static var LIFE_MIN: Array[float] = [5.0, 15.0]      # životnost bubliny (herní minuty)
+static var RADIUS: Array[float] = [60.0, 140.0]      # poloměr bubliny (m)
+static var STRENGTH: Array[float] = [0.5, 3.0]       # stoupání v ose (m/s), sílí k poledni
+static var TOP_AGL: Array[float] = [350.0, 900.0]    # strop termiky nad zemí (m AGL)
+static var SPAWN_DIST: Array[float] = [300.0, 1500.0]# jak daleko od hráče bublina vzniká (m)
+static var SEASON_M: Array[int] = [5, 9]           # měsíce, kdy termika létá (květen–září)
+static var HOURS: Array[float] = [11.0, 17.0]        # denní okno termiky
+static var T_MIN := 18.0                # minimální teplota vzduchu (°C)
+static var FOREST_MAX := 0.35           # nad touto pokryvností lesa termika nevzniká
+static var SINK_RING := 1.4             # do tohoto násobku poloměru kolem bubliny slabě klesá (−0,3 m/s)
+static var STORM_LIFT := 4.0            # max stoupání / sestup pod bouřkou (m/s), šumově
+static var DEBUG_R := 0.0               # >0: ladění – fixní bublina nad hráčem o poloměru (m)
+# M8.D2a: čísla dřív zapsaná přímo ve vzorcích (stejné hodnoty) – laditelné z menu F3 (`tune_letani.gd`)
+static var DAY_FALLOFF := 0.6           # o kolik je bublina na okraji denního okna slabší než v poledne
+static var SINK_MS := 0.3               # m/s – klesání v prstenci kolem bubliny (u okraje)
+static var TOP_FADE := 0.25             # horní podíl výšky bubliny, ve kterém stoupání slábne k nule
+static var STORM_FROM := 0.25           # bouřkové stoupání / sestup od síly bouřky
+static var DRIFT_K := 1.0               # bublina táhne s větrem (× rychlost větru)
 
 var world: World
 var bubbles: Array = []            # {pos: Vector2, r: float, w: float (m/s), top: float (m AGL), zbyva: float (herní min)}
@@ -63,7 +69,7 @@ func _process(delta: float) -> void:
 	for i in range(bubbles.size() - 1, -1, -1):
 		var b: Dictionary = bubbles[i]
 		b["zbyva"] = float(b["zbyva"]) - gmin
-		b["pos"] = (b["pos"] as Vector2) + Vector2(wind.x, wind.z) * delta     # bublina táhne s větrem (reálný čas)
+		b["pos"] = (b["pos"] as Vector2) + Vector2(wind.x, wind.z) * DRIFT_K * delta   # bublina táhne s větrem (reálný čas)
 		if float(b["zbyva"]) <= 0.0:
 			bubbles.remove_at(i)
 	if DEBUG_R > 0.0:
@@ -96,7 +102,7 @@ func _spawn_bubble() -> void:
 		# polední maximum – okolo 13:30 sílí, k ránu / večeru slábne
 		var h := world.clock.hour()
 		var mid := (HOURS[0] + HOURS[1]) * 0.5
-		var day_k := 1.0 - clampf(absf(h - mid) / ((HOURS[1] - HOURS[0]) * 0.5), 0.0, 1.0) * 0.6
+		var day_k := 1.0 - clampf(absf(h - mid) / ((HOURS[1] - HOURS[0]) * 0.5), 0.0, 1.0) * DAY_FALLOFF
 		bubbles.append({"pos": Vector2(x, z), "r": randf_range(RADIUS[0], RADIUS[1]),
 			"w": randf_range(STRENGTH[0], STRENGTH[1]) * day_k, "top": randf_range(TOP_AGL[0], TOP_AGL[1]),
 			"zbyva": randf_range(LIFE_MIN[0], LIFE_MIN[1])})
@@ -118,12 +124,12 @@ func lift_at(pos: Vector3) -> float:
 		if d < r:
 			var gy := world.terrain.height_at(pos.x, pos.z)
 			var agl := pos.y - gy
-			var cap := lerpf(1.0, 0.0, clampf((agl - float(b["top"]) * 0.75) / (float(b["top"]) * 0.25), 0.0, 1.0))
+			var cap := lerpf(1.0, 0.0, clampf((agl - float(b["top"]) * (1.0 - TOP_FADE)) / (float(b["top"]) * TOP_FADE), 0.0, 1.0))
 			w += float(b["w"]) * (1.0 - (d / r) * (d / r)) * cap      # vrchol bubliny stoupá nejvíc, ke stropu slábne
 		elif d < r * SINK_RING:
-			w -= 0.3 * (1.0 - (d - r) / (r * (SINK_RING - 1.0)))        # mírné sestupné kolo okolo
+			w -= SINK_MS * (1.0 - (d - r) / (r * (SINK_RING - 1.0)))    # mírné sestupné kolo okolo
 	# pod bouřkou: silný stoupavý i sestupný šum (jednoduchá „shelf“ náběžka)
-	if world.weather and world.weather.storm > 0.25:
+	if world.weather and world.weather.storm > STORM_FROM:
 		var n := _storm_noise.get_noise_3d(pos.x, pos.y, pos.z + Time.get_ticks_msec() * 0.001)
 		w += n * STORM_LIFT * world.weather.storm
 	return w
