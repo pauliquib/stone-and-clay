@@ -676,3 +676,29 @@ Co změřit: `--perfscene=les_rano_kveten,30`, `--perfscene=rybnik_soumrak,30` a
 se zapnutou / vypnutou „Zvukovou krajinou“ – profily „soundscape“ a „small_life“. Očekávání: průměr +≤ 0,2 ms CPU
 (výběr zdrojů 2×/s ~0,3–0,8 ms jednou za 30 snímků, za snímek jen 16 hlasů a 5 prolnutí), GPU ≈ 0 (5 MultiMesh, ≤ 160
 instancí, unshaded). Syntéza zvuků běží ve vlákně (bez záseku hlavního vlákna). Taky `les_rano_mlha` (cíl +≤ 0,2 ms).
+
+### M8.19A – kalibrace
+
+Pozn.: změny výchozích hodnot (déšť, toky, výnosy, mlha, fenologie ovocných stromů) platí pro novou hru i načtený save;
+F3 je ukáže jako výchozí. Tabulka „před → po, proč“ je v `PROJECT_LOG.md` (M8.19A).
+
+1. `python3 tools/eco_calibrate.py` (~30 s, nic nezapisuje) → posuď výpis: sloupce „model P“ (náhradní počasí) vs. „ref“
+   u fenologie (rašení / kvetení / zbarvení ve dnech v roce), u vody srážky ~560 mm, odtok ~0,15, Q/normál ~0,9, u mlhy
+   45–75 dní, u plodin t/ha vs. ČSÚ a „počasí/K“ ~1,0, u zvěře hustoty po 10 letech. Kde znáš lepší referenci (místní
+   fenologie, výnosy statku), uprav tabulky `REF_*` v hlavičce skriptu a pošli rozdíly. Zkusmo: `--set weather.RAIN_MM_H=3`.
+2. Nová hra, F2 → 15. 6., hraj / přeskakuj 2–3 herní týdny → prší zhruba 1 den z 3–4 (dřív skoro denně); po dešti louže
+   a bláto jen v prohlubních a na cestách, ne všude.
+3. F2 → Příroda – ladění → Voda (vrstva `vlhkost`): v létě orná půda kolem 0,2–0,4, les sušší, údolnice vlhčí; ne celá mapa
+   nasycená (dřív ~1,0). Potoky: hladina kolem normálu, kalné jen po vydatném dešti, v srpnu–září nízko, ale netečou nasucho.
+4. Po letní bouřce (F2 → Bouřka, hodinu počkat) → potok o něco výš a kalný, za 1–2 dny zpět. (Slabší než dřív – pokud chceš
+   výraznější přívaly, napiš; řešení je nelineární intenzita lijáku.)
+5. Pole / zahrada v běžném roce: deník J / info pole → „výnos vůči normálu“ kolem 0,9–1,1 (dřív hluboko pod 1 každý rok);
+   v suchém létě klesne (~0,7).
+6. F2 → 12. 4. v sadu: třešně, švestky a hrušně mají první listy, jabloně začínají rašit (dřív holé ještě kolem 18. 4.);
+   kolem 16.–18. 4. kvetou třešně a švestky; topoly kvetou koncem března.
+7. Údolí ráno (říjen–listopad, jasná bezvětrná noc) → mlha jen některá rána (~1× týdně na podzim), ne skoro každé.
+8. Rozhovor s vesničanem v kotlině za mrazivého rána vs. na kopci → poznámka o zimě odpovídá teplotě v místě; nocleh
+   v kotlině varuje „bude zima“ dřív než na svahu.
+9. Lov za větru (kulovnice na 150+ m, F2 → silný vítr) → u lesa / za kopcem menší snos než na otevřeném poli (vítr v místě
+   střely z pole větru).
+10. Drby (M8.17) se dál vyprávějí jako dřív (náhoda vyprávění je teď ze seedu – postava, den, čtvrthodina), v konzoli bez chyb.

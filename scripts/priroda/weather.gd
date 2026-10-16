@@ -46,7 +46,7 @@ static var TAU_FOG := 0.7
 static var TAU_WIND := 0.4
 static var TAU_TEMP := 1.2
 static var SNOW_BELOW := 0.8           # °C – pod touto teplotou sněží
-static var RAIN_MM_H := 25.0           # rain = 1 odpovídá lijáku 25 mm/h
+static var RAIN_MM_H := 2.5            # mm/h při rain = 1 (× sezónní poměr `rain_season_k`); M8.19: 25 → 2,5 – roční úhrn ~560 mm
 
 ## M8.D2c: čísla ze vzorců vytažená k ladění (F3 → Příroda/Počasí) – výchozí hodnoty = dřívější čísla ve vzorcích.
 static var WARMUP_H := 72.0            # kolik hodin se nasimuluje při startu / skoku v kalendáři
@@ -108,7 +108,7 @@ static var TEMP_MIN_H := 6.0           # minimum teploty (h)
 static var TEMP_MAX_H := 15.0          # maximum teploty (h)
 static var TEMP_RAIN_COOL := 2.5       # déšť ochlazuje (°C při plném dešti)
 static var TEMP_FOG_COOL := 1.0        # mlha ochlazuje (°C při plné mlze)
-static var WET_DAYS_REF := 8.0         # srážkové dny v měsíci, při kterých je váha deště 1
+static var WET_DAYS_REF := 20.0        # srážkové dny v měsíci, při kterých je váha deště 1 (M8.19: 8 → 20 – prší ~8 % hodin, ~100 dní ≥ 1 mm)
 static var STORM_W := 8.0              # váha bouřky (× podíl bouřek měsíce)
 static var STORM_DAY_MULT := 1.6       # … odpoledne (mezi STORM_FROM_H a STORM_TO_H)
 static var STORM_NIGHT_MULT := 0.3     # … jindy
@@ -469,9 +469,28 @@ func wetness_ground() -> float:
 	return wetness
 
 
-## Srážky v mm/h.
+## Srážky v mm/h (čte vodní bilance `SoilWater`). M8.19: × sezónní poměr – v létě vydatnější srážky (bouřky), v zimě mrholení.
 func precip_mm_h() -> float:
-	return rain * RAIN_MM_H
+	if rain <= 0.0:
+		return 0.0
+	return rain * RAIN_MM_H * rain_season_k(clock.day_of_year() if clock != null else 180.0)
+
+
+## Sezónní poměr úhrnu na srážkový den (normál `SoilWater.PRECIP_MM` / `Seasons.WET_DAYS`) vůči ročnímu průměru:
+## leden ~0,6, červenec ~1,5. Bez něj by herní počasí (stejná intenzita situací celý rok) dávalo zimu 2× mokřejší a léto
+## o třetinu sušší než normál (kalibrace M8.19, `tools/eco_calibrate.py`).
+static func rain_season_k(doy: float) -> float:
+	var per := 0.0
+	for m in 12:
+		per += float(SoilWater.PRECIP_MM[m]) / maxf(float(Seasons.WET_DAYS[m]), 1.0)
+	per /= 12.0
+	if per <= 0.0:
+		return 1.0
+	var m0 := fposmod((doy - 15.0) / 30.44, 12.0)
+	var i := int(m0)
+	var a := float(SoilWater.PRECIP_MM[i]) / maxf(float(Seasons.WET_DAYS[i]), 1.0)
+	var b := float(SoilWater.PRECIP_MM[(i + 1) % 12]) / maxf(float(Seasons.WET_DAYS[(i + 1) % 12]), 1.0)
+	return lerpf(a, b, m0 - i) / per
 
 
 ## Směr, kam vítr fouká, ve světě hry (vodorovný jednotkový vektor) × rychlost (m/s).

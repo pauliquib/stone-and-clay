@@ -43,7 +43,7 @@ static var BM0_GM2 := 3.0                # g/m² – biomasa při vzejití (osiv
 static var LEAF_FRAC := 0.5              # podíl biomasy v listech do odkvětu (LAI = SLA × listy)
 static var SLA_M2_G := 0.02              # m² listů na g listové sušiny
 static var LAI_SENESCE_D := 0.03         # podíl LAI, který po odkvětu denně zestárne
-static var WILT_M := 0.12                # vlhkost půdy (podíl AWC) – bod vadnutí, růst 0
+static var WILT_M := 0.0                 # vlhkost půdy (podíl AWC) – bod vadnutí, růst 0 (AWC už je nad bodem vadnutí; M8.19: 0,12 → 0)
 static var DRY_FROM_M := 0.35            # pod touto vlhkostí (× nárok plodiny) začíná stres suchem
 static var WET_FROM_M := 0.9             # nad touto vlhkostí zamokření u citlivých plodin
 static var WATERLOG_K := 0.6             # zamokření při plně nasycené půdě ubere tolik růstu
@@ -58,8 +58,8 @@ static var DEAD_WS := 0.08               # stres vody pod tímto = „úplné su
 static var FROST_SENSITIVE_C := -1.5     # plodiny s `mraz` ≥ tomuto zmrznou i přízemním mrazem (frost_at)
 static var FROST_KILL_AT := 0.75         # Microclimate.frost_at, při kterém přízemní mráz zabije citlivé plodiny
 static var WA_RATE := 0.15               # klouzavý průměr stresu vody (barva pole) – váha dnešního dne
-static var CLIM_MOIST := 0.6             # klimatický normál: vlhkost půdy
-static var CLIM_CLOUD := 0.5             # klimatický normál: oblačnost
+static var CLIM_MOIST := 0.3             # klimatický normál: vlhkost půdy (M8.19: 0,6 → 0,3 – běžný rok ≈ normál, `tools/eco_calibrate.py`)
+static var CLIM_CLOUD := 0.6             # klimatický normál: oblačnost (M8.19: 0,5 → 0,6 = průměr herního počasí)
 static var ANGSTROM_A := 0.25            # Ångström: záření = Ra × (A + B × (1 − oblačnost))
 static var ANGSTROM_B := 0.5
 static var DAY_MIN_HOURS := 12           # DayAcc: tolik hodinových vzorků, aby se den počítal ze skutečného počasí
