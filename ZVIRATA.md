@@ -201,6 +201,28 @@ hmotnosti (`FarmSpecs.meat_kg`) a zdraví zvířete; prase navíc potřebuje pom
 řezníka za `BUTCHER_PRICE` Kč, dá sádlo, jitrnici a tlačenku a zvedne respekt komunity `sousede`.
 
 
+## Stanoviště a populace zvěře (krok M8.15)
+
+`Habitat` (`scripts/eko/habitat.gd`, `World.habitat`, přepínač Realismu „Stanoviště a populace zvěře“) počítá na mřížce
+64 m pro srnce, prase a zajíce skóre **odpočinku** (kryt × klid × zimní závětří) a **pastvy** (potrava podle sezóny).
+Vůdce skupiny podle něj vybírá cíle: mimo dobu aktivity (`AnimalSpecs.active`) jde do krytu a leží, při aktivitě jde na
+pastvu (soumrak: pole a louky u lesa). Bez Habitatu (vypnuto, prvních pár sekund po startu) platí staré stanoviště.
+
+| Druh | Kryt (lože) | Potrava | Zima |
+|---|---|---|---|
+| srnec | houštiny a mladé porosty, vysoké obilí, tráva | louky, ozimy, jetel, okus, žaludy | závětří, jižní svahy, krmelce; za mrazu ne v kotlinách |
+| prase | les s podrostem / jehličnany, kukuřice | rytí (vlhká půda), žaludy a bukvice (semenný rok), kukuřice v mléčné zralosti, louky u lesa | žaludy ulehčí zimu |
+| zajíc | pole a louky s porostem (pelech) | ozimy, jetel, tráva | krmelce trochu |
+
+Populace po 4 honitbách (kvadranty katastru): kapacita K = Σ HSI × hustota při HSI 1 (`DENS_MAX`: srnec 50, prase 20,
+zajíc 40 ks / 100 ha – odhad, ověřit), rovnováha zhruba v polovině K. Rození: srnčata V–VI (1,7 na srnu), selata III–V
+(5 na bachyni × loňské žaludy), zajíci III–IX. Úmrtnost: základní, nad kapacitou, zimní (sníh, mráz; krmelec / žaludy
+ulehčí), auta, plán myslivců (srnec 30 %, prase 60 % × hustota, zajíc 10 % za rok). Hráčův úlovek a sražený kus
+odečte kus z honitby. Kolik zvěře se u hráče objeví (`Fauna._spawn_encounter`), určuje hustota v honitbě a vhodnost okolí.
+Semenný rok dubu a buku 1× za 3–6 let (F2 → Příroda – ladění → Populace zvěře → vynutit). Prasata při vysoké hustotě ryjí
+louky u lesa (tmavá místa, zarostou za 40 dní) a škodí v kukuřici → drby a vnadění u krmelce pod posedem.
+Všechny konstanty: F3 → Zvěř/Stanoviště a Zvěř/Populace a škody (`scripts/dev/tune_m8_15.gd`).
+
 ## Lov zvěře – zásah, postřelení, úlovek (krok M2.9)
 
 Zvěř (`Animal`) po zásahu střelou (`Animal.shot(zóna, energie, odkud, info)`, volá `Hunting.animal_shot`) reaguje podle zóny z `Weapons.hit_zone`:

@@ -2557,3 +2557,42 @@ dopravy, ne o regresi.
   vesničanů na teplotě nezávisí) → háček pro M8.17 (stín v horku taky).
 - Časové měřítko: tepelná kapacita 60 Wh/K je fyzikální (herní hodina = 2 min) – pokud bude zima / žízeň / ospalost
   příliš rychlá, ladit v F3 (`body.thermo.heat_cap_wh_k`, `drowsy_from_h`, `thirst_full_l`) a přenést v M8.19.
+
+## 2026-10-16 – M8.15 Ekologie a populace zvěře
+
+### Hotovo (staticky ověřeno čtením kódu a kontrolou překladu – ruční test čeká)
+- **`Habitat`** (`scripts/eko/habitat.gd`, `World.habitat`, přepínač `habitat`, API z 00_PRINCIPY kap. 3 s fallbackem
+  `active()` = false): mřížka 64 m, statické vrstvy po startu přes `EcoClock.slice` (les/okraj/zástavba/silnice z `Fauna`,
+  houštiny / duby a buky / jehličnany z `TreeManager.ids_near` + `TreeEco`, `Site` voda, závětří, zimní oslunění, kotliny,
+  `Fields` pole a louky), denní skóre odpočinku a pastvy pro srnce, prase, zajíce (`eco_day`, 32 buněk za snímek):
+  plodiny podle `Fields.field_info` / `crop_height_at` (M8.12), tráva luk z `World.meadows` (M8.14, dynamicky, jinak
+  měsíce), žaludy a bukvice `Phenology.fruit` × semenný rok (deterministicky 1× za 3–6 let), krmelce `Hunter`, sníh a
+  vlhkost `SoilWater`, mráz → postih mrazových kotlin (srnci výš na svazích – bod M8.9). API `suitability`, `best_nearby`
+  (rest / feed / water), `rest_at`, `feed_at`, `density`, `spawn_roll`, `pick_weight`, `on_death`, `disturb`, `note_trail`,
+  `trail_at`, `grass_height_at`, `mast_now`, `browse_pressure`, `bait_active`, `rumor`, `journal_text`, `population_text`.
+- **Denní cyklus zvěře** (`animal.gd`): vůdce mimo aktivitu jde do nejlepšího krytu v okrsku a lehne si jen v krytu,
+  za soumraku na pastvu (pole / louka u lesa); přechody lože ↔ pastva = zvěřní ochozy (`note_trail`). V zimě domov
+  u krmelce (dřívější `Hunter`) + pastva u krmelce a závětří v Habitatu.
+- **Populace** po 4 honitbách: logistický růst s kapacitou z HSI, rození v oknech (selata × loňské žaludy), přirozená,
+  zimní (krmelec / žaludy ulehčí) a „nad kapacitou“ úmrtnost, auta, plán myslivců (u prasat podle hustoty), úlovky hráče
+  (`Hunting.on_animal_died` → `on_death`) a sražené kusy (`Animal.knock`). Setkání u hráče: druh podle hustoty × vhodnosti,
+  šance skupiny z hustoty (deterministicky buňka/den/2 h), místo podle vhodnosti (`fauna.gd`).
+- **Důsledky**: rozrytá louka u lesa (MultiMesh `Fauna._update_rooting`, zaroste za 40 dní), škody v kukuřici → drb
+  vesničanů (`World.dialog_context["wildlife"]` → `Dialog.rumor`), událost `wildlife_damage` (háček M7.3), vnadění prasat
+  u krmelce pod posedem (`hunter.gd`), respekt zemědělců za legální úlovek prasete při škodách, okus sazenic podle
+  `browse_pressure` (`planted_trees.gd`). Deník J → odhad zvěře (přesnost Myslivost) a semenný rok; F2 → Příroda – ladění →
+  „Populace zvěře (M8.15)“ (tabulka, vynutit semenný rok); vrstvy `habitat_srnec`, `habitat_prase`.
+- **Otevřené body z dřívějška**: M8.10 „vysoká tráva“ = `Fields.crop_height_at` / `Habitat.grass_height_at` (throttling
+  0,5 s zůstal); M8.D2d `hunting.gd` bere hmotnost z `AnimalSpecs.get_spec` (laditelná kopie); M8.9 inverze viz výš.
+- **Ukládání** klíč `wildlife` (starý save → populace z kapacity). Realismus → „Stanoviště a populace zvěře“.
+- **F3**: `scripts/dev/tune_m8_15.gd`, skupiny „Zvěř/Stanoviště“ a „Zvěř/Populace a škody“ – **168 parametrů**.
+- Měřicí scéna `zver_pulnoc` (`tests.gd`). Doc: `docs/SYSTEMS.md`, README, `ZVIRATA.md`, `docs/testy_M8.md`.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist v `docs/testy_M8.md` → M8.15) a měření `--perfscene=zver_pulnoc` / `pole_leto`.
+- Ochozy se zapisují jen do `Habitat.d_trail` – zápis do mapy pěšin M8.14 (sešlapaná tráva, častější stopy) po sloučení
+  M8.14 (API pěšin neznámé v době psaní). Kryt luk z M8.14 se čte dynamicky (`World.meadows.height_at` / `grass_height_at`).
+- Pevné skupiny zvěře při stavbě světa (`Fauna.POPULATION`) se dál zakládají podle tabulky, z hustoty se odvozují jen
+  setkání u hráče; ptáci v Habitatu nejsou (jen hejna jako dřív).
+- Rozrytí je jen decal (MultiMesh), ne deformační mapa M8.13; úkol „pomoz se škodami“ jen háček (událost) a drb.
+- Hustoty a míry populace jsou odhad (ověřit pro ČR) → kalibrace v M8.19.

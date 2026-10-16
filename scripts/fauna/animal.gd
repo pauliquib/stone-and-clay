@@ -63,8 +63,14 @@ static var STAND_SIGHT_K := 0.6
 ## M8.10: kde je „vysoká tráva“ (srnec v ní skáče odrazovými skoky): třída plochy `Fields.class_at`
 ## (1 orná půda, 2 louka) → měsíce, kdy porost stojí (obilí do žní, louka do první seče). Hrubé, než M8.12 dá
 ## skutečnou výšku plodin.
+## M8.15: s modelem plodin (M8.12) rozhoduje skutečná výška porostu `Fields.crop_height_at`, na louce `Habitat.grass_height_at`
+## (M8.14, jinak hrubě po měsících); tabulka měsíců zůstává jako fallback bez modelu.
 const TALL_VEG_MONTHS := {1: [5, 6, 7], 2: [5, 6]}
 static var TALL_VEG_CHECK_S := 0.5
+static var TALL_VEG_MIN_M := 0.45    # M8.15: porost od této výšky (m) = „vysoká tráva“
+## M8.15: denní cyklus podle `Habitat` (přepínač `habitat`): lože jen v krytu, pastva tam, kde je potrava
+static var HAB_REST_OK := 0.45       # odpočinek na místě, když je kryt (Habitat.rest_at) aspoň tolik, jinak jde do lepšího
+static var HAB_FEED_OK := 0.35       # při aktivitě: pastva pod tolik → přesun na lepší pastvu v okrsku
 
 ## --- M8.D2d: čísla dřív zapsaná přímo ve vzorcích (stejné hodnoty)
 # úroveň detailu a takt rozhodování
@@ -280,6 +286,7 @@ var _pronk_t := 0.0                 # odstup času do příštího odrazového s
 var _anim_dt := 0.0                 # akumulace času pro animaci ve vzdáleném LOD
 var _tall := false                   # M8.10: stojí ve vysoké trávě / obilí (zjišťuje se 2× za s)
 var _tall_t := 0.0
+var _hab_purpose := ""               # M8.15: poslední účel přesunu ("rest" / "feed") – změna = zvěřní ochoz
 var _charged := false
 var _noise_pos := Vector3.ZERO         # odkud zazněl výstřel / hluk (M2.8), odtud zvíře prchá
 var _noise_t := 0.0                    # do kdy (s) zvíře prchá před hlukem
@@ -644,25 +651,43 @@ func _follow_or_idle(_dt: float, active: bool, bad_weather: bool) -> void:
 		want_speed = 0.0
 		state = "graze"
 		return
+	# M8.15: s `Habitat` (srnec, prase, zajíc) vybírá lože a pastvu mřížka stanovišť, jinak staré stanoviště okrsku
+	var hb: Habitat = fauna.habitat_on() if Habitat.sp_index(species) >= 0 else null
+	var hr: float = spec["home_range"]
+	var c := home if global_position.distance_to(home) > hr * HOME_RETURN_K else global_position
 	# vůdce / samotář: mimo dobu aktivity (nebo v nečase) si jde lehnout do úkrytu
 	if (not active and state_t > SHELTER_AFTER_S) or (bad_weather and state_t > SHELTER_BAD_S):
-		var shelter := "forest" if bad_weather or spec["habitat"] != "field" else "field"
-		if fauna.score(shelter, global_position.x, global_position.z) > SHELTER_SCORE:
-			_enter("rest")
-			return
-		if target == Vector3.INF:
-			target = fauna.random_point(global_position, SHELTER_R, shelter, rng)
-			state = "move"
+		if hb != null:
+			if hb.rest_at(species, global_position) >= HAB_REST_OK:
+				_enter("rest")
+				return
+			if target == Vector3.INF:
+				target = hb.best_nearby(species, c, hr, "rest", rng)
+				_hab_move("rest")
+				state = "move"
+		else:
+			var shelter := "forest" if bad_weather or spec["habitat"] != "field" else "field"
+			if fauna.score(shelter, global_position.x, global_position.z) > SHELTER_SCORE:
+				_enter("rest")
+				return
+			if target == Vector3.INF:
+				target = fauna.random_point(global_position, SHELTER_R, shelter, rng)
+				state = "move"
 	if state == "move" and target == Vector3.INF:
 		_enter("graze")
 	if state == "graze" and state_t > rng.randf_range(GRAZE_HOLD[0], GRAZE_HOLD[1]):
-		if rng.randf() < MOVE_CHANCE:
-			var hab: String = spec["habitat"]
-			# srnci se ve dne drží v lese a za soumraku vycházejí na okraje a louky
-			if hab == "edge" and not active:
-				hab = "forest"
-			var c := home if global_position.distance_to(home) > float(spec["home_range"]) * HOME_RETURN_K else global_position
-			target = fauna.random_point(c, float(spec["home_range"]) * HOME_WANDER_K, hab, rng)
+		var hungry := hb != null and active and hb.feed_at(species, global_position) < HAB_FEED_OK
+		if hungry or rng.randf() < MOVE_CHANCE:
+			if hb != null:
+				# soumrak → pastva (pole, louka u lesa), jinak drobné přesuny v dobré pastvě
+				target = hb.best_nearby(species, c if hungry else global_position, hr if hungry else hr * HOME_WANDER_K, "feed" if active else "rest", rng)
+				_hab_move("feed" if active else "rest")
+			if target == Vector3.INF:
+				var hab: String = spec["habitat"]
+				# srnci se ve dne drží v lese a za soumraku vycházejí na okraje a louky
+				if hab == "edge" and not active:
+					hab = "forest"
+				target = fauna.random_point(c, hr * HOME_WANDER_K, hab, rng)
 			state = "move"
 			state_t = 0.0
 		else:
@@ -681,6 +706,15 @@ func _follow_or_idle(_dt: float, active: bool, bad_weather: bool) -> void:
 		want_dir = d.normalized()
 		# přesun krokem, na delší vzdálenost o něco rychleji (ne klusem)
 		want_speed = float(spec["gaits"]["walk"]) if d.length() < LONG_MOVE_D else float(spec["gaits"]["walk"]) * LONG_MOVE_K
+
+
+## M8.15: změna účelu přesunu (lože ↔ pastva) – spojnice se zapíše jako zvěřní ochoz (`Habitat.note_trail`).
+func _hab_move(purpose: String) -> void:
+	if target == Vector3.INF:
+		return
+	if _hab_purpose != "" and _hab_purpose != purpose and fauna.world.habitat != null:
+		fauna.world.habitat.note_trail(global_position, target)
+	_hab_purpose = purpose
 
 
 ## Kdo je hrozba a jak moc si jí zvíře všimlo (zrak, sluch, čich po větru).
@@ -999,7 +1033,17 @@ func _tall_veg(delta: float) -> bool:
 	var f: Fields = fauna.world.fields if fauna.world else null
 	if f == null:
 		return false
-	var months: Array = TALL_VEG_MONTHS.get(f.class_at(global_position.x, global_position.z), [])
+	var cls := f.class_at(global_position.x, global_position.z)
+	# M8.15: skutečná výška porostu (pole: model plodin M8.12, louka: M8.14 / Habitat), jinak tabulka měsíců
+	if cls == 1:
+		var hc := f.crop_height_at(global_position)
+		if hc > 0.0 or fauna.world.realism_on("crops"):
+			_tall = hc >= TALL_VEG_MIN_M
+			return _tall
+	elif cls == 2 and fauna.world.habitat != null:
+		_tall = fauna.world.habitat.grass_height_at(global_position.x, global_position.z) >= TALL_VEG_MIN_M
+		return _tall
+	var months: Array = TALL_VEG_MONTHS.get(cls, [])
 	_tall = fauna.clock.month() in months
 	return _tall
 
@@ -1232,6 +1276,8 @@ func knock(vel: Vector3, spd: float) -> void:
 		_dead_t = 0.0
 		if herd:
 			herd.alarm(global_position, KNOCK_ALARM_S)
+		if fauna != null and fauna.world != null and fauna.world.habitat != null:
+			fauna.world.habitat.on_death(species, global_position, "auto")     # M8.15: srážka ubírá z populace honitby
 	else:
 		velocity = vel
 		_enter("flee")

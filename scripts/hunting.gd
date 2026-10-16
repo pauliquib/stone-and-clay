@@ -282,6 +282,8 @@ func on_animal_died(a: Animal) -> void:
 	c.cargo_kind = String(species_info(a.species).get("cargo", ""))
 	carcasses.append(c)
 	var id := c.owner_id
+	if world.habitat != null:        # M8.15: úlovek ubírá z populace honitby (a ruší okolí)
+		world.habitat.on_death(a.species, c.pos, "lov", id, c.legal)
 	var p := _player(id)
 	if p == null:
 		return
@@ -994,7 +996,7 @@ func spawn_debug_carcass(id: int, species: String) -> String:
 	var c := Carcass.new()
 	c.species = species
 	c.male = true
-	c.live_kg = float(AnimalSpecs.SPECIES[species]["mass"])
+	c.live_kg = float(AnimalSpecs.get_spec(species)["mass"])     # M8.15: laditelná kopie (F3), ne konstanta
 	c.died_min = _now()
 	c.pos = pos
 	c.owner_id = id

@@ -571,3 +571,25 @@ Co změřit: `--perfscene=pole_blato,30` (déšť na poli; sednout do auta / tra
 4× pár `pow` za fyzikální krok, půda po 0,2 s; AI auta dál než 80 m nic; okno kolejí: přepis slotu ~0,5 ms jen při
 přejezdu hranice 64 m, nahrání textury 768² při změně nejvýš 4×/s, mizení ~1 ms jednou za několik herních hodin
 na dlaždici); GPU +≤ 0,1 ms (3–5 vzorků textury na pixel terénu do 120 m). Cíl kroku +≤ 0,3 ms CPU, +≤ 0,3 ms GPU.
+
+## M8.15 – Ekologie a populace zvěře
+
+Pozn.: mřížka stanovišť se po startu staví ~10 s (do té doby zvěř jako dřív), populace se založí po prvním denním
+přepočtu (~10 s). Vrstvy mapy M `habitat_srnec` / `habitat_prase` ukazují vhodnost pro aktuální hodinu.
+
+1. Červen, 20:30, okraj lesa u ozimu / jetele (vrstva `habitat_srnec` zelená na poli): srnci venku na poli; 12:00 tamtéž nikdo.
+2. Červen, poledne, mladá houština (vrstva `habitat_srnec` sytá v lese) → projít porostem → zvedneš srnce z lože.
+3. Leden se sněhem (F2 → Počasí sníh) → srnci u krmelců u chaty a v závětří (jižní svahy), ne v kotlině za mrazu.
+4. F2 → Příroda – ladění → Populace zvěře: čísla po honitbách; ulovit 5 srnců (F2 lov / puška) → „Srnec“ v honitbě o 5 níž, „lov hráč 5“.
+5. F2 → posunout datum o rok (přes jaro) → srnců zase víc (mláďata V–VI ve sloupci „mláďata“).
+6. F2 → Populace → Vynutit semenný rok, říjen–listopad, noc → prasata v bučinách / doubravách (vrstva `habitat_prase` v noci).
+7. F3 → Zvěř/Populace a škody → „Škody – rozrytí louky u lesa“ 0,06 → 0,5, posunout o pár dní → tmavá rozrytá místa na loukách u lesa; drb vesničana „Prasata zas rozryla louku…“.
+8. F5 → F9 → populace, žaludy a rozrytá místa zůstanou (klíč `wildlife`); starý save se načte (populace z kapacity).
+9. Esc → Nastavení → Realismus → vypnout „Stanoviště a populace zvěře“ → zvěř jako dřív (stará stanoviště, pevné okrsky).
+10. Deník J → „Zvěř v honitbách“ (odhad, se zvyšující se Myslivostí přesnější), semenný rok.
+
+Co změřit: `--perfscene=zver_pulnoc,30` (denní přepočet během měření) a `--perfscene=pole_leto,30` se zapnutým / vypnutým
+přepínačem. Očekávání: průměr CPU +≤ 0,1 ms (dotazy zvěře jen při rozhodnutí vůdce, sken setkání po 3 s), po půlnoci
+~10 s přepočtu po 32 buňkách za snímek (+≤ 0,4 ms v těch snímcích), po startu ~10 s statické mřížky (48 buněk, stromy
+v buňce, +≤ 1 ms). Cíl kroku +≤ 0,3 ms průměr. Paměť ≈ 1 MB (mřížka 64 m).
+

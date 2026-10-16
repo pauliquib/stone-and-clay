@@ -820,6 +820,9 @@ func _journal_bbcode() -> String:
 	var phj = game.get("phenology")      # M8.11: rok v přírodě (rašení, květ, pozdní mráz, růst lesa)
 	if phj != null:
 		s += String(phj.journal_text())
+	var hbj = game.get("habitat")        # M8.15: odhad stavu zvěře v honitbách, semenný rok, škody prasat
+	if hbj != null:
+		s += String(hbj.journal_text(player.id))
 	s += b.journal_health()                  # M8.16: oddíl „Zdraví“ (věty, žádná čísla jádra)
 	s += "[b]STATISTIKA[/b]\nVypito celkem %.0f g alkoholu (%d nápojů), snědeno %d kcal, vykouřeno %d cigaret.\n" % [
 		b.total_alc_g, b.drinks, int(b.total_kcal), b.cigarettes_smoked]

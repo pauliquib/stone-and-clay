@@ -125,6 +125,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["micro"] = world.micro.to_dict()             # M8.9: inverze, mlžná vrstva, rosa, noční minima (pár čísel)
 	if world.phenology:
 		d["phenology"] = world.phenology.to_dict()     # M8.11: GDD, teploty dnů, mráz, deník roku, roky růstu
+	if world.habitat:
+		d["wildlife"] = world.habitat.to_dict()        # M8.15: populace zvěře po honitbách, žaludy, škody prasat
 	if world.fields:
 		d["fields_eco"] = world.fields.to_dict()       # M8.12: stav plodin polí (růstový model) + roční shrnutí úrody
 	if world.fences:
@@ -401,6 +403,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		world.micro.restore(d.get("micro", {}))               # M8.9: starý save bez klíče = rozběh z dnešního počasí
 	if world.phenology:
 		world.phenology.restore(d.get("phenology", {}))       # M8.11: starý save bez klíče = rozběh roku z klimatu, bez růstu
+	if world.habitat:
+		world.habitat.restore(d.get("wildlife", {}))          # M8.15: starý save bez klíče = populace z kapacity stanovišť
 	if world.fields:
 		world.fields.restore(d.get("fields_eco", {}))         # M8.12: starý save bez klíče = pole podle normálu k dnešku
 	if world.fences:

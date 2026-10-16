@@ -305,9 +305,23 @@ func open_debug_layers() -> void:
 		opts.append(["Mikroklima (M8.9)", _micro_info])
 	if world.phenology != null:      # M8.11: fenologický kalendář druhů
 		opts.append(["Fenologický kalendář (M8.11)", _pheno_info])
+	if world.habitat != null:        # M8.15: populace zvěře po honitbách, semenný rok
+		opts.append(["Populace zvěře (M8.15)", _habitat_info])
 	opts.append(["← Zpět", open_main])
 	_hud().open_menu("Příroda – ladění", "Vybraná vrstva se kreslí na mapě (M) místo podkladu – " +
 		"barevná mřížka po 16–64 m podle přiblížení. Každý krok M8 přidá svou vrstvu.", opts)
+
+
+## M8.15: tabulka populací (honitby × druhy), vynucený semenný rok.
+func _habitat_info() -> void:
+	var hb: Habitat = world.habitat
+	_hud().open_menu("Populace zvěře", hb.population_text(), [["Obnovit", _habitat_info],
+		["Vynutit / zrušit semenný rok", _habitat_mast], ["← Zpět", open_debug_layers]])
+
+
+func _habitat_mast() -> void:
+	_hud().show_message(world.habitat.toggle_mast_year(), 3.0)
+	_habitat_info()
 
 
 ## Testovací náklad před hráče (M2.10): srnec, divocak, spalek, pytel, vozik.

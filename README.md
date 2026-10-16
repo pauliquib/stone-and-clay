@@ -178,6 +178,17 @@ Koleje a stopy bot / kopyt jsou v deformační mapě (0,25 m/px) a terén je kre
 déšť je zarovná, v suchu vydrží dny. Chodec a kůň v blátě zpomalí a kloužou podle bláta v místě, bota čvachtá, ruční
 vozík s úzkými koly jde těžko. Ladicí vrstva mapy `unosnost`, měřicí scéna `--perfscene=pole_blato`, parametry F3 →
 Vozidla/Terén a bláto (133 parametrů celkem, `scripts/dev/tune_m8_13.gd`).
+**M8.15 Ekologie a populace zvěře** (`Habitat` v `scripts/eko/habitat.gd`, `World.habitat`, přepínač `habitat`
+v Realismu): mřížka stanovišť 64 m se skóre krytu (houštiny a mladé porosty z `TreeEco`, jehličnany v zimě, vysoké
+obilí a kukuřice z modelu plodin, tráva luk), potravy (louky a ozimy, okus, žaludy a bukvice podle fenologie dubu a buku,
+kukuřice v mléčné zralosti, krmelce v zimě, sníh ubírá) a klidu (zástavba, silnice, nedávná střelba) pro srnce, prase
+a zajíce. Srnci ve dne leží v houštinách, za soumraku vycházejí na pole a louky u lesa, v zimě v závětří a u krmelců,
+za mrazu ne v kotlinách; prasata v semenném roce (1× za 3–6 let) v bučinách a doubravách, jindy v kukuřici. Populace po
+4 honitbách (logistický růst s kapacitou z HSI, srnčata V–VI, selata III–V, zimní úmrtnost, plán myslivců, lov hráče,
+auta) určuje, kolik zvěře se u hráče objeví. Prasata ryjí louky u lesa (tmavá místa), vesničané o tom drbou, myslivci
+při škodách vnadí černou pod posedem. Deník J → odhad stavu zvěře (přesnost podle Myslivosti) a semenný rok; F2 →
+Příroda – ladění → „Populace zvěře“ (tabulka, vynutit semenný rok), vrstvy mapy `habitat_srnec`, `habitat_prase`;
+měřicí scéna `--perfscene=zver_pulnoc`; F3 → Zvěř/Stanoviště, Zvěř/Populace a škody (168 parametrů, `scripts/dev/tune_m8_15.gd`).
 **M8.10 Lokomoce zvířat 2 a let ptáků** (přepínač `animal_gait`): zvěř, kůň i hospodářská zvířata mění chod podle
 Froudova čísla (krok → klus → cval plynule, s hysterezí), ohýbají páteř v zatáčce a ve cvalu, dýchají, uši a ocas
 dopruží za pohybem a uši se natočí za zvukem; vyplašený srnec rozevře bílé zrcátko a v obilí / vysoké trávě skáče.

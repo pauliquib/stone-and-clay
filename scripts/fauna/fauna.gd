@@ -406,6 +406,17 @@ func settle_at(x: float, z: float) -> float:
 	return _sample(settle, x, z)
 
 
+## M8.15: silnice v okolí 0..1 (pro klid stanoviště v `Habitat`).
+func road_at(x: float, z: float) -> float:
+	return _sample(road, x, z)
+
+
+## M8.15: `World.habitat`, jen když je zapnutý a mřížka hotová (jinak null → staré chování).
+func habitat_on() -> Habitat:
+	var h: Habitat = world.habitat if world != null else null
+	return h if h != null and h.active() else null
+
+
 ## Jak vhodné je místo pro stanoviště (0 nevhodné … 1 ideální): forest, edge, field, garden, meadow.
 func score(hab: String, x: float, z: float) -> float:
 	if not terrain.contains(x, z, 60.0):
@@ -504,6 +515,7 @@ static var SITE_R := 80.0            # m – místo setkání se dolaďuje v tom
 static var SITE_SCORE := 0.35        # nejmenší skóre místa setkání
 static var FORCE_MIN := 60.0         # m – vynucené setkání (F2) nejblíž …
 static var FORCE_MAX := 110.0        # … nejdál
+static var HAB_SPAWN_SUIT := 0.3     # M8.15: nová skupina jen tam, kde má druh teď vhodnost aspoň tolik (prvních 8 pokusů)
 const PERCH_MASK := 1 | 8         # statika (terén, budovy) + rekvizity, auta ne
 
 var _rays_left := 0
@@ -727,6 +739,7 @@ func _process(delta: float) -> void:
 	if world == null:
 		return
 	murmuration = Murmuration.tick(self, murmuration)
+	_update_rooting()
 	_despawn_far()
 	if world.players.is_empty():
 		return
@@ -795,7 +808,7 @@ func _encounter_for(p: Player) -> void:
 					and a.global_position.distance_squared_to(pos) < ENCOUNTER_R * ENCOUNTER_R:
 				near += 1
 		if near < ENCOUNTER_NEAR:
-			_spawn_encounter(_pick_species(hab), pos, p, anchor, hab)
+			_spawn_encounter(_pick_species(hab, pos), pos, p, anchor, hab)
 	# ptáci (stačí jedno hejno v okolí)
 	var key := "village" if village else hab
 	var fopts: Array = ENCOUNTER_BIRDS.get(key, [])
@@ -807,8 +820,20 @@ func _encounter_for(p: Player) -> void:
 
 
 ## Druh zvěře podle vah ve stanovišti `hab`.
-func _pick_species(hab: String) -> String:
+func _pick_species(hab: String, pos := Vector3.INF) -> String:
 	var options: Array = ENCOUNTER_SPECIES[hab]
+	var hb: Habitat = habitat_on() if pos != Vector3.INF else null
+	if hb != null:
+		# M8.15: váhy × hustota druhu v honitbě a vhodnost okolí teď
+		var tot := 0.0
+		for o in options:
+			tot += float(o[1]) * hb.pick_weight(String(o[0]), pos)
+		var r := rng.randf() * tot
+		for o in options:
+			r -= float(o[1]) * hb.pick_weight(String(o[0]), pos)
+			if r <= 0.0:
+				return o[0]
+		return options[0][0]
 	var roll := rng.randf()
 	for o in options:
 		roll -= float(o[1])
@@ -839,9 +864,12 @@ func _spawn_flock(fopts: Array, pos: Vector3, p: Player, village: bool, force: b
 
 ## Místo pro novou skupinu `dist_min..dist_max` od hráče, ve stanovišti `hab` (INF = nenašlo se).
 ## Blíž než VIEW_CLEAR m se nesmí objevit v zorném kuželu hráče `p` (pop-in před očima).
-func _encounter_site(pos: Vector3, hab: String, dist_min: float, dist_max: float, p: Player = null, min_score := NAN) -> Vector3:
+func _encounter_site(pos: Vector3, hab: String, dist_min: float, dist_max: float, p: Player = null, min_score := NAN, species := "") -> Vector3:
 	if is_nan(min_score):
 		min_score = SITE_SCORE
+	# M8.15: druh hledá místo podle `Habitat` (ve dne kryt, za soumraku pastva) – 1. kolo jen vhodná místa
+	var hb: Habitat = habitat_on() if species != "" else null
+	var hour := clock.hour()
 	for i in 12:
 		var a := rng.randf() * TAU
 		var d := rng.randf_range(dist_min, dist_max)
@@ -850,7 +878,11 @@ func _encounter_site(pos: Vector3, hab: String, dist_min: float, dist_max: float
 		var dd := Vector2(pt.x - pos.x, pt.z - pos.z).length()
 		if dd < dist_min or dd > TRANSIENT_GONE or not terrain.contains(pt.x, pt.z, 60.0):
 			continue
-		if score(hab, pt.x, pt.z) <= min_score:
+		var ok_score := score(hab, pt.x, pt.z) > min_score
+		if hb != null:
+			if hb.suitability(species, pt, hour) < HAB_SPAWN_SUIT and (i < 8 or not ok_score):
+				continue
+		elif not ok_score:
 			continue
 		if p != null and dd < VIEW_CLEAR and _in_view(p, pt):
 			continue
@@ -870,8 +902,12 @@ func _spawn_encounter(id: String, pos: Vector3, p: Player, anchor := Vector3.INF
 		var sh: String = AnimalSpecs.get_spec(id)["habitat"]
 		site = _encounter_site(pos, sh, FORCE_MIN, FORCE_MAX, p, -2.0)
 	else:
+		# M8.15: počet skupin u hráče z hustoty populace v honitbě a vhodnosti okolí (ne pevný)
+		var hb := habitat_on()
+		if hb != null and not hb.spawn_roll(id, pos):
+			return null
 		var sh: String = AnimalSpecs.get_spec(id)["habitat"]
-		site = _encounter_site(pos, sh, SPAWN_MIN, SPAWN_MAX, p)
+		site = _encounter_site(pos, sh, SPAWN_MIN, SPAWN_MAX, p, NAN, id)
 	if site == Vector3.INF:
 		return null
 	var herd := _make_herd(id, site)
@@ -930,6 +966,52 @@ func _despawn_far() -> void:
 			if is_instance_valid(fl):
 				fl.queue_free()
 			_transient_flocks.erase(fl)
+
+
+# ------------------------------------------------------- M8.15: rozrytá místa od prasat (vizuál)
+
+var _root_mm: MultiMeshInstance3D = null
+var _root_ver := -1
+
+
+## Tmavé rozryté skvrny na loukách u lesa (`Habitat.rooted`) – jeden MultiMesh, přestaví se jen při změně seznamu.
+func _update_rooting() -> void:
+	var h: Habitat = world.habitat if world != null else null
+	if h == null or h.rooted_ver == _root_ver:
+		return
+	_root_ver = h.rooted_ver
+	if _root_mm == null:
+		_root_mm = MultiMeshInstance3D.new()
+		_root_mm.name = "Rozryti"
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = 0.75
+		mesh.bottom_radius = 1.0
+		mesh.height = 0.16
+		mesh.radial_segments = 10
+		mesh.rings = 1
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.2, 0.14, 0.09)
+		mat.roughness = 1.0
+		mesh.material = mat
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = mesh
+		_root_mm.multimesh = mm
+		_root_mm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_root_mm.visibility_range_end = 350.0
+		add_child(_root_mm)
+	var mm2 := _root_mm.multimesh
+	var on := h.active()
+	mm2.instance_count = h.rooted.size() if on else 0
+	if not on:
+		return
+	for k in h.rooted.size():
+		var r: Array = h.rooted[k]
+		var x := float(r[0])
+		var z := float(r[1])
+		var sc := float(r[3])
+		var b := Basis(Vector3.UP, float(k) * 1.7).scaled(Vector3(sc, 1.0, sc * 0.7))
+		mm2.set_instance_transform(k, Transform3D(b, Vector3(x, terrain.height_at(x, z) + 0.02, z)))
 
 
 # ------------------------------------------------------------------ hmyz a ptáci
