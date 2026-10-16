@@ -42,23 +42,35 @@ a předat je zpět do projektu (kořenový `config.json`), aby se staly novými 
 
 ### 3.2 Menu (F3, nový `scripts/dev_menu.gd`)
 - Vzhled jako ostatní nabídky (`Hud` panel / stavební funkce z `pause_menu.gd` – neduplikuj, vytáhni sdílené, nebo volej).
-- Levý sloupec skupiny (Auto, Motorka, Kolo, Letadla/rogalo, Dron, Chůze člověka, Zvěř a ptáci, Vítr, Obloha a světlo, Voda, Mikroklima,
-  Dřeviny…), vpravo řádky skupiny se jménem, posuvníkem, hodnotou s jednotkou, nápovědou (tooltip) a tlačítkem „↺“ (výchozí).
+- Levý sloupec skupiny (dvouúrovňově: kategorie z 3.3 → podskupiny), vpravo řádky skupiny se jménem, posuvníkem, hodnotou s jednotkou, nápovědou (tooltip) a tlačítkem „↺“ (výchozí).
   Hledací pole nad seznamem (filtr podle textu). Řádek změněný oproti výchozí hodnotě je zvýrazněný.
 - Dole: **Uložit**, **Exportovat do config.json**, **Výchozí (skupina)**, **Výchozí (vše)** – s potvrzením v menu (žádné `confirm()`).
 - Hra za otevřeného menu **běží** (ať je vidět účinek – např. auto jede), jen se zamkne ovládání postavy/vozidla myší; zavření F3 / Esc.
 - Odkaz „Ladicí vrstvy mapy…“ na existující `open_debug_layers` (F2 zůstává beze změny).
 
-### 3.3 Co zaregistrovat (Minimum)
-- **Vozidla** (požadavek uživatele): auto, motorka, kolo – každé svou skupinu; hlavně síla motoru / točivý moment, brzdy, max. rychlost,
-  řízení (úhel, rychlost natočení, citlivost podle rychlosti), přilnavost / boční tření, odpružení (tuhost, tlumení), těžiště / hmotnost,
-  u motorky a kola náklon (max. úhel, rychlost naklápění, stabilizace), u kola šlapání. Letadla, rogalo, dron, ruční vozík – co jde
-  bez přestavby kódu (aspoň 3–5 hlavních konstant každého).
-- **Systémy M8.1–M8.10**: z každého kroku 3–8 nejdůležitějších koeficientů (vítr: síla/četnost nárazů, závětří; obloha: expozice/adaptace;
-  chůze: délka kroku, IK; voda: infiltrace, výpar, odtok; mikroklima: max. inverze, mlha, rosa; zvěř: Froude prahy, pružiny uší/ocasu;
-  ptáci: termika, klouzání; dřeviny: co je za běhu). Offline data (`site.bin`, `tree_eco.bin`, treegen) se za běhu neladí – vynechat.
+### 3.3 Co zaregistrovat – **dlouhý, úplný seznam** („fyzikální funkce světa“)
+Upřesnění uživatele (16. 10. 2026): menu je od toho, aby **všechny možné funkce šly doladit k dokonalosti** – má to být **dlouhý seznam
+nastavení rozdělený do kategorií**, ovládající „jakoby fyzikální funkce světa“. Ne výběr 3–8 koeficientů, ale **každá konstanta,
+která ovlivňuje chování světa** (fyzika, simulace, AI, animace, časování), kromě čistě technických (velikost bufferu, indexy, cesty k souborům)
+a offline dat (`site.bin`, `tree_eco.bin`, treegen – ty se za běhu neladí). V projektu je řádově 800+ `const` – počítej se stovkami parametrů.
+
+Kategorie (hlavní → podskupiny) – menu je dvouúrovňové:
+- **Svět:** gravitace, rychlost času / délka dne, eko-takt, fyzikální kroky (co jde za běhu).
+- **Vozidla:** Auto · Motorka · Kolo · Ruční vozík · (traktor/další, pokud existují) – motor/točivý moment, převody, brzdy, max. rychlost,
+  řízení (úhel, rychlost, citlivost podle rychlosti), přilnavost, odpružení, hmotnost/těžiště, aerodynamický odpor, náklon u jednostopých, šlapání.
+- **Létání:** Letadlo · Rogalo/trike · Paramotor · Dron · Termika.
+- **Člověk:** Pohyb hráče (rychlosti, skok, zrychlení, tření, plavání) · Tělo (výdrž, hlad, chlad, únava) · Chůze a postoj (Gait) · NPC a vesničané · Pes.
+- **Činnosti:** Rybaření · Lov a balistika · Oheň a požáry · Těžba/řemesla (co je fyzika/časování).
+- **Příroda:** Počasí · Roční doby · Obloha a světlo · Vítr · Voda a půda · Mikroklima · Dřeviny a les · Pole a louky · Louže, stopy.
+- **Zvěř:** Pohyb a rig · Smysly a útěk · Ptáci a let · Hejna a murmurace · Hospodářská zvířata.
+
+### 3.4 Rozdělení práce (orchestrátor)
+- **M8.D1** (jeden subagent): `DevTune` + menu F3 + Režim vývojáře + ukládání/export + kategorie **Svět** a **Vozidla** kompletně.
+- **M8.D2** (čtyři subagenti souběžně, až po sloučení D1, každý jen své soubory): **a)** Létání · **b)** Člověk + Činnosti ·
+  **c)** Příroda · **d)** Zvěř. Registrace patří do souboru systému (nebo jednoho `scripts/dev/tune_<kategorie>.gd` na kategorii),
+  nikdy do sdíleného centrálního seznamu – ať paralelní agenti nekolidují.
 - Převod: `const X := 4200.0` → registrovaný parametr se **stejnou výchozí hodnotou** (chování při výchozím stavu musí zůstat beze změny).
-  Pokud konstantu používá víc souborů, čtou ji z jednoho místa.
+  Pokud konstantu používá víc souborů, čtou ji z jednoho místa. Konstanty použité v `const` výrazech / velikostech polí nech být.
 
 ## 4. Hotovo, když
 - Zapnu Režim vývojáře, F3 → skupina Auto → zvednu sílu motoru → auto hned zrychluje víc; „↺“ vrátí výchozí.

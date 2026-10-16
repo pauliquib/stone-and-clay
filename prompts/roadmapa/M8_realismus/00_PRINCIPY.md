@@ -125,7 +125,7 @@ Barva povrchu (listí, kůra) **nesmí** jít do barev vrcholů – patří do t
 
 ## 10. Menu pro vývojáře – registrace parametrů (od M8.D, platí pro všechny další kroky)
 - Od kroku **M8.D** (`10b_menu_vyvojare.md`, mezi vlnou 4 a 5) existuje registr `DevTune` a menu **F3** (jen v Režimu vývojáře).
-- **Každý další krok M8** zaregistruje 3–8 svých nejdůležitějších koeficientů (`DevTune.register(id, skupina, popisek, výchozí, min, max,
+- **Každý další krok M8** zaregistruje **všechny své laditelné konstanty** (uživatel chce dlouhý úplný seznam – „ladit k dokonalosti“) (`DevTune.register(id, skupina, popisek, výchozí, min, max,
   krok, nápověda, jednotka)`, `id` = `<systém>.<parametr>`), výchozí hodnota = dnešní konstanta (chování beze změny).
 - Hodnotu nikdy nečti z registru za snímek – drž ji v členské proměnné a obnov v handleru signálu `changed`.
 - Vyladěné hodnoty od uživatele přicházejí v kořenovém `config.json` – při kalibraci (M8.19) je přenes jako nové výchozí do kódu / dat.
