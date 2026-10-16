@@ -85,11 +85,12 @@ má sekci „Okolní obce“ (postaví tě na okraj katastru čelem k obci; obce
 Funguje i herní ovladač. Ovládání koně, dronu, letadla, paramotoru a motorového rogala
 (startovní procedury, přistání, licence) je v [`docs/CONTROLS.md`](docs/CONTROLS.md).
 
-## Realismus (M8, probíhá)
+## Realismus (M8)
 
 Milník **M8 Realistický svět** mění krajinu a vesnici z „kulis“ na propojené zjednodušené
 fyzikální/ekologické modely (terén, voda, slunce, vítr → co kde roste a žije). Jde vypnout po
-krocích: Esc → Nastavení → „Realismus (M8)…“. M8.1 (základ) jen zakládá API pro další kroky:
+krocích: Esc → Nastavení → „Realismus (M8)…“ (každý přepínač má v menu větu, co dělá, a odhad ceny).
+Přehled vazeb mezi systémy (diagram), předvolby a výkon: [`docs/SYSTEMS.md`](docs/SYSTEMS.md) → „Realistický svět (M8)“.
 
 | klíč (`GameSettings.realism`) | krok M8 | co zapíná |
 |---|---|---|
@@ -99,7 +100,29 @@ krocích: Esc → Nastavení → „Realismus (M8)…“. M8.1 (základ) jen zak
 | `gait` | M8.6 | **Pohyb člověka** (`scripts/gait.gd`): fázová chůze/běh, chodidla bez klouzání, náklon do svahu, náklad/únava/chlad → postoj; vypnuto = stará animace |
 | `treegen` | M8.8 | **Generované stromy** (`scripts/vegetation/tree_gen.gd`, data `tools/treegen/`): tvar podle druhu, věku a vitality (kužel smrku, deštník borovice, kopule buku, bílá bříza), listí a kůra z atlasu, LOD0/LOD1 zblízka + impostory v dálce; **projeví se po novém načtení světa**; vypnuto / bez `data/tree_species_protos.bin` = 6 původních modelů |
 | `animal_gait` | M8.10 | **Lokomoce zvířat a let ptáků** (`scripts/fauna/quadruped_rig.gd`, `flight_model.gd`, `murmuration.gd`): chody podle Froudova čísla s plynulými přechody, páteř, uši a ocas jako pružiny (uši ke zvuku), zrcátko a skoky srnce v obilí; ptáci mávají / kloužou / plachtí v termice, přistávají s brzděním, letí proti větru; podzimní hejna špačků; vypnuto = dřívější pohyb |
-| `site`, `species`, `wind`, `soil_water`, `treegen`, `micro`, `animal_gait`, `phenology`, `crops`, `terramech`, `ground_veg`, `habitat`, `thermo`, `village_life`, `soundscape` | M8.2–M8.18 | výchozí zapnuto; konkrétní popisek a cena v menu přibude s krokem, který klíč zavádí |
+| `site` | M8.2 | mapa stanovišť (`data/site.bin`) pro ostatní kroky – bez řádku v menu (vypnutí = kroky jedou s fallbackem) |
+| `soil_water` | M8.7 | **Vodní bilance**: vlhkost půdy, tání sněhu, odtok, potoky po bouřce stoupají a kalní, bláto a louže podle místa |
+| `micro` | M8.9 | **Mikroklima**: studený vzduch v kotlinách, ranní údolní mlha, rosa a jinovatka, teplota v místě (HUD, tělo) |
+| `phenology` | M8.11 | **Fenologie a růst stromů**: každý druh raší, kvete a barví se podle sumy teplot, pozdní mráz, stromy rostou v letech |
+| `crops` | M8.12 | **Plodiny podle počasí**: zahrada a pole rostou podle GDD, vody a světla; sucho = slabá úroda |
+| `terramech` | M8.13 | **Bláto a koleje**: zaboření kol a bot podle půdy a vlhkosti, koleje mizí deštěm |
+| `ground_veg` | M8.14 | **Louky, seč a interaktivní tráva**: louka podle stanoviště, seč 2× ročně, sukcese, sešlapání trávy, pěšiny |
+| `habitat` | M8.15 | **Stanoviště a populace zvěře**: zvěř podle krytu, potravy a klidu, semenné roky, populace v letech |
+| `thermo` | M8.16 | **Tělo**: tepelná bilance, žízeň, spánek, zranění pádem |
+| `village_life` | M8.17 | **Život vesnice**: domácnosti s plánem dne, okna, komíny, práce u domů, vztahy a drby |
+| `soundscape` | M8.18 | **Zvuková krajina a drobný život** (viz níž) |
+
+**Předvolby a detail přírody (M8.19).** Esc → Nastavení → Grafika → **„Detail přírody M8“** je součástí předvolby:
+**Nízká** = vzhled jako před M8 (kratší LOD0 generovaných stromů, bez interaktivní trávy, drobného života, údolní mlhy
+a fyzikální oblohy, méně hlasů zvukové krajiny), **Střední** střídmě, plné jen **Vysoká / Ultra** (Ultra navíc delší LOD0
+stromů). Simulace (voda, mikroklima, fenologie, plodiny, populace, domácnosti) běží na všech předvolbách stejně. Volba
+předvolby nastaví i přepínač Fyzikální obloha. Pro měření jde předvolbu a přepínače vnutit jen pro jeden běh:
+`--preset=nizka|stredni|vysoka|ultra` a `--realism=micro:off,soundscape:off` (nic se neukládá). Hodnoty předvoleb jsou
+konzervativní – čeká se na naměřená čísla (plán měření: [`docs/testy_M8.md`](docs/testy_M8.md) → „Plán testování po dokončení M8“).
+
+**Pořadí offline nástrojů M8** (data `data/*.bin` nejsou v gitu, kromě `tree_species_protos.bin`):
+`python3 tools/site.py` → `python3 tools/tree_species.py` → `python3 tools/treegen/treegen.py` → `python3 tools/vegetation.py --eco`
+(podrobně v tabulce nástrojů níž). Bez dat hra běží s fallbackem (staré stromy, louky a voda „jako dřív“).
 
 Měření výkonu po krocích M8: `--perfscene=<jméno>[,sekund]` (`ves_poledne`, `les_rano_mlha`,
 `louka_vitr`, `udoli_noc`, `pole_leto`, `dron_200m`, `zapad_slunce`, `les_leto`) teleportuje na pevnou scénu a změří
@@ -245,6 +268,9 @@ Hledání (název / id / nápověda), změněné řádky zvýrazněné, ↺ = v�
 počítač), **Exportovat** → kořenový **`config.json`** (jen hodnoty odlišné od kódu, seřazené – nové výchozí hodnoty
 projektu, jdou do gitu; v exportované hře vedle spustitelného souboru). Pořadí při startu: kód → `config.json` →
 `ladeni.cfg` (automatické testy a `--shot` `ladeni.cfg` ignorují). Registr `DevTune`, návod v [`docs/DEV.md`](docs/DEV.md).
+Každý krok M8 registruje své konstanty do `scripts/dev/tune_m8_<krok>.gd` (M8.19: Létání/Hranice letu – vodorovná hranice
+letu za katastrem, pásmo varování a protivětru, strop nad terénem). Je-li pod F3 otevřená nabídka HUD (F2, místo), panel F3
+uhne doprava a nabídka jde ovládat myší. Vyladěné hodnoty pošli jako `config.json` (Export) – při kalibraci se přenesou do kódu.
 
 ## Dokumentace
 
@@ -291,6 +317,7 @@ Generované soubory a jejich nástroje (výstupy se commitují, kromě `data/*.b
 | `python3 tools/tree_species.py` (M8.3) | `data/tree_eco.bin` (**není v gitu**) | po `tools/site.py`, po změně `data/trees.bin` nebo `data/dreviny.json` – druh, věk, vitalita, dbh a porost každého stromu + mřížky zápoje / dominantního druhu; vypíše podíly druhů a kontrolu sever/jih/luh; vyžaduje `numpy`, `scipy`, `Pillow` |
 | `python3 tools/treegen/treegen.py [--preview] [--only=buk,smrk]` (M8.8) | `data/tree_species_protos.bin` (DBT2, ~5 MB, **v gitu** – vynuceně, `data/*.bin` je jinak ignorované) + `assets/textures/trees/*.png` (atlasy listí, kůry, impostorů; v gitu) | po změně `data/dreviny.json` → `tvary` (parametry tvaru, mapování druh → tvar) nebo kódu generátoru; ~70 s; `--preview` uloží náhledy LOD0 / LOD1 / impostor všech variant do `tools/out/treegen/` (bez Blenderu); vyžaduje `numpy`, `scipy`, `Pillow`. Po přegenerování otevřít projekt (nebo `godot --headless --import`), ať se atlasy znovu naimportují |
 | `tools/launcher.sh [parametry hry…]` (M8.1) | `logs/m8_perf_<datum_čas>.log` + `logs/latest.log` (**mimo git**) | kdy chceš spustit hru / `--perfscene=…` a poslat výsledek dál bez ručního přepisování konzole – spustí `run.sh`, zachytí výstup, zapíše kompaktní deduplikovaný log (`tools/launcher_log.py`); `--help` jen vypíše nápovědu |
+| `tools/perf_m8_19.sh zaklad\|stredni\|prepinace\|vysoka\|vse` (M8.19) | `logs/m8_19_<skupina>_<datum_čas>.log` (**mimo git**) | po M8 / po změně výkonu: dávka měřicích scén přes `launcher.sh` s předvolbou (`--preset=`) a přepínači (`--realism=`), souhrnný log k odeslání (plán v `docs/testy_M8.md`) |
 
 Binární data mapy (`data/*.bin`) se regenerují exportem z Blenderu přes `tools/export_map.py`
 (postup v [`docs/DEV.md`](docs/DEV.md)); `data/vegetation.bin` navíc přes `tools/vegetation.py`.

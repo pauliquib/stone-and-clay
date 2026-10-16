@@ -21,7 +21,12 @@ zvrací nebo usne v příkopu.
 
 1. **Skutečné místo** – každý dům, cesta a les odpovídá realitě; orientace „jako doma“.
 2. **Uvěřitelná simulace** – fyzika pohybu a aut, fyziologie (Widmark, trávení, nikotin),
-   denní doba, doprava a policie fungují nezávisle na hráči.
+   denní doba, doprava a policie fungují nezávisle na hráči. Od milníku M8 i **příroda**: terén určuje stanoviště,
+   voda v půdě, mikroklima a suma teplot rozhodují, co kde roste, kdy raší a kvete a jaká bude úroda; louky se sečou
+   a zarůstají, zvěř žije podle krytu, potravy a zimy a její počty se mění v letech, auta se boří do bláta a nechávají
+   koleje, vesnice žije podle domácností a krajina zní podle druhu, měsíce a hodiny. Modely jsou jednodušší než realita,
+   ale ne libovolné (každý má „podle čeho“), běží i bez hráče a hráč vidí jejich důsledky (mlha v údolí, buk raší později
+   než bříza, po bouřce kalný potok). Každou část jde vypnout a výkon drží předvolby (Nízká = vzhled jako před M8).
 3. **Příběhy z následků** – nejzajímavější zážitky vznikají kombinací systémů, ne skriptem.
 4. **Spolu je to lepší** – hra je navržená tak, aby se dala hrát s kamarády (kap. 6).
 

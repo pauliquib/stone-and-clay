@@ -42,6 +42,7 @@ var _tiles := {}                        # Vector2i → Image (načtené)
 var _packed := {}                       # Vector2i → PackedByteArray (ZSTD, uložené / odložené)
 var _touch := {}                        # Vector2i → jd poslední stopy
 var _fade := {}                         # Vector2i → čekající násobek hloubky (1 = nic)
+var _fade_scan := true                  # M8.19B: má smysl procházet dlaždice (po hodinovém kroku / načtení), jinak ne každý snímek
 var _win: Image
 var _tex: ImageTexture
 var _slot := []                         # 9 slotů okna → Vector2i dlaždice, kterou drží (NONE = prázdný)
@@ -229,6 +230,8 @@ func _blit_slot(s: int) -> void:
 
 ## Jedna načtená dlaždice s nahromaděným mizením → aplikovat na obraz (a do okna).
 func _fade_one() -> void:
+	if not _fade_scan:
+		return
 	for t in _tiles:
 		var f: float = _fade.get(t, 1.0)
 		if f >= FADE_APPLY:
@@ -242,6 +245,7 @@ func _fade_one() -> void:
 		if _slot[s] == t and not _blit_q.has(s):
 			_blit_q.append(s)
 		return
+	_fade_scan = false                     # nic nečeká – do dalšího hodinového kroku se dlaždice neprocházejí
 
 
 func _drop(t: Vector2i) -> void:
@@ -279,6 +283,7 @@ func _on_eco_hour(dt_h: float) -> void:
 	var frost := sw.frost if sw != null and sw.active() else 0.0
 	var today := world.clock.jd() if world.clock != null else 0
 	var gone: Array[Vector2i] = []
+	_fade_scan = true
 	for t in _touch:
 		var cx := (float(t.x) + 0.5) * TILE_M
 		var cz := (float(t.y) + 0.5) * TILE_M
@@ -332,6 +337,7 @@ func restore(d: Dictionary) -> void:
 		_packed[t] = Marshalls.base64_to_raw(String(e.get("d", "")))
 		_touch[t] = int(e.get("jd", 0))
 		_fade[t] = float(e.get("f", 1.0))
+	_fade_scan = true
 	_slot.fill(NONE)
 	_center = NONE
 	_blit_q.clear()

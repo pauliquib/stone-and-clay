@@ -390,6 +390,8 @@ func _show_graphics() -> void:
 	_gfx_option("Dohlednost", GameSettings.VIEW_NAMES, "view")
 	_gfx_option("Vegetace (květy, ovoce, listí)", GameSettings.VEG_NAMES, "veg")
 	_gfx_option("Aktivita světa (NPC, zvířata, doprava)", GameSettings.SIM_NAMES, "sim")
+	_gfx_option("Detail přírody M8 (stromy zblízka, tráva, drobný život, zvuky)", GameSettings.ECO_NAMES, "eco")   # M8.19B
+	_label(_list, "   Nízký = vzhled jako před M8 (simulace přírody běží dál); mění i Fyzikální oblohu v Realismu.", 13)
 	_check("Záře (bloom)", bool(settings.gfx["glow"]), func(on):
 		settings.set_gfx("glow", on)
 		_refresh_preset_label())

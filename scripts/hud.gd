@@ -1933,19 +1933,21 @@ func _draw_minimap() -> void:
 	if not _mini_built:
 		_build_mini_cache()
 	var wr := MINI_RANGE_M * 0.5 + 40.0    # světový poloměr kruhu + rezerva na tloušťku čar
+	# M8.19B: body čar a rybníků se transformují nativně jedním Transform2D (= xf: c + rot·(q − p2)·k), ne
+	# voláním Callable na každý vrchol; rybníky mimo kruh (AABB) se ani nepřevádějí, ani neořezávají.
+	var mt := Transform2D(rot, c) * Transform2D(0.0, Vector2(k, k), 0.0, -p2 * k)
 	for L in _mini_lines:
 		if (L[1] - p2).length() > L[2] + wr:
 			continue
-		var line := PackedVector2Array()
-		for q in L[0]:
-			line.append(xf.call(q.x, q.y))
+		var line: PackedVector2Array = mt * (L[0] as PackedVector2Array)
 		for seg in _clip_circle_line(line, c, rad):
 			_mini.draw_polyline(seg, L[3], L[4])
 	if game.water:
+		var wrect := Rect2(p2 - Vector2(wr, wr), Vector2(wr, wr) * 2.0)
 		for pd in game.water.ponds:
-			var poly := PackedVector2Array()
-			for q in pd["poly"]:
-				poly.append(xf.call(q.x, q.y))
+			if not (pd["aabb"] as Rect2).intersects(wrect):
+				continue
+			var poly: PackedVector2Array = mt * (pd["poly"] as PackedVector2Array)
 			poly = _clip_circle_poly(poly, c, rad)
 			if poly.size() >= 3:
 				_mini.draw_colored_polygon(poly, Color(0.35, 0.65, 1.0, 0.85))

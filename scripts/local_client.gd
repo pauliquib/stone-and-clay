@@ -85,6 +85,12 @@ func attach(p: Player) -> void:
 	settings.maxfps_from_args = args.has("maxfps")
 	if not is_automated():
 		settings.load_file()
+	var pa := GameSettings.preset_arg(args)     # M8.19B: --preset= / --realism= pro měření (jen tento běh)
+	if pa >= 0:
+		settings.set_preset(pa)
+	var ra := GameSettings.realism_args(args)
+	for k in ra:
+		settings.realism[k] = bool(ra[k])
 	world.realism = settings.realism     # M8.1: stejný Dictionary – přepnutí v Nastavení platí hned i v simulaci
 	radio_view = RadioView.new(self)
 	radio_view.name = "RadioZblizka"

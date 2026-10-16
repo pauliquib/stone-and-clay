@@ -896,6 +896,127 @@
   a společné nárazy / srážky / opilý řidič jako `Car` static var; ruční vozík `HandCart` a tažení `Cargo`). Hodnoty:
   kód → `res://config.json` (Export, jen odlišné, seřazené) → `user://ladeni.cfg` (Uložit). Za snímek se registr nečte.
 
+## Realistický svět (M8)
+
+Milník M8 (`prompts/roadmapa/M8_realismus/`, principy `00_PRINCIPY.md`) proměnil kulisy přírody v soustavu propojených
+zjednodušených modelů: **terén → stanoviště → voda a mikroklima → fenologie → plodiny, louky a zvěř → život vesnice a zvuk**.
+Co závisí jen na terénu, počítají offline nástroje (`tools/site.py`, `tree_species.py`, `treegen/`, `vegetation.py --eco`)
+do `data/*.bin`; za běhu se jen dohledává a pomalu integruje po herních hodinách a dnech. Podrobnosti každého systému jsou
+v odstavcích výš (u každého je číslo kroku M8.x); tady je přehled vazeb, pravidla a výkon.
+
+**Společná pravidla.** Simulace běží ve `World` (do budoucna server), vzhled a zvuk u klienta (shadery, částice,
+`Soundscape`, `SmallLife`, `MicroFx`). Hodinový a denní krok má jediný zdroj – `EcoClock` (`World.eco_hour(dt_h)`,
+`World.eco_day(jd)`), skoky času dohání po snímcích (≤ 2 ms/snímek) a dlouhé průchody rozkládá `EcoClock.slice`.
+Teplota v bodě jen z `Microclimate.temp_at`, vlhkost půdy jen ze `SoilWater`, vítr jen z `WindField`, fáze druhů jen
+z `Phenology`; každé API má fallback (bez dat / vypnuto = dřívější globální hodnota z `Weather`). Každý krok jde vypnout
+(Esc → Nastavení → Realismus, `GameSettings.REALISM_KEYS`) a starý save bez jeho klíče se načte (rozběh z klimatu /
+seedu). Laditelné konstanty: F3 (Režim vývojáře, `DevTune`, soubory `scripts/dev/tune_*.gd`).
+
+```mermaid
+flowchart LR
+  subgraph offline["Offline (tools/*.py → data/*.bin)"]
+    SITEPY[site.py] --> SITEBIN[(site.bin)]
+    SPEC[tree_species.py] --> TECO[(tree_eco.bin)]
+    TG[treegen] --> TGEN[(stromy + impostory)]
+    VEGPY["vegetation.py --eco"] --> VEGBIN[(vegetation.bin)]
+  end
+  WEATHER[Weather + Clock] --> WIND[WindField M8.4]
+  WEATHER --> SKY[SkyModel M8.5]
+  SITEBIN --> SITE[Site M8.2]
+  SITE --> WIND
+  SITE --> SOIL[SoilWater M8.7]
+  WEATHER --> SOIL
+  SITE --> MICRO[Microclimate M8.9]
+  WEATHER --> MICRO
+  SOIL --> MICRO
+  TECO --> TREE[TreeEco M8.3]
+  SITE --> TREE
+  TREE --> TREEGEN[TreeGen M8.8]
+  TGEN --> TREEGEN
+  MICRO --> PHEN[Phenology M8.11]
+  SITE --> PHEN
+  SOIL --> PHEN
+  PHEN --> TREE
+  PHEN --> TREEGEN
+  MICRO --> CROPS[Fields + CropModel M8.12]
+  SOIL --> CROPS
+  SOIL --> TERRA[Terramech + RutMap M8.13]
+  SITE --> TERRA
+  SITE --> MEAD[Meadows + Footpaths M8.14]
+  SOIL --> MEAD
+  WEATHER --> MEAD
+  VEGBIN --> GV[VegetationManager + GroundVegFx M8.14]
+  MEAD --> GV
+  SITE --> HAB[Habitat M8.15]
+  TREE --> HAB
+  PHEN --> HAB
+  CROPS --> HAB
+  MEAD --> HAB
+  SOIL --> HAB
+  HAB --> FAUNA[Fauna + QuadrupedRig M8.10]
+  WIND --> FAUNA
+  MICRO --> BODY[BodyState thermo M8.16]
+  WIND --> BODY
+  BODY --> GAIT[Gait M8.6]
+  MICRO --> HH[Households M8.17]
+  PHEN --> HH
+  HH --> VILL[Villager]
+  HH --> SOUND[Soundscape + SmallLife M8.18]
+  MICRO --> SOUND
+  WIND --> SOUND
+  PHEN --> SOUND
+  SITE --> SOUND
+  SKY --> SOUND
+```
+
+| Krok | Systém (instance) | Přepínač | Krok simulace | Uložení (klíč) |
+|---|---|---|---|---|
+| M8.1 | `EcoClock` (`World.eco`) | – | každý snímek, dohánění | `eco` |
+| M8.2 | `Site` (`World.site`) | `site` | jen data | – |
+| M8.3 | `TreeEco` (`World.tree_eco`) | `species` | jen data (+ růst M8.11) | přes `phenology` |
+| M8.4 | `WindField` (`World.wind_field`) | `wind` | každý snímek (posun nárazů) | – |
+| M8.5 | `Atmosphere.SkyModel` (klient) | `sky` | každý snímek (klient) | – |
+| M8.6 | `Gait` (v `Humanoid`) | `gait` | každý snímek na postavu | – |
+| M8.7 | `SoilWater` (`World.soil_water`) | `soil_water` | `eco_hour`, průchod po kouscích | `soil_water` |
+| M8.8 | `TreeGen` + `TreeLodStreamer` | `treegen` | stavba buněk ≤ 1 ms/snímek | – |
+| M8.9 | `Microclimate` (`World.micro`) + `MicroFx` | `micro` | `eco_hour` | `micro` |
+| M8.10 | `QuadrupedRig`, `FlightModel`, `Murmuration` | `animal_gait` | každý snímek na zvíře v okolí | – |
+| M8.11 | `Phenology` (`World.phenology`) | `phenology` | `eco_hour` / `eco_day` | `phenology` |
+| M8.12 | `Fields` + `CropModel` | `crops` | `eco_hour` / `eco_day` po kouscích | `fields_eco` |
+| M8.13 | `Terramech` + `RutMap` (`World.ruts`) | `terramech` | auto hráče / AI v okolí po `TM_DT`, `eco_hour` | `ruts` |
+| M8.14 | `Meadows`, `Footpaths`, `GroundVegFx` | `ground_veg` | `eco_hour` / `eco_day`, sešlapání každé 2 snímky | `meadows`, `footpaths` |
+| M8.15 | `Habitat` (`World.habitat`) | `habitat` | `eco_day` po kouscích (mřížka 64 m) | `wildlife` |
+| M8.16 | `BodyState` (tepelná bilance) | `thermo` | 4×/s | v `body` |
+| M8.17 | `Households` (`World.households`) | `village_life` | `eco_hour` / `eco_day` po kouscích | `households` |
+| M8.18 | `Soundscape`, `SmallLife`, `NatureLog` (klient) | `soundscape` | výběr 2×/s, kotvy 1×/s | deník v hráči |
+
+**Předvolby a detail přírody (M8.19B).** Esc → Nastavení → Grafika → „Detail přírody M8“ (gfx klíč `eco`, součást
+předvolby; `GameSettings.ECO_LEVELS`) řídí jen vzhled a zvuk – simulace běží na všech úrovních stejně:
+
+| Detail (předvolba) | LOD0 stromů | Interaktivní tráva | Drobný život | Hlasů zvuků / okruh | Údolní mlha (vrstva) | Fyzikální obloha |
+|---|---|---|---|---|---|---|
+| Nízký (Nízká) | 0,5× (≈ 28 m) | ne | ne | 6 / 0,6× | ne | vypnout |
+| Střední (Střední) | 0,75× (≈ 41 m) | ne | poloviční | 10 / 0,8× | ano | zapnout |
+| Vysoký (Vysoká) | 1× (55 m) | ano | plný | 16 / 1× | ano | zapnout |
+| Ultra (Ultra) | 1,3× (≈ 72 m) | ano | plný | 16 / 1× | ano | zapnout |
+
+Fyzikální obloha (přepínač `sky`) se nastaví jen při výslovné volbě předvolby / detailu, ne při každém startu. Interaktivní
+tráva se navíc vypíná s „Vegetace: Vypnuto“ (předvolba Nízká). Pro měření jde předvolbu i přepínače vnutit jen pro jeden běh:
+`--preset=nizka|stredni|vysoka|ultra`, `--realism=micro:off,soundscape:off` (nic se neukládá).
+
+**Výkon.** Rozpočet (00_PRINCIPY kap. 6): 60 FPS na GTX 1050 v předvolbě Střední, každý krok ≤ 0,5 ms CPU / 1,0 ms GPU.
+Naměřený základ před M8 (8. 10. 2026, Quadro M2200, renderer Mobile) byl ~27 FPS / ~37 ms – rozpočet se proto posuzuje
+relativně k základu. Měřicí scény `Tests.PERF_SCENES` (`--perfscene=…`), plán měření po M8 a co poslat zpět: `docs/testy_M8.md`
+→ „Plán testování po dokončení M8“. Profil `--perf` / `--perfscene` vypisuje i položky M8 (`soil_water`, `groundveg`,
+`soundscape`, `small_life`, `body_thermo`, `veg`). Statické výkonové opravy M8.19B: AI auta (dotaz na překážku bez nových
+tvarů, světla brzd jen při změně, kontrola sražení chodce až nad prahovou rychlostí), vesničané (`World.nearest_player`
+bez alokace, blackboard BT jen do naplnění), minimapa (transformace čar nativně, rybníky mimo dosah se přeskočí),
+pěšiny a koleje (slábnutí stop se neprochází každý snímek).
+
+**Multiplayer (V2).** Eko-stav (vlhkost, mikroklima, fenologie, louky, populace, domácnosti) je dnes ve `World` jednoho
+procesu; pro V2 je potřeba ho synchronizovat ze serveru (stav po hodinách / dnech je malý – pár čísel a komprimované mřížky,
+stejné jako v savu), klient si dopočítá jen vzhled. Otevřený bod uzavření M8 (`PROJECT_LOG.md`).
+
 ## Co ve hře je
 
 - **Celý katastr** (~5,2 × 4,6 km) bez načítacích obrazovek: terén 2 m mřížka (kolize =

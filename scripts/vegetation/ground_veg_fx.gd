@@ -54,6 +54,10 @@ var _trail := PackedFloat32Array()      # TRAIL_N × [x, z, r, t0]
 var _trail_head := 0
 var _time := 0.0
 var _on := false
+## M8.19B: sešlapání trávy (zdroje kolem kamery) podle detailu přírody v předvolbě grafiky (`GameSettings.ECO_LEVELS`);
+## vypnuto = `trample_n` 0 (shader trávy nic nepočítá), výška louky, keře a seno zůstávají.
+var interactive := true
+var _trample_on := true
 var _meadow_tex: ImageTexture
 var _meadow_gen := -1
 var _rebuild_pos := Vector3(1e9, 0, 1e9)
@@ -153,13 +157,19 @@ func _process_impl(delta: float) -> void:
 	if not on:
 		return
 	_update_meadow_tex()
-	_agents_t -= delta
-	if _agents_t <= 0.0:
-		_agents_t = AGENTS_REFRESH_S
-		_refresh_agents()
-	_frame += 1
-	if _frame % maxi(UPDATE_FRAMES, 1) == 0:
-		_update_sources()
+	if interactive != _trample_on:
+		_trample_on = interactive
+		if not interactive:
+			_agents.clear()
+			RenderingServer.global_shader_parameter_set("trample_n", 0.0)
+	if interactive:
+		_agents_t -= delta
+		if _agents_t <= 0.0:
+			_agents_t = AGENTS_REFRESH_S
+			_refresh_agents()
+		_frame += 1
+		if _frame % maxi(UPDATE_FRAMES, 1) == 0:
+			_update_sources()
 	var p := _focus()
 	if p != null:
 		var pos := p.global_position

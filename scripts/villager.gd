@@ -226,6 +226,8 @@ func _bt_start() -> void:
 ## Naplní blackboard cíli z herních dat – až když existují místa a registr nemovitostí
 ## (vesničané se rodí před `_spawn_places`/`estate`, proto se to dělá líně za běhu).
 func _bt_fill_vars() -> void:
+	if _bt_vars_ok and _bt_work_ok:
+		return                             # M8.19B: vše vyplněno – bez dvou dynamických `world.get()` každý fyzikální krok
 	var places = world.get("places") if world else null
 	if not (places is Dictionary) or places.is_empty() or world.get("estate") == null:
 		return
@@ -561,7 +563,7 @@ func _physics_impl(delta) -> void:
 			_label.visible = false
 		return
 	# --- pozdrav
-	var in_car: bool = player != null and player.get("car") != null
+	var in_car: bool = player != null and player.car != null
 	if dist < GREET_R and _talk_cool <= 0.0 and _talk <= 0.0 and not in_car:
 		_talk = GREET_S
 		_talk_len = _talk

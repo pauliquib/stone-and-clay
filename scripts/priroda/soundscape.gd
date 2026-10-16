@@ -149,6 +149,10 @@ var _sun_jd := -1
 var _rise := 360.0
 var _set := 1200.0
 var _on := false
+## M8.19B: hustota podle detailu přírody v předvolbě grafiky (`GameSettings.ECO_LEVELS`): nejvýš tolik současných
+## hlasů (0 = celý pool MAX_VOICES) a násobek okruhu SCAN_R. Pool se nemění, jen kolik z něj výběr obsadí.
+var voice_cap := 0
+var scan_k := 1.0
 # výběr – předalokovaná pole (bez alokací za běhu)
 var _top_n := 0
 var _top_score := PackedFloat32Array()
@@ -194,6 +198,12 @@ func _on_tune(id: String, _v: Variant) -> void:
 
 func enabled() -> bool:
 	return world != null and world.realism_on("soundscape")
+
+
+## M8.19B: detail z předvolby grafiky (počet hlasů, násobek okruhu výběru).
+func set_detail(voices: int, scan: float) -> void:
+	voice_cap = maxi(voices, 0)
+	scan_k = clampf(scan, 0.2, 2.0)
 
 
 # ------------------------------------------------------------------ data
@@ -597,7 +607,7 @@ func _bloom(L: Vector3, c: Clock) -> float:
 
 
 func _scan_cells(L: Vector3, mask: float) -> void:
-	var r := int(ceil(SCAN_R / CELL))
+	var r := int(ceil(SCAN_R * scan_k / CELL))
 	var c0 := Vector2i(floori(L.x / CELL), floori(L.z / CELL))
 	var budget := CLASSIFY_PER_TICK
 	if _cells.size() > CACHE_MAX:
@@ -680,7 +690,8 @@ func _candidate(si: int, key: int, pos: Vector3, L: Vector3, mask: float, w: flo
 			return
 		_remove_top(worst_same)
 		n = _top_n
-	if n >= _top_score.size():
+	var cap := _top_score.size() if voice_cap <= 0 else mini(voice_cap, _top_score.size())
+	if n >= cap:
 		if score <= _top_score[n - 1]:
 			return
 		n -= 1

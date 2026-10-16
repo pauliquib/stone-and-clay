@@ -41,6 +41,8 @@ var grid := Vector2(4, 2)
 var variants: Array = []              # {shape, vit, age, crown_r, w, y0, y1, lod: [Mesh LOD0, Mesh LOD1]}
 var _var_idx := {}                    # shape*100 + vit*10 + age → index varianty
 var _mats := {}                       # "tvar_list_pásmo" → ShaderMaterial
+## M8.19B: násobek dosahu LOD0 podle detailu přírody v předvolbě grafiky (`GameSettings.ECO_LEVELS`, 1 = L0_END).
+var lod0_k := 1.0
 var _full := {}                       # varianta → LOD0 bez pásma (zasazené stromy)
 var _imp_mat: ShaderMaterial
 var _imp_mesh: ArrayMesh
@@ -190,12 +192,32 @@ func material(shape: int, leaf: bool, band: int) -> ShaderMaterial:
 	m.set_shader_parameter("bark_atlas", _texture(TEX_BARK))
 	m.set_shader_parameter("atlas_grid", grid)
 	m.set_shader_parameter("stiffness", maxf(float(sh["stiff"]), STIFF_CONIFER if conifer else 0.5))
-	if band == 0:
-		m.set_shader_parameter("lod_band", Vector4(0.0, L0_END, LOD_FADE, 0.0))
-	elif band == 1:
-		m.set_shader_parameter("lod_band", Vector4(L0_END, L1_END, LOD_FADE, 0.0))
+	_set_band(m, band)
 	_mats[key] = m
 	return m
+
+
+## Hranice LOD0 → LOD1 (m) s násobkem z předvolby.
+func l0_end() -> float:
+	return L0_END * lod0_k
+
+
+## M8.19B: dosah LOD0 podle předvolby (Esc → Nastavení → Grafika → Detail přírody) – přepíše pásma hotových materiálů;
+## `TreeLodStreamer` si buňky LOD0 přepočítá při nejbližší kontrole (CHECK_S).
+func set_lod0_scale(k: float) -> void:
+	k = clampf(k, 0.2, 2.5)
+	if is_equal_approx(k, lod0_k):
+		return
+	lod0_k = k
+	for key in _mats:
+		_set_band(_mats[key] as ShaderMaterial, int(String(key).get_slice("_", 2)))
+
+
+func _set_band(m: ShaderMaterial, band: int) -> void:
+	if band == 0:
+		m.set_shader_parameter("lod_band", Vector4(0.0, l0_end(), LOD_FADE, 0.0))
+	elif band == 1:
+		m.set_shader_parameter("lod_band", Vector4(l0_end(), L1_END, LOD_FADE, 0.0))
 
 
 ## LOD meshe varianty: 0 = LOD0, 1 = LOD1 (materiály s pásmem pro streamované buňky).

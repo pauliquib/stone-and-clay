@@ -406,7 +406,10 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 	if world.ruts:
 		world.ruts.restore(d.get("ruts", {}))                 # M8.13: starý save bez klíče = žádné koleje
 	if world.meadows:
-		world.meadows.restore(d.get("meadows", {}))           # M8.14: starý save bez klíče = louky podle data
+		if d.has("meadows"):
+			world.meadows.restore(d["meadows"])
+		else:
+			world.meadows.on_date_set()                        # M8.19B: starý save (M7) bez klíče = louky k datu savu (jako F2 → Datum)
 	if world.footpaths:
 		world.footpaths.restore(d.get("footpaths", {}))       # M8.14: starý save bez klíče = žádné pěšiny
 	if world.micro:
