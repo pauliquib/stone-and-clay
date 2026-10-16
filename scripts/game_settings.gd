@@ -30,6 +30,7 @@ const REALISM_ROWS: Array = [
 	["soil_water", "Vodní bilance", "Vlhkost půdy, tání sněhu, odtok, potoky stoupají a kalní po bouřce, v suchu vysychají; bláto a louže podle místa (M8.7). Vypnuto = jedno globální mokro.", "~0,1 ms CPU"],
 	["treegen", "Generované stromy", "Tvar stromu podle druhu, věku a vitality (kužel smrku, kopule buku, bílá bříza), listí a kůra z atlasu, impostory v dálce (M8.8). Projeví se po novém načtení světa. Vypnuto = 6 původních modelů.", "≈ jako dřív (ověřit --perfscene)"],
 	["micro", "Mikroklima", "Za jasné bezvětrné noci studený vzduch v údolích a kotlinách, ranní údolní mlha, rosa a jinovatka, teplé jižní svahy, chladný les, teplejší obec; HUD a tělo berou teplotu v místě (M8.9). Vypnuto = teplota všude stejná.", "~0,05 ms CPU, mlha ≈ 0 ms GPU"],
+	["phenology", "Fenologie a růst stromů", "Každý druh raší, kvete a barví se podle sumy teplot letošního roku a místa (bříza dřív než dub, kotlina jinak než jižní svah), pozdní mráz spálí květy a ubere ovoce, stromy rostou v letech (M8.11). Vypnuto = jednotný kalendář Seasons.", "≈ 0 ms CPU (denní krok), ≤ 0,1 ms GPU"],
 ]
 
 var realism: Dictionary = {}

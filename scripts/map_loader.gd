@@ -253,6 +253,10 @@ static func build_trees(parent: Node3D, skip := {}, terrain: Terrain = null, mgr
 	var far_cells := {}    # key → {"low": [xf, col], "c3": …, "c4": …, "c5": …}
 	var trunks := []       # pro kolize
 	var meta := {}         # M2.1: i → [nkey, p, near_idx, fkey, group, far_idx, trunk_idx]
+	var eco := TreeGen.read_eco(n)            # M8.11: druh stromu pro fenologický kód (bez dat z prototypu)
+	var eco_rec: PackedByteArray = eco.get("rec", PackedByteArray())
+	var eco_ids: Array = eco.get("ids", [])
+	var site: Site = mgr.world.site if mgr != null and mgr.world != null else null
 	for i in n:
 		if skip.has(i):
 			continue
@@ -262,8 +266,12 @@ static func build_trees(parent: Node3D, skip := {}, terrain: Terrain = null, mgr
 			pos.y = minf(pos.y, terrain.height_at(pos.x, pos.z) - 0.15)
 		var basis := Basis(Vector3.UP, d[k + 3]) * Basis.from_scale(Vector3(d[k + 4], d[k + 5], d[k + 6]))
 		var xf := Transform3D(basis, pos)
-		var col := Color(d[k + 7], d[k + 8], d[k + 9])
 		var p := int(d[k + 10])
+		var sp := String(TreeEco.FALLBACK_PROTO[clampi(p, 0, TreeEco.FALLBACK_PROTO.size() - 1)])
+		if not eco_rec.is_empty():
+			var si := eco_rec.decode_u8(i * TreeEco.REC)
+			sp = String(eco_ids[si]) if si < eco_ids.size() else sp
+		var col := Color(d[k + 7], d[k + 8], d[k + 9], Phenology.instance_alpha(sp, pos, site))   # M8.11: a = fenologický kód
 		trunks.append([pos, d[k + 4] * (0.09 if p < 3 else 0.07), d[k + 5] * (0.5 if p < 3 else 0.3)])
 		var fkey := Vector2i(floori(pos.x / TREE_FAR_CELL), floori(pos.z / TREE_FAR_CELL))
 		if not far_cells.has(fkey):

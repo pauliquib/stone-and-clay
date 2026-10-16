@@ -28,16 +28,36 @@ uniform vec4 lod_band = vec4(0.0, 1e6, 0.0, 0.0);   // od, do, půlšířka prol
 
 #include "res://shaders/include/wind.gdshaderinc"
 #include "res://shaders/include/tree_gen.gdshaderinc"
+#include "res://shaders/include/phenology.gdshaderinc"
 
 varying vec3 tint;
 varying vec3 lpos;
 varying vec3 wpos;
 varying vec3 origin_w;
 varying vec2 tg_fade;
+// M8.11: fenologie druhu a místa (include/phenology) – stav, barvy podzimu / jara / květů, příznaky
+varying flat vec4 ph_st;
+varying flat vec3 ph_aut;
+varying flat vec3 ph_spr;
+varying flat vec4 ph_bl;
+varying flat vec2 ph_fl;     // x = 1 platný kód, y = 1 stálezelený
 
 void vertex() {
 	tint = INSTANCE_CUSTOM.rgb;
 	lpos = VERTEX;
+	ph_st = vec4(foliage, autumn, 0.0, 0.0);
+	ph_aut = vec3(0.0);
+	ph_spr = vec3(0.28, 0.5, 0.12);
+	ph_bl = vec4(0.0);
+	ph_fl = vec2(0.0);
+	if (ph_valid(INSTANCE_CUSTOM.a)) {
+		ivec2 pc = ph_cell(INSTANCE_CUSTOM.a);
+		ph_st = ph_state(pc);
+		ph_aut = ph_info(pc, PH_COL_AUT).rgb;
+		ph_spr = ph_info(pc, PH_COL_SPR).rgb;
+		ph_bl = ph_info(pc, PH_COL_BLOOM);
+		ph_fl = vec2(1.0, ph_info(pc, PH_COL_FLAGS).r);
+	}
 	vec3 origin = MODEL_MATRIX[3].xyz;
 	float tg_dc = distance(MAIN_CAM_INV_VIEW_MATRIX[3].xyz, origin);   // M8.8: LOD pásmo podle hlavní kamery
 	bool tg_cull = tg_band_outside(tg_dc, lod_band);
@@ -92,19 +112,35 @@ void fragment() {
 		vec3 c = mix(base_color, tint, instance_mix);
 		float nz = vnoise(wpos * 1.3) * 0.6 + vnoise(wpos * 4.0) * 0.4;
 		c *= mix(vec3(0.6, 0.7, 0.5), vec3(1.15), nz);
-		if (deciduous) {
+		// M8.11: s platným kódem instance rozhoduje o opadu druh (modřín opadává, smrk ne), jinak materiál
+		bool decid = ph_fl.x > 0.5 ? ph_fl.y < 0.5 : deciduous;
+		float fol = ph_st.x;
+		float aut = ph_st.y;
+		float th = hash(floor(origin_w * 0.37) + 0.5);
+		if (decid) {
 			// každý strom se barví a opadává trochu jinak (hash polohy), listí mizí po chomáčích
-			float th = hash(floor(origin_w * 0.37) + 0.5);
 			float clump = vnoise(wpos * 2.2 + th * 13.0);
-			if (clump * 0.85 + th * 0.15 > foliage * 1.05 - 0.02) {
+			// M8.11: kvetoucí strom (ovocné, třešeň, akát…) má v koruně bílé / růžové chomáče i bez listí
+			bool flower = ph_bl.a > 0.5 && ph_st.z > 0.01 && vnoise(wpos * 6.5 + th * 7.0) > 1.0 - 0.55 * ph_st.z;
+			if (clump * 0.85 + th * 0.15 > fol * 1.05 - 0.02 && !flower) {
 				discard;
 			}
-			float a = clamp(autumn * 1.5 - th * 0.5 + (clump - 0.5) * 0.3, 0.0, 1.0);
+			float a = clamp(aut * 1.5 - th * 0.5 + (clump - 0.5) * 0.3, 0.0, 1.0);
 			vec3 ac = mix(vec3(0.78, 0.52, 0.07), vec3(0.62, 0.2, 0.05), smoothstep(0.35, 0.9, th + clump * 0.3));
-			ac = mix(ac, vec3(0.42, 0.28, 0.1), smoothstep(0.7, 1.0, a) * (1.0 - foliage) * 0.8);
+			if (ph_fl.x > 0.5) {
+				ac = ph_aut * (0.8 + 0.4 * th);       // barva podzimu druhu (dreviny.json)
+			}
+			ac = mix(ac, vec3(0.42, 0.28, 0.1), smoothstep(0.7, 1.0, a) * (1.0 - fol) * 0.8);
 			c = mix(c, ac * (0.75 + 0.45 * nz), a);
-			// jarní rašení: světlejší svěží zeleň
-			c = mix(c, vec3(0.28, 0.5, 0.12) * (0.8 + 0.4 * nz), (1.0 - smoothstep(0.35, 1.0, foliage)) * (1.0 - autumn) * 0.7);
+			// jarní rašení: světlejší svěží zeleň (s fenologií barva jara druhu)
+			c = mix(c, ph_spr * (0.8 + 0.4 * nz), (1.0 - smoothstep(0.35, 1.0, fol)) * (1.0 - aut) * 0.7);
+			if (flower) {
+				c = ph_bl.rgb * (0.85 + 0.3 * nz);
+			}
+		} else if (ph_fl.x > 0.5 && ph_st.w > 0.01) {
+			// M8.11: jarní přírůst jehličnanů – světlé špičky výhonů
+			float tip = smoothstep(0.45, 0.8, vnoise(wpos * 3.1 + th * 5.0));
+			c = mix(c, ph_spr * (1.4 + 0.4 * nz), tip * ph_st.w * 0.6);
 		}
 		if (use_atlas) {                         // M8.8: karta trsu listí z atlasu (kresba × okluze v koruně)
 			vec4 lt = tg_leaf(leaf_atlas, UV, UV2.x, atlas_grid);

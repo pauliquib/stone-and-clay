@@ -52,6 +52,18 @@ func add_tree(nkey: Vector2i, vi: int, i: int, xf: Transform3D, col: Color) -> i
 	return ids.size() - 1
 
 
+## M8.11: růst v letech – přeškáluje uloženou transformaci stromu (pro buňky postavené později).
+func scale_tree(nkey: Vector2i, vi: int, idx: int, sb: Basis) -> void:
+	var g: Array = _groups.get([nkey, vi], [])
+	if g.is_empty():
+		return
+	var xfs: Array = g[0]
+	if idx < 0 or idx >= xfs.size():
+		return
+	var xf: Transform3D = xfs[idx]
+	xfs[idx] = Transform3D(xf.basis * sb, xf.origin)
+
+
 func _process(delta: float) -> void:
 	_t -= delta
 	if _t <= 0.0:

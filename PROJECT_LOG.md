@@ -2403,3 +2403,46 @@ dopravy, ne o regresi.
 - Parametry „(stavba)“ v Voda a půda (oslunění, TWI, rozběh, povodí za mapou, soutoky) se projeví až po novém startu.
 - `DevTune.register` neumí vícerozměrné cíle ani „platí po restartu“ jako vlastnost řádku – zatím jen text v popisku.
 - Křivky ročních dob: den bodu jde posunout za sousední bod (interpolace pak přeskočí) – hlídat při ladění.
+
+## 2026-10-16 – M8.11 Fenologie a růst stromů v letech
+
+### Hotovo (staticky ověřeno čtením kódu + kontrola překladu a shaderů – ruční test čeká)
+- **`Phenology`** (`scripts/eko/phenology.gd`, `World.phenology`, přepínač realismu `phenology`, nový řádek v Nastavení →
+  Realismus): denní krok přes `eco_day` z průměru `Weather.temp` vzorkovaného v `eco_hour` (přeskočené dny / rozběh roku z
+  normálu `Seasons.TEMP_MEAN` + odchylka roku, při dohánění vynucená teplota F2). GDD 5 °C od 1. 1., teplé dny, zimní chlad
+  od 1. 11. (ovocné a buk bez zimy raší později), podzimní chlad od 1. 8. + fotoperioda (`zbarveni_den`), opad. Posun místa
+  `site_shift_k` ze `Site` (výška × gradient, oslunění svahu, mrazová kotlina) → GDD + posun × teplé dny. Pozdní mráz v době
+  květu / plůdků (údolí ↔ svah z `Microclimate.temp_valley/ridge`, bez něj ±K) → `frost_damage` po druhu a 7 pásmech posunu.
+  API (00_PRINCIPY kap. 3): `gdd(year_day, base)`, `phase(species, pos)` → {foliage, autumn, bloom, fruit, frost_damage, flush},
+  `foliage`, `autumn`, `bloom`, `fruit`, `frost_damage`, `crop_factor`, `bloom_near`, `bees_bloom`, `shift_at`,
+  `temp_mean_day`, `enabled`; statické `site_shift_k`, `instance_alpha`, `species_index`. Fallback = `Seasons`.
+- **`data/dreviny.json` → `fenologie`** u 23 druhů (místo null): `rasi_gdd`, `plne_olisteni_gdd`, `kvete_gdd`, `zbarveni_den`,
+  `zbarveni_chlad`, `opad_dni`, `chlad_dni`, `zrani_gdd`, `stalezeleny`, `kvet_barva` – kalibrace přes klimatický normál na
+  průměrná data fází pro střední Moravu (bříza raší ~10. 4., buk ~19. 4., dub ~30. 4.; bříza se barví ~22. 9., javor ~7. 10.,
+  dub ~19. 10., modřín zlátne ~10. 10. a je holý ~1. 11.) – odhad, ověřit v M8.19.
+- **Shadery:** `shaders/include/phenology.gdshaderinc` (globální `pheno_on`, `pheno_lut` – nové v `project.godot`), `tree.gdshader`
+  a `tree_impostor.gdshader` čtou z `INSTANCE_CUSTOM.a` kód druhu a pásma posunu → olistění, zbarvení barvou druhu, jarní barva
+  druhu, květy v koruně (ovocné, třešně, akát, jíva, lípa), přírůst jehličnanů; modřín opadává. Kód sestaví `TreeGen.build`,
+  `MapLoader.build_trees` (staré prototypy, druh z `tree_eco.bin`) a `PlantedTrees._rebuild`; a = 1 → starý vzhled.
+- **Růst v letech:** na Nový rok (i při skoku o roky) +1 rok, faktor přírůstku = 1 − stres (letní sucho `SoilWater`, mráz);
+  `TreeEco.set_growth / base_height / growth_factor`, `height`, `age`, `dbh` s přírůstkem Chapman–Richards; vzhled
+  `TreeManager.regrow(i, k)` + `TreeLodStreamer.scale_tree` po 150 stromech za snímek (`EcoClock.slice`).
+- **Napojení:** `TreeDecor` ovoce × `crop_factor` (druh a místo), zasazené stromy: fenologický kód, ovoce × mráz, vláha i ze
+  `SoilWater` (`SOIL_WET_MIN`); včely `Apiary._activity` z `bees_bloom` (louky + kvetoucí dřeviny v okolí, mezipaměť 128 m/den).
+- **Deník J → „ROK V PŘÍRODĚ“** (data fází letos, pozdní mráz, loni, růst lesa), F2 → Příroda – ladění → „Fenologický kalendář
+  (M8.11)“ (druh → raší / kvete / barví se, dnešní stav, mráz údolí / svah, odchylka roku −3 / 0 / +3 / +5 K), vrstva mapy
+  `fenologie`, měřicí scéna `les_jaro` (`Tests.PERF_SCENES`), uložení klíč `phenology` (starý save = rozběh roku, bez růstu).
+- **Menu pro vývojáře F3:** `scripts/dev/tune_m8_11.gd` – **35 parametrů** (Příroda/Fenologie 28, Příroda/Růst stromů 7);
+  změna → `Phenology.invalidate()` → tabulka pro shadery do herní hodiny. Celkem v registru 3 633 + 35 = 3 668.
+- Kontrola překladu (`--check-only` všech změněných .gd) i `tools/shader_check.gd`: bez chyb.
+
+### Otevřené body
+- Čeká na ruční test uživatele (checklist `docs/testy_M8.md` → M8.11) a měření `--perfscene=les_jaro` / `les_leto` (vlna 8).
+- Nestihlo se (zadání „Co udělat“ nad rámec Minima / Hotovo, když): úmrtnost a souše, zmlazení na pasekách, přechod věkové
+  třídy na jinou variantu meshe (M8.8) – růst je zatím jen měřítko instance; padané listí `TreeDecor` podle opadu druhu
+  (zatím křivka `LEAVES`); zasazené stromy rostou dál vlastním modelem (`GROWTH_SPEEDUP`), ne Chapman–Richards.
+- `TreeManager.height_of` (kácení, čas kácení) bere výšku z `trees.bin` bez růstu; `TreeEco.height` už s růstem.
+- Globální `foliage` / `autumn` (Seasons) dál řídí trávu, padající listí ve větru, `Microclimate` a `SoilWater` (zápoj) –
+  případně v M8.14 / M8.19 přepnout na `Phenology`.
+- Kalibrace GDD je přes klimatický normál (hladký průběh); se skutečnou denní proměnlivostí počasí může rašení přijít o pár
+  dní dřív – doladit v M8.19 (F3 → Příroda/Fenologie).

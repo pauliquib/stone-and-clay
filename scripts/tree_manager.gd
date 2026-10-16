@@ -39,6 +39,8 @@ var _shape_rids: Array[RID] = []        # RIDy tvarů kmenů (vlastník = tady; 
 var _cells := {}                        # Vector2i(64 m) → PackedInt32Array stojících i pokácených stromů
 var _stumps := {}                       # i → StaticBody3D pařezu
 var _orig := {}                         # i → původní Transform3D skrytého stromu
+var _grow_k := {}                       # M8.11: i → měřítko růstu v letech použité na vzhled (chybí = 1)
+var lod_streamer: TreeLodStreamer       # M8.8: streamer blízkých LOD (null = staré prototypy) – růst mění i jeho data
 var _stump_mat: StandardMaterial3D
 
 
@@ -241,6 +243,34 @@ func show_tree(i: int) -> void:
 		(_stumps[i] as Node).queue_free()
 		_stumps.erase(i)
 	tree_restored.emit(i)
+
+
+## M8.11: vzhled stromu na `k` × velikost z dat (růst v letech, `Phenology` po kouscích přes `EcoClock.slice`).
+## Mění jen transformace instancí (impostor, LOD1/LOD0, data streameru); kolize kmene zůstává. Pokácené stromy přeskočí.
+func regrow(i: int, k: float) -> void:
+	if not _meta.has(i) or felled.has(i):
+		return
+	var old: float = _grow_k.get(i, 1.0)
+	if absf(k - old) < 0.002:
+		return
+	var r := k / maxf(old, 0.01)
+	_grow_k[i] = k
+	var sb := Basis.from_scale(Vector3(r, r, r))
+	var m: Array = _meta[i]
+	var far: MultiMesh = _far_mm.get([m[3], m[4]])
+	if far and int(m[5]) < far.instance_count:
+		var xf := far.get_instance_transform(int(m[5]))
+		far.set_instance_transform(int(m[5]), Transform3D(xf.basis * sb, xf.origin))
+	if m[0] != null:
+		var nv: Variant = _near_mm.get([m[0], m[1]])
+		var nears: Array = nv if nv is Array else [nv]
+		for near in nears:
+			if near is MultiMesh and int(m[2]) >= 0 and int(m[2]) < (near as MultiMesh).instance_count:
+				var nm := near as MultiMesh
+				var nx := nm.get_instance_transform(int(m[2]))
+				nm.set_instance_transform(int(m[2]), Transform3D(nx.basis * sb, nx.origin))
+		if lod_streamer != null:
+			lod_streamer.scale_tree(m[0], int(m[1]), int(m[2]), sb)
 
 
 func _set_visible(i: int, on: bool) -> void:

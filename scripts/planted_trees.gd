@@ -82,6 +82,9 @@ const GEN_KEY_BASE := 1000
 const GEN_ADULT_SIZE := 0.6
 const GEN_YOUNG_YEARS := 5.0
 const GUARD_COLOR := Color(0.75, 0.92, 0.75, 0.4)
+## M8.11: stejný model jako les – vláha ze `SoilWater` (půda vlhčí než tohle = strom má vodu i bez zálivky),
+## fenologie podle druhu a místa (kód v `INSTANCE_CUSTOM.a`), ovoce × (1 − poškození pozdním mrazem).
+static var SOIL_WET_MIN := 0.45
 
 var world: World
 var mgr: TreeManager
@@ -395,6 +398,9 @@ func fruit_available(rec: Dictionary) -> int:
 	if s < FRUIT_MIN_S or float(rec["health"]) < 0.3:
 		return 0
 	var ff := Seasons.curve(TreeDecor.FRUIT, world.clock.day_of_year())
+	var ph: Phenology = world.phenology
+	if ph != null and ph.enabled():          # M8.11: pozdní mráz v době květu → méně ovoce
+		ff *= ph.crop_factor(String(ECO_IDS.get(String(rec["sp"]), "")), rec["pos"])
 	var picked := int(rec["pk"]) if int(rec["py"]) == world.clock.year() else 0
 	return maxi(0, floori(float(FRUIT_CAP) * s * ff) - picked)
 
@@ -563,6 +569,9 @@ func _grow(rec: Dictionary, rained: bool, month: int) -> void:
 	if rained:
 		rec["moist"] = maxf(float(rec["moist"]), RAIN_DAYS)
 	var winter := DORMANT_MONTHS.has(month)
+	var sw: SoilWater = world.soil_water
+	if sw != null and sw.active() and sw.moisture_at((rec["pos"] as Vector3).x, (rec["pos"] as Vector3).z) >= SOIL_WET_MIN:
+		rec["moist"] = maxf(float(rec["moist"]), 1.0)     # M8.11: vlhká půda (SoilWater) = vláha i bez zálivky
 	var wet := float(rec["moist"]) > 0.0
 	if wet:
 		rec["moist"] = maxf(0.0, float(rec["moist"]) - 1.0)
@@ -659,7 +668,9 @@ func _rebuild() -> void:
 		if not groups.has(g_key):
 			groups[g_key] = [[], []]
 		groups[g_key][0].append(Transform3D(basis, pos))
-		groups[g_key][1].append(_tint(rec))
+		var tint := _tint(rec)
+		tint.a = Phenology.instance_alpha(String(ECO_IDS.get(String(rec["sp"]), "")), pos, world.site)   # M8.11
+		groups[g_key][1].append(tint)
 		if sy >= COLLIDE_MIN_H:
 			var cs := CollisionShape3D.new()
 			var cyl := CylinderShape3D.new()
