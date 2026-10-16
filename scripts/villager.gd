@@ -6,6 +6,10 @@
 ## Fáze 3 (LimboAI): prvních `BT_VILLAGERS` vesničanů řídí behavior strom `ai/villager_routine.tres`
 ## (denní rutiny – zahrada, práce, hospoda, procházka). BT jen volí cíl (`move_to`/`clear_target`),
 ## samotný pohyb, zdravení i útěk řeší původní kód; bez addonu nebo stromu běží vše jako dřív.
+## M8.17 Život vesnice: ostatní vesničany vede plán dne domácnosti (`Households` → `set_plan` jednou za herní
+## hodinu: domů, na dvůr štípat, na zahradu, do práce, do hospody, na návštěvu); doma se schovají do domu
+## (bez fyziky a vizuálu – `_enter_house`), za simulační bublinou se na cíl jen přesunou. Oblékají se podle
+## teploty (`dress_level`). Bez domácností (vypnutý přepínač `village_life`) chodí jako dřív.
 class_name Villager
 extends CharacterBody3D
 
@@ -13,7 +17,8 @@ static var PHYSICS_RANGE := 160.0
 ## Krok kinematického pohybu hluboce uspaného vesničana (za simulační bublinou World.sim_radius).
 static var SLEEP_STEP := 0.5
 ## Kolik prvních spawnutých vesničanů dostane behavior strom (0 = BT nikdo; Fáze 3: testovací podmnožina).
-const BT_VILLAGERS := 5
+## M8.17: laditelné (F3 → Člověk/Život vesnice, platí po novém načtení světa); ostatní řídí plán domácnosti.
+static var BT_VILLAGERS := 5
 const BT_TREE := "res://ai/villager_routine.tres"
 ## Druhy hran pro pěší A* trasu k cíli z BT (vše, kudy vesničan chodí).
 const WALK_KINDS := ["secondary", "tertiary", "unclassified", "residential", "service", "living_street",
@@ -77,6 +82,7 @@ static var KNOCK_DECEL := 6.0          # m/s² – dobrzdění sraženého
 static var PROMILE_DECAY := 0.01       # ‰/s reálně – vystřízlivění (zjednodušené)
 static var DRUNK_FULL_PROMILE := 2.0   # ‰ – plné potácení
 static var GARDEN_D := 4.0             # m před domem – zahrada (BT)
+static var ENTER_NEAR_R := 5.0         # M8.17: zaseknutý u dveří blíž než tohle = zajde dovnitř (plot, schod)
 
 var graph: RoadGraph
 var terrain: Terrain
@@ -121,6 +127,14 @@ var _bt_home_normal := Vector3(0, 0, 1)
 var _deep := false                # hluboký spánek za 1.7× simulační bubliny (schovaný vizuál, ~2 Hz chůze)
 var _deep_dt := 0.0               # nasčítaný čas do dalšího kroku hlubokého spánku
 var _mid := false                 # střední pásmo (sim_radius…1.7×): viditelný, kinematika bez kolizí
+var household := -1               # M8.17: index domácnosti (`World.households`), −1 = bez domova v registru
+var _plan_inside := false         # M8.17: po příchodu na cíl zajít dovnitř (domov, návštěva)
+var _plan_anim := ""              # M8.17: póza na místě (chop, dig)
+var _anim_on := false
+var _arrived := false             # cíl z BT / plánu už je dosažen (jednorázová reakce `_on_arrive`)
+var _inside := false              # M8.17: je v domě – schovaný, bez fyziky (probudí ho `set_plan`)
+var _house_door := Vector3.INF
+var _dress := -1                  # M8.17: úroveň oblečení podle teploty (0 lehce, 1 větrovka, 2 bunda + čepice)
 
 
 func setup(g: RoadGraph, t: Terrain, w: Node, start_node: int, seed_: int, prof: Dictionary, bt := false) -> void:
@@ -306,6 +320,7 @@ func move_to(target: Vector3) -> bool:
 		_bt_path = PackedVector3Array()
 		_bt_path_i = 0
 		_bt_stuck_n = 0
+		_arrived = false
 	return true
 
 
@@ -314,6 +329,7 @@ func clear_target() -> void:
 	_bt_target_pos = Vector3.INF
 	_bt_path = PackedVector3Array()
 	_bt_path_i = 0
+	_arrived = false
 
 
 ## Aktuální cíl z BT (testy, ladění); Vector3.INF = žádný.
@@ -349,7 +365,110 @@ func _bt_step() -> Vector3:
 			_bt_path_i += 1
 			continue
 		return Vector3(d.x, 0, d.y).normalized() * _speed
+	if not _arrived:
+		_arrived = true
+		_on_arrive()
 	return Vector3.ZERO
+
+
+# ----------------------------------------------------------------- M8.17: plán dne domácnosti
+
+## Povel z `Households` (jednou za herní hodinu): jdi na `target` (INF = choď volně), po příchodu zajdi dovnitř
+## (`inside`) nebo dělej `anim` (štípání, rytí). `snap`: za simulační bublinou se přesune rovnou (žádná chůze).
+func set_plan(target: Vector3, inside: bool, anim: String, snap: bool) -> void:
+	if use_bt:
+		return
+	if _anim_on and anim != _plan_anim:
+		_visual.stop_action()
+		_anim_on = false
+	_plan_anim = anim
+	_plan_inside = inside
+	if target == Vector3.INF:
+		if _inside:
+			_leave_house()
+		clear_target()
+		return
+	if _inside:
+		if inside and target.distance_to(_house_door) <= TARGET_TOL:
+			return                     # zůstává doma
+		_leave_house()
+	if not move_to(target):
+		return
+	if snap and _deep:
+		global_position = target
+		_bt_path = PackedVector3Array([target])
+		_bt_path_i = 1
+		_arrived = true
+		_on_arrive()
+
+
+## Došel na cíl z plánu: dovnitř, nebo práce na místě.
+func _on_arrive() -> void:
+	if _plan_inside and _bt_target_pos != Vector3.INF:
+		_enter_house(_bt_target_pos)
+	elif _plan_anim != "" and not _anim_on and _visual != null:
+		_visual.start_action(_plan_anim)
+		_anim_on = true
+
+
+## Zajde do domu: schovaný pod terénem, bez fyziky a kolizí (žádná cena za snímek, nikdo ho nenajde).
+func _enter_house(door: Vector3) -> void:
+	if _inside or _knocked > 0.0 or _flee_t > 0.0:
+		return
+	_inside = true
+	_house_door = door
+	if _anim_on:
+		_visual.stop_action()
+		_anim_on = false
+	_visual.visible = false
+	_visual.set_process(false)
+	_label.visible = false
+	_name_label.visible = false
+	collision_layer = 0
+	velocity = Vector3.ZERO
+	global_position = door - Vector3(0.0, 40.0, 0.0)
+	set_physics_process(false)
+
+
+func _leave_house() -> void:
+	if not _inside:
+		return
+	_inside = false
+	var p := _house_door
+	if terrain != null:
+		p.y = terrain.height_at(p.x, p.z)
+	global_position = p
+	collision_layer = 4
+	_deep = false
+	_mid = false
+	_deep_dt = 0.0
+	_visual.visible = true
+	_visual.set_process(true)
+	_name_label.visible = true
+	set_physics_process(true)
+
+
+func is_inside() -> bool:
+	return _inside
+
+
+## Oblečení podle teploty (M8.16 háček): 0 = jak má v profilu, 1 = větrovka, 2 = bunda, čepice, rukavice.
+## Přestavba postavy jen při změně úrovně (pár za den).
+func dress_level(lvl: int) -> void:
+	if lvl == _dress or _visual == null:
+		return
+	_dress = lvl
+	var look: Dictionary = persona.profile.get("look", {}) if persona else {}
+	var coats := [Color(0.22, 0.27, 0.36), Color(0.33, 0.25, 0.18), Color(0.2, 0.32, 0.24), Color(0.45, 0.14, 0.12)]
+	var c: Color = coats[absi(_seed) % coats.size()]
+	_visual.jacket_style = "" if lvl == 0 else ("vetrovka" if lvl == 1 else "bunda")
+	_visual.jacket_color = c
+	_visual.sleeve_c = c if lvl > 0 else Color(0, 0, 0, 0)
+	_visual.long_sleeves = lvl > 0 or bool(look.get("sleeves", false))
+	_visual.head_style = "kulich" if lvl == 2 and not bool(look.get("hat", false)) else ""
+	_visual.gloves = lvl == 2
+	if _visual._root != null:
+		_visual._rebuild()
 
 
 func _physics_process(delta: float) -> void:
@@ -505,6 +624,10 @@ func _physics_impl(delta) -> void:
 			_stuck += delta
 			if _stuck > STUCK_S:
 				_stuck = 0.0
+				if _plan_inside and _bt_target_pos != Vector3.INF \
+						and global_position.distance_to(_bt_target_pos) < ENTER_NEAR_R:
+					_enter_house(_bt_target_pos)       # M8.17: u vlastních dveří zaseknutý (plot) – prostě zajde dovnitř
+					return
 				if _bt_target_pos != Vector3.INF:
 					# zaseknutý cestou za cílem z BT → přeskoč bod a naplánuj trasu znovu odsud;
 					# po BT_STUCK_MAX zaseknutích cíl vzdej (replan jinak vrací přeskočení na začátek)

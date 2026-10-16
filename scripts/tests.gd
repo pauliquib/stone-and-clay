@@ -2144,6 +2144,10 @@ const PERF_SCENES := {
 		"weather": "jasno", "popis": "M8.12: pole a zahrada těsně před půlnocí – denní krok plodin (255 polí po kouscích, záhony, stín) proběhne během měření"},
 	"pole_blato": {"pos": Vector3(600.0, 0.0, 600.0), "yaw": 0.0, "date": [2026, 10, 20], "hour": 12.0,
 		"weather": "dest", "popis": "M8.13: pole v říjnu v dešti – terramechanika a koleje (sednout do auta / traktoru a jet po poli; profil „car“)"},
+	"ves_rano_zima": {"pos": Vector3(60.0, 0.0, 110.0), "yaw": 0.0, "date": [2026, 1, 14], "hour": 6.3,
+		"weather": "jasno", "popis": "M8.17: náves ve středu v lednu ráno – rozsvěcují se kuchyně, kouří víc komínů, v 7:00 hodinový krok domácností (prof. „villager“)"},
+	"ves_sobota_rijen": {"pos": Vector3(60.0, 0.0, 110.0), "yaw": 0.0, "date": [2026, 10, 17], "hour": 10.0,
+		"weather": "jasno", "popis": "M8.17: náves v sobotu v říjnu dopoledne – štípání dřeva a hrabání listí u domů, vesničané na dvorech"},
 }
 
 

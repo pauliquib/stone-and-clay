@@ -335,6 +335,9 @@ static func greet(ctx: Dictionary) -> String:
 
 ## Drb z vesnice (E u vesničana). Obsahuje-li „policajti“, hráč se dozví o silniční kontrole.
 static func rumor(ctx: Dictionary) -> String:
+	var vg: String = ctx.get("village_gossip", "")   # M8.17: drb z událostí ve vsi (Households.gossip_line)
+	if vg != "":
+		return vg
 	var out := ["U kapličky prý někdo ztratil dukáty…", "V lesích kolem prý svítí zlaté žaludy!",
 		"Hostinský Láďa točí nejlepší dvanáctku v okolí.", "V Pálenici U Kotla mají slivovici jak křen.",
 		"Vinař Zdeněk dělá degustace, ale kdo se motá, toho vyhodí.",

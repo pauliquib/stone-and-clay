@@ -127,6 +127,8 @@ static func save(world: World, id: int, slot: String) -> bool:
 		d["phenology"] = world.phenology.to_dict()     # M8.11: GDD, teploty dnů, mráz, deník roku, roky růstu
 	if world.fields:
 		d["fields_eco"] = world.fields.to_dict()       # M8.12: stav plodin polí (růstový model) + roční shrnutí úrody
+	if world.households:
+		d["households"] = world.households.to_dict()   # M8.17: stav domů (dřevo, oheň), vztahy (změny proti seedu), paměť drbů
 	if world.fences:
 		d["fences"] = world.fences.to_dict()           # hráčem postavené úseky plotů (Fáze 7; procedurální se přegenerují)
 	if world.farm:
@@ -403,6 +405,8 @@ static func load_slot(world: World, id: int, slot: String) -> bool:
 		world.phenology.restore(d.get("phenology", {}))       # M8.11: starý save bez klíče = rozběh roku z klimatu, bez růstu
 	if world.fields:
 		world.fields.restore(d.get("fields_eco", {}))         # M8.12: starý save bez klíče = pole podle normálu k dnešku
+	if world.households:
+		world.households.restore(d.get("households", {}))     # M8.17: starý save bez klíče = domácnosti podle seedu
 	if world.fences:
 		world.fences.restore(d.get("fences", {}))            # starý save bez klíče = žádné hráčské ploty (Fáze 7)
 	if world.farm:

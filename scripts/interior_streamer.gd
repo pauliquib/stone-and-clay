@@ -492,6 +492,15 @@ func resident_of(eid: int, flat: int) -> Dictionary:
 	if est == null or eid == est.lot_id:
 		return {}
 	var per: Persona = null
+	var hs: Households = world.households
+	if hs != null and hs.enabled():
+		# M8.17: obyvatelé z domácností (stejní, jako svítí okna a kouří komín); −1 = budovu nesimuluje
+		var st := hs.home_state(eid, flat)
+		if st >= 0:
+			per = hs.resident_persona(eid, flat)
+			return {"persona": per, "home": st == 1} if per != null else {}
+		if hs.is_empty_dwelling(eid):
+			return {}
 	if flat == 0 and eid == est.deda_id and world.npcs.has("deda"):
 		per = (world.npcs["deda"] as Npc).persona
 	else:

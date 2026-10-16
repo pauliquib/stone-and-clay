@@ -450,6 +450,30 @@
   a u obecního úřadu, E): výběr a vklad hotovosti. Deník J → Statistika: zůstatek, nepřečtené e-maily, balíky. Ladění: konstanty
   nahoře v `Computer` (`ESHOP_DISCOUNT`, `SHIPPING_KC`, `COD_KC`, `DELIVERY_DAYS`, `ATM_SPOTS`, `TESTS`, `NOTICE_BOARD`,
   `GOSSIP_*`, `DEDA_MAILS`), `Jobs.INVITE_DAYS` / `INVITE_BONUS`; F2 → Hráč „Počítač: +5 000 Kč na účet, balíky doručit hned“.
+- **Život vesnice** (M8.17, `scripts/eko/households.gd` `Households` → `World.households`, přepínač `village_life`,
+  data `data/potreby.json`): z registru nemovitostí se deterministicky (seed = id budovy) složí **domácnosti** – ~70 % rodinných
+  domů a 85 % bytů bytového domu obydleno; členové = 28 postav s modelem (domov `Estate.pick_customer_house(seed)` jako v BT,
+  dvě postavy na jednom domě = jedna rodina) + **neviditelní obyvatelé** (jen data: senior sám / pár, pár, rodina s dětmi,
+  jednotlivec; smyšlená příjmení z dat), zdroj tepla (dřevo / plyn / elektřina podle stáří obyvatel a velikosti domu), zahrada,
+  auto, pes, slepice. **Plán dne** po herních hodinách (`eco_hour` → `EcoClock.slice`, 8 domácností za snímek): rozvrh spánku
+  podle role (pracující 5:30, senior 6:00, víkend o 1,3 h později), pak **utility AI** – užitek činnosti = Σ potřeba × uspokojení
+  (jídlo, práce, hygiena, společnost, odpočinek) + povinnost domu (nákup, zahrada, sekání podle sumy teplot `Phenology.gdd`,
+  štípání do zásoby 11 prms v srpnu–listopadu, hrabání listí, sníh), × okno hodin × počasí (déšť, sněžení, mráz, vedro) ×
+  měsíc × povaha (`Persona`) × víkend, s deterministickým šumem. Hlučné práce respektují noční a nedělní klid
+  (`NoiseRegistry.offense_for("sekacka")`). Postavy s modelem dostanou cíl (`Villager.set_plan` → `move_to`: dvůr, zahrada,
+  práce, hospoda, obchod, návštěva, doma), doma se schovají do domu bez fyziky, za bublinou se jen přesunou; oblékají se podle
+  teploty u domu (větrovka pod 15 °C, bunda + čepice + rukavice pod 5 °C). **Dům jako stav:** okna svítí podle místnosti a toho,
+  kdo je doma (UV2 okna = budova + místnost, textura `house_lit` v `window_glass.gdshader`: kuchyň po vstávání, obývák večer,
+  ložnice před spaním; prázdné domy tmavé), komín podle topení (`Households.chimney_heat`: potřeba tepla z `Microclimate.temp_at`
+  u domu, ranní přiložení → hustší kouř, v noci dohořívá, plyn jen vlečka), zásoba dřeva a jídla, štípání a sekačka jako zvuk
+  u domů do 140 m. Klepání a obyvatel uvnitř (`InteriorStreamer.resident_of`) berou obyvatele a „je doma“ z domácnosti.
+  **Vztahy:** sousedé (4 nejbližší), příbuzní, rivalové; spory (sekačka u rivala, pes), pomoc (sníh u osamělého seniora),
+  půjčky, návštěvy. **Drby:** události domácností a činy hráče (`emit_game_event` → `Households.on_event`; svědci do 120 m,
+  jinak hospoda) jdou do paměti (40 drbů, 21 dní), šíří se sítí kontaktů za hodinu (hospoda, návštěvy, ulice a obchod) a
+  vesničan je řekne na E / „co je nového“ (`World.dialog_context` → `village_gossip` → `Dialog.rumor`) s „včera / předevčírem /
+  před N dny“. Popularitu M7 jen čte. Ukládá se klíč `households` (stav domů, změny vztahů proti seedu, drby s mapou znalostí).
+  Ladění: F2 → Příroda – ladění → Domácnosti (nejbližší domy, kdo co dělá, potřeby, dřevo, kouř) a vrstva mapy `obyvatele`;
+  F3 → Člověk/Život vesnice (+ „– činnosti“). Měřicí scény `ves_rano_zima`, `ves_sobota_rijen`.
 - **Pověst v obci** (`reputation.gd`, HUD vlevo, deník J): −100 až 100, stupně vážený občan / slušný soused /
   nenápadný / problémový / postrach vsi. Ubírá: řízení pod vlivem (i na kole, i bez svědků) a přes zákaz,
   zadržení policií, ujetí policii, sražení chodce či koně, nehody, poškození věcí, rychlá jízda obcí kolem
