@@ -238,7 +238,7 @@ func setup(w: World) -> void:
 	_init_pop()
 	w.eco_day.connect(_on_eco_day)
 	if w.eco != null:
-		w.eco.slice(n, STATIC_PER_FRAME, _static_cell)
+		w.eco.slice(n, STATIC_PER_FRAME, _static_cell, "habitat_static")
 
 
 func _init_pop() -> void:
@@ -427,7 +427,7 @@ func _start_pass() -> void:
 				if ci >= 0:
 					_feeder_area[s_area[ci]] = 1.0
 	_pass_running = true
-	world.eco.slice(nx * nz, DAY_PER_FRAME, _day_cell)
+	world.eco.slice(nx * nz, DAY_PER_FRAME, _day_cell, "habitat_day")
 
 
 func _snow_at(x: float, z: float) -> float:

@@ -380,7 +380,7 @@ func _maybe_regrow() -> void:
 	if n <= 0:
 		_regrow_busy = false
 		return
-	world.eco.slice(n + 1, REGROW_PER_FRAME, _regrow_one.bind(n))
+	world.eco.slice(n + 1, REGROW_PER_FRAME, _regrow_one.bind(n), "phenology_regrow")
 
 
 func _regrow_one(i: int, n: int) -> void:

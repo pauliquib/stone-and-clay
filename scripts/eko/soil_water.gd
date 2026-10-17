@@ -32,9 +32,14 @@ extends RefCounted
 const CELL := 32.0                     # m – hrubá mřížka bilance
 const CELL_AREA := CELL * CELL         # m²
 const CHUNK_STEP := 48                 # buněk za snímek při hodinovém průchodu (~0,3–0,4 ms; průchod ~30 s z 2 min hodiny)
-const CHUNK_INIT := 64                 # buněk za snímek při stavbě mřížky (čte Site + SurfaceMap)
-const CHUNK_D8 := 160                  # buněk za snímek při výpočtu spádnic
-const CHUNK_OUTLET := 320              # buněk za snímek při hledání toku, do kterého buňka ústí
+# Oprava výkonu po M8: kus stavby mřížky stál ~1,4 ms (64 buněk × 22 µs) – kusy jsou menší a strop za snímek
+# (`*_PER_FRAME` kusů) dává stejný počet buněk jako dřív; o zbytek rozhoduje časový rozpočet EcoClock.
+const CHUNK_INIT := 16                 # buněk na kus při stavbě mřížky (čte Site + SurfaceMap; ~0,35 ms)
+static var INIT_PER_FRAME := 4             # … nejvýš kusů za snímek (= dřívějších 64 buněk)
+const CHUNK_D8 := 40                   # buněk na kus při výpočtu spádnic
+static var D8_PER_FRAME := 4               # … nejvýš kusů za snímek (= dřívějších 160 buněk)
+const CHUNK_OUTLET := 80               # buněk na kus při hledání toku, do kterého buňka ústí
+static var OUTLET_PER_FRAME := 4           # … nejvýš kusů za snímek (= dřívějších 320 buněk)
 const STREAMS_PER_FRAME := 24          # úseků toků za snímek při značení koryt do mřížky
 const MAX_WALK := 4000                 # nejdelší cesta po spádnici (ochrana proti cyklu)
 
@@ -332,7 +337,7 @@ func setup(wd: World) -> void:
 	_down.resize(m)
 	_down.fill(-1)
 	wd.eco_hour.connect(_on_eco_hour)
-	wd.eco.slice(ceili(float(n) / CHUNK_INIT), 1, _init_chunk)
+	wd.eco.slice(ceili(float(n) / CHUNK_INIT), INIT_PER_FRAME, _init_chunk, "soil_water_init")
 
 
 ## Zapnuto a postaveno – jinak volající padají na dnešní globální chování.
@@ -463,9 +468,9 @@ func _init_chunk(c: int) -> void:
 		mud[i] = smoothstep(MUD_FROM, MUD_FULL, m_i) * _mudk[i]
 	Tests.prof_add("soil_water", t0)
 	if i1 >= n:
-		world.eco.slice(ceili(float(m) / STREAMS_PER_FRAME), 1, _mark_streams_chunk)
+		world.eco.slice(ceili(float(m) / STREAMS_PER_FRAME), 1, _mark_streams_chunk, "soil_water_streams")
 		if m == 0:
-			world.eco.slice(ceili(float(n) / CHUNK_D8), 1, _d8_chunk)
+			world.eco.slice(ceili(float(n) / CHUNK_D8), D8_PER_FRAME, _d8_chunk, "soil_water_d8")
 
 
 ## Parametry buňky z povrchu, propustnosti, půdy a zápoje: retence SCS (AMC I/II/III) a lepivost bláta.
@@ -497,7 +502,7 @@ func _refresh_params() -> void:
 		_qn_own[si] = Q_SPEC * maxf(_area_loc[si] + _area_ext[si], MIN_AREA_M2)
 		if _tot.size() == m:
 			st_qn[si] = Q_SPEC * maxf(_tot[si], MIN_AREA_M2)
-	world.eco.slice(ceili(float(n) / CHUNK_INIT), 1, _refresh_chunk)
+	world.eco.slice(ceili(float(n) / CHUNK_INIT), INIT_PER_FRAME, _refresh_chunk, "soil_water_refresh")
 
 
 func _refresh_chunk(c: int) -> void:
@@ -533,7 +538,7 @@ func _mark_streams_chunk(c: int) -> void:
 				if _scell[ci] < 0:
 					_scell[ci] = si
 	if s1 >= m:
-		world.eco.slice(ceili(float(n) / CHUNK_D8), 1, _d8_chunk)
+		world.eco.slice(ceili(float(n) / CHUNK_D8), D8_PER_FRAME, _d8_chunk, "soil_water_d8")
 
 
 ## Fáze 3: spádnice D8 (nejstrmější pokles mezi 8 sousedy); bezodtoké buňky (díry hrubé mřížky)
@@ -575,7 +580,7 @@ func _d8_chunk(c: int) -> void:
 		_stamp.resize(n)
 		_stamp.fill(-1)
 		_path.resize(MAX_WALK)
-		world.eco.slice(ceili(float(n) / CHUNK_OUTLET), 1, _outlet_chunk)
+		world.eco.slice(ceili(float(n) / CHUNK_OUTLET), OUTLET_PER_FRAME, _outlet_chunk, "soil_water_outlet")
 
 
 ## Fáze 4: do kterého toku buňka po spádnici ústí (s pamětí – každá buňka se projde jednou).
@@ -785,7 +790,7 @@ func _start_sweep() -> void:
 	_sum_swe = 0.0
 	_cnt = 0
 	_sweeping = true
-	world.eco.slice(ceili(float(n) / CHUNK_STEP), 1, _step_chunk)
+	world.eco.slice(ceili(float(n) / CHUNK_STEP), 1, _step_chunk, "soil_water_hour")
 
 
 static func _scs(p: float, s: float) -> float:

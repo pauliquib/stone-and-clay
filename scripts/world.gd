@@ -3964,8 +3964,12 @@ func _process(_delta: float) -> void:
 func _process_impl(_delta: float) -> void:
 	if not ready_done:
 		return
+	# Oprava výkonu po M8: jemné PERF kategorie `world_*` (součást `world`) – eko-takt dál dělí `world_eco_signals`
+	# (hodinové/denní signály) a `world_job_<práce>` (kusy z `EcoClock.slice`, viz eco_clock.gd).
+	var pt := Tests.prof_t0()
 	if eco:          # M8.1: eko-takt – jediný zdroj eco_hour/eco_day, dohání skoky času po snímcích
 		eco.tick()
+	pt = _prof_step("world_eco", pt)
 	# policie – silniční kontrolu hráč uvidí, až je blízko
 	if police.checkpoint_pos != Vector3.INF:
 		for id in players:
@@ -3976,18 +3980,30 @@ func _process_impl(_delta: float) -> void:
 		debts.advance_to(clock.jd())
 	if court:                     # M4.3: předvolání, jednání u soudu, nepřítomnost
 		court.tick()
+	pt = _prof_step("world_law", pt)
 	if clock and politics:        # M7.1: denní procházka popularity protikandidáta, oznámení blížících se voleb
 		politics.tick(clock.jd())
 	if clock and mayor_office:    # M7.4: měsíční rozpočet, projekty, nabídky úplatků (jen když je hráč starostou)
 		mayor_office.tick(clock.jd())
+	pt = _prof_step("world_politics", pt)
 	_season_t -= _delta
 	if _season_t <= 0.0:
 		_season_t = SEASON_CHECK_S
 		refresh_season_items()
+		pt = _prof_step("world_season_items", pt)
 	_crowd_t -= _delta
 	if _crowd_t <= 0.0:
 		_crowd_t = CROWD_CHECK_S
 		_crowd_tick()
+		_prof_step("world_crowd", pt)
+
+
+## PERF: připíše čas od `t0` do kategorie `key` a vrátí nový začátek (bez profileru = 0, nic se neměří).
+func _prof_step(key: String, t0: int) -> int:
+	if not Tests.PROF_ON:
+		return 0
+	Tests.prof_add(key, t0)
+	return Time.get_ticks_usec()
 
 
 # ------------------------------------------------------------------ sezónní předměty

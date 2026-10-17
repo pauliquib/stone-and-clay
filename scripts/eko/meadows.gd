@@ -70,8 +70,13 @@ static var TREE_YEARS := 5              # od tolika let bez seče nálet stromů
 static var P_SEEDLING := 0.05           # šance náletového stromu na buňku a rok
 static var MAX_SEEDLINGS := 300         # strop náletových stromů (výkon PlantedTrees)
 static var SEEDLING_SIZE := 0.55        # velikost náletu při vzniku (0,15 sazenice … 1 dospělý) – nad hranicí okusu
-static var INIT_ROWS_PER_FRAME := 3
-static var CELLS_PER_FRAME := 700
+static var INIT_ROWS_PER_FRAME := 3     # strop: nejvýš tolik řádků mřížky za snímek při stavbě (víc nedovolí ani rozpočet EcoClock)
+static var CELLS_PER_FRAME := 700       # strop: nejvýš tolik buněk za snímek v denním / hrubém kroku
+## Oprava výkonu po M8: jednotka práce pro `EcoClock.slice` (kus, po kterém se kontroluje časový rozpočet).
+## Dřív byl kus celý řádek (710 buněk × ~20 µs) a 700 buněk denního kroku → 15–50 ms v jednom snímku.
+## F3 → Příroda/Louky (tune_m8_19.gd); hodnota se zachytí při naplánování průchodu, změna platí od dalšího.
+static var INIT_SEG := 32               # buněk řádku na kus při stavbě mřížky (~0,5 ms)
+static var STEP_CHUNK := 64             # buněk na kus v denním a hrubém kroku (~0,3 ms)
 static var FLOWER_MIN_REL := 0.45       # MeadowFlowers: květy jen nad touto relativní výškou (posekaná louka nekvete)
 
 var world: World
@@ -101,6 +106,8 @@ var _day := {}                          # vstupy právě počítaného dne
 var _graze := {}                        # index louky → true (pastva, přepočet každý den)
 var _pending := {}                      # uložení čekající na dokončení inicializace
 var _step_busy := false
+var _seg := 32                          # INIT_SEG zachycený při startu stavby mřížky
+var _chunk := 64                        # STEP_CHUNK zachycený při naplánování denního / hrubého kroku
 var _insol_mu := 5233.0
 var _insol_sd := 623.0
 
@@ -130,7 +137,9 @@ func setup(w: World) -> void:
 	w.eco_hour.connect(_on_eco_hour)
 	w.eco_day.connect(_on_eco_day)
 	if w.eco != null:
-		w.eco.slice(nz, INIT_ROWS_PER_FRAME, _init_row_cb)
+		_seg = maxi(INIT_SEG, 1)
+		var segs := _init_segs()
+		w.eco.slice(nz * segs, maxi(INIT_ROWS_PER_FRAME, 1) * segs, _init_seg_cb, "meadows_init")
 	else:
 		for r in nz:
 			_init_row_cb(r)
@@ -158,11 +167,27 @@ func _kind_for(x: float, z: float) -> int:
 	return KIND_MESIC
 
 
+func _init_segs() -> int:
+	return maxi(int(ceil(float(nx) / float(_seg))), 1)
+
+
+## Kus stavby mřížky: `INIT_SEG` buněk řádku (pořadí buněk `gi` zůstává po řádcích jako dřív).
+func _init_seg_cb(s: int) -> void:
+	var segs := _init_segs()
+	var r := s / segs
+	var c0 := (s % segs) * _seg
+	_init_cells(r, c0, mini(c0 + _seg, nx))
+
+
 func _init_row_cb(r: int) -> void:
+	_init_cells(r, 0, nx)
+
+
+func _init_cells(r: int, c_from: int, c_to: int) -> void:
 	var f: Fields = world.fields
 	var sm: SurfaceMap = world.surface
 	var cz := z0 + (r + 0.5) * CELL
-	for c in nx:
+	for c in range(c_from, c_to):
 		var cx := x0 + (c + 0.5) * CELL
 		var grass := 0
 		var lu_meadow := 0
@@ -194,7 +219,7 @@ func _init_row_cb(r: int) -> void:
 		yu.append(0)
 		grazed.append(0)
 		stats[kd] = int(stats.get(kd, 0)) + 1
-	if r == nz - 1:
+	if r == nz - 1 and c_to >= nx:
 		_finish_init()
 
 
@@ -287,12 +312,18 @@ func _on_eco_day(jd: int) -> void:
 	_find_grazing()
 	_last_jd = jd
 	_step_busy = true
-	var chunks := int(ceil(float(gi.size()) / float(CELLS_PER_FRAME)))
+	_chunk = maxi(STEP_CHUNK, 1)
+	var chunks := int(ceil(float(gi.size()) / float(_chunk)))
 	if world.eco != null and chunks > 0:
-		world.eco.slice(chunks, 1, _step_chunk)
+		world.eco.slice(chunks, _chunks_per_frame(), _step_chunk, "meadows_day")
 	else:
 		for c in chunks:
 			_step_chunk(c)
+
+
+## Strop kusů za snímek odpovídající `CELLS_PER_FRAME` buňkám.
+func _chunks_per_frame() -> int:
+	return maxi(int(CELLS_PER_FRAME / _chunk), 1)
 
 
 func _find_grazing() -> void:
@@ -318,8 +349,8 @@ func _find_grazing() -> void:
 
 
 func _step_chunk(c: int) -> void:
-	var a := c * CELLS_PER_FRAME
-	var b := mini(a + CELLS_PER_FRAME, gi.size())
+	var a := c * _chunk
+	var b := mini(a + _chunk, gi.size())
 	var doy: int = _day["doy"]
 	var jd: int = _day["jd"]
 	var year: int = _day["year"]
@@ -401,7 +432,7 @@ func _seed_tree(i: int, year: int) -> void:
 
 ## Hrubý krok po skoku času (F2 datum, dlouhý spánek, první start): roky bez seče se přehrají podle plánu parcel,
 ## výška porostu se odhadne analyticky (dorůstání od jara / od poslední seče s časovou konstantou REGROW_TAU_D).
-## Po kouscích přes EcoClock (CELLS_PER_FRAME buněk za snímek).
+## Po kouscích přes EcoClock (kusy po STEP_CHUNK buňkách, nejvýš CELLS_PER_FRAME buněk a časový rozpočet za snímek).
 func _coarse(jd: int, first: bool) -> void:
 	if gi.is_empty():
 		return
@@ -412,9 +443,10 @@ func _coarse(jd: int, first: bool) -> void:
 	_year = year
 	_find_grazing()
 	_step_busy = true
-	var chunks := int(ceil(float(gi.size()) / float(CELLS_PER_FRAME)))
+	_chunk = maxi(STEP_CHUNK, 1)
+	var chunks := int(ceil(float(gi.size()) / float(_chunk)))
 	if world.eco != null and chunks > 0:
-		world.eco.slice(chunks, 1, _coarse_chunk)
+		world.eco.slice(chunks, _chunks_per_frame(), _coarse_chunk, "meadows_coarse")
 	else:
 		for c in chunks:
 			_coarse_chunk(c)
@@ -422,8 +454,8 @@ func _coarse(jd: int, first: bool) -> void:
 
 
 func _coarse_chunk(c: int) -> void:
-	var a := c * CELLS_PER_FRAME
-	var b := mini(a + CELLS_PER_FRAME, gi.size())
+	var a := c * _chunk
+	var b := mini(a + _chunk, gi.size())
 	var jd: int = _day["jd"]
 	var year: int = _day["year"]
 	var y0: int = _day["y0"]

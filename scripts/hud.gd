@@ -23,6 +23,8 @@ const MENU_BG := Color(0.07, 0.08, 0.07, 0.95)
 ## Minimapa: velikost v px a světová šířka pohledu v metrech.
 const MINI_SIZE := 240.0
 const MINI_RANGE_M := 420.0
+const MINI_GRID_M := 256.0              # oprava výkonu po M8: buňka mřížky kusů linií minimapy (m)
+const MINI_SEG_PTS := 24               # oprava výkonu po M8: bodů na kus linie v keši minimapy (rychlé přeskočení kusů mimo kruh)
 ## Mapa (M): největší přiblížení kolečkem; 1 = celý katastr v okně.
 const MAP_ZOOM_MAX := 16.0
 ## Vzhled silnic na mapě podle druhu (OSM highway → [barva, šířka px]).
@@ -70,6 +72,9 @@ var _mini: Control                # minimapa s kompasem (vpravo nahoře)
 var _mini_t := 0.0                # minipauza mezi překresleními minimapy (ne každý frame – je drahá)
 var _mini_built := false          # keš statických vrstev minimapy hotová?
 var _mini_lines: Array = []       # [světové body (x,z), střed, ohraničující poloměr, barva, šířka]
+var _mini_grid := {}              # oprava výkonu po M8: Vector2i buňka MINI_GRID_M → PackedInt32Array indexů do _mini_lines
+var _mini_stamp := PackedInt32Array()   # … značka „už vybráno v tomto překresu“ (kus může ležet ve více buňkách)
+var _mini_stamp_n := 0
 var _mini_dir_w: Array = []       # šířky textů kompasu (kompas texty se nemění – shape jednou)
 var map_debug_layer := ""         # M8.1: F2 → Příroda – ladění; klíč do `World.debug_layers`, "" = vypnuto
 var _dbg_key := ""                # keš ladicí mřížky: překreslení jen při změně vrstvy / výřezu / mřížky
@@ -1936,7 +1941,21 @@ func _draw_minimap() -> void:
 	# M8.19B: body čar a rybníků se transformují nativně jedním Transform2D (= xf: c + rot·(q − p2)·k), ne
 	# voláním Callable na každý vrchol; rybníky mimo kruh (AABB) se ani nepřevádějí, ani neořezávají.
 	var mt := Transform2D(rot, c) * Transform2D(0.0, Vector2(k, k), 0.0, -p2 * k)
-	for L in _mini_lines:
+	# oprava výkonu po M8: jen kusy z buněk mřížky `_mini_grid` kolem hráče (dřív test všech ~2 000 linií)
+	var near := PackedInt32Array()
+	var g0 := Vector2i(floori((p2.x - wr) / MINI_GRID_M), floori((p2.y - wr) / MINI_GRID_M))
+	var g1 := Vector2i(floori((p2.x + wr) / MINI_GRID_M), floori((p2.y + wr) / MINI_GRID_M))
+	_mini_stamp_n += 1
+	for gz in range(g0.y, g1.y + 1):
+		for gx in range(g0.x, g1.x + 1):
+			var bucket: PackedInt32Array = _mini_grid.get(Vector2i(gx, gz), PackedInt32Array())
+			for li in bucket:
+				if _mini_stamp[li] != _mini_stamp_n:
+					_mini_stamp[li] = _mini_stamp_n
+					near.append(li)
+	near.sort()                                  # pořadí kreslení jako dřív (hranice, toky, silnice)
+	for li in near:
+		var L: Array = _mini_lines[li]
 		if (L[1] - p2).length() > L[2] + wr:
 			continue
 		var line: PackedVector2Array = mt * (L[0] as PackedVector2Array)
@@ -2030,19 +2049,36 @@ func _draw_minimap() -> void:
 func _build_mini_cache() -> void:
 	_mini_built = true
 	_mini_lines.clear()
+	_mini_grid.clear()
+	_mini_stamp = PackedInt32Array()
 	if meta.is_empty():
 		return
+	# Oprava výkonu po M8: dlouhé linie (hranice katastru, řeka, silnice přes celou mapu) se dělí na kusy po
+	# MINI_SEG_PTS bodech s vlastní ohraničující koulí – dřív hranice i řeka zasahovaly do kruhu vždy, a tak se
+	# každý překres celé transformovaly a ořezávaly v GDScriptu (~2–4 ms na překres).
 	var add := func(pts: PackedVector2Array, col: Color, w: float) -> void:
 		if pts.size() < 2:
 			return
-		var cc := Vector2.ZERO
-		for p in pts:
-			cc += p
-		cc /= float(pts.size())
-		var rr := 0.0
-		for p in pts:
-			rr = maxf(rr, cc.distance_to(p))
-		_mini_lines.append([pts, cc, rr, col, w])
+		var a := 0
+		while a < pts.size() - 1:
+			var e := mini(a + MINI_SEG_PTS, pts.size() - 1)
+			var part := pts.slice(a, e + 1)        # sousední kusy sdílí krajní bod – čára je souvislá
+			var cc := Vector2.ZERO
+			for p in part:
+				cc += p
+			cc /= float(part.size())
+			var rr := 0.0
+			for p in part:
+				rr = maxf(rr, cc.distance_to(p))
+			var li := _mini_lines.size()
+			_mini_lines.append([part, cc, rr, col, w])
+			for gz in range(floori((cc.y - rr) / MINI_GRID_M), floori((cc.y + rr) / MINI_GRID_M) + 1):
+				for gx in range(floori((cc.x - rr) / MINI_GRID_M), floori((cc.x + rr) / MINI_GRID_M) + 1):
+					var key := Vector2i(gx, gz)
+					var bucket: PackedInt32Array = _mini_grid.get(key, PackedInt32Array())
+					bucket.append(li)
+					_mini_grid[key] = bucket
+			a = e
 	var b := PackedVector2Array()
 	for q in meta.get("boundary", []):
 		b.append(Vector2(q[0], q[1]))
@@ -2061,6 +2097,9 @@ func _build_mini_cache() -> void:
 			line.append(Vector2(q[0], q[1]))
 		var st: Array = ROAD_STYLE.get(rd["kind"], ROAD_STYLE["other"])
 		add.call(line, Color(st[0], 0.85), maxf(st[1] * 0.6, 1.0))
+	_mini_stamp.resize(_mini_lines.size())
+	_mini_stamp.fill(0)
+	_mini_stamp_n = 0
 
 
 ## Lomnou čáru `pts` ořízne na kruh (střed `cc`, poloměr `r`) – vrátí seznam souvislých úseků uvnitř.
