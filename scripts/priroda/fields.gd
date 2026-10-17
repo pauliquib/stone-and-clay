@@ -409,7 +409,7 @@ func _on_eco_day(jd: int) -> void:
 	var mm: Array = mo.get(mk, [0.0, 0])
 	mo[mk] = [float(mm[0]) + m, int(mm[1]) + 1]
 	if world.eco != null:
-		world.eco.slice(255, FIELDS_PER_FRAME, _step_field)
+		world.eco.slice(255, FIELDS_PER_FRAME, _step_field, "fields_day")
 	else:
 		for i in 255:
 			_step_field(i)

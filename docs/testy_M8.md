@@ -756,3 +756,15 @@ F3 je ukáže jako výchozí. Tabulka „před → po, proč“ je v `PROJECT_LO
 9. Lov za větru (kulovnice na 150+ m, F2 → silný vítr) → u lesa / za kopcem menší snos než na otevřeném poli (vítr v místě
    střely z pole větru).
 10. Drby (M8.17) se dál vyprávějí jako dřív (náhoda vyprávění je teď ze seedu – postava, den, čtvrthodina), v konzoli bez chyb.
+
+## Oprava výkonu po M8 (17. 10. 2026) – co znovu změřit
+
+- `tools/perf_m8_19.sh zaklad` (6 běhů). Čeká se: `world` ≲ 2 ms/snímek (dřív 23–44 ms), `player_phys` nejvýš 3 volání/snímek
+  (dřív 9), `ves_poledne` Střední zpět k ≥ 20 fps (před M8 22,8–26,8), `hud_minimap` < 1 ms na překres.
+- V profileru jsou nové kategorie (všechny jsou **součástí** `world`): `world_eco` (celý eko-takt), `world_eco_signals`
+  (hodinové/denní signály a jejich odběratelé), `world_job_<práce>` (kusy z `EcoClock.slice`: `meadows_init`, `meadows_day`,
+  `meadows_coarse`, `soil_water_init|streams|d8|outlet|refresh|hour`, `habitat_static|day`, `households_hour`, `fields_day`,
+  `phenology_regrow`), `world_law`, `world_politics`, `world_season_items`, `world_crowd`. `soil_water` je dál uvnitř
+  `world_job_soil_water_*`.
+- Kontrola: ~1–2 min po startu (stavba mřížky luk běží teď v rozpočtu 2 ms) se na loukách objeví výška porostu
+  (`Meadows: … buněk louky` v logu). Pod 20 fps běží fyzika pomaleji než reálný čas (strop 3 kroky/snímek) – herní čas ne.

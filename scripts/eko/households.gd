@@ -553,7 +553,7 @@ func _on_eco_hour(dt_h: float) -> void:
 	_pool_street.clear()
 	_visits.clear()
 	if world.eco != null and dt_h > 0.0:
-		world.eco.slice(hh.size(), HOUR_SLICE, _step.bind(ctx))
+		world.eco.slice(hh.size(), HOUR_SLICE, _step.bind(ctx), "households_hour")
 	else:
 		for i in hh.size():
 			_step(i, ctx)

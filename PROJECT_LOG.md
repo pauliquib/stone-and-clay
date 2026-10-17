@@ -2903,3 +2903,44 @@ Start: výkonový audit, předvolby, savy, dokumentace a plán testů (vlna 8, �
   posílat po hodinovém / denním kroku a při připojení. Klient počítá jen vzhled (`MicroFx`, `GroundVegFx`, `Soundscape`,
   `SmallLife`, stromy), detail přírody je per klient (předvolba). Náhoda v simulaci je seedovaná (deterministická) – ověřit
   při dvou klientech.
+
+## Oprava výkonu po M8 – start (17. 10. 2026)
+
+Začátek hledání výkonové regrese po M8 (ves_poledne 6,3 fps, `world` ~40 ms/snímek).
+
+## 2026-10-17 – Oprava výkonu po M8 (17. 10. 2026)
+
+### Příčiny (log `logs/m8_19_zaklad_20261017_082706.log`, staticky dohledáno čtením)
+- **`world` 23–44 ms/snímek (před M8 0,05 ms) = práce `EcoClock.slice`.** `_drain_jobs` hlídal rozpočet 2 ms jen
+  *mezi* pracemi, ne mezi kusy, a kusy byly obří: stavba mřížky luk `Meadows._init_row_cb` 3 řádky × 710 buněk
+  × ~20 µs (8× `class_at`, 7 dotazů `Site`, 2× `settle_at`) ≈ **40–50 ms každý snímek po dobu 158 snímků** (472 řádků) –
+  při 6 fps to pokrylo celé 20s měření; denní/hrubý krok luk 700 buněk/kus (5–15 ms), stavba vodní bilance 64 buněk/kus
+  = 1,4 ms (kategorie `soil_water`), spádnice 160 a ústí 320 buněk/kus, habitat 48 buněk se stromy/snímek. Hodiny
+  a práce měly navíc každá svůj rozpočet. Čas `world` úměrný délce snímku (ves 40, les 15 ms) odpovídá tomu, kolik snímků
+  měření ještě padlo do stavby.
+- **Spirála smrti:** `max_physics_steps_per_frame` výchozí 8 → při 6 fps 9 fyzikálních kroků/snímek (`player_phys` 9×),
+  takže `villager` (234 volání), `car`, `dog`, `flock` ×3 proti 8. 10. Per-volání `villager` 104 vs 80 µs – v hot cestě
+  M8.17 nic drahého (set_plan/dress_level jen při změně, `_bt_fill_vars` od M8.19B levný); rozdíl přičítám přetížení.
+- **`hud_minimap` 2,2–4,4 ms/překres:** hranice katastru (537 b.), řeka a dlouhé silnice zasahovaly do kruhu vždy → celé
+  se každý překres transformovaly a ořezávaly v GDScriptu; navíc test všech ~2 000 linií.
+- **Nízká < Vysoká:** čtením nic dražšího na Nízké (veg 0, sim 250 m, eco 0, bez stínů). Rozdíl = první běh (studená
+  cache shaderů, načtení 56 s vs 42–45 s) a jiný podíl snímků měření ve stavbě luk. Načtení 56 s: M8 mřížky se staví
+  po kouscích až po načtení – snadnou příčinu z M8 jsem nenašel.
+
+### Opravy (chování simulace stejné – jen kdy a po kolika kouscích)
+- `EcoClock`: jeden společný rozpočet `SLICE_BUDGET_US` za snímek (hodiny + práce), čas se kontroluje **po každém kusu**,
+  práce se střídají (`_rr`, žádné hladovění hodinového plánu domácností), aspoň 1 kus/snímek; `slice(..., tag)` pro PERF.
+- `Meadows`: stavba po kusech `INIT_SEG` = 32 buněk (pořadí `gi` beze změny), denní/hrubý krok po `STEP_CHUNK` = 64 buňkách
+  (strop dál `INIT_ROWS_PER_FRAME` / `CELLS_PER_FRAME`); velikost se zachytí při naplánování.
+- `SoilWater`: kusy 16 / 40 / 80 buněk (stavba, D8, ústí) se stropem 4 kusy/snímek (= dřívější počty buněk).
+- `project.godot`: `physics/common/max_physics_steps_per_frame=3` (60 Hz → reálný čas do 20 fps, pod tím fyzika
+  zpomalí). Herní čas jde z `Clock._process(delta)`, na počtu ticků nic nestojí.
+- Minimapa: linie v keši rozdělené na kusy po 24 bodech + mřížka 256 m → kreslí se jen kusy kolem hráče.
+- Nové PERF kategorie: `world_eco`, `world_eco_signals`, `world_job_<práce>`, `world_law`, `world_politics`,
+  `world_season_items`, `world_crowd`. F3 (`tune_m8_19.gd`): `meadows.init_seg`, `meadows.step_chunk`,
+  `soil_water.init_per_frame|d8_per_frame|outlet_per_frame`.
+- Kontrola překladu (00_SPOLECNE kap. 6) prázdná; shadery beze změny.
+
+### Otevřené body
+- Uživatel změří `tools/perf_m8_19.sh zaklad` (viz `docs/testy_M8.md` → Oprava výkonu po M8). Stavba luk teď trvá
+  ~1–2 min hry (7 s CPU v rozpočtu 2 ms) – kdyby vadilo, zrychlit `_kind_for` (dvojí `settle_at`) nebo stavět ve vlákně.
