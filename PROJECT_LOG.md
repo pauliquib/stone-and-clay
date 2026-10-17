@@ -2944,3 +2944,48 @@ Začátek hledání výkonové regrese po M8 (ves_poledne 6,3 fps, `world` ~40 m
 ### Otevřené body
 - Uživatel změří `tools/perf_m8_19.sh zaklad` (viz `docs/testy_M8.md` → Oprava výkonu po M8). Stavba luk teď trvá
   ~1–2 min hry (7 s CPU v rozpočtu 2 ms) – kdyby vadilo, zrychlit `_kind_for` (dvojí `settle_at`) nebo stavět ve vlákně.
+
+- 17. 10. 2026: Optimalizace CPU (auta, NPC) – start (větev worktree-agent-a0b72bd4b2f65d243).
+
+## 2026-10-17 – Optimalizace CPU – auta a vesničané (17. 10. 2026)
+
+### Hotovo (staticky ověřeno čtením kódu – měření čeká na uživatele)
+Cíl: ves_poledne / Střední 60 fps – skripty měly ~15 ms (villager 3,6, car 3,6, world 2,5, humanoid 1,4). Chování zachováno.
+- `car.gd`: kola (`Wheel`, RayCast3D) mají `enabled = false` – dřív se paprsek dotazoval automaticky každý fyzikální krok
+  **i u uspaných aut** a `_wheels` ho stejně obnovoval `force_raycast_update()` (dvojí dotaz). Odhad −0,3–0,6 ms (fyzika).
+- `car.gd` + `traffic.gd`: **stojící vozidlo bez řidiče** (zaparkovaná, hráčova auta a kola blízko hráče) po `REST_FREEZE_S` = 2 s
+  v klidu zamrzne (`freeze_at_rest`, kolize zůstává). Probudí ho vozidlo s řidičem do `REST_WAKE_M` + 0,8 s jeho jízdy
+  (`Traffic._driven_near`, kontrola po 0,4 s), tlačení (`push_by`), nástup, přidělení trasy. Odhad −1,5–2 ms (většina z 20 volání
+  `car`/snímek byla stojící auta s plnou fyzikou kol).
+- `car.gd` + `traffic.gd`: **AI auto dál než `KIN_LOD_R` = 90 m** jede viditelnou kinematikou (`set_kin_lod` / `_kin_step_vis`):
+  stejné odbavení bodů, pure pursuit (zakřivení omezené rejdem `_max_steer_at`), plán rychlosti podle zatáček (vytažen do
+  `_ai_curve_want`, sdílí ho `_ai_drive`), počasí, světla a hledání překážky v pruhu (`_obstacle_ahead`, `_resolve_block`) po
+  `KIN_PLAN_DT` = 0,25 s; výška a sklon podle trasy + změřená výška karoserie; vizuál s interpolací, točící se kola, zvuk motoru.
+  Zpět na plnou fyziku pod 90 × 0,8 = 72 m (`wake_kin`: rozjeté rychlostí trasy, bez falešného nárazu). Za sim_radius dál stará
+  hluboká kinematika. Kinematická auta mají `FREEZE_MODE_KINEMATIC`. Odhad −0,8–1,5 ms (Vysoká víc – 30 volání).
+- `villager.gd`: LOD kroku – do `LOD_NEAR_R` = 40 m každý krok, do 160 m (move_and_slide) každý 3. krok (20 Hz, `_slide` násobí
+  rychlost nasčítaným krokem), dál každý 4.; v singleplayeru postava za kamerou aspoň každý 4. Sražený / utíkající / mluvící /
+  čekající vždy naplno. Rozložení do snímků přes `_lod_left`. Vesničané v domech dál nestojí nic (fyzika i vizuál vypnuté). Odhad −1,5–2 ms.
+- `humanoid.gd` + nový `scripts/lod_cam.gd` (`LodCam` – kamera jednou za snímek): animace do 25 m každý snímek, do 60 m každý 2.,
+  dál každý 4., za kamerou každý 6. (nasčítaný čas, stagger `randi() % 4`); Gait (terénní IK, vzorkování svahu) jen do 40 m,
+  dál stará jednoduchá animace; neviditelná postava se nepočítá. Odhad −0,6–0,8 ms.
+- `eko/eco_clock.gd`: `JOB_BUDGET_US` = 1 000 µs – strop jen pro práce `slice()` (stavba luk, stanovišť, vodní bilance) uvnitř
+  celkových 2 ms → stavba luk trvá ~2× déle (~2–4 min), snímek během ní o ~1 ms lehčí.
+- F3 (`scripts/dev/tune_m8_19.gd`): Vozidla/LOD (`car_lod.kin_r|kin_hyst|kin_plan_dt|kin_accel|rest_freeze_s|rest_v|rest_wake_m`),
+  Člověk/LOD postav (`villager_lod.near_r|mid_n|far_n|behind_n`, `humanoid_lod.full_r|mid_r|mid_n|far_n|behind_n|gait_r`),
+  Svět/Eko-takt (`eco.job_budget_us`). Výchozí `kin_r` ≥ 320 = staré chování aut; `*_n` = 1 = bez LOD.
+- Kontrola překladu (00_SPOLECNE kap. 6) prázdná. dog / flock / seasonfx beze změny (bez snadné výhry).
+
+### Otevřené body
+- Uživatel změří `tools/perf_m8_19.sh zaklad` (očekávání ves_poledne Střední: skripty ~15 → ~9–10 ms; `car` < 1,5 ms,
+  `villager` < 1,8 ms, `humanoid` < 0,8 ms).
+- Ručně ověřit: náraz hráčovým autem do zaparkovaného (musí se probudit a odletět), tlačení stojícího auta, nástup;
+  AI auto přejíždějící hranici 72–90 m (žádný skok výšky / zastavení); vesničané ve 40–160 m (plynulost, cca 1 px trhání).
+- Kinematické auto (90–320 m) nesráží chodce a neprojde křižovatku s přednostmi jako fyzika – jen staví před překážkou v pruhu.
+
+### Doplněk – stínový LOD postav (GPU, podnět subagenta B)
+- `humanoid.gd`: `_set_shadow_band` – do `SHADOW_PARTS_R` = 12 m od kamery stín ze všech dílů, do `SHADOW_R` = 28 m jen trup
+  a pánev, dál `SHADOW_CASTING_SETTING_OFF`; přepíná se jen při změně pásma (kontrola v `_lod_every`), první osoba beze změny.
+  Ruce mají `visibility_range_end` = `LOD_HAND_VIS_R` = 60 m. Odhad −2 až −4 ms GPU na vsi (stínová mapa).
+- F3 Člověk/LOD postav: `humanoid_lod.shadow_parts_r|shadow_r|hand_vis_r`. Kontrola překladu prázdná.
+- Riziko: postava za ~28 m bez stínu (při nízkém slunci viditelné), ruce mizí za 60 m.

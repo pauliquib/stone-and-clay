@@ -21,6 +21,9 @@ extends RefCounted
 
 ## M8.D: laditelné (F3 → Svět → Eko-takt) – `static var`, výchozí beze změny.
 static var SLICE_BUDGET_US := 2000     # 00_PRINCIPY kap. 6: max. ~2 ms práce EcoClock za snímek i ve špičce
+## Optimalizace CPU (17. 10. 2026): strop jen pro práce ze `slice()` (stavba mřížky luk, stanovišť…) v rámci
+## SLICE_BUDGET_US – během hraní se staví pomaleji, ale snímek zatíží míň (F3 → Svět/Eko-takt, `tune_m8_19.gd`).
+static var JOB_BUDGET_US := 1000
 static var MAX_CATCHUP_DAYS := 30      # delší dluh (dlouhé vězení…) → jeden hrubý krok místo stovek signálů
 
 var world: World
@@ -104,8 +107,10 @@ func _drain_jobs(t0: int) -> void:
 		order.append(_jobs[(_rr + q) % nj])
 	var done_any := false
 	var did := 0
+	# konec rozpočtu: celkový (od začátku tick, včetně hodinových signálů) i jen pro práce (JOB_BUDGET_US)
+	var t_end := mini(t0 + SLICE_BUDGET_US, Time.get_ticks_usec() + JOB_BUDGET_US)
 	for job in order:
-		if did > 0 and Time.get_ticks_usec() - t0 > SLICE_BUDGET_US:
+		if did > 0 and Time.get_ticks_usec() > t_end:
 			break
 		var pt := Tests.prof_t0()
 		var cb: Callable = job["cb"]
@@ -116,7 +121,7 @@ func _drain_jobs(t0: int) -> void:
 			cb.call(idx)
 			idx += 1
 			did += 1
-			if Time.get_ticks_usec() - t0 > SLICE_BUDGET_US:
+			if Time.get_ticks_usec() > t_end:
 				break
 		job["idx"] = idx
 		if idx >= items:

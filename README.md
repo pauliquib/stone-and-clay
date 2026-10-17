@@ -269,7 +269,9 @@ počítač), **Exportovat** → kořenový **`config.json`** (jen hodnoty odliš
 projektu, jdou do gitu; v exportované hře vedle spustitelného souboru). Pořadí při startu: kód → `config.json` →
 `ladeni.cfg` (automatické testy a `--shot` `ladeni.cfg` ignorují). Registr `DevTune`, návod v [`docs/DEV.md`](docs/DEV.md).
 Každý krok M8 registruje své konstanty do `scripts/dev/tune_m8_<krok>.gd` (M8.19: Létání/Hranice letu – vodorovná hranice
-letu za katastrem, pásmo varování a protivětru, strop nad terénem). Je-li pod F3 otevřená nabídka HUD (F2, místo), panel F3
+letu za katastrem, pásmo varování a protivětru, strop nad terénem; optimalizace CPU 17. 10. 2026: **Vozidla/LOD** – AI auta
+od 90 m kinematicky, stojící vozidla bez řidiče zamrznou v klidu; **Člověk/LOD postav** – frekvence kroku vesničanů a animace
+postav podle vzdálenosti a zorného pole; Svět/Eko-takt – strop prací stavby mřížek za snímek). Je-li pod F3 otevřená nabídka HUD (F2, místo), panel F3
 uhne doprava a nabídka jde ovládat myší. Vyladěné hodnoty pošli jako `config.json` (Export) – při kalibraci se přenesou do kódu.
 
 ## Dokumentace
