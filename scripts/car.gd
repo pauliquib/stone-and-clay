@@ -105,6 +105,14 @@ static var AI_STUCK_S := 2.0            # zaseknutí: po kolika s bez pohybu vyc
 static var AI_REVERSE_S := 1.8          # jak dlouho couvá (s)
 static var AI_HONK_S := 3.0             # troubí na překážku po tolika s stání
 static var AI_KIN_PASS := 7.0           # uspané (kinematické) auto odbaví bod trasy na tolik m
+## Optimalizace CPU (17. 10. 2026) – LOD vozidel (F3 → Vozidla/LOD, `scripts/dev/tune_m8_19.gd`).
+static var KIN_LOD_R := 90.0            # AI auto dál od hráče jede po trase kinematicky (viditelně, bez kol a odpružení); ≥ sim_radius = vypnuto
+static var KIN_LOD_HYST := 0.8          # zpět na plnou fyziku až pod KIN_LOD_R × tohle (hystereze)
+static var KIN_PLAN_DT := 0.25          # kinematické auto plánuje rychlost a hledá překážku jednou za tolik s
+static var KIN_ACCEL := 2.0             # kinematické auto: rozjezd (m/s²); brzdí AI_BRAKE × 1,6
+static var REST_FREEZE_S := 2.0         # stojící vozidlo bez řidiče po tolika s v klidu zamrzne (0 = nikdy)
+static var REST_V := 0.08               # „v klidu“ = rychlost i otáčení pod tohle (m/s, rad/s)
+static var REST_WAKE_M := 14.0          # zamrzlé stojící vozidlo se probudí, když k němu dojede vozidlo s řidičem (m + 0,8 s jízdy)
 ## M8.D: společné pro všechna vozidla (F3 → Vozidla → Společné).
 static var VEH_G := 9.81                # gravitace vozidel (svět má 20 m/s² kvůli chůzi – auta jezdí s reálnou)
 static var FLIP_UP := 0.3               # převrácené = osa Y auta míří nahoru míň než tohle
@@ -382,6 +390,12 @@ var _roll := 0.0                   # fyzikální náklon tělesa (rad, + = vprav
 var _si_prev := 0.0                # minulý vstup řízení (derivace pro protizatáčení)
 var _asleep := false               # fyzika auta uspaná (set_asleep – kolize zůstává aktivní)
 var kinematic := false             # uspané AI auto posouvá Traffic po trase bez fyziky
+var rest_frozen := false           # optimalizace CPU: zamrzlé, protože stojí v klidu bez řidiče (budí Traffic / push_by)
+var _rest_t := 0.0                 # jak dlouho stojí v klidu bez řidiče (s)
+var _kin_vis := false              # kinematika se zobrazením (střední pásmo KIN_LOD_R…sim_radius): vizuál, kola, zvuk
+var _kin_dy := 0.0                 # výška karoserie nad bodem trasy (změřená při přechodu do kinematiky)
+var _kin_plan_t := 0.0
+var _kin_want := 0.0
 var _fork: MeshInstance3D
 var _crank: MeshInstance3D
 var _wipers: Array[Node3D] = []    # osy stěračů pod čelním sklem (levý řidič, pravý)
@@ -471,7 +485,10 @@ func _ready() -> void:
 		w.radius = wr
 		w.collision_mask = collision_mask
 		w.exclude_parent = true
-		w.sus_len = rest                                   # start na klidové délce
+		# optimalizace CPU: bez automatického dotazu každý fyzikální krok (běžel i u uspaných aut) –
+		# `_wheels` si paprsek obnoví sám `force_raycast_update()` (funguje i s enabled = false)
+		w.enabled = false
+		w.sus_len = rest                                  # start na klidové délce
 		w.tc = Terramech.Contact.new()                     # M8.13
 		var front := p.z > 0.0
 		w.front = front
@@ -850,7 +867,13 @@ func set_asleep(on: bool, kin := false) -> void:
 		return
 	_asleep = on
 	kinematic = kin
+	rest_frozen = false
+	_rest_t = 0.0
+	if not on:
+		_kin_vis = false
 	if on:
+		# posouvané (kinematické) auto jako kinematické těleso – posun nehýbe statickým stromem broadphase
+		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC if kin else RigidBody3D.FREEZE_MODE_STATIC
 		freeze = true
 		set_physics_process(false)
 		set_process(false)
@@ -870,8 +893,48 @@ func set_asleep(on: bool, kin := false) -> void:
 		vis.global_transform = _cur_xf
 
 
+## Optimalizace CPU (17. 10. 2026): kinematika se zobrazením pro AI auto ve středním pásmu (KIN_LOD_R…sim_radius).
+## `on` = viditelný kinematický posun (vizuál s interpolací, točící se kola, zvuk motoru); `false` = hluboká
+## kinematika za simulační bublinou (vizuál se jen přesouvá, `_process` stojí – jako dřív).
+func set_kin_lod(on: bool) -> void:
+	if not kinematic:
+		if ai_path.size() >= 2:
+			# výška karoserie nad trasou (body trasy leží na terénu) – kinematika ji drží, ať auto při probuzení nepadá
+			_kin_dy = clampf(global_position.y - _ai_carrot(global_position, 0.0).y, 0.0, 0.6)
+		set_asleep(true, true)
+	_kin_vis = on
+	_kin_plan_t = 0.0
+	set_process(on)
+	if not on:
+		vis.global_transform = global_transform
+		_engine.volume_db = -80.0
+
+
+## Optimalizace CPU: stojící vozidlo bez řidiče je dost dlouho v klidu → Traffic ho smí zamrazit (`rest_frozen`).
+func rest_ready() -> bool:
+	return REST_FREEZE_S > 0.0 and drive == Drive.NONE and _rest_t >= REST_FREEZE_S
+
+
+## Zamrazí vozidlo stojící v klidu (kolize zůstává, kola, zvuky a _process stojí; probudí ho `set_asleep(false)`).
+func freeze_at_rest() -> void:
+	set_asleep(true)
+	rest_frozen = true
+
+
+## Probudí kinematické AI auto zpět do plné fyziky – rozjeté rychlostí, kterou jelo po trase.
+func wake_kin() -> void:
+	var v := speed
+	set_asleep(false)
+	linear_velocity = global_transform.basis.z * v
+	_prev_vel = linear_velocity          # žádný falešný „náraz“ v _detect_crash z nulové rychlosti
+	steering = 0.0
+
+
 ## Kinematický posun AI auta po trase pro vzdálená auta (fyzika vypnutá – volá Traffic každý krok).
 func kinematic_step(dt: float) -> void:
+	if _kin_vis:
+		_kin_step_vis(dt)
+		return
 	if ai_path.size() < 2 or ai_i >= ai_path.size():
 		speed = 0.0
 		return
@@ -894,6 +957,77 @@ func kinematic_step(dt: float) -> void:
 	_prev_xf = xf
 	_cur_xf = xf
 	vis.global_transform = xf
+	_t += dt
+
+
+## Viditelná kinematika (střední pásmo): stejná trasa, odbavení bodů, pure pursuit, plán rychlosti podle zatáček
+## a hledání překážky v pruhu jako `_ai_drive`, ale bez kol, odpružení, pohonu a srážek – pohyb jako kolo
+## s rejdem omezeným `_max_steer_at`. Plán rychlosti a překážka se obnovují po KIN_PLAN_DT (ne každý krok).
+func _kin_step_vis(dt: float) -> void:
+	if ai_path.size() < 2 or ai_i >= ai_path.size():
+		speed = 0.0
+		return
+	var pos := global_position
+	_ai_advance(pos)
+	if _ai_pass_until >= 0 and ai_i > _ai_pass_until:
+		_ai_pass_until = -1
+	_ai_offset = move_toward(_ai_offset, AI_PASS_OFFSET if _ai_pass_until >= 0 else 0.0, dt * AI_OFFSET_RATE)
+	_kin_plan_t -= dt
+	if _kin_plan_t <= 0.0:
+		_kin_plan_t = KIN_PLAN_DT
+		var caution := _ai_caution()
+		_ai_lights()
+		_kin_want = 0.0 if ai_stop else _ai_curve_want(pos, caution) * lerpf(1.0, 1.0 - AI_SLOW, caution)
+		_ai_obst = _obstacle_ahead((AI_SEE_BASE + absf(speed) * AI_SEE_K) * (1.0 + caution * AI_GAP))
+	var want := _kin_want
+	_ai_yield_ignore = maxf(_ai_yield_ignore - dt, 0.0)
+	var blocked := not _ai_obst.is_empty() and is_instance_valid(_ai_obst["collider"]) \
+		and not (_ai_yield_ignore > 0.0 and _ai_obst["collider"] is Car)
+	if blocked:
+		var dd: float = _ai_obst["d"]
+		want = minf(want, maxf(dd - AI_STOP_GAP, 0.0) * AI_FOLLOW_K)
+		ai_blocked += dt
+		ai_blocker = _ai_obst["collider"]
+		_resolve_block()
+	else:
+		ai_blocked = 0.0
+		ai_blocker = null
+	ai_target_speed = want
+	speed = move_toward(speed, want, (KIN_ACCEL if want > speed else AI_BRAKE * 1.6) * dt)
+	# směr: zakřivení pure pursuit k bodu trasy, omezené největším rejdem při dané rychlosti
+	var look := clampf(AI_LOOK_K * absf(speed) + AI_LOOK_BASE, AI_LOOK_MIN, AI_LOOK_MAX)
+	var tgt := _ai_carrot(pos, look)
+	var fwd := global_transform.basis.z
+	var hd := Vector2(fwd.x, fwd.z)
+	var to := Vector2(tgt.x - pos.x, tgt.z - pos.z)
+	if hd.length_squared() < 0.0001:
+		hd = to
+	hd = hd.normalized() if hd.length_squared() > 0.0001 else Vector2(0.0, 1.0)
+	var steer_a := 0.0
+	if to.length_squared() > 0.09:
+		var wb: float = model.spec["wb"]
+		var kmax := tan(_max_steer_at(speed)) / wb
+		var kap := clampf(2.0 * sin(hd.angle_to(to)) / maxf(to.length(), 3.0), -kmax, kmax)
+		hd = hd.rotated(kap * speed * dt)
+		steer_a = -atan(kap * wb)
+	steering = move_toward(steering, steer_a, dt * 2.0)
+	var np := pos + Vector3(hd.x, 0.0, hd.y) * speed * dt
+	# výška a sklon podle trasy (body trasy leží na terénu) + změřená výška karoserie
+	var gy := _ai_carrot(np, 0.0).y
+	np.y = lerpf(pos.y, gy + _kin_dy, minf(dt * 8.0, 1.0))
+	var hl := maxf(Vector2(tgt.x - np.x, tgt.z - np.z).length(), 2.0)
+	var f3 := Vector3(hd.x, clampf((tgt.y - gy) / hl, -0.4, 0.4), hd.y).normalized()
+	var xf := Transform3D(Basis.looking_at(-f3, Vector3.UP), np)
+	global_transform = xf
+	_prev_xf = _cur_xf
+	_cur_xf = xf
+	for w in wheels:
+		w.spin += speed / w.radius * dt
+	_update_wheel_visuals()
+	# zvuk motoru zhruba podle rychlosti (bez převodovky)
+	var pitch := clampf((IDLE_RPM + absf(speed) * 110.0) / 60.0 * 2.0 / 42.0, 0.45, 4.5)
+	_engine.pitch_scale = pitch * float(model.spec.get("snd_pitch", 1.0))
+	_engine.volume_db = -10.0 if damage < 100.0 else -80.0
 	_t += dt
 
 
@@ -1218,6 +1352,12 @@ func _physics_impl(delta) -> void:
 			throttle = 0.0
 			brake_in = 0.0
 			handbrake = _push_t <= 0.0          # M8.13: tlačené auto bez řidiče = neutrál, bez ruční brzdy
+			# optimalizace CPU: jak dlouho stojí v klidu (Traffic pak auto zamrazí – `rest_ready`)
+			if _push_t <= 0.0 and trailer == null and linear_velocity.length_squared() < REST_V * REST_V \
+					and angular_velocity.length_squared() < REST_V * REST_V:
+				_rest_t += delta
+			else:
+				_rest_t = 0.0
 	_tm_update(delta)
 	_powertrain(delta)
 	_wheels(delta)
@@ -1815,16 +1955,25 @@ func beacons_off() -> void:
 
 # ------------------------------------------------------------------ AI řidič
 
-func _ai_drive(delta: float) -> void:
-	var pos := global_position
-	var fwd := global_transform.basis.z
-	# počasí: v dešti / sněhu / mlze AI jede opatrněji; v husté mlze a ve tmě rozsvítí světla
-	var caution := 0.0
-	if weather != null:
-		caution = clampf(maxf(weather.rain, weather.snow_cover) + weather.fog, 0.0, 1.0)
+## Počasí: v dešti / sněhu / mlze AI jede opatrněji (0..1).
+func _ai_caution() -> float:
+	if weather == null:
+		return 0.0
+	return clampf(maxf(weather.rain, weather.snow_cover) + weather.fog, 0.0, 1.0)
+
+
+## AI v husté mlze a ve tmě rozsvítí světla.
+func _ai_lights() -> void:
 	var want_lights := (weather != null and weather.fog > 0.3) or (clock != null and clock.is_night())
 	if want_lights != lights_on:
 		toggle_lights()
+
+
+func _ai_drive(delta: float) -> void:
+	var pos := global_position
+	var fwd := global_transform.basis.z
+	var caution := _ai_caution()
+	_ai_lights()
 	var target := Vector3.INF
 	var want := 0.0
 	if ai_direct_target != Vector3.INF:
@@ -1842,40 +1991,7 @@ func _ai_drive(delta: float) -> void:
 		# pure pursuit na bod trasy interpolovaný L metrů před průmětem auta (ne na vrchol trasy za autem)
 		var look := clampf(AI_LOOK_K * absf(speed) + AI_LOOK_BASE, AI_LOOK_MIN, AI_LOOK_MAX)
 		target = _ai_carrot(pos, look)
-		# rychlost podle poloměru zatáček v následujících ~70 m: v každém lomu trasy oblouk tečný k oběma
-		# úsekům (tečné body v půlce kratšího úseku); na rychlost oblouku musí auto zpomalit už v tečném bodě,
-		# s reakční rezervou AI_REACT a plánovaným zpomalením AI_BRAKE
-		want = ai_speed_limit
-		var dist := 0.0
-		var react := absf(speed) * AI_REACT
-		for j in range(maxi(ai_i - 1, 1), ai_path.size() - 1):
-			var pj := Vector2(ai_path[j].x, ai_path[j].z)
-			if j == ai_i:
-				dist = Vector2(pos.x, pos.z).distance_to(pj)
-			elif j > ai_i:
-				dist += pj.distance_to(Vector2(ai_path[j - 1].x, ai_path[j - 1].z))
-			if dist > AI_HORIZON:
-				break
-			var d0 := pj - Vector2(ai_path[j - 1].x, ai_path[j - 1].z)
-			var d1 := Vector2(ai_path[j + 1].x, ai_path[j + 1].z) - pj
-			if d0.length() < 0.3 or d1.length() < 0.3:
-				continue
-			var ang := absf(d0.angle_to(d1))
-			if ang < 0.04:
-				continue
-			var half := minf(d0.length(), d1.length()) * 0.5
-			var r := maxf(half / tan(minf(ang, 3.0) * 0.5), 3.0)
-			# těsnější oblouk = menší boční zrychlení → hlubší zpomalení (široká zatáčka ~3,5 m/s², vlásenka ~2 m/s²)
-			var a_lat := lerpf(AI_ALAT_MIN, AI_ALAT_MAX, clampf((r - 4.0) / AI_ALAT_R, 0.0, 1.0))
-			# na kluzkém povrchu projede zatáčku s menším bočním zrychlením
-			var v_curve := sqrt(maxf(a_lat - caution * AI_SLIP_ALAT, 1.0) * r)
-			var to_tangent := maxf((dist - half if j >= ai_i else 0.0) - react, 0.0)
-			want = minf(want, sqrt(v_curve * v_curve + 2.0 * AI_BRAKE * to_tangent))
-		want = maxf(want, AI_VMIN)
-		if _ai_offset > 0.3:
-			want = minf(want, AI_PASS_V)     # objíždí → pomalu
-		var end_d := Vector2(ai_path[ai_path.size() - 1].x - pos.x, ai_path[ai_path.size() - 1].z - pos.z).length()
-		want = minf(want, end_d * 0.5)
+		want = _ai_curve_want(pos, caution)
 	if target == Vector3.INF or ai_stop:
 		want = 0.0
 	want *= lerpf(1.0, 1.0 - AI_SLOW, caution)     # mokro / sníh / mlha → pomaleji
@@ -1948,6 +2064,46 @@ func _ai_drive(delta: float) -> void:
 		throttle = AI_CRUISE_THR if want > 1.0 else 0.0
 		brake_in = 0.0 if want > 1.0 else 0.6
 	handbrake = want < 0.5 and absf(speed) < 0.5
+
+
+## Plánovaná rychlost po trase (sdílí plná fyzika `_ai_drive` i kinematika `_kin_step_vis`).
+func _ai_curve_want(pos: Vector3, caution: float) -> float:
+	# rychlost podle poloměru zatáček v následujících ~70 m: v každém lomu trasy oblouk tečný k oběma
+	# úsekům (tečné body v půlce kratšího úseku); na rychlost oblouku musí auto zpomalit už v tečném bodě,
+	# s reakční rezervou AI_REACT a plánovaným zpomalením AI_BRAKE
+	var want := ai_speed_limit
+	var dist := 0.0
+	var react := absf(speed) * AI_REACT
+	for j in range(maxi(ai_i - 1, 1), ai_path.size() - 1):
+		var pj := Vector2(ai_path[j].x, ai_path[j].z)
+		if j == ai_i:
+			dist = Vector2(pos.x, pos.z).distance_to(pj)
+		elif j > ai_i:
+			dist += pj.distance_to(Vector2(ai_path[j - 1].x, ai_path[j - 1].z))
+		if dist > AI_HORIZON:
+			break
+		var d0 := pj - Vector2(ai_path[j - 1].x, ai_path[j - 1].z)
+		var d1 := Vector2(ai_path[j + 1].x, ai_path[j + 1].z) - pj
+		if d0.length() < 0.3 or d1.length() < 0.3:
+			continue
+		var ang := absf(d0.angle_to(d1))
+		if ang < 0.04:
+			continue
+		var half := minf(d0.length(), d1.length()) * 0.5
+		var r := maxf(half / tan(minf(ang, 3.0) * 0.5), 3.0)
+		# těsnější oblouk = menší boční zrychlení → hlubší zpomalení (široká zatáčka ~3,5 m/s², vlásenka ~2 m/s²)
+		var a_lat := lerpf(AI_ALAT_MIN, AI_ALAT_MAX, clampf((r - 4.0) / AI_ALAT_R, 0.0, 1.0))
+		# na kluzkém povrchu projede zatáčku s menším bočním zrychlením
+		var v_curve := sqrt(maxf(a_lat - caution * AI_SLIP_ALAT, 1.0) * r)
+		var to_tangent := maxf((dist - half if j >= ai_i else 0.0) - react, 0.0)
+		want = minf(want, sqrt(v_curve * v_curve + 2.0 * AI_BRAKE * to_tangent))
+	want = maxf(want, AI_VMIN)
+	if _ai_offset > 0.3:
+		want = minf(want, AI_PASS_V)     # objíždí → pomalu
+	var end_d := Vector2(ai_path[ai_path.size() - 1].x - pos.x, ai_path[ai_path.size() - 1].z - pos.z).length()
+	want = minf(want, end_d * 0.5)
+	return want
+
 
 ## Úhel lomu trasy v bodu `j` (rad; 0 = rovně, π = otočka).
 func _path_turn(j: int) -> float:

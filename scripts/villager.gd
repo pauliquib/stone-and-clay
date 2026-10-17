@@ -82,6 +82,12 @@ static var KNOCK_DECEL := 6.0          # m/s² – dobrzdění sraženého
 static var PROMILE_DECAY := 0.01       # ‰/s reálně – vystřízlivění (zjednodušené)
 static var DRUNK_FULL_PROMILE := 2.0   # ‰ – plné potácení
 static var GARDEN_D := 4.0             # m před domem – zahrada (BT)
+## Optimalizace CPU (17. 10. 2026) – LOD kroku podle vzdálenosti od hráče (F3 → Člověk/LOD postav, `tune_m8_19.gd`).
+## Krok se počítá jednou za N fyzikálních kroků s nasčítaným časem (stejná trasa i rychlost, nižší frekvence).
+static var LOD_NEAR_R := 40.0          # m – blíž plná frekvence fyziky (60 Hz)
+static var LOD_MID_N := 3              # LOD_NEAR_R … PHYSICS_RANGE (move_and_slide) – každý N-tý krok (20 Hz)
+static var LOD_FAR_N := 4              # za PHYSICS_RANGE (kinematika po terénu / střední pásmo) – každý N-tý krok
+static var LOD_BEHIND_N := 4           # za kamerou (jen jeden hráč, dál než LOD_NEAR_R / 2) aspoň tolikátý krok
 static var ENTER_NEAR_R := 5.0         # M8.17: zaseknutý u dveří blíž než tohle = zajde dovnitř (plot, schod)
 
 var graph: RoadGraph
@@ -134,6 +140,9 @@ var _anim_on := false
 var _arrived := false             # cíl z BT / plánu už je dosažen (jednorázová reakce `_on_arrive`)
 var _inside := false              # M8.17: je v domě – schovaný, bez fyziky (probudí ho `set_plan`)
 var _house_door := Vector3.INF
+var _lod_acc := 0.0               # LOD: nasčítaný čas od posledního kroku
+var _lod_left := 0                # LOD: fyzikálních kroků do dalšího výpočtu
+var _lod_n := 1                   # LOD: aktuální perioda (kroků)
 var _dress := -1                  # M8.17: úroveň oblečení podle teploty (0 lehce, 1 větrovka, 2 bunda + čepice)
 
 
@@ -444,6 +453,8 @@ func _leave_house() -> void:
 	_deep = false
 	_mid = false
 	_deep_dt = 0.0
+	_lod_acc = 0.0
+	_lod_left = 0
 	_visual.visible = true
 	_visual.set_process(true)
 	_name_label.visible = true
@@ -475,8 +486,39 @@ func dress_level(lvl: int) -> void:
 
 func _physics_process(delta: float) -> void:
 	var __t0 := Tests.prof_t0()
-	_physics_impl(delta)
+	_lod_acc += delta
+	_lod_left -= 1
+	if _lod_left <= 0:
+		var dt := minf(_lod_acc, 0.5)
+		_lod_acc = 0.0
+		_lod_n = 1
+		_physics_impl(dt)
+		_lod_left = _lod_n
 	Tests.prof_add("villager", __t0)
+
+
+## LOD: perioda kroku (fyzikálních kroků) podle vzdálenosti od nejbližšího hráče; v singleplayeru navíc
+## šetří postavy za kamerou. Sražený, utíkající, mluvící a čekající vesničan jede vždy naplno.
+func _lod_steps(dist: float) -> int:
+	if dist < LOD_NEAR_R or _knocked > 0.0 or _flee_t > 0.0 or _talk > 0.0 or _wait > 0.0:
+		return 1
+	var n := LOD_MID_N if dist <= PHYSICS_RANGE else LOD_FAR_N
+	if world != null and world.players.size() <= 1 and dist > LOD_NEAR_R * 0.5:
+		LodCam.refresh(self)
+		if LodCam.behind(global_position, 2.0):
+			n = maxi(n, LOD_BEHIND_N)
+	return maxi(n, 1)
+
+
+## move_and_slide s krokem `dt` delším než fyzikální krok (LOD): rychlost se na pohyb dočasně zvětší.
+func _slide(dt: float) -> void:
+	var k := dt / get_physics_process_delta_time()
+	if k > 1.05:
+		velocity *= k
+		move_and_slide()
+		velocity /= k
+	else:
+		move_and_slide()
 
 
 func _physics_impl(delta) -> void:
@@ -485,6 +527,7 @@ func _physics_impl(delta) -> void:
 	var player: Player = world.nearest_player(global_position)
 	var to_player: Vector3 = world.player_world_pos(player) - global_position if player else Vector3(INF, 0, 0)
 	var dist := to_player.length()
+	_lod_n = _lod_steps(dist)
 	# --- simulační pásma okolo hráče (plynulá bublina): <simr plná fyzika+kolize+BT,
 	# simr…1.7×simr MID = viditelný vizuál, ale pohyb jen kinematicky bez kolizí (každý frame
 	# plynule, levné), >1.7×simr hluboký spánek = schovaný vizuál, chůze ~2 Hz
@@ -536,7 +579,7 @@ func _physics_impl(delta) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, KNOCK_DECEL * delta)
 		velocity.z = move_toward(velocity.z, 0.0, KNOCK_DECEL * delta)
 		velocity.y -= GRAVITY * delta
-		move_and_slide()
+		_slide(delta)
 		if global_position.y < terrain.height_at(global_position.x, global_position.z) - 1.0:
 			global_position.y = terrain.height_at(global_position.x, global_position.z) + 0.3
 		if _knocked <= 0.0:
@@ -554,7 +597,7 @@ func _physics_impl(delta) -> void:
 		velocity.x = move_toward(velocity.x, run.x, FLEE_ACCEL * delta)
 		velocity.z = move_toward(velocity.z, run.z, FLEE_ACCEL * delta)
 		velocity.y = -0.5 if is_on_floor() else velocity.y - GRAVITY * delta
-		move_and_slide()
+		_slide(delta)
 		_visual.rotation.y = _yaw
 		_visual.speed = Vector3(velocity.x, 0, velocity.z).length()
 		_visual.on_floor = true
@@ -620,7 +663,7 @@ func _physics_impl(delta) -> void:
 			velocity.y = -0.5
 		else:
 			velocity.y -= GRAVITY * delta
-		move_and_slide()
+		_slide(delta)
 		# zaseknutý (plot, strom, hráč) → otočit se
 		if desired.length() > 0.1 and Vector3(velocity.x, 0, velocity.z).length() < STUCK_V:
 			_stuck += delta

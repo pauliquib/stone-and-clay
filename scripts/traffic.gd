@@ -399,6 +399,9 @@ func _update_driver_lod() -> void:
 ## i nastoupit), ale raycastová kola, _process ani zvuky už neběží. AI auta mimo simulační
 ## bublinu (World.sim_radius) přejdou na levný kinematický posun po trase. Policie se nespí –
 ## hlídka a pronásledování potřebují plnou fyziku.
+## Optimalizace CPU (17. 10. 2026): AI auta už od `Car.KIN_LOD_R` (výchozí 90 m) jedou viditelnou kinematikou
+## (`Car.set_kin_lod`), plná fyzika až pod KIN_LOD_R × KIN_LOD_HYST; stojící vozidla bez řidiče blízko hráče
+## zamrznou po `Car.REST_FREEZE_S` v klidu a probudí je až vozidlo s řidičem, které k nim dojede (nebo tlačení / nástup).
 func _update_car_sleep() -> void:
 	for c in parked:
 		_sleep_still(c)
@@ -406,14 +409,25 @@ func _update_car_sleep() -> void:
 		for c in arr:
 			_sleep_still(c)
 	var simr: float = world.sim_radius
+	var kin_r := minf(Car.KIN_LOD_R, simr)
 	for c in ai_cars:
 		if c == null or not is_instance_valid(c) or c.drive != Car.Drive.AI or c.is_police \
 				or c.ai_direct_target != Vector3.INF:
 			continue
 		var d: float = world.nearest_player_dist(c.global_position)
-		if not c._asleep and d > simr:
-			c.set_asleep(true, true)
-		elif c._asleep and d < simr * 0.7:
+		if not c._asleep:
+			if d > simr:
+				c.set_asleep(true, true)
+			elif d > kin_r:
+				c.set_kin_lod(true)
+		elif c.kinematic:
+			if d < kin_r * Car.KIN_LOD_HYST:
+				c.wake_kin()
+			elif c._kin_vis and d > simr:
+				c.set_kin_lod(false)             # za bublinou – vizuál už se jen přesouvá
+			elif not c._kin_vis and d < simr * 0.9:
+				c.set_kin_lod(true)
+		elif d < simr * 0.7:
 			c.set_asleep(false)
 
 
@@ -422,7 +436,36 @@ func _sleep_still(c: Car) -> void:
 		return
 	var d: float = world.nearest_player_dist(c.global_position)
 	if c._asleep:
-		if d < 110.0:
+		if c.rest_frozen:
+			if _driven_near(c):
+				c.set_asleep(false)
+		elif d < 110.0:
 			c.set_asleep(false)
 	elif d > 170.0:
 		c.set_asleep(true)
+	elif c.rest_ready():
+		c.freeze_at_rest()
+
+
+## Jede k zamrzlému stojícímu vozidlu `c` vozidlo s řidičem (hráč, AI, policie)? Dosah Car.REST_WAKE_M
+## + 0,8 s jízdy (kontrola běží po 0,4 s – rychlé auto nesmí narazit do zamrzlého).
+func _driven_near(c: Car) -> bool:
+	var p := c.global_position
+	for o in ai_cars:
+		if _drives_to(o, c, p):
+			return true
+	for o in _police_cars:
+		if _drives_to(o, c, p):
+			return true
+	for arr in player_vehicles.values():
+		for o in arr:
+			if _drives_to(o, c, p):
+				return true
+	return false
+
+
+func _drives_to(o: Car, c: Car, p: Vector3) -> bool:
+	if o == null or o == c or not is_instance_valid(o) or o.drive == Car.Drive.NONE or (o._asleep and not o._kin_vis):
+		return false
+	var r := Car.REST_WAKE_M + absf(o.speed) * 0.8
+	return o.global_position.distance_squared_to(p) < r * r

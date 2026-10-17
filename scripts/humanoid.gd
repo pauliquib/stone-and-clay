@@ -80,6 +80,14 @@ static var COLD_ARMS_IN := 0.14       # rad – ruce k tělu v zimě
 static var SHIVER_HZ := 26.0          # rad/s – třes zimou
 static var SHIVER_AMP := 0.012        # rad – třes zimou
 static var SHIVER_LEAN := 0.4         # předklon z třesu (× třes)
+## Optimalizace CPU (17. 10. 2026) – LOD animace podle vzdálenosti od kamery (F3 → Člověk/LOD postav,
+## `scripts/dev/tune_m8_19.gd`). Animace se počítá jednou za N snímků s nasčítaným časem (stejný pohyb, nižší frekvence).
+static var LOD_FULL_R := 25.0         # m – blíž každý snímek
+static var LOD_MID_R := 60.0          # m – do této vzdálenosti každý LOD_MID_N-tý snímek, dál LOD_FAR_N-tý
+static var LOD_MID_N := 2
+static var LOD_FAR_N := 4
+static var LOD_BEHIND_N := 6          # postava za kamerou (dál než LOD_FULL_R) – každý tolikátý snímek
+static var LOD_GAIT_R := 40.0         # m – dál jednoduchá animace místo Gait (bez terénní IK a vzorkování svahu)
 
 
 ## Náklon úchopu nástroje v ruce (rot.x, rad) – viz ToolModels.GRIPS.
@@ -168,10 +176,14 @@ var _prev_yaw := 0.0
 var _slope_fwd := 0.0            # cache: sklon terénu pod chodidly (oprava regrese po vlně 2 M8 –
 var _slope_roll_raw := 0.0       # 4x Callable.call(height_at) bylo drahé každý frame, viz níž)
 var _slope_t := 0.0
+var _lod_acc := 0.0              # nasčítaný čas od posledního výpočtu animace (LOD)
+var _lod_left := 0                # snímků do dalšího výpočtu
+var _lod_gait := true             # blízko kamery → Gait; dál stará animace
 
 
 func _ready() -> void:
 	_gait = Gait.new()
+	_lod_left = randi() % 4           # rozložit výpočty vzdálených postav do různých snímků
 	scale = Vector3.ONE * scale_factor
 	_root = _pivot(self, Vector3.ZERO)
 	_hips = _pivot(_root, Vector3(0, 0.95, 0))
@@ -691,8 +703,30 @@ func head_node() -> Node3D:
 
 func _process(delta: float) -> void:
 	var __t0 := Tests.prof_t0()
-	_process_impl(delta)
+	_lod_acc += delta
+	_lod_left -= 1
+	if _lod_left <= 0 and visible:
+		_lod_left = _lod_every()
+		var dt := minf(_lod_acc, 0.25)
+		_lod_acc = 0.0
+		_process_impl(dt)
 	Tests.prof_add("humanoid", __t0)
+
+
+## LOD: po kolika snímcích znovu spočítat animaci (podle vzdálenosti od kamery a zorného pole); nastaví `_lod_gait`.
+func _lod_every() -> int:
+	LodCam.refresh(self)
+	if not LodCam.ok:
+		_lod_gait = true
+		return 1
+	var p := global_position
+	var d2 := LodCam.dist2(p)
+	_lod_gait = d2 < LOD_GAIT_R * LOD_GAIT_R
+	if d2 < LOD_FULL_R * LOD_FULL_R:
+		return 1
+	if LodCam.behind(p, 2.0):
+		return maxi(LOD_BEHIND_N, 1)
+	return maxi(LOD_MID_N if d2 < LOD_MID_R * LOD_MID_R else LOD_FAR_N, 1)
 
 
 func _process_impl(delta: float) -> void:
@@ -731,7 +765,7 @@ func _process_impl(delta: float) -> void:
 	if delta > 0.0001:
 		turn_rate = wrapf(rotation.y - _prev_yaw, -PI, PI) / delta
 	_prev_yaw = rotation.y
-	if gait_on and _gait != null and on_floor and pose == "stand" and not sliding:
+	if gait_on and _lod_gait and _gait != null and on_floor and pose == "stand" and not sliding:
 		_gait.scale_factor = scale_factor
 		_gait.animate(delta, speed, turn_rate, load_kg, tired)
 		leg_l = _gait.leg_l
