@@ -14,7 +14,11 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-SEC="${PERF_SEC:-20}"          # délka měření jedné scény (s); PERF_SEC=30 tools/perf_m8_19.sh zaklad = delší
+SEC="${PERF_SEC:-20}"
+# Bez vsync (FIFO na 60 Hz monitoru zaokrouhlí snímek na 16,7 / 33,3 ms → všechno „30 fps“). Se svislou
+# synchronizací: PERF_VSYNC=1 tools/perf_m8_19.sh …
+VSYNC_ARGS=(--vsync=off --maxfps=0)
+[ -n "${PERF_VSYNC:-}" ] && VSYNC_ARGS=()          # délka měření jedné scény (s); PERF_SEC=30 tools/perf_m8_19.sh zaklad = delší
 
 ZAKLAD=(
 	"nizka|ves_poledne"
@@ -66,7 +70,7 @@ i=0
 for r in "${RUNS[@]}"; do
 	i=$((i + 1))
 	IFS='|' read -r preset scene realism <<< "$r"
-	args=(--preset="$preset" --perfscene="$scene,$SEC")
+	args=(--preset="$preset" "${VSYNC_ARGS[@]}" --perfscene="$scene,$SEC")
 	label="[$i/${#RUNS[@]}] $scene · předvolba $preset"
 	if [ -n "${realism:-}" ]; then
 		args+=(--realism="$realism")
