@@ -2982,3 +2982,10 @@ Cíl: ves_poledne / Střední 60 fps – skripty měly ~15 ms (villager 3,6, car
 - Ručně ověřit: náraz hráčovým autem do zaparkovaného (musí se probudit a odletět), tlačení stojícího auta, nástup;
   AI auto přejíždějící hranici 72–90 m (žádný skok výšky / zastavení); vesničané ve 40–160 m (plynulost, cca 1 px trhání).
 - Kinematické auto (90–320 m) nesráží chodce a neprojde křižovatku s přednostmi jako fyzika – jen staví před překážkou v pruhu.
+
+### Doplněk – stínový LOD postav (GPU, podnět subagenta B)
+- `humanoid.gd`: `_set_shadow_band` – do `SHADOW_PARTS_R` = 12 m od kamery stín ze všech dílů, do `SHADOW_R` = 28 m jen trup
+  a pánev, dál `SHADOW_CASTING_SETTING_OFF`; přepíná se jen při změně pásma (kontrola v `_lod_every`), první osoba beze změny.
+  Ruce mají `visibility_range_end` = `LOD_HAND_VIS_R` = 60 m. Odhad −2 až −4 ms GPU na vsi (stínová mapa).
+- F3 Člověk/LOD postav: `humanoid_lod.shadow_parts_r|shadow_r|hand_vis_r`. Kontrola překladu prázdná.
+- Riziko: postava za ~28 m bez stínu (při nízkém slunci viditelné), ruce mizí za 60 m.

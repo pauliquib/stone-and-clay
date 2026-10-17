@@ -87,6 +87,11 @@ static var LOD_MID_R := 60.0          # m – do této vzdálenosti každý LOD_
 static var LOD_MID_N := 2
 static var LOD_FAR_N := 4
 static var LOD_BEHIND_N := 6          # postava za kamerou (dál než LOD_FULL_R) – každý tolikátý snímek
+## Stínový LOD (GPU, 17. 10. 2026): blízko stín vrhají všechny díly, dál jen trup a pánev, nejdál nic. Přepíná se
+## jen při změně pásma (kontrola spolu s LOD animace). Drobné díly (ruce) se dál než LOD_HAND_VIS_R nekreslí vůbec.
+static var SHADOW_PARTS_R := 12.0     # m – do této vzdálenosti od kamery stín ze všech dílů
+static var SHADOW_R := 28.0           # m – do této jen trup + pánev, dál postava bez stínu
+static var LOD_HAND_VIS_R := 60.0     # m – visibility_range_end rukou (platí pro nově postavené postavy)
 static var LOD_GAIT_R := 40.0         # m – dál jednoduchá animace místo Gait (bez terénní IK a vzorkování svahu)
 
 
@@ -178,6 +183,7 @@ var _slope_roll_raw := 0.0       # 4x Callable.call(height_at) bylo drahé každ
 var _slope_t := 0.0
 var _lod_acc := 0.0              # nasčítaný čas od posledního výpočtu animace (LOD)
 var _lod_left := 0                # snímků do dalšího výpočtu
+var _shadow_band := -1           # stínový LOD: 0 všechny díly, 1 trup + pánev, 2 bez stínu (−1 = nastavit)
 var _lod_gait := true             # blízko kamery → Gait; dál stará animace
 
 
@@ -284,7 +290,10 @@ func _rebuild() -> void:
 # ---------------------------------------------------------------- stavba
 
 func _commit(pivot: Node3D, kit: MeshKit) -> void:
-	var mi := MeshKit.mesh_instance(pivot, kit.commit(MeshKit.vc_material(0.78)), vis_end)
+	var ve := vis_end
+	if pivot == _hand_l or pivot == _hand_r:
+		ve = minf(ve, LOD_HAND_VIS_R) if ve > 0.0 else LOD_HAND_VIS_R
+	var mi := MeshKit.mesh_instance(pivot, kit.commit(MeshKit.vc_material(0.78)), ve)
 	_meshes.append(mi)
 
 
@@ -616,6 +625,20 @@ func set_first_person(fp: bool) -> void:
 	for m in _meshes:
 		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY if fp \
 			else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	_shadow_band = -1                 # stínový LOD se znovu nastaví při příští kontrole
+
+
+## Stínový LOD: pásmo 0 = stín ze všech dílů, 1 = jen trup a pánev, 2 = bez stínu. Mění jen při změně pásma.
+func _set_shadow_band(band: int) -> void:
+	if band == _shadow_band or _fp:
+		return
+	_shadow_band = band
+	for m in _meshes:
+		if not is_instance_valid(m):
+			continue
+		var main := m.get_parent() == _torso or m.get_parent() == _hips
+		var on := band == 0 or (band == 1 and main)
+		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if on else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func land(impact: float) -> void:
@@ -718,10 +741,12 @@ func _lod_every() -> int:
 	LodCam.refresh(self)
 	if not LodCam.ok:
 		_lod_gait = true
+		_set_shadow_band(0)
 		return 1
 	var p := global_position
 	var d2 := LodCam.dist2(p)
 	_lod_gait = d2 < LOD_GAIT_R * LOD_GAIT_R
+	_set_shadow_band(0 if d2 < SHADOW_PARTS_R * SHADOW_PARTS_R else (1 if d2 < SHADOW_R * SHADOW_R else 2))
 	if d2 < LOD_FULL_R * LOD_FULL_R:
 		return 1
 	if LodCam.behind(p, 2.0):

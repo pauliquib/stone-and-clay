@@ -75,6 +75,12 @@ static func register_all() -> void:
 		1, 20, 1, "Postava za kamerou (dál než plná frekvence) – mimo zorné pole stačí zřídka.", "snímků")
 	DevTune.tune(Humanoid, "LOD_GAIT_R", "humanoid_lod.gait_r", LOD_LIDE, "Animace postavy – Gait do",
 		5.0, 400.0, 5.0, "Dál od kamery jednoduchá animace chůze místo fázového cyklu Gait (bez vzorkování svahu).", "m")
+	DevTune.tune(Humanoid, "SHADOW_PARTS_R", "humanoid_lod.shadow_parts_r", LOD_LIDE, "Stín postavy – všechny díly do",
+		0.0, 200.0, 1.0, "Blíž ke kameře vrhají stín všechny díly postavy (ruce, nohy, hlava).", "m")
+	DevTune.tune(Humanoid, "SHADOW_R", "humanoid_lod.shadow_r", LOD_LIDE, "Stín postavy – trup a pánev do",
+		0.0, 400.0, 1.0, "Do této vzdálenosti vrhá stín jen trup a pánev, dál postava stín nevrhá.", "m")
+	DevTune.tune(Humanoid, "LOD_HAND_VIS_R", "humanoid_lod.hand_vis_r", LOD_LIDE, "Ruce postavy – kreslit do",
+		10.0, 500.0, 5.0, "visibility_range_end rukou (drobný díl). Platí pro nově postavené / převlečené postavy.", "m")
 	DevTune.tune(EcoClock, "JOB_BUDGET_US", "eco.job_budget_us", EKO, "Rozpočet prací (stavba mřížek) za snímek",
 		100, 4000, 100, "Strop času za snímek jen pro práce EcoClock.slice (stavba luk, stanovišť, vodní bilance) uvnitř " +
 		"celkového rozpočtu eko-taktu. Menší = plynulejší hra, stavba trvá déle.", "µs")
