@@ -10,6 +10,8 @@ var settings: GameSettings
 var is_open := false
 var _page := "main"
 var _dim: ColorRect
+var _panel: PanelContainer
+var _scroll: ScrollContainer
 var _title: Label
 var _info: Label
 var _list: VBoxContainer
@@ -31,7 +33,8 @@ func _ready() -> void:
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_dim.add_child(center)
-	var panel := PanelContainer.new()
+	_panel = PanelContainer.new()
+	var panel := _panel
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Hud.MENU_BG
 	sb.set_corner_radius_all(12)
@@ -39,7 +42,6 @@ func _ready() -> void:
 	sb.set_border_width_all(1)
 	sb.border_color = Color(Hud.ACCENT, 0.4)
 	panel.add_theme_stylebox_override("panel", sb)
-	panel.custom_minimum_size = Vector2(520, 0)
 	center.add_child(panel)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
@@ -53,18 +55,29 @@ func _ready() -> void:
 	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_sep())
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(500, 0)
+	_scroll = scroll
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(scroll)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_theme_constant_override("separation", 6)
 	scroll.add_child(_list)
-	_list.resized.connect(func(): scroll.custom_minimum_size.y = minf(_list.size.y, 560.0))
+	_list.resized.connect(_fit_to_screen)
 	_status = _label(v, "", 15)
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.add_theme_color_override("font_color", Color(0.7, 1.0, 0.7))
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_dim.visible = false
+	get_viewport().size_changed.connect(_fit_to_screen)
+	_fit_to_screen()
+
+
+## Panel má pevnou šířku podle okna (dlouhé texty se zalamují, nic ho nenafoukne) a seznam
+## se posouvá, když je vyšší než zbytek obrazovky.
+func _fit_to_screen() -> void:
+	var vp := get_viewport().get_visible_rect().size
+	_panel.custom_minimum_size.x = clampf(vp.x - 64.0, 360.0, 780.0)
+	_scroll.custom_minimum_size.y = minf(_list.size.y, clampf(vp.y - 380.0, 160.0, 680.0))
 
 
 # ------------------------------------------------------------------ otevření / zavření
@@ -146,6 +159,7 @@ func _button(text: String, cb: Callable, enabled := true) -> Button:
 	b.text = text
 	b.disabled = not enabled
 	b.add_theme_font_size_override("font_size", 19)
+	b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS   # tlačítko nikdy nerozšíří panel
 	b.custom_minimum_size = Vector2(0, 40)
 	var n := StyleBoxFlat.new()
 	n.bg_color = Color(1, 1, 1, 0.04)
@@ -179,8 +193,8 @@ func _sep() -> HSeparator:
 
 
 func _focus_first() -> void:
-	for c in _list.get_children():
-		if c is Button and not c.disabled:
+	for c in _list.find_children("*", "BaseButton", true, false):   # i přepínače v řádcích
+		if not c.disabled:
 			c.grab_focus.call_deferred()
 			return
 
@@ -352,13 +366,13 @@ func _show_settings() -> void:
 func _show_realism() -> void:
 	_page = "realism"
 	_clear("Realismus (M8)", "Krajina, rostliny a zvěř se postupně mění ze „kulis“ na propojené " +
-		"zjednodušené modely (terén, voda, slunce, vítr…). Každý krok jde vypnout – bez něj hra běží " +
-		"jako dřív. Zatím žádný konkrétní přepínač není hotový – přidá ho krok M8, který danou část zavádí.")
+		"zjednodušené modely (terén, voda, slunce, vítr…). Každý krok jde vypnout – bez něj hra běží jako dřív.")
 	if GameSettings.REALISM_ROWS.is_empty():
 		_label(_list, "Zatím nic k vypnutí (M8.1 jen zakládá přepínače a takt pro další kroky).", 15)
 	for row in GameSettings.REALISM_ROWS:
 		var key: String = row[0]
-		_check("%s – %s" % [row[1], row[2]], settings.realism_on(key), func(on): settings.set_realism(key, on))
+		var hint: String = row[2] if row.size() < 4 else "%s  ·  cena %s" % [row[2], row[3]]
+		_check(row[1], settings.realism_on(key), func(on): settings.set_realism(key, on), hint)
 	_button("← Zpět", _back)
 	_focus_first()
 
@@ -441,6 +455,7 @@ func _row(text: String) -> HBoxContainer:
 	_list.add_child(row)
 	var l := _label(row, text, 17)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return row
 
 
@@ -485,15 +500,32 @@ func _set_adult(on: bool) -> void:
 	ItemsDB.adult_on = on
 
 
-func _check(text: String, on: bool, setter: Callable) -> void:
+## Přepínač: popisek (a volitelně menší nápověda pod ním) vlevo se zalamuje, CheckButton vpravo;
+## klik na popisek přepíná taky.
+func _check(text: String, on: bool, setter: Callable, hint := "") -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	_list.add_child(row)
+	var texts := VBoxContainer.new()
+	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	texts.add_theme_constant_override("separation", 0)
+	texts.mouse_filter = Control.MOUSE_FILTER_STOP
+	row.add_child(texts)
+	_label(texts, text, 17).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if hint != "":
+		var h := _label(texts, hint, 14)
+		h.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		h.add_theme_color_override("font_color", Color(0.72, 0.72, 0.72))
 	var cb := CheckButton.new()
-	cb.text = text
 	cb.button_pressed = on
-	cb.add_theme_font_size_override("font_size", 17)
+	cb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	cb.toggled.connect(func(x: bool):
 		setter.call(x)
 		settings.apply(client))
-	_list.add_child(cb)
+	row.add_child(cb)
+	texts.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			cb.button_pressed = not cb.button_pressed)
 
 
 func _label(parent: Node, text: String, size: int) -> Label:
