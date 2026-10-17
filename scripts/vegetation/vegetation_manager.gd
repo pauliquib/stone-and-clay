@@ -129,6 +129,9 @@ static var WIND_FULL_MS := 10.0
 static var WIND_MAX := 2.0
 ## M8.D2c: změna `bend_k` v menu F3 → materiály se přenastaví při nejbližším ticku větru.
 static var _gen := 0
+## Optimalizace GPU (17. 10. 2026): násobek dosahu všech chunků vegetace navíc k předvolbě (`detail`) – F3 →
+## Svět/Vykreslování (`tune_m8_19.gd` zvýší `_gen`, viditelnost se přepočítá při nejbližším ticku větru).
+static var RANGE_K := 1.0
 
 var world: World
 var terrain: Terrain
@@ -333,7 +336,7 @@ func _refresh_visibility(pos: Vector3) -> void:
 		var mx: Vector2 = ch["max"]
 		var dx := maxf(mn.x - p.x, maxf(0.0, p.x - mx.x))
 		var dz := maxf(mn.y - p.y, maxf(0.0, p.y - mx.y))
-		var r := float(ch["range"]) * detail
+		var r := float(ch["range"]) * detail * RANGE_K
 		mmi.visible = on and dx * dx + dz * dz <= r * r
 
 
@@ -354,6 +357,7 @@ func _process_impl(delta: float) -> void:
 		_seen_gen = _gen
 		for typ in _mats:
 			_apply_params(typ)                    # M8.14: i barvy a reakce na seč / pěšiny / sešlapání
+		_refresh_visibility(_last_pos)            # RANGE_K z F3
 	var wind := Vector2.ZERO
 	if world != null and world.weather != null:
 		var wv: Vector3 = world.weather.wind_vector()

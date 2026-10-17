@@ -5,11 +5,16 @@
 ## parametr – proto tu není.
 ## Oprava výkonu po M8 (17. 10. 2026): velikosti kusů a stropy kusů za snímek pro práce přes `EcoClock.slice`
 ## (stavba mřížky luk, vodní bilance). Celkový časový rozpočet je `eco.slice_budget_us` (tune_svet.gd, Svět/Eko-takt).
+## Optimalizace GPU a předvolby (17. 10. 2026): skupina **Svět/Vykreslování** – hranice LOD generovaných stromů, dosah
+## vegetace, dosah stínů slunce a práh LOD meshů (násobky navíc k předvolbě; výchozí = kód, vzhled beze změny).
 extends RefCounted
 
 const SKUPINA := "Létání/Hranice letu"
 const LOUKY := "Příroda/Louky a podrost"
 const VODA := "Příroda/Voda a půda"
+const VYKRES := "Svět/Vykreslování"
+const GPU_IDS := ["render.tree_l0_end", "render.tree_l1_end", "render.veg_range_k", "render.shadow_dist_k",
+	"render.mesh_lod_k"]
 
 
 static func register_all() -> void:
@@ -35,3 +40,36 @@ static func register_all() -> void:
 		1, 64, 1, "Strop kusů (po 40 buňkách) výpočtu spádnic D8 za snímek.", "kusů")
 	DevTune.tune(SoilWater, "OUTLET_PER_FRAME", "soil_water.outlet_per_frame", VODA, "Vodní bilance – ústí do toků: kusů za snímek",
 		1, 64, 1, "Strop kusů (po 80 buňkách) hledání toku, do kterého buňka ústí, za snímek.", "kusů")
+	_vykreslovani()
+
+
+## Optimalizace GPU (17. 10. 2026): parametry vykreslování; změna se uplatní hned (`on_changed`).
+static func _vykreslovani() -> void:
+	DevTune.tune(TreeGen, "L0_END", "render.tree_l0_end", VYKRES, "Stromy – hranice LOD0 (plný model)",
+		10.0, 165.0, 1.0, "Do této vzdálenosti se kreslí plný model generovaného stromu (× „lod0“ z detailu přírody " +
+		"v předvolbě: Nízký 0,5, Střední 0,6, Vysoký 1, Ultra 1,3). Menší = levnější les zblízka.", "m")
+	DevTune.tune(TreeGen, "L1_END", "render.tree_l1_end", VYKRES, "Stromy – hranice LOD1 → impostor",
+		60.0, 400.0, 5.0, "Dál než tohle (× „lod1“ z předvolby: 0,75 / 0,8 / 1 / 1,15) je strom jen impostor (2 trojúhelníky). " +
+		"Menší = méně buněk LOD1 kolem kamery a méně stínových draw callů.", "m")
+	DevTune.tune(VegetationManager, "RANGE_K", "render.veg_range_k", VYKRES, "Vegetace – násobek dosahu",
+		0.0, 3.0, 0.05, "Násobí dosah chunků trávy, kopřiv, keřů, obilí… navíc k volbě Vegetace v předvolbě (Střední 0,5).", "×")
+	DevTune.tune(GameSettings, "SHADOW_DIST_K", "render.shadow_dist_k", VYKRES, "Stíny – násobek dosahu stínů slunce",
+		0.2, 3.0, 0.05, "Násobí dosah stínů z předvolby (Střední 120 m, Vysoká 240 m). Kratší = méně objektů ve stínovém průchodu.", "×")
+	DevTune.tune(GameSettings, "MESH_LOD_K", "render.mesh_lod_k", VYKRES, "LOD meshů – násobek prahu",
+		0.0, 8.0, 0.1, "Násobí Viewport.mesh_lod_threshold z dohlednosti (Krátká 4, Střední 2, Daleká 1). Vyšší = dřív hrubší " +
+		"LOD u importovaných modelů (.glb); meshe skládané v kódu LOD nemají.", "×")
+	for id in GPU_IDS:
+		if DevTune.differs_from_code(id):
+			on_changed(id, DevTune.value(id))
+
+
+## Změna v F3 (a při startu, když se hodnota z config.json / ladeni.cfg liší od kódu).
+static func on_changed(id: String, _value: Variant) -> void:
+	match id:
+		"render.tree_l0_end", "render.tree_l1_end":
+			if MapLoader.tree_gen != null:
+				MapLoader.tree_gen.refresh_bands()
+		"render.veg_range_k":
+			VegetationManager._gen += 1
+		"render.shadow_dist_k", "render.mesh_lod_k":
+			GameSettings.reapply_live()

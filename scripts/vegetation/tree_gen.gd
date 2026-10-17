@@ -20,8 +20,10 @@ const TEX_BARK := "res://assets/textures/trees/kura.png"
 const TEX_IMP_COLOR := "res://assets/textures/trees/impostor_barva.png"
 const TEX_IMP_NORMAL := "res://assets/textures/trees/impostor_normala.png"
 
-const L0_END := 55.0                  # m – do této vzdálenosti LOD0 (plný model), dál LOD1
-const L1_END := 170.0                 # m – do této vzdálenosti LOD1 (= MapLoader.DEC_FULL_RANGE), dál impostor
+## Optimalizace GPU (17. 10. 2026): `static var` – laditelné v F3 → Svět/Vykreslování (`tune_m8_19.gd`); po změně
+## `refresh_bands()`. Skutečná hranice = tohle × násobek z předvolby (`lod0_k` / `lod1_k`, `GameSettings.ECO_LEVELS`).
+static var L0_END := 55.0             # m – do této vzdálenosti LOD0 (plný model), dál LOD1
+static var L1_END := 170.0            # m – do této vzdálenosti LOD1 (= MapLoader.DEC_FULL_RANGE), dál impostor
 const LOD_FADE := 6.0                 # m – půlšířka pásma prolínání (dither) mezi LOD
 const CROWN_K := 0.85                 # poloměr koruny z dat = sx × CROWN_K (poloměr dřívějšího prototypu)
 const XZ_MIN := 0.8                   # šířkové měřítko modelu vůči datům z ortofota – meze (model si drží tvar druhu)
@@ -43,6 +45,9 @@ var _var_idx := {}                    # shape*100 + vit*10 + age → index varia
 var _mats := {}                       # "tvar_list_pásmo" → ShaderMaterial
 ## M8.19B: násobek dosahu LOD0 podle detailu přírody v předvolbě grafiky (`GameSettings.ECO_LEVELS`, 1 = L0_END).
 var lod0_k := 1.0
+## Optimalizace GPU (17. 10. 2026): násobek hranice LOD1 → impostor (1 = L1_END); menší = méně buněk LOD1 kolem kamery
+## (`TreeLodStreamer`), tedy méně MultiMeshů ve stínovém i hlavním průchodu.
+var lod1_k := 1.0
 var _full := {}                       # varianta → LOD0 bez pásma (zasazené stromy)
 var _imp_mat: ShaderMaterial
 var _imp_mesh: ArrayMesh
@@ -197,27 +202,46 @@ func material(shape: int, leaf: bool, band: int) -> ShaderMaterial:
 	return m
 
 
-## Hranice LOD0 → LOD1 (m) s násobkem z předvolby.
+## Hranice LOD0 → LOD1 (m) s násobkem z předvolby (nikdy za hranicí LOD1).
 func l0_end() -> float:
-	return L0_END * lod0_k
+	return minf(L0_END * lod0_k, l1_end() - 2.0 * LOD_FADE)
+
+
+## Hranice LOD1 → impostor (m) s násobkem z předvolby.
+func l1_end() -> float:
+	return maxf(L1_END * lod1_k, 4.0 * LOD_FADE)
 
 
 ## M8.19B: dosah LOD0 podle předvolby (Esc → Nastavení → Grafika → Detail přírody) – přepíše pásma hotových materiálů;
 ## `TreeLodStreamer` si buňky LOD0 přepočítá při nejbližší kontrole (CHECK_S).
 func set_lod0_scale(k: float) -> void:
-	k = clampf(k, 0.2, 2.5)
-	if is_equal_approx(k, lod0_k):
+	set_lod_scales(k, lod1_k)
+
+
+## Optimalizace GPU (17. 10. 2026): násobky hranic LOD0 i LOD1 najednou (detail přírody v předvolbě).
+func set_lod_scales(k0: float, k1: float) -> void:
+	k0 = clampf(k0, 0.2, 2.5)
+	k1 = clampf(k1, 0.3, 2.0)
+	if is_equal_approx(k0, lod0_k) and is_equal_approx(k1, lod1_k):
 		return
-	lod0_k = k
+	lod0_k = k0
+	lod1_k = k1
+	refresh_bands()
+
+
+## Přepíše pásma LOD ve všech hotových materiálech (předvolba, F3 → L0_END / L1_END).
+func refresh_bands() -> void:
 	for key in _mats:
 		_set_band(_mats[key] as ShaderMaterial, int(String(key).get_slice("_", 2)))
+	if _imp_mat != null:
+		_imp_mat.set_shader_parameter("lod_band", Vector4(l1_end(), 1e6, LOD_FADE, 0.0))
 
 
 func _set_band(m: ShaderMaterial, band: int) -> void:
 	if band == 0:
 		m.set_shader_parameter("lod_band", Vector4(0.0, l0_end(), LOD_FADE, 0.0))
 	elif band == 1:
-		m.set_shader_parameter("lod_band", Vector4(l0_end(), L1_END, LOD_FADE, 0.0))
+		m.set_shader_parameter("lod_band", Vector4(l0_end(), l1_end(), LOD_FADE, 0.0))
 
 
 ## LOD meshe varianty: 0 = LOD0, 1 = LOD1 (materiály s pásmem pro streamované buňky).
@@ -292,7 +316,7 @@ func impostor_material() -> ShaderMaterial:
 	m.set_shader_parameter("imp_normal", _texture(TEX_IMP_NORMAL))
 	m.set_shader_parameter("imp_views", float(imp_views))
 	m.set_shader_parameter("imp_rows", float(variants.size()))
-	m.set_shader_parameter("lod_band", Vector4(L1_END, 1e6, LOD_FADE, 0.0))   # konec 1e6: v float32 ještě ± prolínání
+	m.set_shader_parameter("lod_band", Vector4(l1_end(), 1e6, LOD_FADE, 0.0))   # konec 1e6: v float32 ještě ± prolínání
 	var ext := PackedColorArray()
 	ext.resize(64)
 	for k in variants.size():

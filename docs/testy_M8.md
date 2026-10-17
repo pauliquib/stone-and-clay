@@ -787,3 +787,23 @@ Quadro M2200, Forward+, 1600×900, bez zátěže na pozadí. Před M8 (8. 10., s
 - Střední ≈ Vysoká na vsi → Střední na GPU skoro nic neušetří (k doladění předvoleb). Nízká −7,6 ms.
 - 60 fps (16,6 ms) na Střední **nedrží** – ale celkově je hra rychlejší než před M8 (30,3 vs. 37,3 ms).
 - S vsync na 60 Hz monitoru (Mailbox není dostupný → FIFO) se snímek zaokrouhlí na 30 fps.
+
+## Optimalizace GPU a předvolby (17. 10. 2026) – co změřit
+
+Tabulka předvoleb před → po je v `PROJECT_LOG.md` („Optimalizace GPU a předvolby“). Měřit bez vsync (skript to dělá sám).
+
+1. `tools/perf_m8_19.sh zaklad` (6 běhů) → čeká se `ves_poledne` Střední ≲ 24 ms (dřív 30,3), Vysoká beze změny (~30,5 ms,
+   tedy Střední konečně znatelně levnější), `les_leto` Střední ≲ 18 ms (dřív 21,3), `dron_200m` ≲ 22 ms (dřív 25,5).
+2. `tools/perf_m8_19.sh renderer` (6 běhů: ves_poledne, les_leto, dron_200m na Střední – Forward+ a Mobile hned po sobě) →
+   porovnat dvojice. V logu u každého běhu řádek „Stone & Clay: renderer …“ a „Vulkan … – Forward+ / Forward Mobile“.
+   Mobile nemá SSAO, FSR 2 ani TAA (na Střední se nepoužívají); kdyby byl Mobile výrazně rychlejší, stačí v Esc → Nastavení
+   → Grafika → Renderer přepnout na Mobile (projeví se po restartu).
+3. `tools/perf_m8_19.sh vlakno` (3 běhy, Forward+ s `--render-thread separate`) → srovnat se stejnými scénami ze skupiny
+   `renderer` (forward_plus). Na vsi je snímek ~půl skripty, ~půl příprava vykreslování na hlavním vlákně – ve vlastním
+   vlákně se mohou překrýt (čeká se −3 až −8 ms). Pokud hra v tomto režimu spadne nebo bliká, napiš – výchozí zůstává `safe`.
+4. Kontrola vzhledu na Střední (F2 → náves, poledne, jasno): stíny domů a postav jen do ~120 m (dál bez stínu), mírně
+   měkčí obraz (75 % + FSR 1), bez záře kolem slunce / lamp; stromy zblízka přecházejí na LOD1 už kolem 33 m a na impostor
+   kolem 136 m (Vysoká 55 / 170 m). F3 → Svět/Vykreslování → „Stromy – hranice LOD1“ a „Stíny – násobek dosahu“ jdou
+   doladit za běhu.
+5. Hráč, který měl uloženou předvolbu Střední: po startu Esc → Nastavení → Grafika ukazuje Střední s novými hodnotami
+   (Rozlišení 3D 75 %, Záře vypnutá). Kdo měl Vlastní, toho se změna netýká.

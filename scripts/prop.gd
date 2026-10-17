@@ -56,6 +56,13 @@ func _ready() -> void:
 	can_sleep = true
 	sleeping = true
 	_up0 = global_transform.basis.y
+	# optimalizace 17. 10. 2026: spící předmět (skoro vždy) nevolá _physics_process – probudí ho až fyzika (náraz)
+	set_physics_process(false)
+	sleeping_state_changed.connect(_on_sleeping_changed)
+
+
+func _on_sleeping_changed() -> void:
+	set_physics_process(not sleeping and not _done)
 
 
 func on_hit(impact: float) -> void:

@@ -114,8 +114,10 @@ static func load_chunks(path: String, mat: Material, drape: Terrain = null, drap
 
 ## Přidá dlaždice do scény; volitelně s kolizí (ConcavePolygonShape3D). Mesh i těleso stojí ve středu
 ## dlaždice (`origin` z load_chunks) – dohled i jeho prolínání se tak měří od dlaždice, ne od spawnu.
+## `shadows` = false: dlaždice nevrhá stín (silnice a cesty položené na terénu – stín by nebyl vidět, jen by se
+## kreslily znovu ve stínovém průchodu; optimalizace GPU 17. 10. 2026).
 static func add_chunks(parent: Node3D, name: String, chunks: Array, collide: bool, vis_range := 0.0,
-		surface := "") -> void:
+		surface := "", shadows := true) -> void:
 	var root := Node3D.new()
 	root.name = name
 	parent.add_child(root)
@@ -124,6 +126,8 @@ static func add_chunks(parent: Node3D, name: String, chunks: Array, collide: boo
 		var mi := MeshInstance3D.new()
 		mi.mesh = ch["mesh"]
 		mi.position = origin
+		if not shadows:
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if vis_range > 0.0:
 			mi.visibility_range_end = vis_range
 			mi.visibility_range_end_margin = minf(vis_range * 0.08, 60.0)   # jemné dofadování

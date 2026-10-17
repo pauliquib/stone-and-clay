@@ -73,9 +73,21 @@ const SCALE_NAMES := ["50 %", "67 %", "75 %", "85 %", "100 % (nativní)"]
 const UPSCALE_NAMES := ["Bilineární", "FSR 1 (ostřejší)", "FSR 2 (nejkvalitnější, náročnější)"]
 const AA_NAMES := ["Vypnuto", "FXAA (nejlevnější)", "MSAA 2×", "MSAA 4×", "TAA"]
 const SHADOW_NAMES := ["Vypnuto", "Nízké", "Střední", "Vysoké", "Ultra"]
-## stíny: [velikost mapy, 4 pásma?, dosah m, kvalita měkkých stínů 0–3]
-const SHADOWS := [[0, false, 0.0, 0], [2048, false, 110.0, 0], [2048, true, 180.0, 1], [4096, true, 240.0, 2],
+## stíny: [velikost mapy, 4 pásma?, dosah m, kvalita měkkých stínů 0–3]. Prolínání pásem (blend_splits) jen se 4 pásmy.
+## Optimalizace GPU (17. 10. 2026): Střední 4 pásma / 180 m / měkké 1 → 2 pásma / 120 m / tvrdé – na vsi kreslí stínový
+## průchod každou postavu (~12 dílů), auto a buňku stromů LOD1 znovu v každém pásmu, kam zasáhne; 2 pásma a kratší dosah
+## ≈ polovina stínových draw callů.
+const SHADOWS := [[0, false, 0.0, 0], [2048, false, 110.0, 0], [2048, false, 120.0, 0], [4096, true, 240.0, 2],
 	[8192, true, 320.0, 3]]
+## Optimalizace GPU (17. 10. 2026): práh LOD meshů (`Viewport.mesh_lod_threshold`, výchozí Godot 1) podle dohlednosti –
+## vyšší = dřív hrubší LOD u importovaných modelů s automatickými LOD (.glb); meshe skládané v kódu LOD nemají.
+const MESH_LODS := [4.0, 2.0, 1.0, 1.0]
+## F3 → Svět/Vykreslování (tune_m8_19.gd): násobek dosahu stínů slunce a práh LOD navíc k předvolbě (1 = beze změny).
+static var SHADOW_DIST_K := 1.0
+static var MESH_LOD_K := 1.0
+## Verze tabulky PRESETS: uložené nastavení se starší verzí a pojmenovanou předvolbou (ne Vlastní) se při načtení
+## přepíše novými hodnotami předvolby (jinak by hráč na „Střední“ dál měl staré drahé hodnoty z nastaveni.cfg).
+const PRESETS_VER := 2
 const VIEWS := [0.6, 0.8, 1.0, 1.25]
 const VIEW_NAMES := ["Krátká", "Střední", "Daleká", "Velmi daleká"]
 const VEGS := [0.0, 0.5, 0.75, 1.0]
@@ -93,16 +105,20 @@ const ECO_NAMES := ["Nízký (vzhled jako před M8)", "Střední (střídmě)", 
 ## life = hustota drobného života (0 = nekreslí se), voices = nejvýš současných hlasů zvukové krajiny (pool 16),
 ## sound_r = násobek okruhu výběru zdrojů (SCAN_R 200 m), fog_layer = údolní mlha jako vrstva (M8.9),
 ## sky = fyzikální obloha (přepínač realismu „sky“ – nastaví se jen při volbě předvolby / detailu, ne při každém startu).
+## lod1 = násobek hranice LOD1 → impostor (TreeGen.L1_END 170 m) – optimalizace GPU 17. 10. 2026 (Střední lod0 0,75 → 0,6,
+## lod1 1,0 → 0,8: buňky LOD1 do ~154 m místo ~188 m = ~⅔ plochy).
 const ECO_LEVELS := [
-	{"lod0": 0.5, "trample": false, "life": 0.0, "voices": 6, "sound_r": 0.6, "fog_layer": false, "sky": false},
-	{"lod0": 0.75, "trample": false, "life": 0.5, "voices": 10, "sound_r": 0.8, "fog_layer": true, "sky": true},
-	{"lod0": 1.0, "trample": true, "life": 1.0, "voices": 16, "sound_r": 1.0, "fog_layer": true, "sky": true},
-	{"lod0": 1.3, "trample": true, "life": 1.0, "voices": 16, "sound_r": 1.0, "fog_layer": true, "sky": true},
+	{"lod0": 0.5, "lod1": 0.75, "trample": false, "life": 0.0, "voices": 6, "sound_r": 0.6, "fog_layer": false, "sky": false},
+	{"lod0": 0.6, "lod1": 0.8, "trample": false, "life": 0.5, "voices": 10, "sound_r": 0.8, "fog_layer": true, "sky": true},
+	{"lod0": 1.0, "lod1": 1.0, "trample": true, "life": 1.0, "voices": 16, "sound_r": 1.0, "fog_layer": true, "sky": true},
+	{"lod0": 1.3, "lod1": 1.15, "trample": true, "life": 1.0, "voices": 16, "sound_r": 1.0, "fog_layer": true, "sky": true},
 ]
 ## předvolby: scale, upscale, aa, shadows, view, veg, sim, glow, ssao, eco (M8.19B)
+## Optimalizace GPU (17. 10. 2026, PRESETS_VER 2): Střední mířena na 16,6 ms na GTX 1050 – rozlišení 3D 85 → 75 % (FSR 1),
+## bez záře, stíny Střední = 2 pásma / 120 m / tvrdé, kratší LOD stromů (ECO_LEVELS[1]). Vysoká / Ultra beze změny.
 const PRESETS := [
 	{"scale": 0, "upscale": 1, "aa": 0, "shadows": 0, "view": 0, "veg": 0, "sim": 0, "glow": false, "ssao": false, "eco": 0},
-	{"scale": 3, "upscale": 1, "aa": 1, "shadows": 2, "view": 1, "veg": 1, "sim": 1, "glow": true, "ssao": false, "eco": 1},
+	{"scale": 2, "upscale": 1, "aa": 1, "shadows": 2, "view": 1, "veg": 1, "sim": 1, "glow": false, "ssao": false, "eco": 1},
 	{"scale": 4, "upscale": 0, "aa": 2, "shadows": 3, "view": 2, "veg": 3, "sim": 2, "glow": true, "ssao": false, "eco": 2},
 	{"scale": 4, "upscale": 0, "aa": 3, "shadows": 4, "view": 3, "veg": 3, "sim": 3, "glow": true, "ssao": true, "eco": 3},
 ]
@@ -125,6 +141,8 @@ var _view_applied := 1.0
 var _atlas := -1                 # naposledy nastavená velikost mapy stínů (přealokace = záškub – jen při změně)
 var _soft := -1
 var _hooked := false
+static var _live: GameSettings = null   # F3 (tune_m8_19.gd): kdo naposledy aplikoval grafiku – pro `reapply_live()`
+static var _live_client: WeakRef = null
 
 
 func _init() -> void:
@@ -163,9 +181,12 @@ func load_file() -> void:
 	volume = clampf(float(cf.get_value("zvuk", "hlasitost", volume)), 0.0, 1.0)
 	preset = clampi(int(cf.get_value("grafika", "predvolba", preset)), 0, PRESET_NAMES.size() - 1)
 	if preset < PRESETS.size():
-		gfx["eco"] = PRESETS[preset]["eco"]    # M8.19B: starý cfg bez klíče "eco" → detail přírody podle uložené předvolby
-	for k in GFX_KEYS:
-		gfx[k] = cf.get_value("grafika", k, gfx[k])
+		gfx = PRESETS[preset].duplicate()      # M8.19B: chybějící klíč (starý cfg bez "eco") → hodnota uložené předvolby
+	# optimalizace GPU 17. 10. 2026: pojmenovaná předvolba ze starší tabulky → nové hodnoty předvolby (cfg se nečte)
+	var old_presets := int(cf.get_value("grafika", "verze_predvoleb", 1)) < PRESETS_VER and preset < PRESETS.size()
+	if not old_presets:
+		for k in GFX_KEYS:
+			gfx[k] = cf.get_value("grafika", k, gfx[k])
 	fps_cap = clampi(int(cf.get_value("grafika", "strop_fps", fps_cap)), 0, FPS_CAPS.size() - 1)
 	color_mode = clampi(int(cf.get_value("grafika", "barvy", color_mode)), 0, COLORS.size() - 1)
 	renderer = String(cf.get_value("grafika", "renderer", renderer))
@@ -190,6 +211,7 @@ func save_file() -> void:
 	cf.set_value("obsah", "dospeli", adult_content)
 	cf.set_value("zvuk", "hlasitost", volume)
 	cf.set_value("grafika", "predvolba", preset)
+	cf.set_value("grafika", "verze_predvoleb", PRESETS_VER)
 	for k in GFX_KEYS:
 		cf.set_value("grafika", k, gfx[k])
 	cf.set_value("grafika", "strop_fps", fps_cap)
@@ -253,7 +275,7 @@ func _eco_realism() -> void:
 func _apply_eco(client: Node) -> void:
 	var lv := eco_level()
 	if MapLoader.tree_gen != null:
-		MapLoader.tree_gen.set_lod0_scale(float(lv["lod0"]))
+		MapLoader.tree_gen.set_lod_scales(float(lv["lod0"]), float(lv.get("lod1", 1.0)))
 	if client.world and client.world.vegetation and client.world.vegetation.fx:
 		client.world.vegetation.fx.interactive = bool(lv["trample"])
 	var ss: Soundscape = client.get("soundscape")
@@ -266,6 +288,8 @@ func _apply_eco(client: Node) -> void:
 
 
 func apply_graphics(client: Node) -> void:
+	_live = self
+	_live_client = weakref(client)
 	var vp: Viewport = client.get_viewport()
 	# rozlišení 3D a upscaling (HUD zůstává v plném rozlišení)
 	var sc: float = SCALES[clampi(int(gfx["scale"]), 0, SCALES.size() - 1)]
@@ -297,7 +321,8 @@ func apply_graphics(client: Node) -> void:
 				RenderingServer.directional_soft_shadow_filter_set_quality(_soft)
 			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if sh[1] \
 				else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-			sun.directional_shadow_max_distance = float(sh[2])
+			sun.directional_shadow_blend_splits = bool(sh[1])     # prolínání pásem = druhé čtení mapy na pixel
+			sun.directional_shadow_max_distance = float(sh[2]) * SHADOW_DIST_K
 	# záře a stínování okolím
 	var env: Environment = client.env
 	if env:
@@ -324,6 +349,7 @@ func apply_graphics(client: Node) -> void:
 		Engine.max_fps = FPS_CAPS[clampi(fps_cap, 0, FPS_CAPS.size() - 1)]
 	# dohlednost
 	var view: float = VIEWS[clampi(int(gfx["view"]), 0, VIEWS.size() - 1)]
+	vp.mesh_lod_threshold = float(MESH_LODS[clampi(int(gfx["view"]), 0, MESH_LODS.size() - 1)]) * MESH_LOD_K
 	var tree: SceneTree = client.get_tree()
 	if not _hooked:
 		_hooked = true
@@ -354,6 +380,15 @@ func _scale_range(n: Node) -> void:
 	g.visibility_range_end = o.y * _view_applied
 	g.visibility_range_begin_margin = o.z * _view_applied
 	g.visibility_range_end_margin = o.w * _view_applied
+
+
+## F3 (tune_m8_19.gd): znovu uplatní grafiku po změně SHADOW_DIST_K / MESH_LOD_K (nic, dokud hra grafiku nenastavila).
+static func reapply_live() -> void:
+	if _live == null or _live_client == null:
+		return
+	var c: Node = _live_client.get_ref()
+	if c != null and is_instance_valid(c) and c.is_inside_tree():
+		_live.apply_graphics(c)
 
 
 ## Pohyb myši (px) upravený podle citlivosti a obrácení osy Y.

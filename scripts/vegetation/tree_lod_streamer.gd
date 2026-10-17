@@ -104,7 +104,7 @@ func _update_sets() -> void:
 	if cp == null:
 		return
 	var c: Vector3 = cp
-	var reach := [TreeGen.L1_END + TreeGen.LOD_FADE + MARGIN, gen.l0_end() + TreeGen.LOD_FADE + MARGIN]   # M8.19B: LOD0 podle předvolby
+	var reach := [gen.l1_end() + TreeGen.LOD_FADE + MARGIN, gen.l0_end() + TreeGen.LOD_FADE + MARGIN]   # M8.19B / opt. GPU: LOD0 i LOD1 podle předvolby
 	# zrušit vzdálené
 	for bk in _built.keys():
 		var b: Vector3i = bk

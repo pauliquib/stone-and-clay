@@ -2944,3 +2944,89 @@ Začátek hledání výkonové regrese po M8 (ves_poledne 6,3 fps, `world` ~40 m
 ### Otevřené body
 - Uživatel změří `tools/perf_m8_19.sh zaklad` (viz `docs/testy_M8.md` → Oprava výkonu po M8). Stavba luk teď trvá
   ~1–2 min hry (7 s CPU v rozpočtu 2 ms) – kdyby vadilo, zrychlit `_kind_for` (dvojí `settle_at`) nebo stavět ve vlákně.
+
+## Optimalizace GPU a předvolby – start (17. 10. 2026)
+
+Začátek práce subagenta B (GPU, předvolby, renderer Mobile/Forward+). Základ main f7d33e0.
+
+## 2026-10-17 – Optimalizace GPU a předvolby (17. 10. 2026)
+
+Podklad: `logs/m8_19_zaklad_20261017_185907.log` (Quadro M2200, Forward+, 1600×900, bez vsync) – `ves_poledne` Nízká 22,7 /
+Střední 30,3 / Vysoká 30,5 ms. Skripty na vsi ~15 ms, zbytek ~15 ms vykreslování. Střední ≈ Vysoká ukazuje, že na vsi
+nerozhoduje počet pixelů (85 vs. 100 %), ale **příprava snímku na CPU** (draw cally hlavního a stínového průchodu, Godot
+4.3 kreslí ve výchozím `safe` na hlavním vlákně) – proto se Střední zlevnila hlavně ve stínech a LOD (počet objektů),
+pixely až na druhém místě. SSR / SSIL / SDFGI / objemová mlha se ve hře nepoužívají (ověřeno grepem).
+
+### Hotovo (staticky ověřeno čtením kódu – měření čeká na uživatele)
+
+**Předvolby (`scripts/game_settings.gd`, `PRESETS_VER` 2) – před → po:**
+
+| Volba | Nízká | Střední (před → po) | Vysoká | Ultra |
+|---|---|---|---|---|
+| Rozlišení 3D | 50 % FSR 1 | 85 % → **75 %** FSR 1 | 100 % | 100 % |
+| Vyhlazování | vyp. | FXAA | MSAA 2× | MSAA 4× |
+| Stíny slunce | vyp. | 2048, 4 pásma, 180 m, měkké 1, prolínání → **2048, 2 pásma, 120 m, tvrdé, bez prolínání** | 4096, 4 p., 240 m, měkké 2 | 8192, 4 p., 320 m, měkké 3 |
+| Záře (glow) | vyp. | zap. → **vyp.** | zap. | zap. |
+| SSAO | vyp. | vyp. | vyp. | zap. |
+| Dohlednost / práh LOD meshů | 0,6 / 1 → **4** | 0,8 / 1 → **2** | 1,0 / 1 | 1,25 / 1 |
+| Vegetace (dosah) | vyp. | 0,5 | 1,0 | 1,0 |
+| Stromy LOD0 / LOD1 (m) | 27 / 170 → **27 / 128** | 41 / 170 → **33 / 136** | 55 / 170 | 72 / 170 → 72 / **196** |
+| Aktivita světa | 250 m | 400 m | 600 m | 900 m |
+
+- Uložená **pojmenovaná** předvolba ze starší tabulky (`verze_predvoleb` < 2 v `nastaveni.cfg`) se při načtení nahradí
+  novými hodnotami; Vlastní zůstává. Starý cfg bez klíče = verze 1.
+- `directional_shadow_blend_splits` jen se 4 pásmy (prolínání = druhé čtení stínové mapy na pixel).
+- `Viewport.mesh_lod_threshold` podle dohlednosti (`MESH_LODS` 4 / 2 / 1 / 1) – týká se jen importovaných modelů s LOD.
+
+**Další úpravy:**
+- `TreeGen`: `L0_END` / `L1_END` → `static var`, nový násobek `lod1_k` (`ECO_LEVELS["lod1"]`), `set_lod_scales`,
+  `refresh_bands` (pásma LOD1 i impostorů); `TreeLodStreamer` staví buňky LOD1 do `gen.l1_end()`.
+- Silnice a cesty (`MapLoader.add_chunks(…, shadows = false)`, `world.gd`) nevrhají stín – leží na terénu, stín nebyl vidět.
+- `Prop` (popelnice, schránky, lavičky): spící předmět vypne `_physics_process`, probudí ho `sleeping_state_changed`.
+- F3 → **Svět/Vykreslování** (`tune_m8_19.gd`, 5 parametrů): `render.tree_l0_end`, `render.tree_l1_end`,
+  `render.veg_range_k` (`VegetationManager.RANGE_K`), `render.shadow_dist_k`, `render.mesh_lod_k` (`GameSettings`,
+  uplatní `GameSettings.reapply_live()`).
+- Renderer pro jeden běh: `STONECLAY_RENDERER=mobile|forward_plus` v `run.sh` (přebíjí `nastaveni.cfg`, projde přes
+  `launcher.sh` → `spustit_z_plochy.sh`); zkušebně `STONECLAY_RENDER_THREAD=safe|separate` → `--render-thread`. `run.sh`
+  vypíše „Stone & Clay: renderer …“ (je v logu launcheru).
+- `tools/perf_m8_19.sh renderer` (ves_poledne, les_leto, dron_200m na Střední, Forward+ a Mobile, 6 běhů) a `vlakno`
+  (3 běhy s `separate`); běh má nově pole `předvolba|scéna|realism|renderer|vlákno`.
+
+**Odhad úspory na Střední (ves_poledne, GTX 1050 / M2200):**
+
+| Změna | Odhad |
+|---|---|
+| Stíny 4 → 2 pásma, 180 → 120 m, tvrdé, bez prolínání | −2 až −4 ms (CPU příprava stínového průchodu −40–60 % draw callů; GPU −1 ms) |
+| Rozlišení 85 → 75 % | −0,5 až −1,5 ms GPU (−22 % pixelů; terén má ~15 čtení textur na pixel) |
+| Záře vyp. | −0,3 až −0,6 ms GPU |
+| Stromy LOD0 41 → 33 m, LOD1 170 → 136 m | −0,5 až −1,5 ms (buňky LOD1 128 m do ~154 m místo ~188 m; v lese víc) |
+| Silnice bez stínu | −0,2 až −0,5 ms |
+| Prop bez `_physics_process` ve spánku | −0,1 až −0,2 ms CPU |
+| **Celkem** | **−4 až −8 ms → ~22–26 ms** (skripty ~15 ms zůstávají – ty řeší souběžná CPU optimalizace) |
+
+**Statická analýza draw callů na vsi (neopraveno – mimo rozsah nebo cizí soubory):**
+- `building_details.gd` (fasády, okna M8.17 `window_glass`): už sloučené po dlaždici 256 m, 2 meshe na dlaždici, bez stínu,
+  `VIS_END` 450 m – v pořádku. Zdi / střechy (`walls.bin`, `roofs.bin`) po dlaždicích 256 m – v pořádku.
+- `street_lights.gd`: sloupy i hlavice v MultiMesh, pool 8 / 16 OmniLight **bez stínů** – v pořádku (v poledne nic).
+- Žádné OmniLight / SpotLight se stíny ve hře není (grep `shadow_enabled`); jen slunce.
+- **Postavy (`humanoid.gd`, souběžná CPU optimalizace – nesahal jsem):** ~12 MeshInstance3D na postavu (`_commit` pro boky,
+  trup, hlavu, ruce, nohy), všechny vrhají stín. ~55 vesničanů + NPC na vsi ≈ 650 draw callů v hlavním průchodu a dalších
+  ~650–1300 ve stínech. Návrh: sloučit díly do jednoho meshe se skinem nebo vypnout `cast_shadow` dílům dál než ~30 m
+  (stín jen trupu); odhad −2 až −4 ms CPU vykreslování.
+- **Auta (`car.gd` / `car_model.gd`, souběžná CPU optimalizace):** modely z mnoha dílů, 20 aut na Střední; návrh stínově jen
+  karoserie, kola bez stínu dál než 40 m. Odhad −0,5 až −1 ms.
+- `prop.gd`: ~70 předmětů, každý vlastní `ArrayMesh` (`PropModels.trash_bin` bez cache) – paměť, draw cally stejné;
+  stíny malých předmětů ~70 draw callů na pásmo. Malé.
+- Occlusion culling (domy na návsi zakrývají zbytek obce) se nepoužívá – `OccluderInstance3D` ze stěn budov by ušetřil
+  odhadem −1 až −2 ms na vsi; větší úkol (pečení occluderů z `walls.bin`).
+
+**Kontrola:** `--import` + `--check-only` všech změněných `.gd` (a `local_client.gd`, `pause_menu.gd`) – prázdné;
+`tools/shader_check.gd` s `--rendering-method mobile` i `forward_plus` – prázdné (shadery beze změny; všechny prostorové
+shadery M8 v `shaders/` se na Mobile přeloží).
+
+### Otevřené body
+- Uživatel změří `tools/perf_m8_19.sh zaklad`, `renderer` a `vlakno` (docs/testy_M8.md → „Optimalizace GPU a předvolby“).
+- Pokud `vlakno` (`--render-thread separate`) výrazně pomůže a je stabilní → zvážit výchozí
+  `rendering/driver/threads/thread_model` v `project.godot`.
+- Postavy a auta – sloučení dílů / stíny jen zblízka (viz výš) po dokončení CPU optimalizace.
+- Hustota vegetace (ne jen dosah) by šla řídit `MultiMesh.visible_instance_count` po zamíchání instancí v chunku.
