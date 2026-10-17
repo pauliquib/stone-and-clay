@@ -768,3 +768,22 @@ F3 je ukáže jako výchozí. Tabulka „před → po, proč“ je v `PROJECT_LO
   `world_job_soil_water_*`.
 - Kontrola: ~1–2 min po startu (stavba mřížky luk běží teď v rozpočtu 2 ms) se na loukách objeví výška porostu
   (`Meadows: … buněk louky` v logu). Pod 20 fps běží fyzika pomaleji než reálný čas (strop 3 kroky/snímek) – herní čas ne.
+
+### Naměřeno 17. 10. 2026 večer – po opravě výkonu, bez vsync (`tools/perf_m8_19.sh zaklad`, log `logs/m8_19_zaklad_20261017_185907.log`)
+
+Quadro M2200, Forward+, 1600×900, bez zátěže na pozadí. Před M8 (8. 10., s vsync Mailbox): `ves_poledne` 26,8 fps / 37,3 ms.
+
+| Scéna | Předvolba | FPS (min–max) | Snímek |
+|---|---|---|---|
+| ves_poledne | Nízká | 44,0 (39–50) | 22,7 ms |
+| ves_poledne | Střední | 33,0 (25–38) | 30,3 ms |
+| ves_poledne | Vysoká | 32,8 (27–36) | 30,5 ms |
+| les_leto | Střední | 46,9 (29–54) | 21,3 ms |
+| dron_200m | Střední | 39,1 (33–45) | 25,5 ms |
+| les_rano_mlha | Střední | 49,0 (30–57) | 20,4 ms |
+
+- Skripty na vsi (Střední) dohromady ~15 ms/snímek (villager 3,6, car 3,6, world 2,5 – z toho 1,3 ms dostavba luk jen první minuty
+  po startu, humanoid 1,4); zbytek snímku (~15 ms) je vykreslování → na vsi je hra vázaná na GPU i CPU zhruba napůl.
+- Střední ≈ Vysoká na vsi → Střední na GPU skoro nic neušetří (k doladění předvoleb). Nízká −7,6 ms.
+- 60 fps (16,6 ms) na Střední **nedrží** – ale celkově je hra rychlejší než před M8 (30,3 vs. 37,3 ms).
+- S vsync na 60 Hz monitoru (Mailbox není dostupný → FIFO) se snímek zaokrouhlí na 30 fps.
