@@ -355,8 +355,8 @@ func build() -> void:
 	# prolínání FADE_SELF by jinak počítalo od spawnu a za ~1,3 km od domu by mapa zmizela, vlna 0b)
 	MapLoader.add_chunks(map_root, "Budovy_steny", MapLoader.load_chunks("res://data/walls.bin", m_wall), true, 1600.0, "budova")
 	MapLoader.add_chunks(map_root, "Budovy_strechy", MapLoader.load_chunks("res://data/roofs.bin", m_roof), true, 1700.0, "budova")
-	MapLoader.add_chunks(map_root, "Silnice", MapLoader.load_chunks("res://data/asphalt.bin", m_asph, terrain, 0.1), true, 1800.0, "asfalt")
-	MapLoader.add_chunks(map_root, "Cesty", MapLoader.load_chunks("res://data/gravel.bin", m_grav, terrain, 0.09), true, 1400.0, "sterk")
+	MapLoader.add_chunks(map_root, "Silnice", MapLoader.load_chunks("res://data/asphalt.bin", m_asph, terrain, 0.1), true, 1800.0, "asfalt", false)
+	MapLoader.add_chunks(map_root, "Cesty", MapLoader.load_chunks("res://data/gravel.bin", m_grav, terrain, 0.09), true, 1400.0, "sterk", false)
 
 	loading.emit("Potoky a rybníky…")
 	await _frames(1)

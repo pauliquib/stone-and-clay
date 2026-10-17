@@ -119,6 +119,11 @@ stromů). Simulace (voda, mikroklima, fenologie, plodiny, populace, domácnosti)
 předvolby nastaví i přepínač Fyzikální obloha. Pro měření jde předvolbu a přepínače vnutit jen pro jeden běh:
 `--preset=nizka|stredni|vysoka|ultra` a `--realism=micro:off,soundscape:off` (nic se neukládá). Hodnoty předvoleb jsou
 konzervativní – čeká se na naměřená čísla (plán měření: [`docs/testy_M8.md`](docs/testy_M8.md) → „Plán testování po dokončení M8“).
+Od 17. 10. 2026 (optimalizace GPU) je **Střední** levnější: 3D 75 % + FSR 1, bez záře, stíny 2 pásma / 120 m / tvrdé,
+kratší LOD stromů (LOD0 33 m, LOD1 136 m); uložená pojmenovaná předvolba se při startu přepne na nové hodnoty.
+Renderer jen pro jeden běh: `STONECLAY_RENDERER=mobile ./run.sh` (bez změny nastavení), zkušebně vykreslování ve vlastním
+vlákně `STONECLAY_RENDER_THREAD=separate ./run.sh`. Ladění v F3 → **Svět/Vykreslování** (hranice LOD stromů, dosah
+vegetace a stínů, práh LOD meshů).
 
 **Pořadí offline nástrojů M8** (data `data/*.bin` nejsou v gitu, kromě `tree_species_protos.bin`):
 `python3 tools/site.py` → `python3 tools/tree_species.py` → `python3 tools/treegen/treegen.py` → `python3 tools/vegetation.py --eco`
@@ -319,7 +324,7 @@ Generované soubory a jejich nástroje (výstupy se commitují, kromě `data/*.b
 | `python3 tools/tree_species.py` (M8.3) | `data/tree_eco.bin` (**není v gitu**) | po `tools/site.py`, po změně `data/trees.bin` nebo `data/dreviny.json` – druh, věk, vitalita, dbh a porost každého stromu + mřížky zápoje / dominantního druhu; vypíše podíly druhů a kontrolu sever/jih/luh; vyžaduje `numpy`, `scipy`, `Pillow` |
 | `python3 tools/treegen/treegen.py [--preview] [--only=buk,smrk]` (M8.8) | `data/tree_species_protos.bin` (DBT2, ~5 MB, **v gitu** – vynuceně, `data/*.bin` je jinak ignorované) + `assets/textures/trees/*.png` (atlasy listí, kůry, impostorů; v gitu) | po změně `data/dreviny.json` → `tvary` (parametry tvaru, mapování druh → tvar) nebo kódu generátoru; ~70 s; `--preview` uloží náhledy LOD0 / LOD1 / impostor všech variant do `tools/out/treegen/` (bez Blenderu); vyžaduje `numpy`, `scipy`, `Pillow`. Po přegenerování otevřít projekt (nebo `godot --headless --import`), ať se atlasy znovu naimportují |
 | `tools/launcher.sh [parametry hry…]` (M8.1) | `logs/m8_perf_<datum_čas>.log` + `logs/latest.log` (**mimo git**) | kdy chceš spustit hru / `--perfscene=…` a poslat výsledek dál bez ručního přepisování konzole – spustí `run.sh`, zachytí výstup, zapíše kompaktní deduplikovaný log (`tools/launcher_log.py`); `--help` jen vypíše nápovědu |
-| `tools/perf_m8_19.sh zaklad\|stredni\|prepinace\|vysoka\|vse` (M8.19) | `logs/m8_19_<skupina>_<datum_čas>.log` (**mimo git**) | po M8 / po změně výkonu: dávka měřicích scén přes `launcher.sh` s předvolbou (`--preset=`) a přepínači (`--realism=`), souhrnný log k odeslání (plán v `docs/testy_M8.md`) |
+| `tools/perf_m8_19.sh zaklad\|stredni\|prepinace\|vysoka\|renderer\|vlakno\|vse` (M8.19) | `logs/m8_19_<skupina>_<datum_čas>.log` (**mimo git**) | po M8 / po změně výkonu: dávka měřicích scén přes `launcher.sh` s předvolbou (`--preset=`) a přepínači (`--realism=`), souhrnný log k odeslání (plán v `docs/testy_M8.md`) |
 
 Binární data mapy (`data/*.bin`) se regenerují exportem z Blenderu přes `tools/export_map.py`
 (postup v [`docs/DEV.md`](docs/DEV.md)); `data/vegetation.bin` navíc přes `tools/vegetation.py`.

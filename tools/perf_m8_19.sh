@@ -9,7 +9,9 @@
 #   tools/perf_m8_19.sh stredni      2. priorita: všechny ostatní scény na Střední (18 běhů, ~8 min)
 #   tools/perf_m8_19.sh prepinace    3. priorita: přepínače Realismu vyp. proti zap. na Střední (8 běhů, ~4 min)
 #   tools/perf_m8_19.sh vysoka       4. priorita: 3 scény na Vysoká a Ultra (6 běhů, ~3 min)
-#   tools/perf_m8_19.sh vse          všechno za sebou (38 běhů, ~17 min)
+#   tools/perf_m8_19.sh renderer     Forward+ proti Mobile: ves_poledne, les_leto, dron_200m na Střední (6 běhů, ~3 min)
+#   tools/perf_m8_19.sh vlakno       vykreslování ve vlastním vlákně (--render-thread separate), 3 scény na Střední (~2 min)
+#   tools/perf_m8_19.sh vse          všechno za sebou (47 běhů, ~21 min)
 #   tools/perf_m8_19.sh --help
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -51,14 +53,27 @@ VYSOKA=(
 	"ultra|ves_poledne" "ultra|les_leto" "ultra|dron_200m"
 )
 
-usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; }
+# Forward+ proti Mobile (renderer jen pro tento běh přes STONECLAY_RENDERER – nastavení ve hře se nemění)
+RENDERER=(
+	"stredni|ves_poledne||forward_plus" "stredni|ves_poledne||mobile"
+	"stredni|les_leto||forward_plus" "stredni|les_leto||mobile"
+	"stredni|dron_200m||forward_plus" "stredni|dron_200m||mobile"
+)
+# Příprava snímku ve vlastním vlákně (STONECLAY_RENDER_THREAD=separate) – srovnat se stejnými scénami ze skupiny renderer
+VLAKNO=(
+	"stredni|ves_poledne|||separate" "stredni|les_leto|||separate" "stredni|dron_200m|||separate"
+)
+
+usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; }
 
 case "${1:-}" in
 	zaklad) RUNS=("${ZAKLAD[@]}") ;;
 	stredni) RUNS=("${STREDNI[@]}") ;;
 	prepinace) RUNS=("${PREPINACE[@]}") ;;
 	vysoka) RUNS=("${VYSOKA[@]}") ;;
-	vse) RUNS=("${ZAKLAD[@]}" "${STREDNI[@]}" "${PREPINACE[@]}" "${VYSOKA[@]}") ;;
+	renderer) RUNS=("${RENDERER[@]}") ;;
+	vlakno) RUNS=("${VLAKNO[@]}") ;;
+	vse) RUNS=("${ZAKLAD[@]}" "${STREDNI[@]}" "${PREPINACE[@]}" "${VYSOKA[@]}" "${RENDERER[@]}" "${VLAKNO[@]}") ;;
 	-h|--help) usage; exit 0 ;;
 	*) usage; exit 1 ;;
 esac
@@ -69,18 +84,27 @@ OUT="logs/m8_19_${1}_$(date +%Y%m%d_%H%M%S).log"
 i=0
 for r in "${RUNS[@]}"; do
 	i=$((i + 1))
-	IFS='|' read -r preset scene realism <<< "$r"
+	IFS='|' read -r preset scene realism renderer thread <<< "$r"
 	args=(--preset="$preset" "${VSYNC_ARGS[@]}" --perfscene="$scene,$SEC")
 	label="[$i/${#RUNS[@]}] $scene · předvolba $preset"
+	envs=()
 	if [ -n "${realism:-}" ]; then
 		args+=(--realism="$realism")
 		label="$label · $realism"
 	fi
+	if [ -n "${renderer:-}" ]; then
+		envs+=("STONECLAY_RENDERER=$renderer")
+		label="$label · renderer $renderer"
+	fi
+	if [ -n "${thread:-}" ]; then
+		envs+=("STONECLAY_RENDER_THREAD=$thread")
+		label="$label · vlákno $thread"
+	fi
 	echo "=== $label"
-	tools/launcher.sh "${args[@]}" >/dev/null 2>&1
+	env "${envs[@]}" tools/launcher.sh "${args[@]}" >/dev/null 2>&1
 	{
 		echo "=================================================================="
-		echo "=== $label (tools/launcher.sh ${args[*]})"
+		echo "=== $label (${envs[*]:+${envs[*]} }tools/launcher.sh ${args[*]})"
 		cat "logs/latest.log" 2>/dev/null || echo "(log chybí)"
 		echo
 	} >> "$OUT"

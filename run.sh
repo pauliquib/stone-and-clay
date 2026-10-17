@@ -42,7 +42,19 @@ fi
 # Godot ho nejde přepnout za běhu, proto se čte tady a předává jako startovní parametr.
 CFG="$HOME/.local/share/godot/app_userdata/Stone & Clay/nastaveni.cfg"
 RENDERER=$(sed -n 's/^renderer="\(.*\)"$/\1/p' "$CFG" 2>/dev/null | tail -1)
+# Přebití pro měření / zkoušku bez změny nastavení: STONECLAY_RENDERER=mobile|forward_plus ./run.sh
+# (tools/perf_m8_19.sh renderer; proměnná projde přes tools/launcher.sh a tools/spustit_z_plochy.sh)
+if [ -n "${STONECLAY_RENDERER:-}" ]; then
+  RENDERER="$STONECLAY_RENDERER"
+fi
 if [ "$RENDERER" != "mobile" ]; then
   RENDERER=forward_plus
 fi
-exec "$GODOT" --path . "${DRIVER[@]}" --rendering-method "$RENDERER" "$@"
+# Zkušebně vykreslování ve vlastním vlákně (Godot --render-thread safe|separate; výchozí projekt = safe):
+# STONECLAY_RENDER_THREAD=separate ./run.sh – příprava snímku (culling, draw cally) běží souběžně se skripty.
+THREAD=()
+if [ -n "${STONECLAY_RENDER_THREAD:-}" ]; then
+  THREAD=(--render-thread "$STONECLAY_RENDER_THREAD")
+fi
+echo "Stone & Clay: renderer $RENDERER${STONECLAY_RENDER_THREAD:+, vlákno vykreslování $STONECLAY_RENDER_THREAD}" >&2
+exec "$GODOT" --path . "${DRIVER[@]}" --rendering-method "$RENDERER" "${THREAD[@]}" "$@"
