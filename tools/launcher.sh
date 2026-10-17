@@ -45,8 +45,10 @@ echo "(syrový výstup běží do $RAW, kompaktní log se zapíše do $OUT)"
 
 # "--" odděluje parametry Godotu od parametrů hry (main.gd čte jen OS.get_cmdline_user_args() za "--"),
 # launcher ho doplní sám, ať se nemusí psát při každém spuštění.
+# Přes hlídací spouštěč: Godot 4.3 se pod Waylandem občas zasekne hned po startu (viz tools/spustit_z_plochy.sh)
+# – zaseknutý start se zopakuje, ať dávka měření (perf_m8_19.sh) nestojí.
 set +e
-./run.sh -- "$@" 2>&1 | tee "$RAW"
+bash tools/spustit_z_plochy.sh -- "$@" 2>&1 | tee "$RAW"
 STATUS=${PIPESTATUS[0]}
 set -e
 
