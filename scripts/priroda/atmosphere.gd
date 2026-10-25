@@ -1,6 +1,8 @@
 ## Atmosféra u klienta – jak počasí a roční období vypadají a zní (simulaci drží World: Clock + Weather):
 ## - slunce a měsíc podle skutečné polohy (Clock.sun_enu / moon_enu), barva a síla světla, stíny
-## - obloha (shaders/sky.gdshader): mraky podle oblačnosti, červánky, hvězdy, měsíc s fází, opar
+## - obloha (shaders/sky.gdshader): fyzikální rozptyl (Rayleigh + Mie + ozon), mraky osvětlené sluncem podle oblačnosti,
+##   soumrak se zemským stínem, hvězdy, měsíc s fází, opar; barvy mlhy, slunce a světla na mraky z téhož modelu
+##   (`SkyModel.clear_sky`, `_sky_light`), stín mraku přes slunce, adaptace oka; stará obloha = sky_legacy.gdshader
 ## - mlha a zatažená obloha tlumí světlo, blesky rozsvítí oblohu a se zpožděním zahřmí
 ## - déšť a sníh: částice kolem kamery, nepadají pod střechy (výšková kolize částic sleduje kameru)
 ## - zvuk deště a větru
@@ -66,6 +68,24 @@ static var PURKINJE_SAT := 0.35      # … sytost barev v hluboké tmě
 static var LEGACY_EXPOSURE_NIGHT := 1.7  # stará obloha (realismus „sky“ vypnut): expozice v noci
 static var LEGACY_EXPOSURE_OVERCAST := 0.12
 static var TREE_FAR_HIGH := 2.6      # ve výšce vidět stromy dál (×)
+## 10/2026: fyzikální obloha (shaders/sky.gdshader) – kalibrace jasu, adaptace oka v soumraku, mraky a mlha.
+static var SKY_SUN_E := 14.0         # jas slunce v jednotkách obrazu (obloha je pak při expozici 1 jako fotka)
+static var SKY_TURB := 1.5           # opar za jasna (aerosol, 1 ≈ 3× čistý vzduch) – letní moravská nížina
+static var SKY_TURB_HAZE := 5.0      # … přídavek při plném oparu / mlze / dešti
+static var SKY_GAIN_K := 0.6        # adaptace oka v soumraku: komprese jasu oblohy (0 = žádná, 1 = úplná)
+static var SKY_GAIN_MAX := 22.0      # … nejvýš
+static var SUN_DISK_K := 3.0         # jas slunečního kotouče (× jas slunce)
+static var CLOUD_SUN_K := 0.11       # světlo slunce na mraky (× jas slunce)
+static var CLOUD_AMB_K := 0.85       # světlo oblohy na mraky
+static var GROUND_ALBEDO := Vector3(0.12, 0.13, 0.09)   # průměr krajiny pod obzorem (odrazy, světlo zdola)
+static var GROUND_SUN_K := 0.12      # … podíl přímého slunce
+static var NIGHT_SKY := Vector3(0.0028, 0.0042, 0.0095)   # vzdušné světélkování + hvězdné pozadí
+static var MOON_SKY := 0.012         # měsícem nasvícená obloha při úplňku
+static var CLOUD_SHADOW_MIN := 0.12  # přímé slunce za mrakem (podíl) – když mrak zakryje slunce, ztmavne krajina
+static var FOG_SUN_SCATTER := 0.12   # mlha prosvícená sluncem (záře ve směru slunce)
+static var AMBIENT_NIGHT_SKY := 4.5  # světlo prostředí v noci u fyzikální oblohy (oko vidí víc, než unese expozice)
+static var AMBIENT_TWILIGHT := 1.8   # … v soumraku (slunce 0° až −8°: krajina ještě čitelná, ne černá)
+static var SKY_LIGHT_HZ := 4.0       # jak často přepočítat barvy oblohy pro skript (slunce se hýbe pomalu)
 static var GRASS_SNOW_DIM := 0.3     # sníh ubírá zeleň trávy (shader grass_green)
 static var WIND_STRENGTH_FULL := 12.0    # shader wind_strength = vítr / tato rychlost (m/s)
 static var LEAF_STORM_FROM := 0.7    # listí začne padat od podílu LEAF_GUST_MS
@@ -202,6 +222,89 @@ class SkyModel:
 		var lux := sun_illuminance_lux(elev_deg, cloud_cover, haze) + sky_illuminance_lux(elev_deg, cloud_cover, haze)
 		return lux / LUMINOUS_EFFICACY
 
+	# --- Rozptyl ve směru pohledu (10/2026): týž model jako `clear_sky` v shaders/sky.gdshader (jednoduchý rozptyl
+	# Rayleigh + Mie + ozon, Chapmanova funkce ke slunci). Skript ho vyhodnotí jen pro pár směrů ~4× za sekundu –
+	# barva mlhy u obzoru, světlo na mraky, barva slunce a zisk adaptace oka v soumraku tak sedí s oblohou.
+	const R_KM := 6360.0                 # poloměr Země
+	const RA_KM := 6460.0                # horní hranice atmosféry
+	const H0_KM := 0.3                   # výška pozorovatele (Morava ~300 m n. m.)
+	const BETA_R := Vector3(5.802e-3, 13.558e-3, 33.1e-3)   # Rayleigh 1/km (R, G, B)
+	const BETA_O := Vector3(2.0e-3, 1.881e-3, 0.085e-3)     # ozon – Chappuisova pásma (stanový profil 10–40 km)
+	const MULTI_SCAT := 0.4              # vícenásobný rozptyl (izotropní podíl)
+
+	## Chapmanova funkce × exp(−h) v jednotkách výšky škály (Schüler 2012): optická hloubka ke zdroji z výšky h
+	## pod úhlem s kosinem `cz`; pod obzorem paprsek projde tečným bodem (zemský stín → velká hodnota).
+	static func chapman(x: float, h: float, cz: float) -> float:
+		var c := sqrt(x + h)
+		if cz >= 0.0:
+			return c / (c * cz + 1.0) * exp(-h)
+		var x0 := sqrt(maxf(1.0 - cz * cz, 0.0)) * (x + h)
+		return 2.0 * sqrt(x0) * exp(minf(x - x0, 60.0)) - c / (1.0 - c * cz) * exp(-h)
+
+	static func _vexp(tau: Vector3) -> Vector3:
+		return Vector3(exp(-minf(tau.x, 80.0)), exp(-minf(tau.y, 80.0)), exp(-minf(tau.z, 80.0)))
+
+	static func _ozone_tau(h_km: float, mus: float) -> Vector3:
+		var mp := maxf(mus, 0.0)
+		var amo := 1.0 / sqrt(mp * mp + 0.0035) * (1.0 + clampf(-mus * 10.0, 0.0, 1.0)) * clampf((45.0 - h_km) / 20.0, 0.0, 1.0)
+		return BETA_O * 15.0 * amo
+
+	## Propustnost atmosféry (R, G, B) pro světlo slunce do výšky `h_km` nad mořem; `mus` = sin výšky slunce,
+	## `turb` = opar (1 ≈ 3× čistý vzduch). Nízké slunce zčervená, pod obzorem (zemský stín) → 0.
+	static func transmittance(h_km: float, mus: float, turb: float) -> Vector3:
+		var bme := 0.004 * 3.0 * turb * 1.11
+		var tau := BETA_R * (8.0 * chapman(R_KM / 8.0, h_km / 8.0, mus)) \
+			+ Vector3.ONE * (bme * 1.2 * chapman(R_KM / 1.2, h_km / 1.2, mus)) + _ozone_tau(h_km, mus)
+		return _vexp(tau)
+
+	## Jasná obloha ve směru `d` (bez kotoučů a mraků) pro slunce ve směru `sd` – relativní radiance (R, G, B)
+	## pro jas slunce 1; `n` vzorků podél paprsku. Shodné s `clear_sky` v shaders/sky.gdshader.
+	static func clear_sky(d: Vector3, sd: Vector3, turb: float, n := 8) -> Vector3:
+		var mu := maxf(d.y, 0.0)
+		var r0 := R_KM + H0_KM
+		var b := r0 * mu
+		var tmax := -b + sqrt(b * b + RA_KM * RA_KM - r0 * r0)
+		var dh := Vector2(d.x, d.z)
+		dh = dh / dh.length() if dh.length() > 1e-5 else Vector2(1.0, 0.0)
+		var sh := dh.dot(Vector2(sd.x, sd.z))
+		var sqmu := sqrt(maxf(1.0 - mu * mu, 0.0))
+		var cs := Vector3(d.x, mu, d.z).normalized().dot(sd)
+		var pr := 0.0597 * (1.0 + cs * cs)
+		var g := 0.78
+		var pm := (1.0 - g * g) / (12.566 * pow(maxf(1.0 + g * g - 2.0 * g * cs, 1e-4), 1.5))
+		var bms := 0.004 * 3.0 * turb
+		var bme := bms * 1.11
+		var tauv := Vector3.ZERO
+		var l := Vector3.ZERO
+		var fn := float(n)
+		for i in n:
+			var fi := float(i)
+			var f0 := (fi + 0.5) / fn
+			var t := tmax * f0 * f0
+			var dt := tmax * ((fi + 1.0) * (fi + 1.0) - fi * fi) / (fn * fn)
+			var px := t * sqmu
+			var py := r0 + t * mu
+			var r := sqrt(px * px + py * py)
+			var h := r - R_KM
+			var mus := (px * sh + py * sd.y) / r
+			var dr := exp(-h / 8.0)
+			var dm := exp(-h / 1.2)
+			var dz := maxf(1.0 - absf(h - 25.0) / 15.0, 0.0)
+			var ext := BETA_R * dr + Vector3.ONE * (bme * dm) + BETA_O * dz
+			var tmid := tauv + ext * (dt * 0.5)
+			tauv += ext * dt
+			var to := _ozone_tau(h, mus)
+			var ts := _vexp(BETA_R * (8.0 * chapman(795.0, h / 8.0, mus)) + Vector3.ONE * (bme * 1.2 * chapman(5300.0, h / 1.2, mus)) + to)
+			var ims := _vexp(BETA_R * (4.0 * chapman(795.0, h / 8.0, minf(mus + 0.03, 1.0))) + to)
+			var tv := _vexp(tmid)
+			var sr := BETA_R * dr
+			var sm := Vector3.ONE * (bms * dm)
+			l += tv * (ts * (sr * pr + sm * pm) + (sr + sm) * ims * (MULTI_SCAT / 12.566)) * dt
+		return l
+
+	static func luminance(c: Vector3) -> float:
+		return c.x * 0.2126 + c.y * 0.7152 + c.z * 0.0722
+
 var sky_mat: ShaderMaterial
 var _rain: GPUParticles3D
 var _snow: GPUParticles3D
@@ -219,6 +322,25 @@ var _flash := 0.0
 var _flash_seq: Array = []           # [čas, síla] – záblesky jednoho blesku
 var _cloud_off := Vector2.ZERO
 var _t := 0.0
+# fyzikální obloha (10/2026)
+static var _cloud_img: Image
+static var _cloud_tex: ImageTexture
+static var _cover_q: PackedFloat32Array
+var _legacy_tex: NoiseTexture2D
+var _sky_phys := false
+var _lum_ref := 1.0
+var _wb := Vector3.ONE                   # vyvážení bílé (polední slunce bílé)
+var _sl_t := -1.0                        # odpočet do přepočtu barev oblohy (s)
+var _sun_col := Vector3.ONE              # propustnost atmosféry ke slunci u země (× vyvážení bílé)
+var _horizon := Vector3(0.7, 0.75, 0.8)  # barva obzoru (mlha), jednotky obrazu
+var _sky_gain := 1.0
+var _cloud_thr := 0.5
+var _sun_occl := 0.0                     # mrak před sluncem 0..1 (vyhlazeno)
+var _last_min := NAN                     # herní minuty minulého snímku (skok času → expozice hned)
+var _jump_prev := NAN
+var _prev_cloud := -1.0
+var _prev_fog := -1.0
+var _sky_rt := 0                         # snímků do návratu cubemapy oblohy do postupného obnovování
 
 
 func setup(c: Clock, w: Weather, e: Environment, s: DirectionalLight3D, m: DirectionalLight3D, north: float,
@@ -241,24 +363,112 @@ func setup(c: Clock, w: Weather, e: Environment, s: DirectionalLight3D, m: Direc
 
 func _build_sky() -> void:
 	sky_mat = ShaderMaterial.new()
-	sky_mat.shader = load("res://shaders/sky.gdshader")
-	var noise := FastNoiseLite.new()
-	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	noise.frequency = 0.012
-	noise.fractal_octaves = 5
-	noise.fractal_gain = 0.55
-	var tex := NoiseTexture2D.new()
-	tex.width = 512
-	tex.height = 512
-	tex.seamless = true
-	tex.generate_mipmaps = true
-	tex.noise = noise
-	sky_mat.set_shader_parameter("cloud_noise", tex)
+	_sky_phys = not _sky_on()
+	_set_sky_shader(_sky_on())
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
 	sky.radiance_size = Sky.RADIANCE_SIZE_128
 	env.sky = sky
+	# hodnota pro normalizaci adaptace: průměrný jas jasné oblohy se sluncem 60° nad obzorem
+	var sd60 := Vector3(0.0, sin(deg_to_rad(60.0)), -cos(deg_to_rad(60.0)))
+	_lum_ref = _sky_avg_lum(sd60, SKY_TURB)
+	_wb = SkyModel.transmittance(SkyModel.H0_KM, sd60.y, SKY_TURB)
+	_wb = Vector3(_wb.y / _wb.x, 1.0, _wb.y / _wb.z)       # vyvážení bílé: polední slunce = bílé
+
+
+## Fyzikální obloha (sky.gdshader) nebo stará ruční (sky_legacy.gdshader, Nízká předvolba / realismus „Obloha“ vypnut).
+## Přepíná se za běhu podle přepínače; stará obloha má svůj původní šum, ať vypadá i stojí přesně jako dřív.
+func _set_sky_shader(phys: bool) -> void:
+	if phys == _sky_phys:
+		return
+	_sky_phys = phys
+	if phys:
+		sky_mat.shader = load("res://shaders/sky.gdshader")
+		sky_mat.set_shader_parameter("cloud_noise", cloud_noise_texture())
+		_sl_t = -1.0                        # hned přepočítat barvy oblohy
+	else:
+		sky_mat.shader = load("res://shaders/sky_legacy.gdshader")
+		if _legacy_tex == null:
+			var noise := FastNoiseLite.new()
+			noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+			noise.frequency = 0.012
+			noise.fractal_octaves = 5
+			noise.fractal_gain = 0.55
+			_legacy_tex = NoiseTexture2D.new()
+			_legacy_tex.width = 512
+			_legacy_tex.height = 512
+			_legacy_tex.seamless = true
+			_legacy_tex.generate_mipmaps = true
+			_legacy_tex.noise = noise
+		sky_mat.set_shader_parameter("cloud_noise", _legacy_tex)
+
+
+## Šum mraků 256×256 RGBA (bezešvý, s mipmapami) – R makro fBm (4 buňky na dlaždici), G kupy (Worley 8),
+## B detail fBm (16), A jemné kupy (Worley 20). Vzniká jednou za běh (~0,1 s); obrázek čte i skript (stín mraků).
+static func cloud_noise_image() -> Image:
+	if _cloud_img != null:
+		return _cloud_img
+	const N := 256
+	var layers: Array[PackedByteArray] = []
+	var specs := [[FastNoiseLite.TYPE_PERLIN, 4.0, 4, false], [FastNoiseLite.TYPE_CELLULAR, 8.0, 2, true],
+		[FastNoiseLite.TYPE_PERLIN, 16.0, 3, false], [FastNoiseLite.TYPE_CELLULAR, 20.0, 1, true]]
+	var seed_ := 1307
+	for sp in specs:
+		var fn := FastNoiseLite.new()
+		fn.seed = seed_
+		seed_ += 101
+		fn.noise_type = sp[0]
+		fn.frequency = float(sp[1]) / float(N)
+		fn.fractal_type = FastNoiseLite.FRACTAL_FBM if int(sp[2]) > 1 else FastNoiseLite.FRACTAL_NONE
+		fn.fractal_octaves = int(sp[2])
+		fn.fractal_gain = 0.5
+		if sp[0] == FastNoiseLite.TYPE_CELLULAR:
+			fn.cellular_distance_function = FastNoiseLite.DISTANCE_EUCLIDEAN
+			fn.cellular_return_type = FastNoiseLite.RETURN_DISTANCE
+		var img := fn.get_seamless_image(N, N, bool(sp[3]), false, 0.15, true)
+		img.convert(Image.FORMAT_L8)
+		layers.append(img.get_data())
+	var out := PackedByteArray()
+	out.resize(N * N * 4)
+	var r := layers[0]
+	var g := layers[1]
+	var b := layers[2]
+	var a := layers[3]
+	for i in N * N:
+		var o := i * 4
+		out[o] = r[i]
+		out[o + 1] = g[i]
+		out[o + 2] = b[i]
+		out[o + 3] = a[i]
+	_cloud_img = Image.create_from_data(N, N, false, Image.FORMAT_RGBA8, out)
+	# kvantily tvaru mraků (shape = 0,58 R + 0,42 G jako v shaderu) → práh pro dané pokrytí oblohy
+	var vals := PackedFloat32Array()
+	vals.resize(4096)
+	for i in 4096:
+		var j := (i * 16 + (i * 7) % 16) % (N * N)
+		vals[i] = (float(r[j]) * 0.58 + float(g[j]) * 0.42) / 255.0
+	vals.sort()
+	_cover_q = PackedFloat32Array()
+	for k in 33:
+		_cover_q.append(vals[mini(int(k / 32.0 * 4095.0), 4095)])
+	return _cloud_img
+
+
+static func cloud_noise_texture() -> ImageTexture:
+	if _cloud_tex == null:
+		var img := cloud_noise_image().duplicate() as Image
+		img.generate_mipmaps()
+		_cloud_tex = ImageTexture.create_from_image(img)
+	return _cloud_tex
+
+
+## Práh tvaru mraků, nad kterým šum pokryje podíl oblohy `cover` (0..1).
+static func cloud_threshold(cover: float) -> float:
+	cloud_noise_image()
+	var x := clampf(1.0 - cover, 0.0, 1.0) * 32.0
+	var i := mini(int(x), 31)
+	return lerpf(_cover_q[i], _cover_q[i + 1], x - float(i))
 
 
 func _build_precip() -> void:
@@ -467,13 +677,45 @@ func update(delta: float) -> void:
 	var total_lux := sun_lux + sky_lux + moon_lux + SkyModel.STARLIGHT_LUX + _lp * SkyModel.LIGHT_POLLUTION_LUX
 	var target_ev := lerpf(SkyModel.ev100_from_lux(total_lux), SkyModel.ev100_from_lux(INDOOR_REF_LUX), _indoor_s)
 	var adapt_rate := ADAPT_RATE_LIGHT if target_ev > exposure_ev else ADAPT_RATE_DARK
-	exposure_ev = move_toward(exposure_ev, target_ev, delta * adapt_rate)
+	# první snímek a skok času (spánek, F2, načtení hry) → oko je už přizpůsobené, žádné 20 s černé noci
+	var jumped := is_nan(_last_min) or absf(clock.minutes - _last_min) > 20.0
+	_last_min = clock.minutes
+	exposure_ev = target_ev if jumped else move_toward(exposure_ev, target_ev, delta * adapt_rate)
+	# po skoku času by postupně (INCREMENTAL) obnovovaná cubemapa oblohy ještě pár snímků svítila „starým“ nebem
+	# (noc osvětlená poledním nebem) – na pár snímků ji přepočítat celou
+	if env.sky != null:
+		var wjump := absf(cloud - _prev_cloud) > 0.2 or absf(fog - _prev_fog) > 0.2
+		_prev_cloud = cloud
+		_prev_fog = fog
+		if (jumped and not is_nan(_jump_prev)) or wjump:
+			_sky_rt = 8
+			env.sky.process_mode = Sky.PROCESS_MODE_REALTIME
+		elif _sky_rt > 0:
+			_sky_rt -= 1
+			if _sky_rt == 0:
+				env.sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
+	_jump_prev = clock.minutes
 
 	var sun_up := smoothstep(-2.0, 3.0, elev)
 	var moon_up := smoothstep(-2.0, 4.0, moon_elev)
+	_set_sky_shader(sky_on)
+	var wv0 := weather.wind_vector() if weather else Vector3(-2.0, 0, 0.5)
+	_cloud_off += (Vector2(wv0.x, wv0.z) * CLOUD_DRIFT + Vector2(-0.0004, 0.0001)) * delta
+	_lp = move_toward(_lp, light_pollution, delta * LP_RATE)
 	if sky_on:
-		sun.light_color = SkyModel.sun_tint(elev, haze)
-		sun.light_energy = SUN_ENERGY * clampf(sun_lux / SkyModel.SUN_LUX_ZENITH, 0.0, 1.0) * sun_up
+		# 10/2026: barvy z modelu rozptylu (stejného jako obloha) – slunce zčervená, mraky, mlha a země ladí s oblohou
+		_sl_t -= delta
+		if _sl_t <= 0.0 or jumped:
+			_sl_t = 1.0 / SKY_LIGHT_HZ
+			_sky_light(sd, md, elev, haze, cloud, dark, moon_up)
+		# stín mraku: když mrak na obloze zakryje slunce, přímé světlo zeslábne (plynule, jak mrak táhne)
+		var occl := _cloud_at(sd, cloud)
+		_sun_occl = occl if jumped else move_toward(_sun_occl, occl, delta * 0.8)
+		var clear_lux := SkyModel.sun_illuminance_lux(elev, 0.0, haze)
+		var direct := lerpf(1.0, CLOUD_SHADOW_MIN, smoothstep(0.05, 0.7, _sun_occl))
+		var sc := _sun_col / maxf(maxf(_sun_col.x, _sun_col.y), maxf(_sun_col.z, 1e-4))
+		sun.light_color = Color(sc.x, sc.y, sc.z)
+		sun.light_energy = SUN_ENERGY * clampf(clear_lux / SkyModel.SUN_LUX_ZENITH, 0.0, 1.0) * direct * sun_up
 		moon.light_energy = MOON_ENERGY * clampf(moon_lux / SkyModel.MOON_LUX_FULL, 0.0, 1.0) * moon_up * (1.0 - day) * (1.0 - overcast * MOON_OVERCAST_DIM)
 	else:
 		sun.light_color = Color(1.0, 0.96, 0.9).lerp(Color(1.0, 0.58, 0.32), warm)
@@ -483,10 +725,7 @@ func update(delta: float) -> void:
 	sun.shadow_opacity = 1.0 - overcast * SHADOW_OVERCAST_DIM
 	moon.visible = moon.light_energy > 0.005 and not sun.visible
 
-	# --- obloha
-	# mraky táhnou po větru (ve výšce fouká víc, minimálně pomalý posun i za bezvětří)
-	var wv0 := weather.wind_vector() if weather else Vector3(-2.0, 0, 0.5)
-	_cloud_off += (Vector2(wv0.x, wv0.z) * CLOUD_DRIFT + Vector2(-0.0004, 0.0001)) * delta
+	# --- obloha (mraky táhnou po větru, minimálně pomalý posun i za bezvětří)
 	sky_mat.set_shader_parameter("sun_dir", sd)
 	sky_mat.set_shader_parameter("moon_dir", md)
 	sky_mat.set_shader_parameter("moon_light", clock.moon_illumination())
@@ -494,19 +733,29 @@ func update(delta: float) -> void:
 	sky_mat.set_shader_parameter("cloud_dark", dark)
 	sky_mat.set_shader_parameter("cloud_offset", _cloud_off)
 	sky_mat.set_shader_parameter("haze", haze)
-	sky_mat.set_shader_parameter("sky_on", sky_on)   # M8.5: Pás Venuše při soumraku jen v nové obloze
-	_lp = move_toward(_lp, light_pollution, delta * LP_RATE)
+	sky_mat.set_shader_parameter("sky_on", sky_on)
 	sky_mat.set_shader_parameter("light_pollution", _lp)
 	_update_flash(delta)
 	sky_mat.set_shader_parameter("flash", _flash)
 
 	# --- světlo prostředí a mlha
-	env.ambient_light_energy = (lerpf(AMBIENT_NIGHT, 1.0, day) * (1.0 - dark * AMBIENT_DARK_DIM) * lerpf(1.0, AMBIENT_INDOOR, _indoor_s)
+	var amb_night := AMBIENT_NIGHT if not sky_on else lerpf(AMBIENT_NIGHT_SKY, AMBIENT_TWILIGHT,
+		smoothstep(-12.0, -5.0, elev)) * lerpf(1.0, 1.0 / AMBIENT_TWILIGHT, smoothstep(0.0, 8.0, elev))
+	env.ambient_light_energy = (lerpf(amb_night, 1.0, day) * (1.0 - dark * AMBIENT_DARK_DIM) * lerpf(1.0, AMBIENT_INDOOR, _indoor_s)
 		+ _flash * FLASH_AMBIENT * (1.0 - _indoor_s))
 	env.ambient_light_sky_contribution = 1.0
-	var fog_col := Color(0.72, 0.8, 0.9).lerp(Color(0.7, 0.72, 0.75), overcast)
-	fog_col = fog_col.lerp(Color(0.04, 0.05, 0.08), 1.0 - day).lerp(Color(0.9, 0.6, 0.45), warm * day * 0.45 * (1.0 - overcast))
-	env.fog_light_color = fog_col
+	if sky_on:
+		# mlha má barvu oblohy u obzoru (vzdušná perspektiva) a ve směru slunce se prosvítí
+		var m := maxf(maxf(_horizon.x, _horizon.y), maxf(_horizon.z, 1e-5))
+		env.fog_light_color = Color(_horizon.x / m, _horizon.y / m, _horizon.z / m)
+		env.fog_light_energy = m
+		env.fog_sun_scatter = FOG_SUN_SCATTER * (1.0 - overcast) * sun_up
+	else:
+		var fog_col := Color(0.72, 0.8, 0.9).lerp(Color(0.7, 0.72, 0.75), overcast)
+		fog_col = fog_col.lerp(Color(0.04, 0.05, 0.08), 1.0 - day).lerp(Color(0.9, 0.6, 0.45), warm * day * 0.45 * (1.0 - overcast))
+		env.fog_light_color = fog_col
+		env.fog_light_energy = 1.0
+		env.fog_sun_scatter = 0.0
 	# M6.2: dohled z výšky – nad ~150 m AGL se mlha ředí a horizont se táhne, ať je okolí
 	# mapy (Surroundings) čitelné; v mlze zůstane dohled omezený (fog drží svoji část)
 	var high := 0.0
@@ -517,20 +766,24 @@ func update(delta: float) -> void:
 	env.fog_sky_affect = clampf(fog * FOG_SKY_FOG + rain * FOG_SKY_RAIN + high * FOG_SKY_HIGH, 0.0, FOG_SKY_MAX)
 	env.fog_aerial_perspective = lerpf(AERIAL_LOW, AERIAL_HIGH, high) * (1.0 - fog)
 	_micro_fx_update(cam, delta)          # M8.9: údolní mlha (výšková) a rosa / jinovatka podle World.micro
+	# podání barev z Nastavení (GameSettings.apply_graphics uloží základ do meta prostředí) – Purkyňův posun ho
+	# jen násobí, nepřepisuje (dřív se barevný režim každým snímkem ztratil)
+	var base_sat := float(env.get_meta("color_saturation", 1.0))
+	var base_con := float(env.get_meta("color_contrast", 1.0))
+	env.adjustment_enabled = true
+	env.adjustment_brightness = 1.0
+	env.adjustment_contrast = base_con
 	if sky_on:
 		# M8.5: expozice z vyhlazené EV100 (SkyModel) – kalibrováno, ať je jasné poledne ≈ jako dřív (1,0),
 		# v soumraku a v noci násobič roste (oko se roztáhne), ať zůstane scéna čitelná (Purkyně).
 		var exp_mult := 1.0 + EXPOSURE_DARK_GAIN * maxf(EXPOSURE_MID_EV - exposure_ev, 0.0)
 		env.tonemap_exposure = clampf(exp_mult, 1.0, EXPOSURE_MAX_MULT) * (1.0 + overcast * EXPOSURE_OVERCAST)
-		env.adjustment_enabled = true
-		env.adjustment_brightness = 1.0
-		env.adjustment_contrast = 1.0
 		# Purkyňův posun: pod cca 1 lx ztrácí oko barvocit (tyčinkové vidění) – postupná desaturace do ~8 EV tmy
 		var purkinje := clampf(-exposure_ev / PURKINJE_EV, 0.0, 1.0)
-		env.adjustment_saturation = lerpf(1.0, PURKINJE_SAT, purkinje)
+		env.adjustment_saturation = base_sat * lerpf(1.0, PURKINJE_SAT, purkinje)
 	else:
 		env.tonemap_exposure = lerpf(LEGACY_EXPOSURE_NIGHT, 1.0, day) * (1.0 + overcast * LEGACY_EXPOSURE_OVERCAST)
-		env.adjustment_enabled = false
+		env.adjustment_saturation = base_sat
 	MapLoader.set_tree_far_mult(lerpf(1.0, TREE_FAR_HIGH, high))      # M6.2: ve výšce vidět stromy dál
 
 	# --- srážky kolem kamery
@@ -588,6 +841,104 @@ func update(delta: float) -> void:
 	rs.global_shader_parameter_set("autumn", Seasons.autumn(doy))
 	rs.global_shader_parameter_set("wind_strength", clampf(wind / WIND_STRENGTH_FULL, 0.0, 1.0))   # zpětná kompatibilita (M8.4: = speed/12)
 	_set_wind_globals()
+
+
+## Jas jasné oblohy pro adaptaci oka – geometrický průměr (zenit ×2, obzor ke slunci a od slunce), aby jasný
+## západ u obzoru „nepřehlušil“ tmavnoucí zenit, který svítí na zem.
+func _sky_avg_lum(sd: Vector3, turb: float) -> float:
+	var hz := Vector3(sd.x, 0.0, sd.z)
+	hz = hz.normalized() if hz.length() > 1e-4 else Vector3(1.0, 0.0, 0.0)
+	return _geo_lum(SkyModel.clear_sky(Vector3.UP, sd, turb), SkyModel.clear_sky(hz, sd, turb),
+		SkyModel.clear_sky(-hz, sd, turb))
+
+
+func _geo_lum(zen: Vector3, hs: Vector3, ha: Vector3) -> float:
+	var lz := log(maxf(SkyModel.luminance(zen), 1e-12))
+	var ls := log(maxf(SkyModel.luminance(hs), 1e-12))
+	var la := log(maxf(SkyModel.luminance(ha), 1e-12))
+	return exp((lz * 2.0 + ls + la) * 0.25) * SKY_SUN_E
+
+
+## 10/2026: barvy pro fyzikální oblohu (~4× za s) – stejný model rozptylu jako shader: zisk adaptace oka
+## v soumraku, barva slunce (propustnost atmosféry), světlo na mraky v 1,6 a 8 km, barva obzoru (mlha) a země.
+func _sky_light(sd: Vector3, md: Vector3, elev: float, haze: float, cloud: float, dark: float, moon_up: float) -> void:
+	var turb := SKY_TURB + SKY_TURB_HAZE * haze
+	var hz := Vector3(sd.x, 0.0, sd.z)
+	hz = hz.normalized() if hz.length() > 1e-4 else Vector3(1.0, 0.0, 0.0)
+	var hp := Vector3(-hz.z, 0.0, hz.x)
+	var zen := SkyModel.clear_sky(Vector3.UP, sd, turb)
+	var hs := SkyModel.clear_sky(hz, sd, turb)
+	var ha := SkyModel.clear_sky(-hz, sd, turb)
+	var h90 := SkyModel.clear_sky(hp, sd, turb, 6)
+	var lum := _geo_lum(zen, hs, ha)
+	# oko se v soumraku roztáhne: tmavnutí oblohy se stlačí (fyzikálně ~1000× za občanský soumrak → ~20×)
+	_sky_gain = clampf(pow(maxf(lum, 1e-9) / _lum_ref, -SKY_GAIN_K), 1.0, SKY_GAIN_MAX)
+	var e := SKY_SUN_E * _sky_gain
+	var wb := _wb
+	var night := smoothstep(-4.0, -14.0, elev)
+	var ov := smoothstep(0.72, 0.97, cloud)
+	_sun_col = SkyModel.transmittance(SkyModel.H0_KM, sd.y, turb) * wb
+	var ts_c := SkyModel.transmittance(SkyModel.H0_KM + 1.6, sd.y, turb) * wb
+	var ts_ci := SkyModel.transmittance(SkyModel.H0_KM + 8.0, sd.y, turb) * wb
+	var moon_e := MOON_SKY * clock.moon_illumination() * moon_up
+	var moon_tint := Vector3(0.30, 0.42, 0.75) * moon_e
+	var avg_h := (hs + ha + h90 * 2.0) * 0.25 * wb
+	var side_h := (ha + h90 * 2.0) / 3.0 * wb           # obzor mimo slunce – barva mlhy (záři ke slunci dodá fog_sun_scatter)
+	var zen_w := zen * wb
+	var amb := (zen_w * 0.5 + avg_h * 0.5) * (e * CLOUD_AMB_K) + NIGHT_SKY * 2.0 + moon_tint * 1.2
+	var csun := ts_c * (e * CLOUD_SUN_K)
+	# obzor: jasná obloha, při zatažení šedá vrstva (stejně jako shader), noc a měsíc
+	_horizon = side_h * e + NIGHT_SKY * 2.5 + moon_tint * 1.5
+	var sl := SkyModel.luminance(csun)
+	var st := (csun * 0.4 + Vector3.ONE * sl * 0.6) * 0.2 * 0.75 + amb * 0.38
+	st *= 1.0 - dark * 0.55
+	_horizon = _horizon.lerp(st, ov)
+	var sun_k := maxf(sd.y, 0.0) * GROUND_SUN_K * (1.0 - ov * 0.9)
+	var ground := GROUND_ALBEDO * (_sun_col * (e * sun_k) + (zen_w + avg_h) * (0.5 * e) * (1.0 - ov * 0.5) + st * ov) \
+		+ NIGHT_SKY * 0.6
+	_cloud_thr = cloud_threshold(clampf(cloud, 0.0, 1.0))
+	var m := sky_mat
+	m.set_shader_parameter("white_bal", wb)
+	m.set_shader_parameter("turbidity", turb)
+	m.set_shader_parameter("sun_e", SKY_SUN_E)
+	m.set_shader_parameter("sky_gain", _sky_gain)
+	m.set_shader_parameter("sky_night", night)
+	m.set_shader_parameter("sun_disk", _sun_col * (SKY_SUN_E * SUN_DISK_K * _sky_gain))
+	m.set_shader_parameter("cloud_sun", csun)
+	m.set_shader_parameter("cirrus_sun", ts_ci * (e * CLOUD_SUN_K))
+	m.set_shader_parameter("cloud_amb", amb)
+	m.set_shader_parameter("horizon_col", _horizon)
+	m.set_shader_parameter("ground_col", ground)
+	m.set_shader_parameter("night_col", NIGHT_SKY)
+	m.set_shader_parameter("moon_e", moon_e)
+	m.set_shader_parameter("cloud_thr", _cloud_thr)
+
+
+## Hustota mraků na obloze ve směru `d` (0..1) – týž šum a práh jako shader (bez jemného detailu); pro stín mraku.
+func _cloud_at(d: Vector3, cloud: float) -> float:
+	if d.y <= 0.0:
+		return smoothstep(0.72, 0.97, cloud)
+	var img := cloud_noise_image()
+	var r0 := SkyModel.R_KM + SkyModel.H0_KM
+	var rc := SkyModel.R_KM + 1.6
+	var b := r0 * d.y
+	var t := -b + sqrt(b * b + rc * rc - r0 * r0)
+	var uv := Vector2(d.x, d.z) * (t / 9.0) + _cloud_off
+	var n := img.get_width()
+	var p := Vector2(fposmod(uv.x, 1.0), fposmod(uv.y, 1.0)) * float(n) - Vector2(0.5, 0.5)
+	var x0 := int(floor(p.x))
+	var y0 := int(floor(p.y))
+	var fx := p.x - float(x0)
+	var fy := p.y - float(y0)
+	var s := 0.0
+	for k in 4:
+		var xi := posmod(x0 + (k & 1), n)
+		var yi := posmod(y0 + (k >> 1), n)
+		var c := img.get_pixel(xi, yi)
+		var w := (fx if k & 1 else 1.0 - fx) * (fy if k >> 1 else 1.0 - fy)
+		s += (c.r * 0.58 + c.g * 0.42) * w
+	var dens := clampf((s - _cloud_thr) / maxf(1.0 - _cloud_thr, 0.05) * 1.7, 0.0, 1.0)
+	return maxf(dens, smoothstep(0.72, 0.97, cloud) * 0.9)
 
 
 ## M8.4: globální uniformy větru pro vegetaci (include/wind.gdshaderinc) – stejná data jako `WindField`.

@@ -161,23 +161,7 @@ func blackout_fx(dur: float) -> void:
 
 func build_environment() -> void:
 	env = Environment.new()
-	env.background_mode = Environment.BG_SKY
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_sky_contribution = 1.0
-	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 1.0
-	env.tonemap_white = 6.0
-	env.fog_enabled = true
-	env.fog_light_color = Color(0.72, 0.8, 0.9)
-	env.fog_density = 0.00022
-	env.fog_aerial_perspective = 0.5
-	env.fog_sky_affect = 0.0
-	env.glow_enabled = true
-	env.glow_intensity = 0.25
-	env.glow_bloom = 0.02
-	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.08
+	setup_environment(env)
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -205,6 +189,49 @@ func build_environment() -> void:
 	atmosphere.realism = settings.realism     # M8.5: přepínač "sky" (Esc → Nastavení → Realismus)
 	add_child(atmosphere)
 	atmosphere.setup(world.clock, world.weather, env, sun, moon, 78.37, world.terrain)
+
+
+## Výchozí prostředí (obloha, mlha, tonemapping, záře, parametry SSAO/SSIL/SSR). Co se zapíná podle předvolby,
+## řídí `GameSettings.apply_graphics`, co se mění s denní dobou a počasím, `Atmosphere.update`.
+static func setup_environment(e: Environment) -> void:
+	e.background_mode = Environment.BG_SKY
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	e.ambient_light_sky_contribution = 1.0
+	e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	e.tonemap_exposure = 1.0
+	e.tonemap_white = 6.0
+	e.fog_enabled = true
+	e.fog_light_color = Color(0.72, 0.8, 0.9)
+	e.fog_density = 0.00022
+	e.fog_aerial_perspective = 0.5
+	e.fog_sky_affect = 0.0
+	# záře jen z opravdu jasných míst (slunce, lampy, odlesky) – dřívější bloom 0,02 zamlžoval celý obraz
+	e.glow_enabled = true
+	e.glow_intensity = 0.3
+	e.glow_bloom = 0.0
+	e.glow_hdr_threshold = 1.0
+	e.adjustment_enabled = true
+	e.adjustment_saturation = 1.08
+	# stínování okolím (SSAO – Vysoká/Ultra): kontaktní stín v koutech, pod okapy a u paty zdí, ne tmavé fleky
+	e.ssao_radius = 1.2
+	e.ssao_intensity = 1.6
+	e.ssao_power = 1.5
+	e.ssao_detail = 0.5
+	e.ssao_horizon = 0.06
+	e.ssao_sharpness = 0.98
+	e.ssao_light_affect = 0.1
+	e.ssao_ao_channel_affect = 0.0
+	# nepřímé světlo z obrazu (SSIL – Ultra): odraz sluncem zalité zdi / trávy do stínu
+	e.ssil_radius = 4.0
+	e.ssil_intensity = 0.8
+	e.ssil_sharpness = 0.98
+	e.ssil_normal_rejection = 1.0
+	# odrazy z obrazu (SSR – Ultra): voda, mokrá silnice, okna
+	e.ssr_max_steps = 48
+	e.ssr_fade_in = 0.15
+	e.ssr_fade_out = 2.0
+	e.ssr_depth_tolerance = 0.3
 
 
 func _update_daylight(delta: float) -> void:
