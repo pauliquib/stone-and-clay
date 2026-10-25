@@ -55,7 +55,7 @@ vec3 ts_soil(TsSig s, out float ts_h) {
 // `ts_aut` = podzim (čerstvé, jen mírně zrzavé listí)
 vec3 ts_forest(TsSig s, float ts_aut, out float ts_h) {
 	float ts_leaf = 1.0 - smoothstep(0.35, 0.8, s.n0.b);
-	vec3 lc = mix(ts_s2l(vec3(0.19, 0.16, 0.11)), ts_s2l(vec3(0.31, 0.26, 0.17)), s.n0.a);   // rozložené listí / jehličí
+	vec3 lc = mix(ts_s2l(vec3(0.18, 0.16, 0.11)), ts_s2l(vec3(0.29, 0.26, 0.17)), s.n0.a);   // rozložené listí / jehličí
 	lc = mix(lc, ts_s2l(vec3(0.42, 0.31, 0.17)), step(0.8, s.n0.a) * ts_aut * 0.7);
 	vec3 c = mix(ts_s2l(vec3(0.10, 0.09, 0.06)), lc, 0.45 + 0.55 * ts_leaf);
 	c *= 0.85 + 0.30 * s.nf.r;
