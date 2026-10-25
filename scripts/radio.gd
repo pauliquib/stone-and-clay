@@ -7,8 +7,9 @@
 ##
 ## Stanice:
 ##   – smyšlené, hudba generovaná ve hře (RadioMusic): „Rádio Kovadlina“ (metal), „Rádio Pohoda“ (klidná hudba)
-##   – internetové rozhlasové stanice ze souboru data/radia.json (veřejné streamy – přehrávají se jen
-##     u hráče, hra je nešíří dál). Dekóduje je program ffmpeg (OS.execute_with_pipe → PCM → AudioStreamGenerator);
+##   – internetové stanice, které si hráč přidá sám do user://radia.json (jen u sebe, mimo repozitář;
+##     data/radia.json žádné reálné stanice neobsahuje – viz README → Právní zásady → Rádio). Přehrávají se jen
+##     u hráče, hra je nešíří dál. Dekóduje je program ffmpeg (OS.execute_with_pipe → PCM → AudioStreamGenerator);
 ##     bez ffmpeg nebo bez internetu stanice nehraje a hra to oznámí.
 ##
 ## Sousedé: hlasitost × „hlučnost“ stanice (metal 1,0 · klidná hudba 0,3 · mluvené slovo 0,3…) = hluk.
@@ -39,7 +40,7 @@ static var _hiss_wav: AudioStreamWAV   # šum mezi stanicemi (vyrobený jednou)
 
 var world: World
 var car_mode := false                  # M5.9: autorádio ve vozidle – bez modelu lampového rádia a bez štítků na stupnici
-var stations: Array = []               # BUILTIN + data/radia.json
+var stations: Array = []               # BUILTIN + data/radia.json + user://radia.json
 var station := ""                      # id stanice, "" = vypnuto
 var volume := 5                        # 0..10
 var owner_id := 1
@@ -91,13 +92,8 @@ static func make(w: World, pos: Vector3, yaw: float) -> Radio:
 
 func _ready() -> void:
 	stations = BUILTIN.duplicate(true)
-	if FileAccess.file_exists("res://data/radia.json"):
-		var extra = JSON.parse_string(FileAccess.get_file_as_string("res://data/radia.json"))
-		if extra is Array:
-			for s in extra:
-				if s is Dictionary and s.has("url") and s.has("name"):
-					stations.append({"id": "net:" + String(s["url"]), "name": String(s["name"]), "url": String(s["url"]),
-						"genre": String(s.get("genre", "internetové rádio")), "noise": float(s.get("noise", 0.5))})
+	_load_stations("res://data/radia.json")
+	_load_stations("user://radia.json")       # vlastní seznam hráče (jen na jeho počítači)
 	if not car_mode:
 		_build_model()
 	_player = AudioStreamPlayer3D.new()
@@ -113,6 +109,21 @@ func _ready() -> void:
 	if not car_mode:
 		_build_dial_labels()
 	_update_label()
+
+
+## Přidá internetové stanice ze souboru (záznamy s `url` a `name`; stejná URL jen jednou).
+func _load_stations(path: String) -> void:
+	if not FileAccess.file_exists(path):
+		return
+	var extra = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not extra is Array:
+		return
+	for s in extra:
+		if s is Dictionary and s.has("url") and s.has("name"):
+			var id := "net:" + String(s["url"])
+			if station_info(id).is_empty():
+				stations.append({"id": id, "name": String(s["name"]), "url": String(s["url"]),
+					"genre": String(s.get("genre", "internetové rádio")), "noise": float(s.get("noise", 0.5))})
 
 
 func _build_model() -> void:

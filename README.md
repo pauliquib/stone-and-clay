@@ -366,10 +366,37 @@ Shrnutí z [`PRAVNI_DOPORUCENI.md`](PRAVNI_DOPORUCENI.md) – platí pro všeche
 - **Značky:** místo ochranných známek se používají smyšlené nebo parodické názvy (auta Oktávka / Fábička /
   Stodvacka, motorka Javor, kolo Favorín, Bylinkovka, Hořká; smyšlené podniky Hospoda U Hřiště, Pálenice U Kotla…).
 - **Obecní symboly:** znak a prapor obce se ve hře nepoužívají.
-- **Rádio:** vlastní stanice ve hře jsou smyšlené a hudba je generovaná. Internetové stanice v `data/radia.json`
-  jsou jen odkazy na veřejné streamy Českého rozhlasu, které hra přehrává u hráče jako běžný internetový
-  přijímač (nic nenahrává ani nešíří, žádná loga). Názvy stanic jsou ochranné známky provozovatele – před
-  veřejným šířením hry je vhodné `radia.json` vyprázdnit, nebo si vyžádat souhlas. Stejné pravidlo platí pro
-  případné další stanice (Rock Radio, Radio Beat, Rock Zone): zatím nejsou přidány, dokud nebude souhlas provozovatelů
-  nebo jiné ověřené řešení. Hra je přehrává jen u hráče, nic nenahrává ani nešíří.
+- **Rádio:** stanice dodávané se hrou jsou jen smyšlené a hudba v nich je generovaná ve hře. Repozitář ani hra
+  neobsahují žádné reálné rozhlasové stanice – žádné názvy, adresy streamů, loga ani jingly (`data/radia.json` má
+  jen smyšlené stanice bez streamu, které se bez `url` v rádiu neukážou). Reálné stanice (např. Český rozhlas,
+  Rock Radio, Radio Beat, Rock Zone) se do repozitáře nepřidávají.
+
+  **Chceš ve hře poslouchat skutečné internetové rádio?** Rádio umí přehrát internetový stream jako běžný
+  internetový přijímač (přes program `ffmpeg`). Legálně to jde takto – **jen pro vlastní soukromý poslech**:
+
+  1. Vytvoř si vlastní soubor `radia.json` v datové složce hry na svém počítači (ne v repozitáři):
+     - Linux: `~/.local/share/godot/app_userdata/Stone & Clay/radia.json`
+     - Windows: `%APPDATA%\Godot\app_userdata\Stone & Clay\radia.json`
+     - macOS: `~/Library/Application Support/Godot/app_userdata/Stone & Clay/radia.json`
+
+     ```json
+     [
+      {"name": "Moje stanice", "url": "https://…oficiální adresa streamu…", "genre": "rock", "noise": 0.7}
+     ]
+     ```
+     (`noise` 0–1 = jak moc stanice ruší sousedy.) Hra soubor načte při startu a stanice se objeví na stupnici.
+  2. Použij jen adresu streamu, kterou **provozovatel stanice sám veřejně a zdarma zveřejňuje** (typicky na svém
+     webu v sekci „poslech online“ / „stream“). Nepoužívej adresy z neoficiálních sběrných webů a nic neobcházej –
+     přihlášení, předplatné, geografické omezení, časově omezené odkazy ani ochranu proti kopírování.
+  3. Přečti si podmínky užití stanice. Pokud zakazují přehrávání streamu v aplikacích třetích stran, stanici
+     nepřidávej.
+  4. Stream nenahrávej, nepřeposílej a nepouštěj ho dál – ani v živém vysílání nebo videu ze hry (Twitch,
+     YouTube…), ani nahlas na veřejném místě. To už je veřejné šíření, ke kterému je potřeba licence (OSA,
+     Intergram) a souhlas vysílatele. Při streamování hry rádio vypni nebo poslouchej vestavěné smyšlené stanice.
+  5. Svůj `radia.json` se skutečnými stanicemi nikam nenahrávej ani nesdílej (necommituj ho, nepřibaluj ke hře,
+     neposílej v modech) – každý hráč si seznam vytváří sám.
+
+  Pokud by měly být reálné stanice přímo součástí hry, je potřeba nejdřív písemný souhlas provozovatele (užití
+  názvu – ochranné známky – a streamu ve hře). Bez něj se nic nepřidává. Tohle je praktické doporučení, ne právní
+  rada.
 - **Doložka:** úvodní obrazovka, nápověda F1 a začátek tohoto README (`Hud.DISCLAIMER`).

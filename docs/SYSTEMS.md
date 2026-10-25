@@ -91,8 +91,9 @@
   magické oko se při přesném naladění rozsvítí, lampy se po zapnutí ~2 s nahřívají. Táhni myší přes knoflík
   (Shift = jemně), kolečko, A/D ladění, W/S hlasitost; Esc / E / pravé tlačítko = odejít. Doma zůstává nabídka „Rádio…“.
   Smyšlené stanice s hudbou generovanou ve hře – *Rádio Kovadlina* (metal) a *Rádio Pohoda* (klidná hudba) –
-  a internetové stanice ze souboru `data/radia.json` (veřejné streamy Českého rozhlasu; přehrávají se přes
-  program **ffmpeg**, bez něj nebo bez internetu nehrají). Hlasitost 0–10. Hluk = hlasitost × hlučnost stanice;
+  a internetové stanice ze souborů `data/radia.json` (jen smyšlené, bez streamu) a `user://radia.json` (vlastní
+  seznam hráče na jeho počítači, viz README → Právní zásady → Rádio); přehrávají se přes program **ffmpeg**,
+  bez něj nebo bez internetu nehrají. Hlasitost 0–10. Hluk = hlasitost × hlučnost stanice;
   nad únosnou mez roste zlost sousedů (v noční klid 22–6 h 3× rychleji a mez je nízko): stížnosti vesničanů
   a dědy, pak pověst („rušení klidu“), v noci policie – pokuta 2 000 Kč a ztlumení. Tichá příjemná hudba přes
   den dědu potěší. Stav rádia se ukládá.

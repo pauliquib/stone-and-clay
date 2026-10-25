@@ -4,12 +4,13 @@
 
 Cheat: F2 → Hráč / Teleport. Ověř jen to, co je v kroku hotové.
 
-1. Doma: zapni rádio (E) → v seznamu jsou ČRo stanice z `data/radia.json` beze změny (nové rockové stanice zatím nejsou).
-2. Přepni na ČRo Radiožurnál → hraje (potřebuje internet a ffmpeg).
+1. Doma: zapni rádio (E) → na stupnici jsou jen vestavěné smyšlené stanice (Kovadlina, Pohoda); žádné ČRo.
+2. Vytvoř `user://radia.json` podle README (vlastní stanice s oficiální URL) → po startu je na stupnici a hraje
+   (potřebuje internet a ffmpeg).
 3. Odpoj internet → přepni stanici → hláška „Stanice nehraje“ (nebo po ~12 s ukončení), hra běží dál bez pádu.
 4. Bez ffmpeg (pokud jde otestovat) → hláška „Internetové rádio potřebuje program ffmpeg“.
 5. Hlasitost 8 v noci u stanice s vyšším `noise` → sousedé reagují (zvýšený hluk).
-6. README → Právní zásady → Rádio: poznámka k nepřidaným stanicím je srozumitelná.
+6. README → Právní zásady → Rádio: návod pro vlastní stanice je srozumitelný.
 # Ruční testy – M5 (Obec a volný čas)
 
 Každý krok má vlastní oddíl. Testuje uživatel po dokončení vlny; agent hru nespouští.
@@ -31,9 +32,9 @@ Každý krok má vlastní oddíl. Testuje uživatel po dokončení vlny; agent h
 
 Cheat: F2 → Hráč / Teleport. Stream doplní uživatel – dokud není `url`, stanice v nabídce nejsou.
 
-1. Doplň `url` u „Rock Pod Kopcem“ v `data/radia.json`, ulož, spusť hru → doma (E) se stanice objeví v seznamu.
+1. Doplň `url` u „Rock Pod Kopcem“ v místní kopii `data/radia.json` (necommitovat), ulož, spusť hru → doma (E) se stanice objeví v seznamu.
 2. Přepni na ni → hraje (internet a ffmpeg); bez internetu hláška „Stanice nehraje“, hra běží dál.
-3. Hlasitost 8 v noci → sousedé reagují dřív než u ČRo Vltava (noise 0,75).
+3. Hlasitost 8 v noci → sousedé reagují dřív než u Rádia Pohoda (noise 0,75 proti 0,3).
 4. Bez `url` u některé stanice se v nabídce neobjeví a hra nepadá.
 
 ## M5.9 – Autorádio a vnitřní světlo v autě (body 5–6)

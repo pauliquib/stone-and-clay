@@ -3186,3 +3186,19 @@ Snímky před/po: `logs/screenshoty/pred_a_po_final.png` (lokálně, logs/ je v 
 - Hlídka po honičce ve slepé ulici s hráčem do 150 m se pořád může otočit obloukem mimo silnici.
 - Šípky a zahradní plody mají červené bobule i v červnu (akcentová barva bez sezóny).
 - Ve skutečné hře na GPU ověřit výkon Vysoké/Ultra (SSAO/SSIL/SSR, kvalitní voda, stíny vegetace) – v cloudu jen software.
+
+
+## 2026-10-25 – Rádio: odebrány stanice ČRo, vlastní stanice jen u hráče
+
+### Hotovo (staticky ověřeno čtením kódu)
+- `data/radia.json`: odebráno 5 stanic Českého rozhlasu (názvy + URL streamů). Zůstávají jen 3 smyšlené rockové stanice bez `url`
+  (v rádiu se nezobrazují).
+- `scripts/radio.gd`: načítání stanic přesunuto do `_load_stations(path)`; kromě `res://data/radia.json` se čte i
+  `user://radia.json` – vlastní seznam hráče na jeho počítači (mimo repozitář a build). Stejná URL se nepřidá dvakrát.
+- `README.md` → Právní zásady → Rádio: přepsáno – repozitář reálné stanice neobsahuje; návod, jak si hráč legálně přidá
+  stanici jen pro soukromý poslech (oficiální veřejná URL od provozovatele, podmínky užití, nic neobcházet, nenahrávat,
+  neštreamovat, soubor nesdílet). Navazující úpravy v `docs/SYSTEMS.md`, `docs/VIZE_A_ROADMAPA.md`, `docs/testy_M5.md`.
+
+### Otevřené body
+- Ruční test: bez `user://radia.json` jen vestavěné stanice; s vlastním souborem stanice hraje (checklist `docs/testy_M5.md`).
+- V multiplayeru má každý počítač vlastní seznam – stanice, kterou klient nemá, u něj nehraje (ticho, bez chyby).

@@ -56,8 +56,9 @@ a shrnutí v [`../README.md`](../README.md) → „Právní zásady obsahu“. D
   jako orientace pro umístění).
 - **Modely vozidel z internetu** musí být **odbrandované** (bez log, maskotů, typových nápisů) a pojmenované
   parodicky (Oktávka, Fábička, Javor…). I free model skutečného auta nese ochrannou známku / design výrobce.
-- **Reálná rádia** (bod 19) – jen jako odkaz na veřejný stream v `data/radia.json`, žádná loga ani jingly
-  v datech hry; před veřejným vydáním souhlas provozovatele nebo vyprázdnit seznam (stejně jako u ČRo).
+- **Reálná rádia** (bod 19) – v repozitáři ani ve hře žádná (stanice ČRo odebrány). Hráč si je může přidat
+  sám do `user://radia.json` jen pro soukromý poslech (návod v README → Právní zásady → Rádio); do hry jen
+  s písemným souhlasem provozovatele.
 - **Zákony ČR** jsou ve hře zjednodušené – u každého čísla (pokuty, body, lhůty) ve zdrojových datech uvádět
   paragraf a datum ověření; do nápovědy doložku „zjednodušená herní simulace, nejde o právní radu“.
 
