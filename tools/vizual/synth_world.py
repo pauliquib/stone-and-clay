@@ -28,7 +28,7 @@ Výstupy (formáty podle čteček ve hře – terrain.gd, map_loader.gd, surface
 
 Závislosti: numpy, Pillow, scipy (pip install scipy).
 
-  python3 tools/vizual/synth_world.py [--force] [--only=terrain,buildings,roads,trees,landuse,surround,extra]
+  python3 tools/vizual/synth_world.py [--force] [--out=adresář] [--only=terrain,buildings,roads,trees,landuse,surround,extra]
 """
 import json
 import math
@@ -50,6 +50,7 @@ except ImportError:  # pragma: no cover
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.dirname(os.path.dirname(HERE))
 DATA = os.path.join(GAME, "data")
+OUT = DATA                  # kam se zapisuje (--out=adresář – zkušební běh vedle pravých dat)
 
 CHUNK = 256.0               # dlaždice DBM1 (m)
 COARSE = 16.0               # krok hrubé mřížky kostry terénu (m)
@@ -59,9 +60,11 @@ HILL_DIST = 320.0           # m – jak rychle terén od údolnice stoupá (1 �
 MICRO_AMP = 0.07            # mikroreliéf jen ve vizuální výšce (m)
 PAD_DILATE = 0.8            # plošina domu přesahuje půdorys (m)
 PAD_BLEND = 6.0             # náběh terénu k plošině (m)
+PAD_ATTRACT = 10.0          # do této vzdálenosti od domu se profil silnice přitahuje k jeho ground_y (m)
 ROAD_SMOOTH = 14.0          # σ vyhlazení profilu silnice podél osy (m)
 ROAD_SHOULDER = 4.0         # náběh terénu od okraje vozovky (m)
 ROAD_MAX_GRADE = 0.12       # nejvyšší podélný sklon po vyhlazení
+ROAD_ITERS = 3              # kola sladění profilů na křižovatkách
 ROAD_W = {"secondary": 7.0, "tertiary": 6.5, "unclassified": 5.5, "residential": 5.5, "living_street": 5.0,
           "service": 3.5, "track": 3.0, "path": 1.5, "footway": 1.8, "cycleway": 2.0}
 GRAVEL_KINDS = {"track", "path"}
@@ -344,59 +347,7 @@ def build_terrain(g, meta, buildings, water):
         pond[sl] |= ins
     log(f"koryta a rybníky ({time.time() - t0:.1f} s)")
 
-    # --- silnice: profil podél osy z terénu, vyhlazený a omezený sklonem; plochý příčný řez
-    rm = np.zeros((g.h, g.w), bool)
-    rprof = np.zeros((g.h, g.w), np.float32)
-    rhw = np.zeros((g.h, g.w), np.float32)
-    rpri = np.zeros((g.h, g.w), np.float32)
-    order = sorted(meta["roads"], key=lambda r: ROAD_W.get(r["kind"], 4.0))   # širší silnice kreslit poslední (vyhraje)
-    road_lines = []
-    for rd in order:
-        hw = ROAD_W.get(rd["kind"], 4.0) * 0.5
-        P = resample(rd["pts"], 1.0)
-        if len(P) < 2:
-            continue
-        prof = g.sample(H_pre, P[:, 0], P[:, 1]).astype(np.float64)
-        # sklon pod domy/potoky: profil ber z vyhlazeného terénu podél osy
-        n = len(P)
-        sig = ROAD_SMOOTH if n > 8 else 2.0
-        prof = ndimage.gaussian_filter1d(prof, sig, mode="nearest")
-        # omez sklon (dopředně i zpětně, pak průměr – symetrické)
-        f = prof.copy()
-        b = prof.copy()
-        for i in range(1, n):
-            f[i] = np.clip(f[i], f[i - 1] - ROAD_MAX_GRADE, f[i - 1] + ROAD_MAX_GRADE)
-        for i in range(n - 2, -1, -1):
-            b[i] = np.clip(b[i], b[i + 1] - ROAD_MAX_GRADE, b[i + 1] + ROAD_MAX_GRADE)
-        prof = 0.5 * (f + b)
-        road_lines.append((rd, P, prof, hw))
-        c, r = g.to_px(P[:, 0], P[:, 1])
-        c, r = np.round(c).astype(int), np.round(r).astype(int)
-        ok = (c >= 0) & (c < g.w) & (r >= 0) & (r < g.h)
-        rm[r[ok], c[ok]] = True
-        rprof[r[ok], c[ok]] = prof[ok]
-        rhw[r[ok], c[ok]] = hw
-    d, (ir, ic) = ndimage.distance_transform_edt(~rm, return_indices=True)
-    d = d.astype(np.float32) * g.sp
-    hwn = rhw[ir, ic]
-    tgt = rprof[ir, ic]
-    del ir, ic
-    core = d <= hwn + 1.0
-    wgt = np.where(core, 1.0, 1.0 - smoothstep(hwn + 1.0, hwn + 1.0 + ROAD_SHOULDER, d)).astype(np.float32)
-    H = H * (1.0 - wgt) + tgt * wgt
-    # křižovatky: maskované rozmazání uvnitř vozovky (různé profily dvou silnic se slijí)
-    m = (d <= hwn + 2.0).astype(np.float32)
-    hb = ndimage.gaussian_filter(H * m, 2.0)
-    mb = ndimage.gaussian_filter(m, 2.0)
-    H = np.where(m > 0, hb / np.maximum(mb, 1e-6), H)
-    del H_pre
-    road_core = core
-    road_dist = d
-    road_hw = hwn
-    del tgt, wgt, m, hb, mb, rprof, rhw, rpri, rm
-    log(f"silnice ({time.time() - t0:.1f} s)")
-
-    # --- plošiny domů: přesně ground_y pod půdorysem (+PAD_DILATE), plynulý náběh PAD_BLEND
+    # --- rastr domů (id, vzdálenost, ground_y nejbližšího) – pro profily silnic i plošiny
     img = Image.new("F", (g.w, g.h), 0.0)
     idimg = Image.new("I", (g.w, g.h), 0)
     dr = ImageDraw.Draw(img)
@@ -409,11 +360,78 @@ def build_terrain(g, meta, buildings, water):
     pid = np.asarray(idimg, np.int32)
     pad = ndimage.binary_dilation(pad, iterations=1) | pad            # +2 m buňka (půdorys po rastrování)
     gy = np.array([0.0] + [b["ground_y"] for b in buildings], np.float32)
-    d, (ir, ic) = ndimage.distance_transform_edt(pid == 0, return_indices=True)
-    d = d.astype(np.float32) * g.sp
+    bd, (ir, ic) = ndimage.distance_transform_edt(pid == 0, return_indices=True)
+    bd = bd.astype(np.float32) * g.sp
     gnear = gy[pid[ir, ic]]
     del ir, ic
-    inside = d <= PAD_DILATE + g.sp
+    # přesně ground_y: buňky půdorysu a lem jedné buňky (bilineární vzorek u zdi), lem ne pod vozovkou
+    # profil silnice se vzorkuje z terénu přitaženého k patám domů do PAD_ATTRACT m (domy u ulice pak
+    # stojí na úrovni vozovky – hrubá kostra 16 m to sama nezaručí a u zdi by vznikl schod)
+    wb = (1.0 - smoothstep(0.0, PAD_ATTRACT, bd)).astype(np.float32)
+    Hb = H_pre * (1.0 - wb) + gnear * wb
+    del wb
+    # --- silnice: profil podél osy z terénu, vyhlazený a omezený sklonem; plochý příčný řez.
+    # Profily křížících se silnic se sladí iterací: každé kolo vzorkuje profily z terénu po minulém kole
+    # (na křižovatce je tam už vozovka té druhé silnice), takže se výšky na styku sbíhají.
+    order = sorted(meta["roads"], key=lambda r: ROAD_W.get(r["kind"], 4.0))   # širší silnice kreslit poslední (vyhraje)
+    lines = []
+    for rd in order:
+        P = resample(rd["pts"], 1.0)
+        if len(P) >= 2:
+            lines.append((rd, P, ROAD_W.get(rd["kind"], 4.0) * 0.5))
+    Hsrc = Hb
+    for it in range(ROAD_ITERS):
+        rm = np.zeros((g.h, g.w), bool)
+        rprof = np.zeros((g.h, g.w), np.float32)
+        rhw = np.zeros((g.h, g.w), np.float32)
+        road_lines = []
+        for rd, P, hw in lines:
+            prof = g.sample(Hsrc, P[:, 0], P[:, 1]).astype(np.float64)
+            n = len(P)
+            sig = ROAD_SMOOTH if n > 8 else 2.0
+            prof = ndimage.gaussian_filter1d(prof, sig, mode="nearest")
+            # omez sklon (dopředně i zpětně, pak průměr – symetrické)
+            f = prof.copy()
+            bk = prof.copy()
+            for i in range(1, n):
+                f[i] = min(max(f[i], f[i - 1] - ROAD_MAX_GRADE), f[i - 1] + ROAD_MAX_GRADE)
+            for i in range(n - 2, -1, -1):
+                bk[i] = min(max(bk[i], bk[i + 1] - ROAD_MAX_GRADE), bk[i + 1] + ROAD_MAX_GRADE)
+            prof = 0.5 * (f + bk)
+            road_lines.append((rd, P, prof, hw))
+            c, r = g.to_px(P[:, 0], P[:, 1])
+            c, r = np.round(c).astype(int), np.round(r).astype(int)
+            ok = (c >= 0) & (c < g.w) & (r >= 0) & (r < g.h)
+            rm[r[ok], c[ok]] = True
+            rprof[r[ok], c[ok]] = prof[ok]
+            rhw[r[ok], c[ok]] = hw
+        d, (ir, ic) = ndimage.distance_transform_edt(~rm, return_indices=True)
+        d = d.astype(np.float32) * g.sp
+        hwn = rhw[ir, ic]
+        tgt = rprof[ir, ic]
+        del ir, ic, rprof, rhw, rm
+        core = d <= hwn + 1.0
+        wgt = np.where(core, 1.0, 1.0 - smoothstep(hwn + 1.0, hwn + 1.0 + ROAD_SHOULDER, d)).astype(np.float32)
+        base = Hb if it < ROAD_ITERS - 1 else H
+        Hr = base * (1.0 - wgt) + tgt * wgt
+        # křižovatky: maskované rozmazání uvnitř vozovky (různé profily dvou silnic se slijí)
+        m = (d <= hwn + 2.0).astype(np.float32)
+        hb = ndimage.gaussian_filter(Hr * m, 3.0)
+        mb = ndimage.gaussian_filter(m, 3.0)
+        Hr = np.where(m > 0, hb / np.maximum(mb, 1e-6), Hr).astype(np.float32)
+        del tgt, wgt, m, hb, mb
+        if it < ROAD_ITERS - 1:
+            Hsrc = Hr
+        else:
+            H = Hr
+    del H_pre, Hsrc, Hb
+    road_core = core
+    road_dist = d
+    road_hw = hwn
+    log(f"silnice ({time.time() - t0:.1f} s)")
+
+    d = bd
+    inside = (d < 0.5 * g.sp) | ((d <= PAD_DILATE + g.sp) & ~road_core)
     wgt = np.where(inside, 1.0, 1.0 - smoothstep(PAD_DILATE + g.sp, PAD_DILATE + g.sp + PAD_BLEND, d))
     wgt = np.where(inside, 1.0, wgt * (1.0 - road_core))                 # vozovka má přednost (náběh ne)
     H = (H * (1.0 - wgt) + gnear * wgt).astype(np.float32)
@@ -431,12 +449,12 @@ def write_terrain(g, H, masks):
     micro = fbm((g.h, g.w), 3, 2, 31) * MICRO_AMP
     quiet = np.clip(1.0 - masks["pad_w"] - masks["road_core"], 0.0, 1.0) * (masks["stream_dist"] > 4.0)
     vis = (H + micro * quiet).astype(np.float32)
-    vis.tofile(os.path.join(DATA, "terrain_height.bin"))
-    (H / g.sp).astype(np.float32).tofile(os.path.join(DATA, "terrain_collision.bin"))
+    vis.tofile(os.path.join(OUT, "terrain_height.bin"))
+    (H / g.sp).astype(np.float32).tofile(os.path.join(OUT, "terrain_collision.bin"))
     gz, gx = np.gradient(vis.astype(np.float64), g.sp)
     n = np.stack([-gx, np.ones_like(gx), -gz], axis=-1)
     n /= np.linalg.norm(n, axis=-1, keepdims=True)
-    ((n * 0.5 + 0.5) * 255).round().astype(np.uint8).tofile(os.path.join(DATA, "terrain_normal.bin"))
+    ((n * 0.5 + 0.5) * 255).round().astype(np.uint8).tofile(os.path.join(OUT, "terrain_normal.bin"))
     CH = g.chunk_cells
     mm = np.zeros((g.ncz, g.ncx, 2), np.float32)
     for iz in range(g.ncz):
@@ -444,7 +462,7 @@ def write_terrain(g, H, masks):
             blk = vis[iz * CH:iz * CH + CH + 1, ix * CH:ix * CH + CH + 1]
             if blk.size:
                 mm[iz, ix] = blk.min(), blk.max()
-    mm.tofile(os.path.join(DATA, "terrain_chunks.bin"))
+    mm.tofile(os.path.join(OUT, "terrain_chunks.bin"))
     log(f"terén zapsán: výšky {vis.min():.1f}..{vis.max():.1f} m")
     return vis
 
@@ -520,6 +538,38 @@ def building_rect(b, P):
     return c, u, v, (pu.max() - pu.min()) * 0.5, (pv.max() - pv.min()) * 0.5
 
 
+def inner_rect(P, u, v, res=0.25):
+    """Největší obdélník (osy u, v) uvnitř půdorysu – pro střechu domu do L / T (histogramová metoda nad rastrem)."""
+    pu, pv = P @ u, P @ v
+    nu = int((pu.max() - pu.min()) / res) + 1
+    nv = int((pv.max() - pv.min()) / res) + 1
+    U, V = np.meshgrid(pu.min() + (np.arange(nu) + 0.5) * res, pv.min() + (np.arange(nv) + 0.5) * res)
+    ins = point_in_poly(U, V, np.c_[pu, pv])          # řádek = v, sloupec = u
+    best = (0, 0, 0, 0, 0)                             # plocha, v0, v1, u0, u1 (indexy)
+    hgt = np.zeros(nu, int)
+    for j in range(nv):
+        hgt = np.where(ins[j], hgt + 1, 0)
+        st = []
+        for i in range(nu + 1):
+            cur = hgt[i] if i < nu else 0
+            start = i
+            while st and st[-1][1] >= cur:
+                s0, h0 = st.pop()
+                if h0 * (i - s0) > best[0]:
+                    best = (h0 * (i - s0), j - h0 + 1, j + 1, s0, i)
+                start = s0
+            st.append((start, cur))
+    _, v0, v1, u0, u1 = best
+    a0, a1 = pu.min() + u0 * res, pu.min() + u1 * res
+    b0, b1 = pv.min() + v0 * res, pv.min() + v1 * res
+    c = u * (a0 + a1) * 0.5 + v * (b0 + b1) * 0.5
+    return c, (a1 - a0) * 0.5, (b1 - b0) * 0.5
+
+
+def poly_area(P):
+    return abs(np.sum(P[:, 0] * np.roll(P[:, 1], -1) - np.roll(P[:, 0], -1) * P[:, 1])) * 0.5
+
+
 def build_buildings(g, H, buildings):
     walls, roofs = TriBuf(), TriBuf()
     rng = np.random.default_rng(122)
@@ -534,7 +584,8 @@ def build_buildings(g, H, buildings):
                           else FACADES[rng.integers(len(FACADES))])
         rcol = srgb_to_lin(ROOFS[rng.integers(len(ROOFS))])
         # pata zdí: pod nejnižší terén u stěny − 0,5 m (na svahu nikde nevisí)
-        hv = g.sample(H, P[:, 0], P[:, 1])
+        E = resample(np.vstack([P, P[:1]]), 1.0)
+        hv = g.sample(H, E[:, 0], E[:, 1])
         base = min(gy, float(hv.min())) - 0.5
         for i in range(k):
             a, c = P[i], P[(i + 1) % k]
@@ -551,6 +602,20 @@ def build_buildings(g, H, buildings):
                 roofs.tri((A[0], top, A[1]), (B[0], top, B[1]), (C[0], top, C[1]), rcol, nrm=(0, 1, 0), out=(0, 1, 0))
             continue
         c, u, v, hl, hw = building_rect(b, P)
+        if poly_area(P) < 0.85 * 4.0 * hl * hw:
+            # dům do L / T: sedlo nad největším vepsaným obdélníkem (štíty stojí na zdech), křídla mimo něj
+            # dostanou plochou střechu ve výšce okapu (deska přes celý půdorys – pod sedlem není vidět)
+            if shape != "hipped":
+                c, hl, hw = inner_rect(P, u, v)
+                if hw > hl and shape == "gable_long":
+                    u, v, hl, hw = v, -u, hw, hl      # hřeben po delší straně vepsaného obdélníku
+            top = ey + 0.12
+            for i in range(k):
+                a, cc = P[i], P[(i + 1) % k]
+                roofs.quad((a[0], ey, a[1]), (cc[0], ey, cc[1]), (cc[0], top, cc[1]), (a[0], top, a[1]), rcol)
+            for tri in ear_clip(P):
+                A, B, C = (P[j] for j in tri)
+                roofs.tri((A[0], top, A[1]), (B[0], top, B[1]), (C[0], top, C[1]), rcol, nrm=(0, 1, 0), out=(0, 1, 0))
         ov = 0.45
         slope = (ry - ey) / max(hw, 0.3)
         ze = ey - ov * slope
@@ -581,8 +646,8 @@ def build_buildings(g, H, buildings):
             walls.tri(Q(-hl, hw, ey), Q(-hl, -hw, ey), Q(-hl, 0, ry), fac, out=(-u[0], 0, -u[1]))
             walls.tri(Q(hl, -hw, ey), Q(hl, hw, ey), Q(hl, 0, ry), fac, out=(u[0], 0, u[1]))
             # podhled střechy (spodní strana přesahu) se kreslí díky cull_disabled
-    write_dbm1(os.path.join(DATA, "walls.bin"), walls)
-    write_dbm1(os.path.join(DATA, "roofs.bin"), roofs)
+    write_dbm1(os.path.join(OUT, "walls.bin"), walls)
+    write_dbm1(os.path.join(OUT, "roofs.bin"), roofs)
 
 
 def ear_clip(P):
@@ -652,8 +717,8 @@ def build_roads(g, H, masks):
             buf.tri(a, b, c, white, nrm=(0, 1, 0), out=(0, 1, 0))
             buf.tri(a, c, d, white, nrm=(0, 1, 0), out=(0, 1, 0))
     # orientace: tri() prohazuje pořadí – u vozovky chceme normálu nahoru a přední stranu shora
-    write_dbm1(os.path.join(DATA, "asphalt.bin"), asph)
-    write_dbm1(os.path.join(DATA, "gravel.bin"), grav)
+    write_dbm1(os.path.join(OUT, "asphalt.bin"), asph)
+    write_dbm1(os.path.join(OUT, "gravel.bin"), grav)
 
 
 # ---------------------------------------------------------------------------------------------- krajina (4 m)
@@ -728,7 +793,7 @@ def land_cover(g, H, masks, buildings, meta, water):
     landuse[..., 0] = np.where(garden, 4, landuse[..., 0])
     landuse[..., 1] = np.where(arable, (ids % 255) + 1, 0).astype(np.uint8)
     hdr = b"LUSE" + struct.pack("<i", 1) + struct.pack("<fff", g.x0, g.z0, cell) + struct.pack("<ii", nx, nz)
-    with open(os.path.join(DATA, "landuse.bin"), "wb") as f:
+    with open(os.path.join(OUT, "landuse.bin"), "wb") as f:
         f.write(hdr)
         f.write(landuse.tobytes())
 
@@ -741,7 +806,7 @@ def land_cover(g, H, masks, buildings, meta, water):
     trk = (rd < rhw + 0.6) & (rhw > 0) & (rhw <= 1.6)
     surf[trk] = 7
     hdr = b"SURF" + struct.pack("<i", 1) + struct.pack("<fff", g.x0, g.z0, cell) + struct.pack("<ii", nx, nz)
-    with open(os.path.join(DATA, "surface.bin"), "wb") as f:
+    with open(os.path.join(OUT, "surface.bin"), "wb") as f:
         f.write(hdr)
         f.write(surf.tobytes())
     log(f"landuse.bin + surface.bin {nx}×{nz}: les {forest.mean() * 100:.0f} %, orná {arable.mean() * 100:.0f} % "
@@ -814,7 +879,7 @@ def tree_protos():
         protos.append([cyl(0.06, 0.035, 0.0, 0.62), blob(cy, 0.85, ry, lumps, 60 + k)])
     for k, (y0, r, tiers) in enumerate(((0.12, 0.55, 5), (0.18, 0.5, 6), (0.08, 0.62, 4))):
         protos.append([cyl(0.05, 0.02, 0.0, 0.95), cone_stack(y0, 1.0, r, tiers)])
-    with open(os.path.join(DATA, "tree_protos.bin"), "wb") as f:
+    with open(os.path.join(OUT, "tree_protos.bin"), "wb") as f:
         f.write(b"DBT1")
         f.write(struct.pack("<i", len(protos)))
         for surfs in protos:
@@ -944,7 +1009,7 @@ def build_trees(g, H, masks, lc, buildings, meta, water):
     for i, (x, z, p, sx, sy, col) in enumerate(out):
         y = float(g.sample(H, x, z)) - 0.1
         rec[i] = (x, y, z, rng.random() * 6.2832, sx, sy, sx, col[0], col[1], col[2], p)
-    with open(os.path.join(DATA, "trees.bin"), "wb") as f:
+    with open(os.path.join(OUT, "trees.bin"), "wb") as f:
         f.write(b"DBI1")
         f.write(struct.pack("<i", len(rec)))
         f.write(rec.tobytes())
@@ -973,10 +1038,10 @@ def build_surround(g, skel, cmeta, lc):
     f = fbm((sz, sx), 26, 3, 41)
     cls = np.where(f > 0.25, 3, np.where(f < -0.15, 1, 0)).astype(np.uint8)
     hdr = struct.pack("<i", 1) + struct.pack("<fff", cx0, cz0, step) + struct.pack("<ii", sx, sz)
-    with open(os.path.join(DATA, "surround_height.bin"), "wb") as fo:
+    with open(os.path.join(OUT, "surround_height.bin"), "wb") as fo:
         fo.write(b"SURH" + hdr)
         fo.write(hh.astype(np.float32).tobytes())
-    with open(os.path.join(DATA, "surround_surface.bin"), "wb") as fo:
+    with open(os.path.join(OUT, "surround_surface.bin"), "wb") as fo:
         fo.write(b"SURS" + hdr)
         fo.write(cls.tobytes())
     log(f"surround_height.bin {sx}×{sz} po {step:.0f} m")
@@ -985,11 +1050,11 @@ def build_surround(g, skel, cmeta, lc):
 # ---------------------------------------------------------------------------------------------- hlavní
 
 def missing(names, force):
-    return force or any(not os.path.exists(os.path.join(DATA, n)) for n in names)
+    return force or any(not os.path.exists(os.path.join(OUT, n)) for n in names)
 
 
 def run_tool(args, out):
-    if os.path.exists(os.path.join(DATA, out)):
+    if os.path.exists(os.path.join(OUT, out)):
         return
     log("spouštím", " ".join(args))
     r = subprocess.run([sys.executable] + args, cwd=GAME)
@@ -998,7 +1063,12 @@ def run_tool(args, out):
 
 
 def main():
+    global OUT
     force = "--force" in sys.argv
+    for a in sys.argv[1:]:
+        if a.startswith("--out="):
+            OUT = os.path.abspath(a.split("=", 1)[1])
+            os.makedirs(OUT, exist_ok=True)
     only = None
     for a in sys.argv[1:]:
         if a.startswith("--only="):
@@ -1018,7 +1088,7 @@ def main():
     todo = [k for k, v in groups.items() if (only is None or k in only) and missing(v, force)]
     for k in todo:
         for n in groups[k]:
-            if os.path.exists(os.path.join(DATA, n)) and not force:
+            if os.path.exists(os.path.join(OUT, n)) and not force:
                 raise SystemExit(f"synth_world: {n} už existuje a skupina '{k}' je neúplná – "
                                  "nic nepřepisuji (pravá data?). Použij --force, nebo soubor smaž.")
     if todo:
@@ -1029,7 +1099,7 @@ def main():
         if "terrain" in todo:
             Hv = write_terrain(g, H, masks)
         else:
-            Hv = np.fromfile(os.path.join(DATA, "terrain_height.bin"), np.float32).reshape(g.h, g.w)
+            Hv = np.fromfile(os.path.join(OUT, "terrain_height.bin"), np.float32).reshape(g.h, g.w)
         if "buildings" in todo:
             build_buildings(g, Hv, buildings)
         if "roads" in todo:
@@ -1038,11 +1108,11 @@ def main():
         if "landuse" in todo or "trees" in todo:
             if "landuse" not in todo:
                 log("POZOR: landuse.bin existuje – maska lesa pro stromy se dopočítá, soubor se nepřepíše")
-                bak = {n: open(os.path.join(DATA, n), "rb").read() for n in groups["landuse"]}
+                bak = {n: open(os.path.join(OUT, n), "rb").read() for n in groups["landuse"]}
             lc = land_cover(g, Hv, masks, buildings, meta, water)
             if "landuse" not in todo:
                 for n, data in bak.items():
-                    open(os.path.join(DATA, n), "wb").write(data)
+                    open(os.path.join(OUT, n), "wb").write(data)
         if "trees" in todo:
             tree_protos()
             build_trees(g, Hv, masks, lc, buildings, meta, water)
@@ -1051,7 +1121,7 @@ def main():
         log(f"hotovo za {time.time() - t0:.0f} s")
     else:
         log("základní data už existují – nic negeneruji (--force přepíše)")
-    if only is None or "extra" in only:
+    if (only is None or "extra" in only) and OUT == DATA:
         # odvozená data původními nástroji (jen když chybí; bez nich má hra fallbacky)
         run_tool(["tools/site.py"], "site.bin")
         run_tool(["tools/tree_species.py"], "tree_eco.bin")

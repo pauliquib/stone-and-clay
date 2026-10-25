@@ -48,6 +48,7 @@ DOOR_FACE_COS = -0.3          # cos(normála hrany, směr k silnici) pod → WAR
 DOOR_FACE_MIN_DIST = 2.0      # blíž silnici se směr nehodnotí (šum)
 DOOR_EXTRA_WARN = 8.0         # dveře o tolik dál od silnice než nejbližší bod obvodu → WARN
 # --- terén pod domy
+TERR_INSET = 1.0         # m – vzorky terénu pod domem až tak daleko od zdi
 TERR_STEP = 1.0               # krok vzorků uvnitř půdorysu (m)
 TERR_MEAN_WARN, TERR_MAX_WARN = 0.15, 0.5
 TERR_MEAN_FAIL, TERR_MAX_FAIL = 0.6, 2.0
@@ -401,8 +402,19 @@ def check_terrain(F, terr, B, polys, roads, quick):
     devs = []
     for b, p in zip(B, polys):
         gx, gz = grid_in_poly(p, TERR_STEP)
-        gx = np.concatenate([gx, p[:, 0]])
-        gz = np.concatenate([gz, p[:, 1]])
+        # jen body aspoň TERR_INSET od zdi: bilineární vzorek u zdi míchá buňku za ní (mřížka 2 m),
+        # kde smí terén klesat/stoupat (sokl, vozovka u domu); u malých staveb aspoň těžiště
+        if len(gx):
+            dmin = np.full(len(gx), np.inf)
+            for i in range(len(p)):
+                a0, b0 = p[i], p[(i + 1) % len(p)]
+                ab = b0 - a0
+                t = np.clip(((gx - a0[0]) * ab[0] + (gz - a0[1]) * ab[1]) / max(float(ab @ ab), 1e-9), 0, 1)
+                dmin = np.minimum(dmin, np.hypot(gx - a0[0] - ab[0] * t, gz - a0[1] - ab[1] * t))
+            keep = dmin >= TERR_INSET
+            gx, gz = gx[keep], gz[keep]
+        if not len(gx):
+            gx, gz = np.array([p[:, 0].mean()]), np.array([p[:, 1].mean()])
         h = terr.sample(gx, gz)
         if not np.isfinite(h).all():
             F.add("teren_domy", "WARN", "dům leží (částečně) mimo výškovou mřížku", [gx[0], b["ground_y"], gz[0]], 1, id=b["id"])
