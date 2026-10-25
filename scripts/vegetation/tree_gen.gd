@@ -347,11 +347,13 @@ func impostor_material() -> ShaderMaterial:
 	m.set_shader_parameter("imp_views", float(imp_views))
 	m.set_shader_parameter("imp_rows", float(variants.size()))
 	m.set_shader_parameter("lod_band", Vector4(l1_end(), 1e6, LOD_FADE, 0.0))   # konec 1e6: v float32 ještě ± prolínání
-	var ext := PackedColorArray()
+	# 2026-10: PackedVector4Array, ne PackedColorArray – pole barev Godot u `vec4[]` převádí ze sRGB do lineáru,
+	# takže půlšířka (0,27 → 0,06) vycházela ~4,5× menší a impostory byly úzké „topoly“ (výška ~1 se skoro nemění)
+	var ext := PackedVector4Array()
 	ext.resize(64)
 	for k in variants.size():
 		var v: Dictionary = variants[k]
-		ext[k] = Color(float(v["w"]), float(v["y0"]), float(v["y1"]), 0.0 if is_conifer_variant(k) else 1.0)
+		ext[k] = Vector4(float(v["w"]), float(v["y0"]), float(v["y1"]), 0.0 if is_conifer_variant(k) else 1.0)
 	m.set_shader_parameter("imp_ext", ext)
 	_imp_mat = m
 	return m

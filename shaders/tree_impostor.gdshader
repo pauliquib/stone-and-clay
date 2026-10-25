@@ -12,6 +12,8 @@
 //   * stínový průchod (stíny impostorů zapíná TreeGen jen od Vysoké): karta se natočí ke světlu (svislá) – stín má
 //     siluetu stromu, ne čáru. Poznává se podle toho, že kamera průchodu není hlavní kamera.
 //   * osvětlení jako LOD1 (drsnost, prosvítání listí, okluze, variace barvy podle stromu).
+//   * sousední snímky atlasu se střídají ditherem (ne průměrem alfy), alfa zesílená podle mipu; rozměry variant
+//     (`imp_ext`) jdou jako PackedVector4Array (barvy by Godot převedl ze sRGB → úzké impostory).
 shader_type spatial;
 render_mode cull_disabled, diffuse_burley, world_vertex_coords;
 
@@ -149,8 +151,20 @@ void fragment() {
 	float fb = mod(frame_a + 1.0, imp_views);
 	vec2 ua = (vec2(fa, row) + uvl) * cell;
 	vec2 ub = (vec2(fb, row) + uvl) * cell;
-	vec4 col = mix(texture(imp_color, ua), texture(imp_color, ub), frame_t);
-	vec4 nr = mix(texture(imp_normal, ua), texture(imp_normal, ub), frame_t);
+	// 2026-10: snímky se neprolínají alfou (listí dvou pohledů se nepřekrývá → průměr alfy pod 0,5 → řídká koruna),
+	// ale ditherem po pixelech; alfa se zesílí podle mipu (jako tg_leaf) – vzdálená koruna neprořídne
+	bool fb_sel = tg_dither(FRAGCOORD.xy + vec2(31.0, 7.0)) < frame_t;
+	vec4 col_a = texture(imp_color, ua);
+	vec4 col_b = texture(imp_color, ub);
+	vec4 nr_a = texture(imp_normal, ua);
+	vec4 nr_b = texture(imp_normal, ub);
+	vec4 col = fb_sel ? col_b : col_a;
+	vec4 nr = fb_sel ? nr_b : nr_a;
+	vec2 tsz = vec2(textureSize(imp_color, 0));
+	vec2 ddx = dFdx(ua) * tsz;
+	vec2 ddy = dFdy(ua) * tsz;
+	float mip = clamp(0.5 * log2(max(max(dot(ddx, ddx), dot(ddy, ddy)), 1e-8)), 0.0, 6.0);
+	col.a *= 1.0 + mip * TG_ALPHA_MIP;
 	vec3 nw;
 	if (tg_dither(FRAGCOORD.yx + vec2(17.0, 5.0)) >= top_k) {
 		if (!inside || col.a < 0.5) {
@@ -223,7 +237,7 @@ void fragment() {
 			c *= col.r / TG_LEAF_MEAN * IMP_SELF_SHADE;
 		}
 	} else {
-		c = col.rgb;
+		c = col.rgb * 0.7;                         // kůra: průměrná okluze jako LOD (COLOR.a), jinak bílé větve
 	}
 	float snow = clamp(snow_cover * 1.6 - (1.0 - nz) * 0.4, 0.0, 1.0) * smoothstep(0.2, 0.7, nw.y);
 	c = mix(c, vec3(0.88, 0.9, 0.95), snow);

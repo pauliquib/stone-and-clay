@@ -354,6 +354,7 @@ void fragment() {
 	c = mix(c, vec3(0.82, 0.86, 0.9), clamp(v_rime * 0.6, 0.0, 0.6));   // M8.9 jinovatka
 	ALBEDO = c;
 	ROUGHNESS = mix(rough, 0.4, v_dew);              // M8.9: orosená tráva se leskne
-	SPECULAR = mix(0.3, 0.55, v_dew);
+	// nízký odlesk suchých listů: s 0,3 Godot zvedá Fresnel na hraně (f90) a listy proti slunci / obloze bělaly
+	SPECULAR = mix(0.12, 0.5, v_dew);
 	BACKLIGHT = c * bl;                              // prosycení proti světlu (listy/tráva)
 }
