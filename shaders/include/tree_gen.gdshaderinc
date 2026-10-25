@@ -12,6 +12,12 @@
 const float TG_LEAF_MEAN = 0.62;        // průměrný jas atlasu listí (shodně s tools/treegen/textures.py LEAF_MEAN)
 const float TG_ALPHA_MIP = 0.25;        // zesílení alfy listí v menších mipmapách (listy v dálce neprořídnou)
 const float TG_TILE_PX = 512.0;         // px dlaždice atlasu
+const vec3 TG_LEAF_BACKLIGHT = vec3(1.0, 1.1, 0.6);   // 2026-10: barva světla prošlého listem (žlutozelená), LOD i impostor
+
+// 2026-10: variace odstínu a jasu koruny podle stromu (hash polohy) – stejně v tree.gdshader i v impostoru.
+vec3 tg_tree_var(float h_in) {
+	return mix(vec3(0.93, 1.0, 1.06), vec3(1.07, 1.02, 0.86), h_in) * (0.9 + 0.2 * fract(h_in * 7.31));
+}
 
 // x = náběh pásma 0..1 (0 = před začátkem), y = doběh 0..1 (1 = za koncem). band_v.z <= 0 → bez pásma.
 vec2 tg_band_fade(float dist_v, vec4 band_v) {

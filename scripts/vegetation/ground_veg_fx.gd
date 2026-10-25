@@ -124,6 +124,13 @@ func _add_mmi(mm: MultiMesh, mat: Material) -> void:
 	_nodes.append(mmi)
 
 
+## 2026-10: keře sukcese a seno vrhají stín jen na Vysoké / Ultra (volá VegetationManager při změně předvolby).
+func set_shadows(on: bool) -> void:
+	for mmi in _nodes:
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if on \
+			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
 ## Globální parametry shaderu z laditelných hodnot (po změně v F3).
 func apply_shader_params() -> void:
 	RenderingServer.global_shader_parameter_set("trample_bend", TRAMPLE_BEND)

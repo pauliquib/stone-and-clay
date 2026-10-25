@@ -45,12 +45,7 @@ static func build(m: CarModel) -> ArrayMesh:
 			_krosak(m, kp, kt, kf, kh, ktl)
 		_:
 			_jawa(m, kp, kt, kf, kh, ktl)
-	m.paint_mat = StandardMaterial3D.new()
-	m.paint_mat.albedo_color = m.paint
-	m.paint_mat.metallic = 0.35
-	m.paint_mat.roughness = 0.35
-	m.paint_mat.clearcoat_enabled = true
-	m.paint_mat.clearcoat = 0.6
+	m.paint_mat = MeshKit.paint_material(m.paint, 0.35, 0.35, 0.6, 0.15, 0.25)
 	m.head_mat = StandardMaterial3D.new()
 	m.head_mat.vertex_color_use_as_albedo = true
 	m.head_mat.emission_enabled = true

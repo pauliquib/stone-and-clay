@@ -173,6 +173,8 @@ static func _build_meshes(spec: Dictionary, g: Dictionary, male: bool, winter: b
 	var us := [0.0, 0.02, 0.05, 0.1, 0.16, 0.22, 0.32, 0.42, 0.52, 0.62, 0.72, 0.8, 0.86, 0.92, 0.96, 0.985, 1.0]
 	var rump: Color = spec["rump"]
 	var stripes: Color = spec["stripes"]
+	var spots: Color = spec.get("spots", Color(-1, 0, 0))     # strakatá srst (skot): bílé skvrny přes základní barvu
+	var spot_seed := float(hash(String(spec["id"])) % 97) * 0.37
 	for u in us:
 		var st := station(spec, g, u)
 		var ring := PackedVector3Array()
@@ -188,6 +190,12 @@ static func _build_meshes(spec: Dictionary, g: Dictionary, male: bool, winter: b
 				c = c.lerp(rump, (1.0 - u / 0.17) * smoothstep(0.95, 0.2, sa))
 			if stripes.r >= 0.0 and sa > -0.35 and j % 2 == 0 and u > 0.08 and u < 0.9:
 				c = stripes
+			if spots.r >= 0.0:
+				# nepravidelné skvrny: součin dvou vln po délce a obvodu (deterministické – sdílený mesh druhu)
+				var w := sin(u * 9.0 + spot_seed + sin(a * 2.0) * 1.1) * sin(a * 2.0 + u * 4.0 - spot_seed) \
+					+ 0.3 * sin(u * 17.0 - a * 3.0 + spot_seed * 2.0)
+				if w > 0.3 or sa < -0.45 or u > 0.93:
+					c = spots
 			rc.append(c)
 		rings.append(ring)
 		cols.append(rc)
@@ -202,6 +210,17 @@ static func _build_meshes(spec: Dictionary, g: Dictionary, male: bool, winter: b
 			k.box(Vector3(0, st[1] + st[3] + hgt * 0.3, st[0]), Vector3(0.025, hgt, 0.09), dark.darkened(0.2), Vector3(-0.25, 0, 0))
 	if spec.get("tack", false):
 		_tack_body(k, spec, g)
+	# vemeno krávy: mezi zadníma nohama pod břichem, se čtyřmi struky
+	var ud: float = spec.get("udder", 0.0)
+	if ud > 0.0 and not male:
+		var uz: float = g["hip"].z + ud * 1.3
+		var st := station_at_z(spec, g, uz)
+		var uy: float = st[1] - st[3] * 0.82
+		var pink := Color(0.86, 0.66, 0.6)
+		k.sphere(Vector3(0, uy - ud * 0.25, uz), 1.0, pink, Vector3(ud * 1.05, ud * 0.85, ud * 1.15))
+		for sx: float in [1.0, -1.0]:
+			for sz: float in [1.0, -1.0]:
+				k.capsule(Vector3(sx * ud * 0.45, uy - ud * 0.95, uz + sz * ud * 0.5), 0.018, 0.09, pink.darkened(0.08))
 	ms["torso"] = k.commit(fur)
 
 	# ---------------- krk (podél +Z)
@@ -235,11 +254,24 @@ static func _build_meshes(spec: Dictionary, g: Dictionary, male: bool, winter: b
 	var hr: float = hd[1]
 	var sr: float = hd[2]
 	var nose: Color = spec["nose"]
+	var hcoat: Color = spec.get("head_col", coat)
 	var prof := PackedVector2Array([Vector2(0.002, -hr * 0.6), Vector2(hr * 0.72, -hr * 0.38), Vector2(hr, -hr * 0.05),
 		Vector2(hr * 0.93, hl * 0.28), Vector2(lerpf(hr, sr, 0.55), hl * 0.6), Vector2(sr * 1.12, hl * 0.86),
 		Vector2(sr, hl * 0.97), Vector2(sr * 0.55, hl + 0.004), Vector2(0.002, hl + 0.006)])
-	var pc := PackedColorArray([coat, coat, coat, coat, coat.lerp(nose, 0.15), coat.lerp(nose, 0.5), nose, nose, nose])
-	k.lathe(prof, to_z, coat, 16, 0.8, 1.0, pc)
+	var pc := PackedColorArray([hcoat, hcoat, hcoat, hcoat, hcoat.lerp(nose, 0.15), hcoat.lerp(nose, 0.5), nose, nose, nose])
+	k.lathe(prof, to_z, hcoat, 16, 0.8, 1.0, pc)
+	# rohy skotu: krátké, ze stran temene do stran a nahoru, světlé s tmavou špičkou
+	var horn: float = spec.get("horns", 0.0)
+	if horn > 0.0:
+		var hc0 := Color(0.86, 0.8, 0.66)
+		for s: float in [1.0, -1.0]:
+			var b0 := Vector3(s * hr * 0.62, hr * 0.78, -hr * 0.1)
+			var b1 := b0 + Vector3(s * horn * 0.6, horn * 0.25, horn * 0.05)
+			var b2 := b1 + Vector3(s * horn * 0.2, horn * 0.45, horn * 0.2)
+			_stick(k, b0, b1, 0.03, 0.022, hc0)
+			_stick(k, b1, b2, 0.022, 0.006, hc0.darkened(0.5))
+		# čupřina mezi rohy
+		k.sphere(Vector3(0, hr * 0.85, -hr * 0.05), 1.0, hcoat.darkened(0.05), Vector3(hr * 0.55, hr * 0.25, hr * 0.35))
 	var blaze: Color = spec.get("blaze", Color(-1, 0, 0))
 	if blaze.r >= 0.0:
 		k.sphere(Vector3(0, hr * 0.8, hl * 0.42), 1.0, blaze, Vector3(hr * 0.2, hr * 0.14, hl * 0.4))
@@ -432,6 +464,7 @@ static func fur_material(tint := 1.0) -> StandardMaterial3D:
 	m.roughness = 0.88
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	m.diffuse_mode = BaseMaterial3D.DIFFUSE_BURLEY
+	m.set_meta("vc_shader", MeshKit.fur_shader(0.88, tint))   # kreslí se vc_fur.gdshader (MeshKit.commit / shader_of)
 	_mats[key] = m
 	return m
 
@@ -457,5 +490,5 @@ static func _node(parent: Node3D, pos: Vector3) -> Node3D:
 
 static func _mi(parent: Node3D, mesh: ArrayMesh, fur: Material) -> MeshInstance3D:
 	var mi := MeshKit.mesh_instance(parent, mesh, VIS_END)
-	mi.set_surface_override_material(0, fur)
+	mi.set_surface_override_material(0, MeshKit.shader_of(fur))
 	return mi

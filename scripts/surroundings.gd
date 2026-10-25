@@ -2,7 +2,8 @@
 ## Data: `data/surround_height.bin` (výšky, krok ~25 m) a `data/surround_surface.bin`
 ## (maska povrchu – třídy jako `SurfaceMap` + 8 voda), připraví `tools/surroundings.py`
 ## (bin soubory nejsou v gitu). Výšky čte vertex shader (`shaders/surroundings.gdshader`),
-## barva tříd sdílí paletu s `terrain.gdshader`. Oblast katastru shader zapustí pod
+## barva tříd sdílí procedurální povrch s `terrain.gdshader` (`shaders/include/terrain_surface.gdshaderinc`,
+## stejný šum `Terrain.detail_noise_texture()`), orná půda je mozaika polí s barvami plodin z `field_lut` terénu. Oblast katastru shader zapustí pod
 ## detailní terén (díra `HOLE_SINK` / `HOLE_BLEND`), okraje dlaždic mají sukně.
 ## Bez kolizí a bez stínů. Les = tmavší povrch + MultiMesh hrubých kuželů do `CONE_RANGE`.
 ## Když data chybí → plochá zvlněná krajina ve výšce okraje katastru (fallback) – hra funguje.
@@ -48,6 +49,12 @@ func setup(terrain: Terrain) -> void:
 	if not _load_data():
 		_make_fallback(terrain)
 	_build_material()
+	# tabulka barev plodin: stejná jako v katastru (Terrain.set_field_lut ji pak předává i sem)
+	var lut = terrain.material.get_shader_parameter("field_lut")
+	if lut is Texture2D:
+		material.set_shader_parameter("field_lut", lut)
+		material.set_shader_parameter("use_fields", true)
+	terrain.linked_materials.append(material)
 	_build_tiles()
 	_build_cones()
 
@@ -157,20 +164,11 @@ func _build_material() -> void:
 	var simg := Image.create(2, 2, false, Image.FORMAT_R8)
 	if _surface.size() == nx * nz:
 		simg = Image.create_from_data(nx, nz, false, Image.FORMAT_R8, _surface)
-	var noise := FastNoiseLite.new()
-	noise.frequency = 0.02
-	noise.fractal_octaves = 4
-	var ntex := NoiseTexture2D.new()
-	ntex.width = 512
-	ntex.height = 512
-	ntex.seamless = true
-	ntex.generate_mipmaps = true
-	ntex.noise = noise
 	material = ShaderMaterial.new()
 	material.shader = load("res://shaders/surroundings.gdshader")
 	material.set_shader_parameter("height_tex", ImageTexture.create_from_image(himg))
 	material.set_shader_parameter("surface_tex", ImageTexture.create_from_image(simg))
-	material.set_shader_parameter("detail_noise", ntex)
+	material.set_shader_parameter("detail_noise", Terrain.detail_noise_texture())
 	material.set_shader_parameter("grid_origin", Vector2(x0, z0))
 	material.set_shader_parameter("spacing", spacing)
 	material.set_shader_parameter("grid_size", Vector2(nx, nz))

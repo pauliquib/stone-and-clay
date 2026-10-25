@@ -1,7 +1,8 @@
 ## M8.8 Generované stromy: modely podle druhu, věku a vitality z `data/tree_species_protos.bin` (DBT2, `tools/treegen/`),
 ## LOD0 / LOD1 zblízka (streamované po buňkách, `TreeLodStreamer`) a impostory v dálce (jeden MultiMesh na buňku 256 m).
 ## Podle čeho: space colonization (Runions et al. 2007) / přeslenový růst, Weber & Penn 1995, oktaedrické / více-pohledové
-## impostory (zjednodušeně 8 pohledů kolem osy Y) – viz hlavička `tools/treegen/treegen.py`.
+## impostory (zjednodušeně 8 pohledů kolem osy Y) – viz hlavička `tools/treegen/treegen.py`. 2026-10: impostor se
+## shora prolne do procedurální koruny, hýbe se ve větru a od Vysoké vrhá stín (`tree_impostor.gdshader`).
 ##
 ## Vstup za běhu: `trees.bin` (poloha, natočení, měřítko, barva z ortofota) + `tree_eco.bin` (M8.3: druh, věk, vitalita –
 ## čte se přímo, protože `TreeEco` vzniká až po indexu stromů). Bez `tree_eco.bin` druh z prototypu (`TreeEco.FALLBACK_PROTO`).
@@ -50,6 +51,10 @@ var lod0_k := 1.0
 var lod1_k := 1.0
 var _full := {}                       # varianta → LOD0 bez pásma (zasazené stromy)
 var _imp_mat: ShaderMaterial
+## 2026-10: MultiMeshe impostorů – stín vrhají jen od Vysoké (`gfx_quality` > 1,5; stíny tam sahají až 240–320 m,
+## tedy za hranici LOD1 → bez nich by stromům v pásmu impostorů stín „zmizel“). Přepíná `update_impostor_shadows`.
+var _imp_nodes: Array[MultiMeshInstance3D] = []
+var _imp_shadow := -1
 var _imp_mesh: ArrayMesh
 var _tex := {}
 
@@ -327,6 +332,18 @@ func impostor_material() -> ShaderMaterial:
 	return m
 
 
+## Stín impostorů podle předvolby (volá TreeLodStreamer při kontrole buněk; mění se jen při změně kvality).
+func update_impostor_shadows() -> void:
+	var on := 1 if float(RenderingServer.global_shader_parameter_get("gfx_quality")) > 1.5 else 0
+	if on == _imp_shadow:
+		return
+	_imp_shadow = on
+	for mmi in _imp_nodes:
+		if is_instance_valid(mmi):
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if on == 1 \
+				else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
 ## Karta impostoru: rohy jen v UV (shader ji staví ve světě – world_vertex_coords), barva vrcholu bílá
 ## (shader čte variantu z barvy instance). AABB dost velký pro otočení ke kameře.
 func impostor_mesh() -> ArrayMesh:
@@ -449,10 +466,12 @@ func build(parent: Node3D, skip: Dictionary, terrain: Terrain, mgr: TreeManager)
 		mmi.multimesh = mm
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mmi.visibility_range_end = MapLoader.TREE_FAR_RANGE
+		_imp_nodes.append(mmi)
 		far_mm[[key, "imp"]] = mm
 		MapLoader._far_mmis.append(mmi)
 		root.add_child(mmi)
 	root.add_child(streamer)
+	update_impostor_shadows()
 
 	# kolize kmenů – stejně jako MapLoader.build_trees (tvary přímo na fyzikálním serveru, jedno tělo na buňku 256 m)
 	var bodies := {}

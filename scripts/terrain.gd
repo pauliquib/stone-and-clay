@@ -1,7 +1,9 @@
 ## Terén celého katastru: výšková mřížka DMR 5G (2 m) z Blender exportu.
 ## - kolize: jeden HeightMapShape3D (stejná data jako vzhled)
 ## - vzhled: dlaždice 128 m, každá ve 4 LOD (2 / 4 / 8 / 32 m), výšky čte vertex shader z textury,
-##   praskliny mezi LOD skrývají "sukně" (okraje stažené dolů)
+##   praskliny mezi LOD skrývají "sukně" (okraje stažené dolů); přepnutí LOD je plynulé – geomorfing ve vertex
+##   shaderu (UV sítě nese krok další LOD a konec dosahu, `lod_cam` = poloha kamery každý snímek)
+## - povrch: procedurální materiály tříd ze šumu `detail_noise_texture()` (RGBA, 4 nezávislé kanály)
 class_name Terrain
 extends Node3D
 
@@ -29,6 +31,11 @@ var chunk_cells: int
 var heights: PackedFloat32Array
 var material: ShaderMaterial
 var use_ortho := false            # barva terénu z ortofota (F2 → Terén); výchozí = procedurální povrch
+var has_ortho := false            # ortofoto (textures/ortho_*.jpg) je k dispozici – není v gitu, bez něj jen procedurální povrch
+## Další materiály, které berou tabulku barev polí (okolí katastru – Surroundings).
+var linked_materials: Array[ShaderMaterial] = []
+
+static var _noise_cache: Texture2D = null
 
 
 func build(meta: Dictionary) -> void:
@@ -69,30 +76,33 @@ func build(meta: Dictionary) -> void:
 	var himg := Image.create_from_data(w, h, false, Image.FORMAT_RF, hbytes)
 	var nimg := Image.create_from_data(w, h, false, Image.FORMAT_RGB8, nbytes)
 	nimg.generate_mipmaps()
-	var noise := FastNoiseLite.new()
-	noise.frequency = 0.02
-	noise.fractal_octaves = 4
-	var ntex := NoiseTexture2D.new()
-	ntex.width = 512
-	ntex.height = 512
-	ntex.seamless = true
-	ntex.generate_mipmaps = true
-	ntex.noise = noise
 
 	material = ShaderMaterial.new()
 	material.shader = load("res://shaders/terrain.gdshader")
 	material.set_shader_parameter("height_tex", ImageTexture.create_from_image(himg))
 	material.set_shader_parameter("normal_tex", ImageTexture.create_from_image(nimg))
-	material.set_shader_parameter("detail_noise", ntex)
+	material.set_shader_parameter("detail_noise", detail_noise_texture())
+	material.set_shader_parameter("chunk_size", chunk_cells * spacing)
 	material.set_shader_parameter("grid_origin", Vector2(x0, z0))
 	material.set_shader_parameter("spacing", spacing)
 	material.set_shader_parameter("grid_size", Vector2(w, h))
 	# směr severu ve světě (sněhové jazyky na odvrácených svazích)
 	var nd := Clock.enu_to_world(Vector3(0.0, 1.0, 0.0), float(meta.get("north_angle_deg", 78.37)))
 	material.set_shader_parameter("north_xz", Vector2(nd.x, nd.z))
+	# ortofoto jen když soubor je (textures/*.jpg nejsou v gitu – ASSETY.md); bez něj zůstane procedurální povrch
+	has_ortho = true
 	for key in ["ortho_full", "ortho_core"]:
-		var o: Dictionary = meta[key]
-		material.set_shader_parameter(key, load(o["file"]))
+		var o: Dictionary = meta.get(key, {})
+		var file := String(o.get("file", ""))
+		var tex: Texture2D = null
+		# ResourceLoader.exists stačí .import – bez zdrojového jpg (a importu) by load() hlásil ERROR
+		if file != "" and ResourceLoader.exists(file) \
+				and (FileAccess.file_exists(file) or OS.has_feature("template")):
+			tex = load(file) as Texture2D
+		if tex == null:
+			has_ortho = false
+			continue
+		material.set_shader_parameter(key, tex)
 		var rect := Vector4(o["x0"], o["z0"], o["size_x"], o["size_z"])
 		material.set_shader_parameter("full_rect" if key == "ortho_full" else "core_rect", rect)
 
@@ -103,8 +113,12 @@ func build(meta: Dictionary) -> void:
 	var size := chunk_cells * spacing
 	var lod_quads := [chunk_cells, chunk_cells / 2, chunk_cells / 4, chunk_cells / 16]
 	var meshes := []
-	for q in lod_quads:
-		meshes.append(_grid_mesh(q, size))
+	for li in lod_quads.size():
+		# geomorfing: krok další (hrubší) LOD v buňkách výškové mřížky a konec dosahu této LOD (poslední nemorfuje)
+		var morph := Vector2.ZERO
+		if li + 1 < lod_quads.size():
+			morph = Vector2(chunk_cells / lod_quads[li + 1], LOD_RANGES[li + 1])
+		meshes.append(_grid_mesh(lod_quads[li], size, morph))
 	var mm := FileAccess.get_file_as_bytes("res://data/terrain_chunks.bin").to_float32_array()
 	var ncx := int(hm["ncx"])
 	var ncz := int(hm["ncz"])
@@ -145,8 +159,21 @@ func set_forest_density(tex: Texture2D, rect: Vector4) -> void:
 	material.set_shader_parameter("forest_rect", rect)
 
 
+## Poloha kamery pro geomorfing LOD (shader ji potřebuje i ve stínovém průchodu, kde CAMERA_POSITION_WORLD je světlo).
+func _process(_delta: float) -> void:
+	if material == null:
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam != null:
+		material.set_shader_parameter("lod_cam", cam.global_position)
+
+
 ## Barva terénu: true = ortofoto ČÚZK (porovnání), false = procedurální povrch (výchozí).
+## Bez souborů ortofota zůstane procedurální povrch.
 func set_ortho(on: bool) -> void:
+	if on and not has_ortho:
+		push_warning("Terrain: ortofoto není k dispozici (textures/ortho_*.jpg) – zůstává procedurální povrch")
+		on = false
 	use_ortho = on
 	material.set_shader_parameter("use_ortho", on)
 
@@ -168,6 +195,53 @@ func _load_surface_textures() -> void:
 ## Tabulka barev plodin pro dnešní datum (Fields.lut_image).
 func set_field_lut(tex: Texture2D) -> void:
 	material.set_shader_parameter("field_lut", tex)
+	for m in linked_materials:
+		m.set_shader_parameter("field_lut", tex)
+		m.set_shader_parameter("use_fields", tex != null)
+
+
+## RGBA šum 512² (bezešvý, s mipmapami) pro terén i okolí – jedna textura = 4 nezávislé hodnoty na vzorek:
+## R = fraktální simplex (stejný jako dřívější NoiseTexture2D), G = druhý nezávislý fraktální šum,
+## B = buňkový šum – vzdálenost ke středu buňky (hrudky, kamínky, listí), A = náhodná hodnota téže buňky (odstín).
+## Generuje se jednou (nativně FastNoiseLite, prokládání kanálů ~0,1 s) a sdílí se.
+static func detail_noise_texture() -> Texture2D:
+	if _noise_cache != null:
+		return _noise_cache
+	const N := 512
+	var chans: Array[PackedByteArray] = []
+	for k in 4:
+		var fn := FastNoiseLite.new()
+		if k < 2:
+			fn.seed = k * 101
+			fn.frequency = 0.02
+			fn.fractal_octaves = 4
+		else:
+			fn.seed = 77
+			fn.noise_type = FastNoiseLite.TYPE_CELLULAR
+			fn.frequency = 0.06
+			fn.fractal_type = FastNoiseLite.FRACTAL_NONE
+			fn.cellular_jitter = 0.9
+			fn.cellular_return_type = FastNoiseLite.RETURN_DISTANCE if k == 2 else FastNoiseLite.RETURN_CELL_VALUE
+		var img := fn.get_seamless_image(N, N, false, false, 0.1, true)
+		if img.get_format() != Image.FORMAT_L8:
+			img.convert(Image.FORMAT_L8)
+		chans.append(img.get_data())
+	var out := PackedByteArray()
+	out.resize(N * N * 4)
+	var r := chans[0]
+	var g := chans[1]
+	var b := chans[2]
+	var a := chans[3]
+	for i in N * N:
+		var o := i * 4
+		out[o] = r[i]
+		out[o + 1] = g[i]
+		out[o + 2] = b[i]
+		out[o + 3] = a[i]
+	var rgba := Image.create_from_data(N, N, false, Image.FORMAT_RGBA8, out)
+	rgba.generate_mipmaps()
+	_noise_cache = ImageTexture.create_from_image(rgba)
+	return _noise_cache
 
 
 ## Květy na loukách 0..1.
@@ -199,7 +273,8 @@ func _apply_water_carve(coll: PackedFloat32Array, nbytes: PackedByteArray) -> bo
 
 
 ## Mřížka n×n čtverců přes `size` metrů + sukně po obvodu (vrcholy s y = −1 shader stáhne dolů).
-func _grid_mesh(n: int, size: float) -> ArrayMesh:
+## `morph` jde do UV všech vrcholů: (krok další LOD v buňkách, konec dosahu LOD v m) – pro geomorfing; 0 = bez.
+func _grid_mesh(n: int, size: float, morph := Vector2.ZERO) -> ArrayMesh:
 	var verts := PackedVector3Array()
 	var idx := PackedInt32Array()
 	var step := size / n
@@ -239,6 +314,10 @@ func _grid_mesh(n: int, size: float) -> ArrayMesh:
 	normals.resize(verts.size())
 	normals.fill(Vector3.UP)
 	arr[Mesh.ARRAY_NORMAL] = normals
+	var uvs := PackedVector2Array()
+	uvs.resize(verts.size())
+	uvs.fill(morph)
+	arr[Mesh.ARRAY_TEX_UV] = uvs
 	var m := ArrayMesh.new()
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 	return m

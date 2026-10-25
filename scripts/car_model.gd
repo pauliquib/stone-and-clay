@@ -249,7 +249,7 @@ var police := false
 var plate := "4QQ 3457"
 
 var body_mesh: ArrayMesh
-var paint_mat: StandardMaterial3D
+var paint_mat: Material            # ShaderMaterial vc_paint (MeshKit.paint_material)
 var glass_mat: StandardMaterial3D
 var head_mat: StandardMaterial3D
 var tail_mat: StandardMaterial3D
@@ -490,24 +490,22 @@ func build() -> ArrayMesh:
 			hull_points.append(Vector3(-p.x, p.y, p.z))
 	_details(kt)
 	# materiály
-	paint_mat = StandardMaterial3D.new()
-	paint_mat.albedo_color = paint
-	paint_mat.vertex_color_use_as_albedo = false
-	paint_mat.metallic = 0.5
-	paint_mat.roughness = 0.3
-	paint_mat.clearcoat_enabled = true
-	paint_mat.clearcoat = 0.8
-	paint_mat.clearcoat_roughness = 0.15
+	paint_mat = MeshKit.paint_material(paint, 0.3, 0.5, 0.8, 0.15)
 	glass_mat = StandardMaterial3D.new()
-	glass_mat.albedo_color = Color(0.08, 0.1, 0.12, 0.62)
+	# tmavé tónované sklo: interiér prosvítá jen zblízka, odraz oblohy podle úhlu (metalické + rim)
+	glass_mat.albedo_color = Color(0.03, 0.045, 0.06, 0.72)
 	glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glass_mat.metallic = 0.4
-	glass_mat.roughness = 0.04
+	glass_mat.metallic = 0.65
+	glass_mat.metallic_specular = 0.8
+	glass_mat.roughness = 0.03
+	glass_mat.rim_enabled = true
+	glass_mat.rim = 0.35
+	glass_mat.rim_tint = 0.2
 	glass_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	body_mesh = ArrayMesh.new()
 	_add_surface(kp, paint_mat)
 	_add_surface(kg, glass_mat)
-	_add_surface(kt, MeshKit.vc_material(0.55, 0.2, 0.0, false))
+	_add_surface(kt, MeshKit.vc_material(0.55, 0.2, 0.0, false), 0.45)
 	# světla
 	var kh := MeshKit.new()
 	var ktl := MeshKit.new()
@@ -740,9 +738,12 @@ func _cyl(r: float, h: float) -> CylinderMesh:
 	return m
 
 
-func _add_surface(kit: MeshKit, mat: Material) -> void:
+## `ground_ao` > 0 → barvy vrcholů do té výšky ztmavnou k zemi (upečené před zálohou pro deformaci).
+func _add_surface(kit: MeshKit, mat: Material, ground_ao := 0.0) -> void:
 	if kit.is_empty():
 		return
+	if ground_ao > 0.0:
+		kit.bake_ground_ao(ground_ao)
 	_surf.append({"v": kit.verts.duplicate(), "n": kit.norms.duplicate(), "c": kit.cols.duplicate(),
 		"i": kit.idx.duplicate(), "v0": kit.verts.duplicate()})
 	_mats.append(mat)
@@ -772,7 +773,7 @@ func deform(p: Vector3, dir: Vector3, depth: float, radius: float) -> void:
 		arr[Mesh.ARRAY_COLOR] = s["c"]
 		arr[Mesh.ARRAY_INDEX] = s["i"]
 		body_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
-		body_mesh.surface_set_material(si, _mats[si])
+		body_mesh.surface_set_material(si, MeshKit.shader_of(_mats[si]))
 
 
 func repair() -> void:

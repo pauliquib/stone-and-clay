@@ -9,9 +9,17 @@ var cols := PackedColorArray()
 var idx := PackedInt32Array()
 
 static var _vc_mats := {}
+static var _shaders := {}
+
+const VC_SHADER := "res://shaders/vc_model.gdshader"
+const VC_SHADER_2S := "res://shaders/vc_model_2s.gdshader"
+const VC_PAINT := "res://shaders/vc_paint.gdshader"
+const VC_FUR := "res://shaders/vc_fur.gdshader"
 
 
-## Sdílený materiál s barvou z vrcholů.
+## Sdílený materiál s barvou z vrcholů. Vrací StandardMaterial3D (API pro volající, kteří ho přiřazují přímo),
+## ale nese v meta `vc_shader` ShaderMaterial vc_model.gdshader se stejnými parametry – `commit()` a `shader_of()`
+## ho použijí místo něj: šum podle druhu materiálu a zastínění spodku (dražší část až od Vysoké).
 static func vc_material(rough := 0.8, metal := 0.0, emissive := 0.0, cull := true) -> StandardMaterial3D:
 	var key := "%.2f_%.2f_%.2f_%s" % [rough, metal, emissive, cull]
 	if _vc_mats.has(key):
@@ -27,8 +35,51 @@ static func vc_material(rough := 0.8, metal := 0.0, emissive := 0.0, cull := tru
 		m.emission = Color.WHITE
 	if not cull:
 		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var sm := ShaderMaterial.new()
+	sm.shader = _shader(VC_SHADER if cull else VC_SHADER_2S)
+	sm.set_shader_parameter("vc_rough", rough)
+	sm.set_shader_parameter("vc_metal", metal)
+	sm.set_shader_parameter("vc_emis", emissive)
+	m.set_meta("vc_shader", sm)
 	_vc_mats[key] = m
 	return m
+
+
+## Materiál, který se má opravdu kreslit: u materiálů z `vc_material()` / srsti jejich shaderová varianta.
+static func shader_of(mat: Material) -> Material:
+	if mat != null and mat.has_meta("vc_shader"):
+		return mat.get_meta("vc_shader")
+	return mat
+
+
+## Lak vozidla (CarModel, BikeModel): barva `color` × barva vrcholu, metalíza a clearcoat od Vysoké (vc_paint.gdshader).
+## `low_ao` = síla ztmavení a prachu u země (počátek modelu na zemi; tenký rám kola menší).
+static func paint_material(color: Color, rough := 0.3, metal := 0.5, coat := 0.8, coat_rough := 0.15,
+		low_ao := 1.0) -> ShaderMaterial:
+	var sm := ShaderMaterial.new()
+	sm.shader = _shader(VC_PAINT)
+	sm.set_shader_parameter("vc_low_ao", low_ao)
+	sm.set_shader_parameter("vc_paint", color)
+	sm.set_shader_parameter("vc_rough", rough)
+	sm.set_shader_parameter("vc_metal", metal)
+	sm.set_shader_parameter("vc_coat", coat)
+	sm.set_shader_parameter("vc_coat_rough", coat_rough)
+	return sm
+
+
+## Srst (QuadrupedModel.fur_material): barvy vrcholů v sRGB × odstín jedince, chlupy od Vysoké (vc_fur.gdshader).
+static func fur_shader(rough: float, tint: float) -> ShaderMaterial:
+	var sm := ShaderMaterial.new()
+	sm.shader = _shader(VC_FUR)
+	sm.set_shader_parameter("vc_rough", rough)
+	sm.set_shader_parameter("vc_tint", tint)
+	return sm
+
+
+static func _shader(path: String) -> Shader:
+	if not _shaders.has(path):
+		_shaders[path] = load(path)
+	return _shaders[path]
 
 
 func is_empty() -> bool:
@@ -217,7 +268,11 @@ func loft(rings: Array, ring_colors: Array, closed := false, flip := false) -> i
 	return base
 
 
-func commit(mat: Material = null, into: ArrayMesh = null) -> ArrayMesh:
+## Hotový mesh (nová plocha do `into`, jinak nový ArrayMesh). `ground_ao` > 0: model stojí počátkem na zemi
+## (auto, předmět, zvíře) – barvy vrcholů do této výšky (m) k zemi ztmavnou (levná náhrada okluze, upečená jednou).
+func commit(mat: Material = null, into: ArrayMesh = null, ground_ao := 0.0) -> ArrayMesh:
+	if ground_ao > 0.0:
+		bake_ground_ao(ground_ao)
 	var arr := []
 	arr.resize(Mesh.ARRAY_MAX)
 	arr[Mesh.ARRAY_VERTEX] = verts
@@ -226,8 +281,23 @@ func commit(mat: Material = null, into: ArrayMesh = null) -> ArrayMesh:
 	arr[Mesh.ARRAY_INDEX] = idx
 	var m := into if into != null else ArrayMesh.new()
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
-	m.surface_set_material(m.get_surface_count() - 1, mat if mat != null else vc_material())
+	m.surface_set_material(m.get_surface_count() - 1, shader_of(mat if mat != null else vc_material()))
 	return m
+
+
+## Ztmaví barvy vrcholů blízko země (y = 0 v souřadnicích modelu) – kontaktní stín pod autem, u kopyt, u dna popelnice.
+## Plochy natočené dolů ztmavnou víc. `h` = výška, nad kterou už se nic nemění.
+func bake_ground_ao(h: float, strength := 0.45) -> void:
+	for i in verts.size():
+		var y := verts[i].y
+		if y >= h:
+			continue
+		var t := clampf(y / h, 0.0, 1.0)
+		t = t * t * (3.0 - 2.0 * t)
+		var down := clampf(-norms[i].y, 0.0, 1.0)
+		var f := 1.0 - strength * (1.0 - t) * (0.75 + 0.25 * down)
+		var c := cols[i]
+		cols[i] = Color(c.r * f, c.g * f, c.b * f, c.a)
 
 
 func clear() -> void:

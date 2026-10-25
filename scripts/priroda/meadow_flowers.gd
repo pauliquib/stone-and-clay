@@ -5,6 +5,10 @@
 ## Na zem přidávají i barevné tečky v terénním shaderu (`meadow_bloom`) – zdálky.
 ## Přestavba běží po kouscích přes několik snímků (FRAME_BUDGET_US) a do MultiMesh se zapíše najednou
 ## jedním bufferem – pohyb hráče tak nezpůsobí záseky. M8.14: na posekané louce (`Meadows.rel_at`) květy nejsou. `detail` (Nastavení → Grafika) zmenší okruh, 0 = bez květů.
+## 2026-10: místo kuliček skutečné květy – stvol, lístky a okvětí (karty s procedurálním výřezem, model
+## `GroundVegMeshes` „meadow_flower“, shader `vegetation.gdshader` s `veg_inst_acc`): barva v INSTANCE_CUSTOM.rgb,
+## tvar okvětí v .a (bílá = kopretina, žlutá = pryskyřník, fialová = chrpa / jetel, růžová = kohoutek), kývají se
+## ve větru, sešlapují se a k okraji okruhu plynule řídnou (`veg_fade_end`) – přestavba po 25 m není vidět.
 class_name MeadowFlowers
 extends Node3D
 
@@ -22,6 +26,8 @@ static var BLOOM_MIN := 0.03          # slabší kvetení = žádné květy
 static var SNOW_HIDES_BLOOM := 2.0    # květy mizí pod sněhem (× pokrývka) – stejné id jako SeasonFx
 ## Barvy: bílá, žlutá, fialová, růžová; na jaře (kolem dne 100) víc bílé a žluté, v létě fialové a růžové
 const PALETTE := [Color(0.95, 0.95, 0.92), Color(0.98, 0.85, 0.15), Color(0.6, 0.35, 0.8), Color(0.95, 0.55, 0.7)]
+## Rezerva (m) mezi plynulým zmizením květů a okrajem okruhu (přestavba po REBUILD_DIST)
+const FADE_MARGIN := 15.0
 
 var world: World
 var fields: Fields
@@ -33,12 +39,14 @@ var _last_jd := -1
 var _last_bloom := -1.0
 var _busy := false
 var detail := 1.0                      # 0 = vypnuto, 0.5–1 = poměr okruhu (Nastavení → Grafika → Vegetace)
+var _mat: ShaderMaterial
 
 
 func set_detail(d: float) -> void:
 	if is_equal_approx(d, detail):
 		return
 	detail = d
+	_apply_fade()
 	_last_pos = Vector3(1e9, 0, 1e9)       # přestavět při příští aktualizaci
 
 
@@ -47,25 +55,34 @@ func setup(w: World) -> void:
 	fields = w.fields
 	terrain = w.terrain
 	top_level = true
-	var mesh := SphereMesh.new()
-	mesh.radius = 0.05
-	mesh.height = 0.07
-	mesh.radial_segments = 6
-	mesh.rings = 3
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 0.85
-	mesh.material = mat
+	_mat = ShaderMaterial.new()
+	_mat.shader = load("res://shaders/vegetation.gdshader")
+	_mat.set_shader_parameter("veg_color_mode", 1)
+	_mat.set_shader_parameter("veg_inst_acc", 1.0)
+	_mat.set_shader_parameter("season_mode", 4)
+	_mat.set_shader_parameter("bend_k", 0.9)
+	_mat.set_shader_parameter("veg_trample", 0.8)
+	_mat.set_shader_parameter("veg_lo", Color(0.12, 0.24, 0.07))
+	_mat.set_shader_parameter("veg_hi", Color(0.30, 0.46, 0.16))
+	_apply_fade()
 	_mm = MultiMesh.new()
 	_mm.transform_format = MultiMesh.TRANSFORM_3D
-	_mm.use_colors = true
-	_mm.mesh = mesh
+	_mm.use_custom_data = true             # rgb = barva květu, a = typ okvětí / 4 (vegetation.gdshader)
+	_mm.mesh = GroundVegMeshes.build("meadow_flower")
 	_mm.instance_count = MAX_FLOWERS
 	_mm.visible_instance_count = 0
 	_mmi = MultiMeshInstance3D.new()
 	_mmi.multimesh = _mm
+	_mmi.material_override = _mat
 	_mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_mmi)
+
+
+## Plynulé řídnutí květů k okraji okruhu (shader): mez = okruh − rezerva na posun hráče do přestavby.
+func _apply_fade() -> void:
+	if _mat != null:
+		var rad := RADIUS * maxf(detail, 0.1)
+		_mat.set_shader_parameter("veg_fade_end", maxf(rad - FADE_MARGIN, rad * 0.6))
 
 
 ## Volá se párkrát za sekundu: `pos` = poloha hráče, `doy` = den v roce, `snow` = sníh na zemi 0..1.
@@ -138,7 +155,7 @@ func _rebuild(pos: Vector3, doy: float, bloom: float) -> void:
 				ci = 0 if (h2 / 1000) % 2 == 0 else 1
 			else:
 				ci = 2 if (h2 / 1000) % 3 != 0 else 3
-			var y := terrain.height_at(x, z) + 0.04
+			var y := terrain.height_at(x, z) - 0.02
 			var sc := 0.7 + float((h2 / 7) % 100) / 100.0 * 0.7
 			# řádky matice 3×4 (otočení kolem Y a měřítko) + barva RGBA
 			var a := float(h2 % 628) / 100.0
@@ -149,7 +166,7 @@ func _rebuild(pos: Vector3, doy: float, bloom: float) -> void:
 			buf[o] = c; buf[o + 1] = 0.0; buf[o + 2] = si; buf[o + 3] = x
 			buf[o + 4] = 0.0; buf[o + 5] = sc; buf[o + 6] = 0.0; buf[o + 7] = y
 			buf[o + 8] = -si; buf[o + 9] = 0.0; buf[o + 10] = c; buf[o + 11] = z
-			buf[o + 12] = col.r; buf[o + 13] = col.g; buf[o + 14] = col.b; buf[o + 15] = col.a
+			buf[o + 12] = col.r; buf[o + 13] = col.g; buf[o + 14] = col.b; buf[o + 15] = (ci + 0.25) / 4.0
 			n += 1
 			if n >= MAX_FLOWERS:
 				break

@@ -86,12 +86,9 @@ static func build(m: CarModel) -> ArrayMesh:
 				hp.append(Vector3(x, y, z))
 	m.hull_points = hp
 	# materiály a plochy
-	m.paint_mat = StandardMaterial3D.new()
-	m.paint_mat.albedo_color = m.paint
-	m.paint_mat.metallic = 0.3
-	m.paint_mat.roughness = 0.45
+	m.paint_mat = MeshKit.paint_material(m.paint, 0.45, 0.3, 0.5, 0.3, 0.6)
 	m._add_surface(kp, m.paint_mat)
-	m._add_surface(kt, MeshKit.vc_material(0.55, 0.2, 0.0, false))
+	m._add_surface(kt, MeshKit.vc_material(0.55, 0.2, 0.0, false), 0.5)
 	m._add_surface(kh, m.head_mat)
 	m._add_surface(ktl, m.tail_mat)
 	# řidič: sedí uprostřed na sedadle, ruce na volantu, nohy na plošině

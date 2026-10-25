@@ -69,6 +69,7 @@ func _process(delta: float) -> void:
 	if _t <= 0.0:
 		_t = CHECK_S
 		_update_sets()
+		gen.update_impostor_shadows()             # 2026-10: stíny impostorů podle předvolby
 	if _queue.is_empty():
 		return
 	var t0 := Time.get_ticks_usec()

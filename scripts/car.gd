@@ -569,6 +569,7 @@ func _ready() -> void:
 	_prev_xf = _cur_xf
 	vis.global_transform = _cur_xf
 	_apply_tune()
+	_place_wheels()          # kola hned na místě (top_level – jinak do prvního _process leží v počátku světa)
 	DevTune.hub().changed.connect(_on_tune)     # M8.D: změna v menu F3 → hmotnost, pružení, těžiště hned
 
 
@@ -776,7 +777,7 @@ func _build_wipers() -> void:
 		pivot.basis = _wiper_basis * Basis(Vector3.UP, WIPER_PARK)
 		var mi := MeshInstance3D.new()
 		mi.mesh = mesh
-		mi.material_override = mat
+		mi.material_override = MeshKit.shader_of(mat)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		pivot.add_child(mi)
 		vis.add_child(pivot)
@@ -873,15 +874,19 @@ func set_asleep(on: bool, kin := false) -> void:
 		_kin_vis = false
 	if on:
 		# posouvané (kinematické) auto jako kinematické těleso – posun nehýbe statickým stromem broadphase
+		if not kin:
+			_snap_to_ground()
 		freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC if kin else RigidBody3D.FREEZE_MODE_STATIC
 		freeze = true
 		set_physics_process(false)
 		set_process(false)
+		_pin_wheels(true)
 		_engine.volume_db = -80.0
 		_skid.volume_db = -80.0
 		if _rain_roof:
 			_rain_roof.stop()
 	else:
+		_pin_wheels(false)
 		freeze = false
 		set_process(true)
 		set_physics_process(true)
@@ -908,6 +913,62 @@ func set_kin_lod(on: bool) -> void:
 	if not on:
 		vis.global_transform = global_transform
 		_engine.volume_db = -80.0
+	_pin_wheels(not on)      # bez _process kola jedou s karoserií jako děti, s ním je umisťuje _process_impl
+
+
+## Umístí vizuál kol podle aktuální polohy auta a pružení (bez interpolace) – po startu a po teleportu.
+func _place_wheels() -> void:
+	if _wheel_vis.is_empty():
+		return
+	_update_wheel_visuals()
+	_update_wheel_visuals()                     # _prev_wxf = _cur_wxf
+	var xf := global_transform
+	var lean_xf := Transform3D(Basis(Vector3.BACK, lean), Vector3.ZERO) if two_wheeler else Transform3D.IDENTITY
+	for i in _wheel_vis.size():
+		_wheel_vis[i].global_transform = xf * lean_xf * xf.affine_inverse() * _cur_wxf[i] if two_wheeler else _cur_wxf[i]
+
+
+## Kola uspaného auta / hluboké kinematiky (_process stojí): `on` = kola se připnou ke karoserii (top_level vypnuto,
+## jedou s tělesem samy), `false` = zpět top_level pro interpolaci v _process_impl. Vizuální validátor našel kola
+## aut uspaných hned po startu v počátku světa [0,0,0] – _process je nestihl ani jednou umístit.
+func _pin_wheels(on: bool) -> void:
+	if _wheel_vis.is_empty():
+		return
+	if on:
+		_place_wheels()
+	for wm in _wheel_vis:
+		wm.top_level = not on                   # set_as_top_level zachová globální polohu
+
+
+## Před uspáním: auto, které ještě nedosedlo (spawn kousek nad zemí), spustí na kola – jinak zamrzne ve vzduchu
+## (validátor: kolo a Jawa u domova ~0,16 m nad zemí). Jen dolů, o nejmenší mezeru pod koly, pružení na klidovém prověšení.
+func _snap_to_ground() -> void:
+	if wheels.is_empty() or not is_inside_tree():
+		return
+	var up := global_transform.basis.y.normalized()
+	if up.y < 0.7:
+		return                                  # převrácené / na boku – nechat být
+	var gap := INF
+	var hits: Array[float] = []
+	for w in wheels:
+		w.force_raycast_update()
+		if not w.is_colliding():
+			hits.append(INF)
+			continue
+		var d := w.get_collision_point().distance_to(w.global_position)
+		hits.append(d)
+		var sag := clampf(mass * VEH_G / (float(wheels.size()) * maxf(w.stiff, 1.0)), 0.0, w.travel)
+		gap = minf(gap, d - w.radius - (w.rest - sag))
+	if gap == INF or gap < 0.02 or gap > 1.0:
+		return
+	global_position -= up * gap
+	_cur_xf = global_transform
+	_prev_xf = _cur_xf
+	vis.global_transform = _cur_xf
+	for i in wheels.size():
+		var w := wheels[i]
+		if hits[i] < INF:
+			w.sus_len = clampf(hits[i] - gap - w.radius, maxf(w.rest - w.travel, 0.02), w.rest + w.travel)
 
 
 ## Optimalizace CPU: stojící vozidlo bez řidiče je dost dlouho v klidu → Traffic ho smí zamrazit (`rest_frozen`).
