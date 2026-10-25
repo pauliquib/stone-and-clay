@@ -14,6 +14,8 @@ class_name Villager
 extends CharacterBody3D
 
 static var PHYSICS_RANGE := 160.0
+var _ground_t := 0.0          # kinematická chůze: do dalšího paprsku na povrch (s)
+var _ground_off := 0.0        # … a výška povrchu (silnice) nad terénem (m)
 ## Krok kinematického pohybu hluboce uspaného vesničana (za simulační bublinou World.sim_radius).
 static var SLEEP_STEP := 0.5
 ## Kolik prvních spawnutých vesničanů dostane behavior strom (0 = BT nikdo; Fáze 3: testovací podmnožina).
@@ -654,7 +656,19 @@ func _physics_impl(delta) -> void:
 	if dist > PHYSICS_RANGE:
 		# daleko: kinematicky po terénu
 		global_position += desired * delta
-		global_position.y = terrain.height_at(global_position.x, global_position.z)
+		# povrch nad terénem (asfalt leží ~0,13 m nad mřížkou) – paprsek jen 2× za s, mezi tím se drží poslední posun
+		_ground_t -= delta
+		var th := terrain.height_at(global_position.x, global_position.z)
+		if _ground_t <= 0.0:
+			_ground_t = 0.5
+			_ground_off = 0.0
+			var q := PhysicsRayQueryParameters3D.create(Vector3(global_position.x, th + 1.0, global_position.z),
+				Vector3(global_position.x, th - 0.3, global_position.z), 1)
+			q.exclude = [get_rid()]
+			var hit := get_world_3d().direct_space_state.intersect_ray(q)
+			if not hit.is_empty():
+				_ground_off = clampf(float(hit["position"].y) - th, 0.0, 0.3)
+		global_position.y = th + _ground_off
 		velocity = desired
 	else:
 		velocity.x = move_toward(velocity.x, desired.x, WALK_ACCEL * delta)
