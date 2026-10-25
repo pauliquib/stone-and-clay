@@ -5,7 +5,7 @@
 //    (1 omítka v barvě tintu, u tmavých fasád stodol prkna, 2 střecha – pálené tašky / eternit / lepenka, 3 asfalt se záplatami a vyjetými stopami,
 //    4 štěrková cesta) ze sdílené RGBA textury šumů `noise_tex` (ProcTextures) – 2–4 čtení místo 9 u textur.
 // Na obou cestách: sokl, vlhkost a odstřik u paty zdí, šmouhy a stín pod okapem (UV = pata a vrchol sloupce zdi,
-// `wall_cols`), mech na severních stranách střech, krajnice a stopy cest (UV = (s, šířka pásu), `road_uv`;
+// `wall_cols`), mech na severních stranách střech, krajnice a stopy cest (UV = (s, šířka pásu), `road_uv`, viz road_e;
 // atributy dopočítá MapLoader.load_chunks), sníh a mokro (louže ve stopách).
 // Dražší části (bump omítky, praskliny, lišejník, louže) jen pro gfx_quality > 1,5 (Vysoká, Ultra).
 shader_type spatial;
@@ -59,6 +59,18 @@ vec3 plaster_tint(vec3 t) {
 	t.b = min(t.b, t.g * 0.93);
 	t = mix(vec3(dot(t, vec3(0.2126, 0.7152, 0.0722))), t, 0.85);   // za šera nežloutne do hořčicové
 	return t * 0.94;
+}
+
+// Cesty: (vzdálenost od okraje, souměrná vzdálenost pro vyjeté stopy) z UV = (s, W). s ∈ 0..1 = „stan“
+// min(s, 1 − s) · W (okraje na obou stranách pásu); s ∈ 2..3 = protější strana zakrytá jiným pásem (ústí odbočky,
+// křižovatka) → vzdálenost od okraje lineárně (s − 2) · W, stopy dál souměrně.
+vec2 road_e(vec2 uv) {
+	if (uv.x > 1.5) {
+		float l = (uv.x - 2.0) * uv.y;
+		return vec2(l, min(l, uv.y - l));
+	}
+	float e = min(uv.x, 1.0 - uv.x) * uv.y;
+	return vec2(e);
 }
 
 // Bump z výšky (m) přes derivace obrazovky (Mikkelsen 2010) – bez tangent, jen Vysoká+.
@@ -233,9 +245,12 @@ void fragment() {
 		vec4 na = nzs(g * 0.85);
 		vec4 nb = nzs(g * 0.055 + vec2(0.5, 0.21));
 		float e = 99.0;
+		float et = 99.0;
 		float rw = -1.0;
 		if (road_uv && UV.y > 0.0) {
-			e = min(UV.x, 1.0 - UV.x) * UV.y;
+			vec2 ee = road_e(UV);
+			e = ee.x;
+			et = ee.y;
 			rw = UV.y;
 		}
 		vec3 acol = vec3(0.105, 0.103, 0.1) * (0.8 + 0.42 * nb.g);
@@ -247,9 +262,9 @@ void fragment() {
 		if (rw > 0.0) {
 			float hw = 0.5 * rw;
 			float t1 = rw < 4.6 ? max(hw - 0.85, 0.35) : 0.75;
-			tr = 1.0 - smoothstep(0.1, 0.4, abs(e - t1));
+			tr = 1.0 - smoothstep(0.1, 0.4, abs(et - t1));
 			if (rw >= 4.6) {
-				tr = max(tr, 1.0 - smoothstep(0.1, 0.4, abs(e - (hw - 0.8))));
+				tr = max(tr, 1.0 - smoothstep(0.1, 0.4, abs(et - (hw - 0.8))));
 			}
 			tr *= 0.55 + 0.45 * nb.a;
 		}
@@ -301,15 +316,16 @@ void fragment() {
 		vec3 grass = mix(vec3(0.15, 0.13, 0.065), vec3(0.05, 0.1, 0.025), clamp(grass_green, 0.0, 1.0)) * (0.75 + 0.5 * na.r);
 		if (road_uv && UV.y > 0.0) {
 			float rw = UV.y;
-			float e = min(UV.x, 1.0 - UV.x) * rw;
+			vec2 ee = road_e(UV);
+			float e = ee.x;
 			float hw = 0.5 * rw;
 			float tr = 0.0;
 			if (rw > 2.2) {
-				tr = (1.0 - smoothstep(0.12, 0.4, abs(e - max(hw - 0.75, 0.3)))) * (0.6 + 0.4 * nb.a);
+				tr = (1.0 - smoothstep(0.12, 0.4, abs(ee.y - max(hw - 0.75, 0.3)))) * (0.6 + 0.4 * nb.a);
 			}
 			gcol = mix(gcol, base * vec3(0.8, 0.72, 0.6) * (0.8 + 0.3 * na.a), tr * 0.75);
 			rough = mix(rough, 0.82, tr);
-			float gs = (1.0 - smoothstep(0.2, 0.42, abs(e - hw) + (na.a - 0.5) * 0.25)) * step(2.4, rw) * smoothstep(0.3, 0.6, nb.g + 0.25);
+			float gs = (1.0 - smoothstep(0.2, 0.42, abs(ee.y - hw) + (na.a - 0.5) * 0.25)) * step(2.4, rw) * smoothstep(0.3, 0.6, nb.g + 0.25);
 			float ez = e + (nb.g - 0.5) * 0.35 + (na.a - 0.5) * 0.2;
 			float side = 1.0 - smoothstep(0.0, 0.3, ez);
 			gcol = mix(gcol, grass, max(gs, side * 0.85));
@@ -355,7 +371,7 @@ void fragment() {
 	if (use_tex && mat_kind == 3 && road_uv) {
 		snow_k = 0.5;
 		if (UV.y > 0.0) {
-			float e = min(UV.x, 1.0 - UV.x) * UV.y;
+			float e = road_e(UV).x;
 			alb *= mix(0.8, 1.0, smoothstep(0.03, 0.45, e));
 			snow_k = 0.6 + 0.9 * (1.0 - smoothstep(0.3, 1.4, e));
 		}

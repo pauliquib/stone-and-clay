@@ -155,7 +155,8 @@ static func north_xz() -> Vector2:
 ## M9 (vlna E): drapované cesty se adaptivně dělí (hrany přes nerovný terén se půlí, viz DRAPE_TOL) – dřív se
 ## posouvaly jen vrcholy a terén mezi nimi prorůstal (6,4 % vzorků asfaltu pod terénem). Normály drapovaných cest
 ## jsou normály terénu. Atributy vrcholů pro procedurální materiál (UV): cesty (s, W) – s = 0 na okraji pásu, 1
-## u protějšího vrcholu, W = šířka pásu (vzdálenost od okraje = min(s, 1 − s) · W, krajnice a vyjeté stopy);
+## u protějšího vrcholu, W = šířka pásu (vzdálenost od okraje = min(s, 1 − s) · W, krajnice a vyjeté stopy; okraj
+## zakrytý jiným pásem – ústí odbočky – se za okraj nepočítá a s ∈ 2..3 značí lineární vzdálenost, viz _set_side);
 ## zdi (pata, vrchol) – světová výška spodní a horní hrany svislého sloupce zdi (sokl, šmouhy pod okapem).
 ## Výpočet dlaždic běží paralelně (WorkerThreadPool), meshe se skládají v hlavním vlákně.
 static func load_chunks(path: String, mat: Material, drape: Terrain = null, drape_h := 0.1) -> Array:
@@ -363,6 +364,50 @@ static func _drape_chunk(job: Dictionary, f: DrapeField, drape_h: float) -> void
 		for e in 3:
 			var k := _ekey(p[t * 3 + e], p[t * 3 + (e + 1) % 3])
 			ecount[k] = int(ecount.get(k, 0)) + 1
+	# okraj, za kterým hned pokračuje jiný pás (ústí odbočky, konec pásu uvnitř křižovatky), okrajem není – jinak by
+	# se uprostřed vozovky kreslila rozpadlá krajnice (a v zimě sněhový mnohoúhelník) prosvítající přes druhý pás
+	var grid := {}
+	for t in nt:
+		var lo := Vector2(minf(p[t * 3].x, minf(p[t * 3 + 1].x, p[t * 3 + 2].x)), minf(p[t * 3].z, minf(p[t * 3 + 1].z, p[t * 3 + 2].z)))
+		var hi := Vector2(maxf(p[t * 3].x, maxf(p[t * 3 + 1].x, p[t * 3 + 2].x)), maxf(p[t * 3].z, maxf(p[t * 3 + 1].z, p[t * 3 + 2].z)))
+		for gx in range(floori(lo.x / 4.0), floori(hi.x / 4.0) + 1):
+			for gz in range(floori(lo.y / 4.0), floori(hi.y / 4.0) + 1):
+				var gk := Vector2i(gx, gz)
+				if not grid.has(gk):
+					grid[gk] = PackedInt32Array()
+				grid[gk].append(t)
+	for t in nt:
+		for e in 3:
+			var a := p[t * 3 + e]
+			var b := p[t * 3 + (e + 1) % 3]
+			var k := _ekey(a, b)
+			if int(ecount[k]) != 1:
+				continue
+			var o := p[t * 3 + (e + 2) % 3]
+			var d := Vector2(b.x - a.x, b.z - a.z).normalized()
+			var nrm := Vector2(-d.y, d.x)
+			var mid := Vector2((a.x + b.x) * 0.5, (a.z + b.z) * 0.5)
+			if nrm.dot(Vector2(o.x, o.z) - mid) > 0.0:
+				nrm = -nrm                          # ven z pásu (od protějšího vrcholu)
+			var q := mid + nrm * 0.3
+			for t2 in grid.get(Vector2i(floori(q.x / 4.0), floori(q.y / 4.0)), PackedInt32Array()):
+				if t2 != t and Geometry2D.point_is_inside_triangle(q, Vector2(p[t2 * 3].x, p[t2 * 3].z),
+						Vector2(p[t2 * 3 + 1].x, p[t2 * 3 + 1].z), Vector2(p[t2 * 3 + 2].x, p[t2 * 3 + 2].z)):
+					ecount[k] = -1                  # zakrytý okraj
+					break
+	# vrcholy na skutečném (b) a zakrytém (c) okraji – roh ústí odbočky leží na obou a platí jako skutečný okraj
+	var on_b := {}
+	var on_c := {}
+	for t in nt:
+		for e in 3:
+			var c := int(ecount[_ekey(p[t * 3 + e], p[t * 3 + (e + 1) % 3])])
+			if c == 1 or c == -1:
+				for j in [e, (e + 1) % 3]:
+					var vk := Vector2i(roundi(p[t * 3 + j].x * 50.0), roundi(p[t * 3 + j].z * 50.0))
+					if c == 1:
+						on_b[vk] = true
+					else:
+						on_c[vk] = true
 	var sw := PackedVector2Array()        # (s, W) na vrchol trojúhelníku
 	sw.resize(n)
 	var multi: Array[int] = []            # trojúhelníky s více okraji (konce pásů) – po mediánu šířky
@@ -373,10 +418,27 @@ static func _drape_chunk(job: Dictionary, f: DrapeField, drape_h: float) -> void
 			if int(ecount[_ekey(p[t * 3 + e], p[t * 3 + (e + 1) % 3])]) == 1:
 				bnd.append(e)
 		if bnd.size() == 1:
-			widths.append(_set_side(p, sw, t, bnd[0]))
+			# protější strana pásu zakrytá jiným pásem → vzdálenost od okraje lineárně přes celý pás (s + 2)
+			var o := p[t * 3 + (bnd[0] + 2) % 3]
+			var ok := Vector2i(roundi(o.x * 50.0), roundi(o.z * 50.0))
+			widths.append(_set_side(p, sw, t, bnd[0], on_c.has(ok) and not on_b.has(ok)))
 		elif bnd.is_empty():
-			for j in 3:
-				sw[t * 3 + j] = Vector2(0.5, -1.0)      # vnitřek (křižovatka): W < 0 = bez okrajů a stop
+			var cov := -1
+			for e in 3:
+				if int(ecount[_ekey(p[t * 3 + e], p[t * 3 + (e + 1) % 3])]) == -1:
+					cov = e if cov == -1 else -2
+			var o2 := p[t * 3 + (cov + 2) % 3] if cov >= 0 else Vector3.ZERO
+			if cov >= 0 and on_b.has(Vector2i(roundi(o2.x * 50.0), roundi(o2.z * 50.0))):
+				# zakrytý okraj, protější vrchol na skutečném okraji: lineárně od něj (zakrytá strana = šířka pásu)
+				var i0 := t * 3 + cov
+				var i1 := t * 3 + (cov + 1) % 3
+				var wd := maxf(_line_dist(p[i0], p[i1], o2), 0.5)
+				sw[i0] = Vector2(3.0, wd)
+				sw[i1] = Vector2(3.0, wd)
+				sw[t * 3 + (cov + 2) % 3] = Vector2(2.0, wd)
+			else:
+				for j in 3:
+					sw[t * 3 + j] = Vector2(0.5, -1.0)      # vnitřek (křižovatka): W < 0 = bez okrajů a stop
 		else:
 			multi.append(t)
 	var med := 3.0
@@ -509,14 +571,17 @@ static func _drape_chunk(job: Dictionary, f: DrapeField, drape_h: float) -> void
 
 
 ## Okraj pásu = hrana `e` trojúhelníku `t`: její vrcholy s = 0, protější vrchol s = 1; W = jeho vzdálenost od okraje.
-static func _set_side(p: PackedVector3Array, sw: PackedVector2Array, t: int, e: int) -> float:
+## `lin` – protější strana pásu není okraj (zakrytá jiným pásem): s = 2 na okraji, 3 u protějšího vrcholu
+## (shader: vzdálenost od okraje lineárně (s − 2) · W místo „stanu“ min(s, 1 − s) · W).
+static func _set_side(p: PackedVector3Array, sw: PackedVector2Array, t: int, e: int, lin := false) -> float:
 	var i0 := t * 3 + e
 	var i1 := t * 3 + (e + 1) % 3
 	var i2 := t * 3 + (e + 2) % 3
 	var wd := maxf(_line_dist(p[i0], p[i1], p[i2]), 0.5)
-	sw[i0] = Vector2(0.0, wd)
-	sw[i1] = Vector2(0.0, wd)
-	sw[i2] = Vector2(1.0, wd)
+	var s0 := 2.0 if lin else 0.0
+	sw[i0] = Vector2(s0, wd)
+	sw[i1] = Vector2(s0, wd)
+	sw[i2] = Vector2(s0 + 1.0, wd)
 	return wd
 
 

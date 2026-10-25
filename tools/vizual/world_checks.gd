@@ -792,9 +792,9 @@ func _check_facades() -> void:
 		var bad := false
 		var nm := "Fasady/dvere_%d" % int(id)
 		var kind: String = dinfo.get("kind", "door")
-		var hgt := BuildingDetails.DOOR_H
+		var hgt := float(dinfo.get("height", BuildingDetails.DOOR_H))   # skutečná výška (dveře snížené pod okap)
 		var b2: Dictionary = bd.buildings().get(id, {})
-		if kind == "gate":
+		if kind == "gate" and not dinfo.has("height"):
 			var rule: Dictionary = BuildingDetails.RULES.get(b2.get("type", "house"), {})
 			hgt = float(rule.get("gate", [3.0, 2.5])[1])
 		if _b.has(int(id)):
