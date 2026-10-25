@@ -3146,3 +3146,43 @@ Jeden příkaz (`--quick`, `--no-engine`, `--out=…`, `--res=WxH`); starý výs
 - **Procedurální modely**: druh materiálu v alfě barvy vrcholu (kůže, vlasy, látka, useň, lak, srst), sklo aut, reflektory,
   vlasy postav. Opravy: kola uspaných aut ležela v počátku světa, kolo a Jawa visely nad zemí, popelnice a schránky se na
   svahu převracely; `World._spawn_props` už nestaví popelnice do budov.
+
+### Závěrečné ladění (podle validátoru a snímků)
+- **Noc**: čitelná modrošedá (ambient z noční oblohy, expozice, světlejší obzor; střední jas 0,06 → ~0,10–0,12).
+- **Zima**: chladně bílá místo béžové (neutrální světlo pod souvislou oblačností, mlha při sněžení ~800 m, jemnější LUT;
+  terén: bílý sníh s modravými závějemi, dno rybníka vně hladiny se nestínuje → zmizely tmavé klíny u ledu).
+- **Pole**: řádky setí, kolejové řádky, souvrať a mez, vláhové skvrny, polehlé obilí, vlnění klasů (Vysoká+); geometrie
+  parcel (směr řádků, vzdálenost od okraje) se dopočítá ve vlákně při startu (~5 s).
+- **Koryta**: dno jen pod hladinou (atlas pobřeží nese hloubku), nepravidelné oblázky a písek místo „dlažby“.
+- **Veřejné osvětlení**: graf silnic je zahuštěný na hrany ≤ 12 m, ale lampa se stavěla jen na hraně delší než 15 m →
+  **nestála žádná lampa** (i se skutečnými daty). Teď se rozmisťují po celé silnici podle ujeté délky (na vsi 71 lamp).
+- **Policejní hlídka** jezdila do slepé ulice, otáčela se obloukem mimo silnici a zabořila se do svahu u plošiny domu
+  (i ve výchozím stavu) – cíle tras jen průjezdné uzly, přeplánování od uzlu před autem.
+- **Vesničané** v kinematické chůzi (> 160 m) stáli 13 cm v asfaltu – výška podle paprsku na povrch 2× za s.
+- Květy dostávají `field_lut`, validátor fotí skutečný okraj lesa a pole s obilím, `--quick` fotí soumrak před nocí.
+
+### Výsledek validátoru (`tools/vizual/run.sh`, výchozí stav → konec)
+| Vrstva | Před | Po |
+|---|---|---|
+| data | FAIL 18 / WARN 306 | FAIL 10 / WARN 207 |
+| geometrie | FAIL 15 / WARN 28 | **FAIL 0** / WARN 4 |
+| galerie (25 modelů) | 0 nálezů | 0 nálezů |
+| obraz (35 snímků) | WARN 14 | WARN ~8 (dron a kolo: vysoké frekvence) |
+
+Terén pod domy sedí na `ground_y` u 95 % domů (86 %). Zmizelo: kola aut v počátku světa (9×), převrácené popelnice (18×),
+popelnice v budovách, dveře nad okapem, terén prorůstající asfaltem (6,4 % → 0 %), z-fighting štěrk/asfalt i vodních
+toků, nenavázané samplery, zabořená policie, „noc osvětlená jako den“.
+Snímky před/po: `logs/screenshoty/pred_a_po_final.png` (lokálně, logs/ je v .gitignore), report `logs/vizual/final2/`.
+
+### Otevřené body
+- **Vady vstupních dat `data/buildings.json`** (platí i pro skutečná data): kůlny/garáž `dmp_1`, `279053586`, `dmp_77`,
+  `dmp_5` mají zdi 13–16 m; domy `dmp_108`, `dmp_51`, `dmp_7` zasahují 2,7–3,2 m do vozovky (kandidáti pro
+  `tools/clean_road_clashes.py REMOVE_BUILDINGS`); 19 domů má střed hřebene mimo půdorys.
+- Syntetický terén: 3 FAIL daleko od vsi (strmá účelová cesta #819 u Břehatic, příčný sklon ulice #1179, kůlna
+  918931174 u koryta) a dveře 279053673 nad zářezem silnice – jen pro cloudová data, ne pro hru se skutečnými daty.
+- Klasy obilí jsou řídké (~42/ha, `tools/vegetation.py` CROP_WHEAT) – pole zblízka působí plošně; hustota je otázka
+  rozpočtu vegetace.
+- Stíny mraků jsou zatím jen celkové ztlumení slunce (putující stín po zemi by potřeboval globální `cloud_tex` v terénu).
+- Hlídka po honičce ve slepé ulici s hráčem do 150 m se pořád může otočit obloukem mimo silnici.
+- Šípky a zahradní plody mají červené bobule i v červnu (akcentová barva bez sezóny).
+- Ve skutečné hře na GPU ověřit výkon Vysoké/Ultra (SSAO/SSIL/SSR, kvalitní voda, stíny vegetace) – v cloudu jen software.
