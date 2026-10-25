@@ -2,7 +2,8 @@
 ## Data: `data/surround_height.bin` (výšky, krok ~25 m) a `data/surround_surface.bin`
 ## (maska povrchu – třídy jako `SurfaceMap` + 8 voda), připraví `tools/surroundings.py`
 ## (bin soubory nejsou v gitu). Výšky čte vertex shader (`shaders/surroundings.gdshader`),
-## barva tříd sdílí paletu s `terrain.gdshader`. Oblast katastru shader zapustí pod
+## barva tříd sdílí procedurální povrch s `terrain.gdshader` (`shaders/include/terrain_surface.gdshaderinc`,
+## stejný šum `Terrain.detail_noise_texture()`), orná půda je mozaika polí s barvami plodin z `field_lut` terénu. Oblast katastru shader zapustí pod
 ## detailní terén (díra `HOLE_SINK` / `HOLE_BLEND`), okraje dlaždic mají sukně.
 ## Bez kolizí a bez stínů. Les = tmavší povrch + MultiMesh hrubých kuželů do `CONE_RANGE`.
 ## Když data chybí → plochá zvlněná krajina ve výšce okraje katastru (fallback) – hra funguje.
@@ -13,6 +14,7 @@ const TILE_M := 2048.0          # hrana dlaždice okolí (m) – 64×64 quadů n
 const TILE_QUADS := 64
 const HOLE_SINK := 3.0          # zapuštění pod detailní terén uvnitř jeho obdélníku (m)
 const HOLE_BLEND := 30.0        # náběh zapuštění od okraje detailního terénu (m)
+const KAT_JOIN := 160.0         # pás za hranicí katastru, na kterém výška přechází z detailního terénu do okolí (m)
 const SKIRT_DEPTH := 60.0       # sukně okrajů dlaždic (m)
 const FALLBACK_EXTENT := 4500.0 # bez dat: jak daleko za detailní terén sahá krajina (m)
 const FALLBACK_STEP := 64.0     # krok fallback mřížky (m)
@@ -36,24 +38,46 @@ var loaded := false             # true = reálná data ze surround_height.bin, f
 var material: ShaderMaterial
 
 var _surface := PackedByteArray()
+var _terrain: Terrain = null
 var _kat := Rect2()             # obdélník detailního terénu (katastr)
 var _rng := RandomNumberGenerator.new()
 
 
 ## Postaví okolí podle terénu katastru (volá World po `terrain.build`).
 func setup(terrain: Terrain) -> void:
+	_terrain = terrain
 	_kat = Rect2(terrain.x0, terrain.z0, (terrain.w - 1) * terrain.spacing,
 		(terrain.h - 1) * terrain.spacing)
 	_rng.seed = 122
 	if not _load_data():
 		_make_fallback(terrain)
 	_build_material()
+	# tabulka barev plodin: stejná jako v katastru (Terrain.set_field_lut ji pak předává i sem)
+	var lut = terrain.material.get_shader_parameter("field_lut")
+	if lut is Texture2D:
+		material.set_shader_parameter("field_lut", lut)
+		material.set_shader_parameter("use_fields", true)
+	terrain.linked_materials.append(material)
 	_build_tiles()
 	_build_cones()
 
 
-## Výška okolí v bodě (bilineárně) – pro kužely lesa a ladění. Vně mřížky svírá na okraj.
+## Výška okolí v bodě jako ve vertex shaderu: bilineárně z mřížky okolí, u hranice katastru (pás KAT_JOIN)
+## přelitá do výšky detailního terénu v nejbližším bodě katastru. Vně mřížky svírá na okraj.
 func height_at(x: float, z: float) -> float:
+	var hs := _grid_height(x, z)
+	if _terrain == null:
+		return hs
+	var cx := clampf(x, _kat.position.x, _kat.end.x)
+	var cz := clampf(z, _kat.position.y, _kat.end.y)
+	var d := Vector2(x - cx, z - cz).length()
+	if d >= KAT_JOIN:
+		return hs
+	return lerpf(_terrain.height_at(cx, cz), hs, smoothstep(0.0, KAT_JOIN, d))
+
+
+## Výška mřížky okolí (bilineárně).
+func _grid_height(x: float, z: float) -> float:
 	if nx < 2 or nz < 2:
 		return 0.0
 	var fx := clampf((x - x0) / spacing, 0.0, nx - 1.001)
@@ -157,20 +181,11 @@ func _build_material() -> void:
 	var simg := Image.create(2, 2, false, Image.FORMAT_R8)
 	if _surface.size() == nx * nz:
 		simg = Image.create_from_data(nx, nz, false, Image.FORMAT_R8, _surface)
-	var noise := FastNoiseLite.new()
-	noise.frequency = 0.02
-	noise.fractal_octaves = 4
-	var ntex := NoiseTexture2D.new()
-	ntex.width = 512
-	ntex.height = 512
-	ntex.seamless = true
-	ntex.generate_mipmaps = true
-	ntex.noise = noise
 	material = ShaderMaterial.new()
 	material.shader = load("res://shaders/surroundings.gdshader")
 	material.set_shader_parameter("height_tex", ImageTexture.create_from_image(himg))
 	material.set_shader_parameter("surface_tex", ImageTexture.create_from_image(simg))
-	material.set_shader_parameter("detail_noise", ntex)
+	material.set_shader_parameter("detail_noise", Terrain.detail_noise_texture())
 	material.set_shader_parameter("grid_origin", Vector2(x0, z0))
 	material.set_shader_parameter("spacing", spacing)
 	material.set_shader_parameter("grid_size", Vector2(nx, nz))
@@ -179,6 +194,12 @@ func _build_material() -> void:
 	material.set_shader_parameter("hole_sink", HOLE_SINK)
 	material.set_shader_parameter("hole_blend", HOLE_BLEND)
 	material.set_shader_parameter("skirt_depth", SKIRT_DEPTH)
+	if _terrain != null and _terrain.material != null:
+		# napojení výšek na detailní terén (sdílená textura výšek, žádná kopie) a sever pro sněhové jazyky
+		material.set_shader_parameter("kat_height", _terrain.material.get_shader_parameter("height_tex"))
+		material.set_shader_parameter("kat_grid", Vector3(_terrain.spacing, _terrain.w, _terrain.h))
+		material.set_shader_parameter("kat_join", KAT_JOIN)
+		material.set_shader_parameter("north_xz", _terrain.material.get_shader_parameter("north_xz"))
 
 
 ## Dlaždice `TILE_M` × `TILE_M` přes celou mřížku okolí; ty celé uvnitř katastru se přeskočí
@@ -232,7 +253,7 @@ func _build_cones() -> void:
 			var jz := _rng.randf_range(-spacing * 1.2, spacing * 1.2)
 			var s := _rng.randf_range(0.7, 1.5)
 			var b := Basis(Vector3.UP, _rng.randf_range(0.0, TAU)) * Basis.from_scale(Vector3(s, s, s))
-			xforms.append(Transform3D(b, Vector3(wx + jx, height_at(wx, wz) + CONE_H * 0.5 * s - 1.0, wz + jz)))
+			xforms.append(Transform3D(b, Vector3(wx + jx, height_at(wx + jx, wz + jz) + CONE_H * 0.5 * s - 1.0, wz + jz)))
 	if xforms.is_empty():
 		return
 	var cone := CylinderMesh.new()

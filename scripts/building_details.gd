@@ -74,6 +74,12 @@ const STEP_COLOR := Color(0.50, 0.50, 0.48)
 const GATE_COLORS := [Color(0.72, 0.72, 0.70), Color(0.35, 0.22, 0.12), Color(0.30, 0.38, 0.30)]
 const BRICK := Color(0.42, 0.20, 0.15)
 const CAP := Color(0.30, 0.30, 0.31)
+const CHIMNEY_PLASTER := Color(0.62, 0.60, 0.56)
+## Šambrány (omítkové orámování oken starších domů) a okapové svody.
+const SURROUND_COLORS := [Color(0.84, 0.82, 0.77), Color(0.74, 0.70, 0.62), Color(0.62, 0.60, 0.57)]
+const PIPE_COLORS := [Color(0.56, 0.58, 0.60), Color(0.56, 0.58, 0.60), Color(0.28, 0.18, 0.12), Color(0.22, 0.22, 0.23)]
+const PIPE_R := 0.045             # m – polovina průřezu svodu
+const DOOR_MIN_H := 1.75          # m – nižší dveře se nekreslí (stěna u terénu moc nízká)
 
 ## Geometrie jedné dlaždice 256 m (přímo měněná pole – žádné kopírování polí při přidávání).
 class Tile extends RefCounted:
@@ -306,6 +312,14 @@ func _build_one(b: Dictionary, tiles: Dictionary) -> void:
 		"door": DOOR_COLORS[rng.randi() % DOOR_COLORS.size()],
 		"gate": GATE_COLORS[rng.randi() % GATE_COLORS.size()],
 	}
+	# vlna E: další detaily z vlastního generátoru (původní posloupnost `rng` – rozmístění oken – zůstává)
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = id * 104729 + 71
+	var btype: String = b["type"]
+	look["surround"] = btype == "house" and rng2.randf() < 0.45
+	look["surround_col"] = SURROUND_COLORS[rng2.randi() % SURROUND_COLORS.size()]
+	look["pipe"] = PIPE_COLORS[rng2.randi() % PIPE_COLORS.size()]
+	look["plastered_chimney"] = rng2.randf() < 0.45
 
 	# dveře / vrata
 	var door_edge := -1
@@ -319,7 +333,9 @@ func _build_one(b: Dictionary, tiles: Dictionary) -> void:
 		door_edge = pick[0]
 		door_t = pick[1]
 		if door_edge >= 0:
-			_emit_door(tiles, b, edges[door_edge], door_t, kind, rule, look)
+			door_t = _emit_door(tiles, b, edges[door_edge], door_t, kind, rule, look)
+			if door_t < 0.0:
+				door_edge = -1          # stěna u terénu moc nízká – dveře se vynechaly
 
 	# okna
 	var mode: String = rule.get("win", "none")
@@ -362,7 +378,11 @@ func _build_one(b: Dictionary, tiles: Dictionary) -> void:
 
 	# komín
 	if rule.get("chimney", false):
-		_emit_chimneys(tiles, b, rng)
+		_emit_chimneys(tiles, b, rng, look)
+
+	# okapové svody u domů a veřejných budov
+	if btype == "house" or btype == "public":
+		_emit_downpipes(tiles, b, edges, door_edge, door_t, kind, rule, look)
 
 
 static func _pick_weighted(weights: Array, r: float) -> int:
@@ -463,6 +483,13 @@ func _emit_window(tiles: Dictionary, b: Dictionary, e: Dictionary, t: float, sil
 	var y0 := gy + sill
 	var c3 := Vector3(p2.x, y0 + wh * 0.5, p2.y)
 	var frame_col: Color = look["frame"]
+	if look.get("surround", false):
+		# šambrána: plochý omítkový rám 15 cm kolem okna, 2,4 cm před zdí (pod rámem i parapetem)
+		var top := minf(wh * 0.5 + 0.15, eave - 0.03 - c3.y) if b["known"] else wh * 0.5 + 0.15
+		var bot := wh * 0.5 + 0.17
+		var cs := Vector3(c3.x, c3.y + (top - bot) * 0.5, c3.z)
+		_box(kit, cs + n3 * 0.012, u3 * (ww * 0.5 + 0.15), Vector3.UP * ((top + bot) * 0.5), n3 * 0.012,
+			look["surround_col"])
 	# rám (přední strana 6,5 cm od zdi), parapet, sklo o 0,3 cm před rámem
 	_box(kit, c3 + n3 * 0.03, u3 * (ww * 0.5 + 0.07), Vector3.UP * (wh * 0.5 + 0.07), n3 * 0.035, frame_col)
 	_box(kit, Vector3(p2.x, y0 - 0.035, p2.y) + n3 * 0.06, u3 * (ww * 0.5 + 0.12), Vector3.UP * 0.035,
@@ -519,36 +546,89 @@ func _glass_quad(tile: Tile, bl: Vector3, tl: Vector3, tr: Vector3, br: Vector3,
 		tile.guv2.append(uv2)
 
 
+## Dveře / vrata na stěně `e` v poloze `t`. Vrací skutečnou polohu na stěně, nebo −1, když se nevešly.
+## Dveře nesmí přesáhnout okap (validátor: vrata 2,8 m o 0,32 m nad okapem): nejdřív se zkusí posunout po stěně
+## k nižšímu terénu; vrata, která se nevejdou, se nahradí dveřmi; dveře se sníží (nejvýš na okap − 0,1 m) a pod
+## DOOR_MIN_H se vynechají.
 func _emit_door(tiles: Dictionary, b: Dictionary, e: Dictionary, t: float, kind: String, rule: Dictionary,
-		look: Dictionary) -> void:
+		look: Dictionary) -> float:
 	var op: Vector2 = e["o"]
 	var up_: Vector2 = e["u"]
 	var nrm: Vector2 = e["n"]
-	var p2 := op + up_ * t
-	var gy := _terrain.height_at(p2.x, p2.y)
-	var fr := _frame_of(e)
-	var n3: Vector3 = fr[0]
-	var u3: Vector3 = fr[1]
-	var tile := _tile_of(tiles, p2)
-	var kit: MeshKit = tile.kit
 	var w := DOOR_W
 	var h := DOOR_H
 	if kind == "gate":
 		w = float(rule["gate"][0])
 		h = float(rule["gate"][1])
+	var base := DOOR_STEP if kind == "door" else 0.02
+	var top_extra := 0.12 if kind == "door" else 0.0     # zárubeň nad dveřmi
+	var p2 := op + up_ * t
+	var gy := _terrain.height_at(p2.x, p2.y)
+	if b["known"]:
+		var eave: float = b["eave"]
+		var room := eave - 0.1 - base - top_extra       # nejvyšší přípustná výška dveří nad terénem
+		if gy + h > room:
+			var elen: float = e["len"]
+			var lo := minf(w * 0.5 + 0.4, elen * 0.5)
+			var hi := maxf(elen - w * 0.5 - 0.4, lo)
+			var best_t := t
+			var best_d := INF
+			var low_t := t
+			var low_g := gy
+			for i in 33:
+				var tt := lerpf(lo, hi, float(i) / 32.0)
+				var q := op + up_ * tt
+				var g := _terrain.height_at(q.x, q.y)
+				if g < low_g:
+					low_g = g
+					low_t = tt
+				if g + h <= room and absf(tt - t) < best_d:
+					best_d = absf(tt - t)
+					best_t = tt
+			if best_d < INF:
+				t = best_t
+			elif kind == "gate":
+				# vrata se v plné výšce nevejdou nikam na stěnu (nízká stavba na svahu) – snížená vrata by
+				# nesla rozměr z RULES jen naoko (validátor, Estate); místo nich obyčejné dveře
+				return _emit_door(tiles, b, e, t, "door", rule, look)
+			else:
+				t = low_t
+				h = room - low_g
+				if h < DOOR_MIN_H:
+					return -1.0
+			p2 = op + up_ * t
+			gy = _terrain.height_at(p2.x, p2.y)
+			h = minf(h, room - gy)
+	var fr := _frame_of(e)
+	var n3: Vector3 = fr[0]
+	var u3: Vector3 = fr[1]
+	var tile := _tile_of(tiles, p2)
+	var kit: MeshKit = tile.kit
+	if kind == "gate":
 		var gcol: Color = look["gate"]
 		var c := Vector3(p2.x, gy + h * 0.5 + 0.02, p2.y)
 		_box(kit, c + n3 * 0.04, u3 * (w * 0.5), Vector3.UP * (h * 0.5), n3 * 0.04, gcol)
 		for f in [0.3, 0.62]:
 			_box(kit, Vector3(p2.x, gy + 0.02 + h * float(f), p2.y) + n3 * 0.085, u3 * (w * 0.5),
 				Vector3.UP * 0.035, n3 * 0.015, gcol.darkened(0.35))
+		# svislé dělení křídel a zárubeň
+		_box(kit, Vector3(p2.x, gy + 0.02 + h * 0.5, p2.y) + n3 * 0.085, u3 * 0.02, Vector3.UP * (h * 0.5),
+			n3 * 0.012, gcol.darkened(0.45))
+		_box(kit, Vector3(p2.x, gy + h * 0.5 + 0.04, p2.y) + n3 * 0.025, u3 * (w * 0.5 + 0.08),
+			Vector3.UP * (h * 0.5 + 0.02), n3 * 0.025, gcol.darkened(0.25))
 	else:
 		var y_base := gy + DOOR_STEP
 		var fcol: Color = look["frame"]
+		var dcol: Color = look["door"]
 		_box(kit, Vector3(p2.x, y_base + (h + 0.12) * 0.5, p2.y) + n3 * 0.03, u3 * (w * 0.5 + 0.1),
 			Vector3.UP * ((h + 0.12) * 0.5), n3 * 0.03, fcol)
 		_box(kit, Vector3(p2.x, y_base + h * 0.5, p2.y) + n3 * 0.055, u3 * (w * 0.5), Vector3.UP * (h * 0.5),
-			n3 * 0.02, look["door"])
+			n3 * 0.02, dcol)
+		# kazetové výplně (dvě vystouplé desky) – dveře nejsou plochý obdélník
+		for fy in [0.27, 0.7]:
+			var ph := h * (0.3 if fy < 0.5 else 0.36)
+			_box(kit, Vector3(p2.x, y_base + h * float(fy), p2.y) + n3 * 0.078, u3 * (w * 0.5 - 0.12),
+				Vector3.UP * (ph * 0.5), n3 * 0.006, dcol.lightened(0.06))
 		_box(kit, Vector3(p2.x, y_base + 1.0, p2.y) + n3 * 0.09 + u3 * (w * 0.5 - 0.14), u3 * 0.03,
 			Vector3.UP * 0.07, n3 * 0.02, Color(0.6, 0.5, 0.2))
 		# schod (spodek hluboko pod terénem, ať nevisí na svahu)
@@ -556,10 +636,67 @@ func _emit_door(tiles: Dictionary, b: Dictionary, e: Dictionary, t: float, kind:
 			n3 * 0.3, STEP_COLOR)
 	var id: int = b["id"]
 	_doors[id] = {"pos": Vector3(p2.x, gy, p2.y), "normal": n3, "yaw": atan2(nrm.x, nrm.y), "width": w,
-		"kind": kind}
+		"kind": kind, "height": h}
+	return t
 
 
-func _emit_chimneys(tiles: Dictionary, b: Dictionary, rng: RandomNumberGenerator) -> void:
+## Okapové svody: dvě svislé trubky u rohů okapové stěny (u sedlové střechy stěna rovnoběžná s hřebenem),
+## od terénu pod přesah střechy, dole s výtokovým kolenem. Ne u stěn sousedících s jinou budovou a u dveří.
+func _emit_downpipes(tiles: Dictionary, b: Dictionary, edges: Array, door_edge: int, door_t: float, kind: String,
+		rule: Dictionary, look: Dictionary) -> void:
+	if not b["known"]:
+		return
+	var eave: float = b["eave"]
+	var rdir: Vector2 = b["ridge_dir"]
+	var gable: bool = b["shape"] != "flat" and b["shape"] != "hipped" and rdir.length() > 0.5
+	var best := -1
+	var bl := 0.0
+	for ei in edges.size():
+		var e: Dictionary = edges[ei]
+		var u: Vector2 = e["u"]
+		if gable and absf(u.dot(rdir.normalized())) < 0.9:
+			continue
+		if float(e["len"]) > bl:
+			bl = e["len"]
+			best = ei
+	if best < 0 or bl < 3.0:
+		return
+	var e2: Dictionary = edges[best]
+	var op: Vector2 = e2["o"]
+	var up_: Vector2 = e2["u"]
+	var nn: Vector2 = e2["n"]
+	var fr := _frame_of(e2)
+	var n3: Vector3 = fr[0]
+	var u3: Vector3 = fr[1]
+	var col: Color = look["pipe"]
+	var dw := DOOR_W if kind == "door" else float(rule.get("gate", [3.0])[0])
+	for tt in [0.2, bl - 0.2]:
+		if best == door_edge and absf(float(tt) - door_t) < dw * 0.5 + 0.35:
+			continue
+		var p2 := op + up_ * float(tt)
+		if _inside_other(p2 + nn * 0.35, int(b["id"])):
+			continue
+		var gy := _terrain.height_at(p2.x, p2.y)
+		var y1 := eave - 0.05
+		if y1 - gy < 1.5:
+			continue
+		var c := Vector3(p2.x, 0.0, p2.y) + n3 * (PIPE_R + 0.035)
+		var tile := _tile_of(tiles, p2)
+		var y0 := gy + 0.28
+		_box(tile.kit, Vector3(c.x, (y0 + y1) * 0.5, c.z), u3 * PIPE_R, Vector3.UP * ((y1 - y0) * 0.5),
+			n3 * PIPE_R, col)
+		# výtokové koleno (šikmo od zdi) a objímky
+		var bend := Basis(u3, -0.6)
+		_box(tile.kit, Vector3(c.x, gy + 0.17, c.z) + n3 * 0.07, u3 * PIPE_R, bend * (Vector3.UP * 0.13),
+			bend * (n3 * PIPE_R), col)
+		var yk := y0 + 0.6
+		while yk < y1 - 0.3:
+			_box(tile.kit, Vector3(c.x, yk, c.z), u3 * (PIPE_R + 0.008), Vector3.UP * 0.012,
+				n3 * (PIPE_R + 0.008), col.darkened(0.3))
+			yk += 1.8
+
+
+func _emit_chimneys(tiles: Dictionary, b: Dictionary, rng: RandomNumberGenerator, look: Dictionary = {}) -> void:
 	var shape: String = b["shape"]
 	var ridge: float = b["ridge"]
 	var eave: float = b["eave"]
@@ -590,7 +727,11 @@ func _emit_chimneys(tiles: Dictionary, b: Dictionary, rng: RandomNumberGenerator
 		var tile := _tile_of(tiles, p2)
 		var kit: MeshKit = tile.kit
 		var c := Vector3(p2.x, (top + base_y) * 0.5, p2.y)
-		_box(kit, c, d3 * 0.28, Vector3.UP * ((top - base_y) * 0.5), s3 * 0.28, BRICK)
+		var plastered: bool = look.get("plastered_chimney", false)
+		_box(kit, c, d3 * 0.28, Vector3.UP * ((top - base_y) * 0.5), s3 * 0.28, CHIMNEY_PLASTER if plastered else BRICK)
+		# římsa pod hlavou komína a krycí deska
+		_box(kit, Vector3(p2.x, top - 0.12, p2.y), d3 * 0.32, Vector3.UP * 0.04, s3 * 0.32,
+			CHIMNEY_PLASTER.darkened(0.1) if plastered else BRICK.darkened(0.15))
 		_box(kit, Vector3(p2.x, top + 0.05, p2.y), d3 * 0.36, Vector3.UP * 0.06, s3 * 0.36, CAP)
 		_chimneys.append({"id": b["id"], "pos": Vector3(p2.x, top + 0.11, p2.y), "base_y": base_y})
 

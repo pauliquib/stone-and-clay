@@ -18,7 +18,7 @@ const STEPS := 3                         # schůdky na krátké straně (-U)
 const STEP_GAP := 1.5                    # půlšířka vstupu ve schůdcích (m, podél V)
 const FLOOR_LIFT := 0.1                  # dno nad terénem (m)
 const COL_CONCRETE := Color(0.74, 0.74, 0.71)
-const COL_WATER := Color(0.22, 0.52, 0.58, 0.72)
+const COL_WATER := Color(0.20, 0.42, 0.40, 0.76)   # zelenkavá voda bývalé požární nádrže
 
 var world: World
 var terrain: Terrain
@@ -123,7 +123,7 @@ func _mat(col: Color) -> StandardMaterial3D:
 func _water_mat() -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = COL_WATER
-	m.roughness = 0.15
-	m.metallic_specular = 0.6
+	m.roughness = 0.05                   # klidná hladina: ostrý odraz oblohy
+	m.metallic_specular = 0.5            # F0 ≈ 0,02–0,04 (voda)
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	return m

@@ -1,7 +1,9 @@
 ## Terén celého katastru: výšková mřížka DMR 5G (2 m) z Blender exportu.
 ## - kolize: jeden HeightMapShape3D (stejná data jako vzhled)
 ## - vzhled: dlaždice 128 m, každá ve 4 LOD (2 / 4 / 8 / 32 m), výšky čte vertex shader z textury,
-##   praskliny mezi LOD skrývají "sukně" (okraje stažené dolů)
+##   praskliny mezi LOD skrývají "sukně" (okraje stažené dolů); přepnutí LOD je plynulé – geomorfing ve vertex
+##   shaderu (UV sítě nese krok další LOD a konec dosahu, `lod_cam` = poloha kamery každý snímek)
+## - povrch: procedurální materiály tříd ze šumu `detail_noise_texture()` (RGBA, 4 nezávislé kanály)
 class_name Terrain
 extends Node3D
 
@@ -19,6 +21,20 @@ const SURFACE_TEXTURES := [
 ]
 ## Velikost dlaždice textury povrchu v metrech (3–6 m).
 const SURFACE_TEX_SCALE := 4.5
+## Pobřežní pás: vzdálenost od vodní čáry potoků a rybníků (data/water.json) v bodech mřížky DMR (2 m),
+## kódovaná R8 v rozsahu SHORE_MIN..SHORE_MAX m (záporná = pod hladinou). Ukládá se jen v dlaždicích
+## SHORE_TILE × SHORE_TILE bodů, kde voda je (~3 000 z 21 000), do atlasu s okrajem 1 px (hardwarový lineární filtr
+## i přes hranu dlaždice) + malá tabulka dlaždice → místo v atlasu. ~3,5 MB místo 21 MB celé mřížky.
+const SHORE_MIN := -2.0
+const SHORE_MAX := 3.0
+const SHORE_TILE := 32
+const SHORE_ROW := 64             # dlaždic v řádku atlasu
+## Hloubka vody nad terénem v bodech pobřežního pásu (kanál G atlasu): DEPTH_MIN..DEPTH_MAX m. Dno se v shaderu kreslí
+## jen pod hladinou (výška hladiny z water.json: body toků / level rybníka) – ne na terénu, který z vody vyčnívá.
+const DEPTH_MIN := -1.0
+const DEPTH_MAX := 2.0
+## Geometrie polí (`_field_geo`): jednotka vzdálenosti od okraje pole v kanálu A rastru landuse (m).
+const FIELD_DIST_UNIT := 0.25
 
 var w: int
 var h: int
@@ -29,6 +45,14 @@ var chunk_cells: int
 var heights: PackedFloat32Array
 var material: ShaderMaterial
 var use_ortho := false            # barva terénu z ortofota (F2 → Terén); výchozí = procedurální povrch
+var has_ortho := false            # ortofoto (textures/ortho_*.jpg) je k dispozici – není v gitu, bez něj jen procedurální povrch
+## Další materiály, které berou tabulku barev polí (okolí katastru – Surroundings).
+var linked_materials: Array[ShaderMaterial] = []
+var shore_ready := false          # pobřežní pás spočítán (počítá se ve vlákně po build)
+var _shore_task := -1
+var _field_task := -1
+
+static var _noise_cache: Texture2D = null
 
 
 func build(meta: Dictionary) -> void:
@@ -69,42 +93,51 @@ func build(meta: Dictionary) -> void:
 	var himg := Image.create_from_data(w, h, false, Image.FORMAT_RF, hbytes)
 	var nimg := Image.create_from_data(w, h, false, Image.FORMAT_RGB8, nbytes)
 	nimg.generate_mipmaps()
-	var noise := FastNoiseLite.new()
-	noise.frequency = 0.02
-	noise.fractal_octaves = 4
-	var ntex := NoiseTexture2D.new()
-	ntex.width = 512
-	ntex.height = 512
-	ntex.seamless = true
-	ntex.generate_mipmaps = true
-	ntex.noise = noise
 
 	material = ShaderMaterial.new()
 	material.shader = load("res://shaders/terrain.gdshader")
 	material.set_shader_parameter("height_tex", ImageTexture.create_from_image(himg))
 	material.set_shader_parameter("normal_tex", ImageTexture.create_from_image(nimg))
-	material.set_shader_parameter("detail_noise", ntex)
+	material.set_shader_parameter("detail_noise", detail_noise_texture())
+	material.set_shader_parameter("chunk_size", chunk_cells * spacing)
 	material.set_shader_parameter("grid_origin", Vector2(x0, z0))
 	material.set_shader_parameter("spacing", spacing)
 	material.set_shader_parameter("grid_size", Vector2(w, h))
 	# směr severu ve světě (sněhové jazyky na odvrácených svazích)
 	var nd := Clock.enu_to_world(Vector3(0.0, 1.0, 0.0), float(meta.get("north_angle_deg", 78.37)))
 	material.set_shader_parameter("north_xz", Vector2(nd.x, nd.z))
+	# ortofoto jen když soubor je (textures/*.jpg nejsou v gitu – ASSETY.md); bez něj zůstane procedurální povrch
+	has_ortho = true
 	for key in ["ortho_full", "ortho_core"]:
-		var o: Dictionary = meta[key]
-		material.set_shader_parameter(key, load(o["file"]))
+		var o: Dictionary = meta.get(key, {})
+		var file := String(o.get("file", ""))
+		var tex: Texture2D = null
+		# ResourceLoader.exists stačí .import – bez zdrojového jpg (a importu) by load() hlásil ERROR
+		if file != "" and ResourceLoader.exists(file) \
+				and (FileAccess.file_exists(file) or OS.has_feature("template")):
+			tex = load(file) as Texture2D
+		if tex == null:
+			has_ortho = false
+			continue
+		material.set_shader_parameter(key, tex)
 		var rect := Vector4(o["x0"], o["z0"], o["size_x"], o["size_z"])
 		material.set_shader_parameter("full_rect" if key == "ortho_full" else "core_rect", rect)
 
 	_load_surface_textures()
+	# pobřežní pás – ve vlákně (~1–3 s GDScriptu), shader ho do té doby vynechá (shore_ntiles = 0)
+	_shore_task = WorkerThreadPool.add_task(_shore_job, false, "Terrain: pobřežní pás")
 
 	# --- dlaždice (LOD hustota se odvozuje z chunk_cells: LOD0 = 2 m rozlišení,
 	# další úrovně 4/8/32 m – beze změny pro chunk_cells 64 i 128)
 	var size := chunk_cells * spacing
 	var lod_quads := [chunk_cells, chunk_cells / 2, chunk_cells / 4, chunk_cells / 16]
 	var meshes := []
-	for q in lod_quads:
-		meshes.append(_grid_mesh(q, size))
+	for li in lod_quads.size():
+		# geomorfing: krok další (hrubší) LOD v buňkách výškové mřížky a konec dosahu této LOD (poslední nemorfuje)
+		var morph := Vector2.ZERO
+		if li + 1 < lod_quads.size():
+			morph = Vector2(chunk_cells / lod_quads[li + 1], LOD_RANGES[li + 1])
+		meshes.append(_grid_mesh(lod_quads[li], size, morph))
 	var mm := FileAccess.get_file_as_bytes("res://data/terrain_chunks.bin").to_float32_array()
 	var ncx := int(hm["ncx"])
 	var ncz := int(hm["ncz"])
@@ -113,7 +146,13 @@ func build(meta: Dictionary) -> void:
 			var hmin := mm[(iz * ncx + ix) * 2] - 6.0
 			var hmax := mm[(iz * ncx + ix) * 2 + 1] + 1.0
 			var origin := Vector3(x0 + ix * size, 0.0, z0 + iz * size)
-			var aabb := AABB(Vector3(0, hmin, 0), Vector3(size, hmax - hmin, size))
+			# AABB souměrné kolem výšky středu dlaždice: visibility_range měří vzdálenost ke středu AABB a geomorfing
+			# ve vertex shaderu počítá tutéž vzdálenost z výšky středového bodu mřížky → morf doběhne přesně před přepnutím LOD
+			var ci := mini(ix * chunk_cells + chunk_cells / 2, w - 1)
+			var cj := mini(iz * chunk_cells + chunk_cells / 2, h - 1)
+			var hc := heights[cj * w + ci]
+			var half := maxf(hmax - hc, hc - hmin)
+			var aabb := AABB(Vector3(0, hc - half, 0), Vector3(size, 2.0 * half, size))
 			for li in lod_quads.size():
 				var mi := MeshInstance3D.new()
 				mi.mesh = meshes[li]
@@ -128,9 +167,149 @@ func build(meta: Dictionary) -> void:
 
 
 ## Pole a louky podle kalendáře (Fields): mapa využití ploch a její obdélník (x0, z0, šířka, výška).
+## Hned se použije rastr RG8 (třída, číslo pole); ve vlákně se k němu dopočítá geometrie polí (`_field_geo`)
+## a textura se nahradí RGBA8 – shader do té doby bere směr řádků z hashe čísla pole (`field_geo` = false).
 func set_landuse(tex: Texture2D, rect: Vector4) -> void:
 	material.set_shader_parameter("landuse_tex", tex)
 	material.set_shader_parameter("landuse_rect", rect)
+	material.set_shader_parameter("field_geo", false)
+	if tex == null or _field_task >= 0:
+		return
+	var img := tex.get_image()
+	if img == null or img.get_format() != Image.FORMAT_RG8 or img.get_width() < 3 or img.get_height() < 3:
+		return
+	_field_task = WorkerThreadPool.add_task(_field_geo_job.bind(img.get_data(), img.get_width(), img.get_height(),
+		rect.z / img.get_width()), false, "Terrain: geometrie polí")
+
+
+func _field_geo_job(d: PackedByteArray, nx: int, nz: int, cell: float) -> void:
+	var img := Image.create_from_data(nx, nz, false, Image.FORMAT_RGBA8, _field_geo(d, nx, nz, cell))
+	call_deferred("_field_geo_done", img)
+
+
+func _field_geo_done(img: Image) -> void:
+	if _field_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_field_task)
+		_field_task = -1
+	if material != null:
+		material.set_shader_parameter("landuse_tex", ImageTexture.create_from_image(img))
+		material.set_shader_parameter("field_geo", true)
+
+
+## Geometrie polí pro shader z rastru landuse (RG8 prokládaně: třída, číslo pole) → RGBA8:
+## R, G beze změny; B = směr řádků setí = hlavní osa souvislé plochy pole (momenty buněk, 0..π → 0..255) – u malých
+## a kulatých parcel směr z hashe čísla pole; A = vzdálenost od okraje pole v FIELD_DIST_UNIT (chamfer 3 × 3,
+## strop 63,75 m) – souvratě, meze a kolejový řádek podél okraje. Shader to čte týmž texelFetch jako třídu (bez čtení navíc).
+## Okraj = buňka pole se sousedem jiné třídy / čísla (vzdálenost středu buňky od hranice = půl buňky).
+## ~5 M buněk ≈ 4–6 s GDScriptu ve vlákně (jednou při startu).
+func _field_geo(d: PackedByteArray, nx: int, nz: int, cell: float) -> PackedByteArray:
+	var n := nx * nz
+	var key := PackedByteArray()   # číslo pole na orné půdě, jinak 0
+	key.resize(n)
+	for k in n:
+		if d[k * 2] == 1:
+			key[k] = d[k * 2 + 1]
+	var so := roundi(cell / FIELD_DIST_UNIT)                 # krok k sousedovi
+	var sd := roundi(cell * 1.41421 / FIELD_DIST_UNIT)       # krok po úhlopříčce
+	var e0 := roundi(cell * 0.5 / FIELD_DIST_UNIT)           # okrajová buňka
+	var ed := roundi(cell * 0.70711 / FIELD_DIST_UNIT)       # roh cizí buňky po úhlopříčce
+	var dist := PackedByteArray()
+	dist.resize(n)
+	# chamfer – dopředný průchod (sousedé vlevo a v řádku nad)
+	for j in nz:
+		var row := j * nx
+		for i in nx:
+			var k := row + i
+			var kk := key[k]
+			if kk == 0:
+				continue
+			if i == 0 or j == 0 or i == nx - 1 or j == nz - 1 \
+					or key[k - 1] != kk or key[k + 1] != kk or key[k - nx] != kk or key[k + nx] != kk:
+				dist[k] = e0
+				continue
+			var v := mini(dist[k - 1], dist[k - nx]) + so
+			v = mini(v, dist[k - nx - 1] + sd if key[k - nx - 1] == kk else ed)
+			v = mini(v, dist[k - nx + 1] + sd if key[k - nx + 1] == kk else ed)
+			dist[k] = mini(v, 255)
+	var out := PackedByteArray()
+	out.resize(n * 4)
+	# souvislé plochy pole (BFS, 4-sousedství): hlavní osa z momentů → kanál B všech buněk plochy
+	var seen := PackedByteArray()
+	seen.resize(n)
+	var q := PackedInt32Array()
+	q.resize(n)
+	for k0 in n:
+		var kk := key[k0]
+		if kk == 0 or seen[k0] != 0:
+			continue
+		seen[k0] = 1
+		q[0] = k0
+		var qh := 0
+		var qt := 1
+		var sx := 0.0
+		var sz := 0.0
+		var sxx := 0.0
+		var szz := 0.0
+		var sxz := 0.0
+		while qh < qt:
+			var k := q[qh]
+			qh += 1
+			var x := k % nx
+			var z := k / nx
+			sx += x
+			sz += z
+			sxx += x * x
+			szz += z * z
+			sxz += x * z
+			if x > 0 and seen[k - 1] == 0 and key[k - 1] == kk:
+				seen[k - 1] = 1
+				q[qt] = k - 1
+				qt += 1
+			if x < nx - 1 and seen[k + 1] == 0 and key[k + 1] == kk:
+				seen[k + 1] = 1
+				q[qt] = k + 1
+				qt += 1
+			if z > 0 and seen[k - nx] == 0 and key[k - nx] == kk:
+				seen[k - nx] = 1
+				q[qt] = k - nx
+				qt += 1
+			if z < nz - 1 and seen[k + nx] == 0 and key[k + nx] == kk:
+				seen[k + nx] = 1
+				q[qt] = k + nx
+				qt += 1
+		var cnt := float(qt)
+		var mx := sx / cnt
+		var mz := sz / cnt
+		var cxx := sxx / cnt - mx * mx
+		var czz := szz / cnt - mz * mz
+		var cxz := sxz / cnt - mx * mz
+		var disc := sqrt(0.25 * (cxx - czz) * (cxx - czz) + cxz * cxz)
+		var l1 := 0.5 * (cxx + czz) + disc
+		var l2 := 0.5 * (cxx + czz) - disc
+		var ang := 0.5 * atan2(2.0 * cxz, cxx - czz)
+		if qt < 40 or l1 < 1.5 * maxf(l2, 0.01):
+			ang = fposmod(sin(kk * 12.9898) * 43758.5453, 1.0) * PI   # kulatá / malá parcela: stabilní směr z čísla pole
+		var b := clampi(int(fposmod(ang, PI) / PI * 256.0), 0, 255)
+		for t in qt:
+			out[q[t] * 4 + 2] = b
+	# chamfer – zpětný průchod (sousedé vpravo a v řádku pod) + zápis R, G, A
+	for j in range(nz - 1, -1, -1):
+		var row := j * nx
+		for i in range(nx - 1, -1, -1):
+			var k := row + i
+			out[k * 4] = d[k * 2]
+			out[k * 4 + 1] = d[k * 2 + 1]
+			var kk := key[k]
+			if kk == 0:
+				continue
+			var v := dist[k]
+			if v > e0:
+				v = mini(v, mini(dist[k + 1], dist[k + nx]) + so)
+				v = mini(v, dist[k + nx + 1] + sd if key[k + nx + 1] == kk else ed)
+				v = mini(v, dist[k + nx - 1] + sd if key[k + nx - 1] == kk else ed)
+				dist[k] = v
+			out[k * 4 + 3] = v
+	return out
 
 
 ## Maska povrchu (SurfaceMap, data/surface.bin) pro shader. Bez ní se třída odvodí z landuse + lesa + sklonu.
@@ -145,8 +324,21 @@ func set_forest_density(tex: Texture2D, rect: Vector4) -> void:
 	material.set_shader_parameter("forest_rect", rect)
 
 
+## Poloha kamery pro geomorfing LOD (shader ji potřebuje i ve stínovém průchodu, kde CAMERA_POSITION_WORLD je světlo).
+func _process(_delta: float) -> void:
+	if material == null:
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam != null:
+		material.set_shader_parameter("lod_cam", cam.global_position)
+
+
 ## Barva terénu: true = ortofoto ČÚZK (porovnání), false = procedurální povrch (výchozí).
+## Bez souborů ortofota zůstane procedurální povrch.
 func set_ortho(on: bool) -> void:
+	if on and not has_ortho:
+		push_warning("Terrain: ortofoto není k dispozici (textures/ortho_*.jpg) – zůstává procedurální povrch")
+		on = false
 	use_ortho = on
 	material.set_shader_parameter("use_ortho", on)
 
@@ -168,6 +360,53 @@ func _load_surface_textures() -> void:
 ## Tabulka barev plodin pro dnešní datum (Fields.lut_image).
 func set_field_lut(tex: Texture2D) -> void:
 	material.set_shader_parameter("field_lut", tex)
+	for m in linked_materials:
+		m.set_shader_parameter("field_lut", tex)
+		m.set_shader_parameter("use_fields", tex != null)
+
+
+## RGBA šum 512² (bezešvý, s mipmapami) pro terén i okolí – jedna textura = 4 nezávislé hodnoty na vzorek:
+## R = fraktální simplex (stejný jako dřívější NoiseTexture2D), G = druhý nezávislý fraktální šum,
+## B = buňkový šum – vzdálenost ke středu buňky (hrudky, kamínky, listí), A = náhodná hodnota téže buňky (odstín).
+## Generuje se jednou (nativně FastNoiseLite, prokládání kanálů ~0,1 s) a sdílí se.
+static func detail_noise_texture() -> Texture2D:
+	if _noise_cache != null:
+		return _noise_cache
+	const N := 512
+	var chans: Array[PackedByteArray] = []
+	for k in 4:
+		var fn := FastNoiseLite.new()
+		if k < 2:
+			fn.seed = k * 101
+			fn.frequency = 0.02
+			fn.fractal_octaves = 4
+		else:
+			fn.seed = 77
+			fn.noise_type = FastNoiseLite.TYPE_CELLULAR
+			fn.frequency = 0.06
+			fn.fractal_type = FastNoiseLite.FRACTAL_NONE
+			fn.cellular_jitter = 0.9
+			fn.cellular_return_type = FastNoiseLite.RETURN_DISTANCE if k == 2 else FastNoiseLite.RETURN_CELL_VALUE
+		var img := fn.get_seamless_image(N, N, false, false, 0.1, true)
+		if img.get_format() != Image.FORMAT_L8:
+			img.convert(Image.FORMAT_L8)
+		chans.append(img.get_data())
+	var out := PackedByteArray()
+	out.resize(N * N * 4)
+	var r := chans[0]
+	var g := chans[1]
+	var b := chans[2]
+	var a := chans[3]
+	for i in N * N:
+		var o := i * 4
+		out[o] = r[i]
+		out[o + 1] = g[i]
+		out[o + 2] = b[i]
+		out[o + 3] = a[i]
+	var rgba := Image.create_from_data(N, N, false, Image.FORMAT_RGBA8, out)
+	rgba.generate_mipmaps()
+	_noise_cache = ImageTexture.create_from_image(rgba)
+	return _noise_cache
 
 
 ## Květy na loukách 0..1.
@@ -199,7 +438,8 @@ func _apply_water_carve(coll: PackedFloat32Array, nbytes: PackedByteArray) -> bo
 
 
 ## Mřížka n×n čtverců přes `size` metrů + sukně po obvodu (vrcholy s y = −1 shader stáhne dolů).
-func _grid_mesh(n: int, size: float) -> ArrayMesh:
+## `morph` jde do UV všech vrcholů: (krok další LOD v buňkách, konec dosahu LOD v m) – pro geomorfing; 0 = bez.
+func _grid_mesh(n: int, size: float, morph := Vector2.ZERO) -> ArrayMesh:
 	var verts := PackedVector3Array()
 	var idx := PackedInt32Array()
 	var step := size / n
@@ -239,9 +479,170 @@ func _grid_mesh(n: int, size: float) -> ArrayMesh:
 	normals.resize(verts.size())
 	normals.fill(Vector3.UP)
 	arr[Mesh.ARRAY_NORMAL] = normals
+	var uvs := PackedVector2Array()
+	uvs.resize(verts.size())
+	uvs.fill(morph)
+	arr[Mesh.ARRAY_TEX_UV] = uvs
 	var m := ArrayMesh.new()
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 	return m
+
+
+## Vlákno: spočítá pobřežní pás a předá ho hlavnímu vláknu (textury se tvoří tam).
+func _shore_job() -> void:
+	var res := _compute_shore()
+	call_deferred("_shore_done", res)
+
+
+func _shore_done(res: Array) -> void:
+	if _shore_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_shore_task)
+		_shore_task = -1
+	if res.size() == 3 and material != null:
+		material.set_shader_parameter("shore_atlas", ImageTexture.create_from_image(res[0]))
+		material.set_shader_parameter("shore_idx", ImageTexture.create_from_image(res[1]))
+		material.set_shader_parameter("shore_ntiles", res[2])
+	shore_ready = true
+
+
+func _exit_tree() -> void:
+	if _shore_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_shore_task)
+		_shore_task = -1
+	if _field_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_field_task)
+		_field_task = -1
+
+
+## Vzdálenost od vodní čáry v bodech mřížky: toky = vzdálenost od osy − pološířka druhu (water.json kinds),
+## rybníky = vzdálenost od obrysu, uvnitř záporná. K tomu hloubka vody nad terénem (hladina toku z výšek jeho bodů,
+## rybníka z `level`; nejbližší úsek vyhrává). Vrací [atlas RG8 (R vzdálenost, G hloubka), tabulka RG8, počet dlaždic]
+## nebo [] bez dat.
+func _compute_shore() -> Array:
+	const PATH := "res://data/water.json"
+	if not FileAccess.file_exists(PATH):
+		return []
+	var data = JSON.parse_string(FileAccess.get_file_as_string(PATH))
+	if not (data is Dictionary):
+		return []
+	var kinds: Dictionary = data.get("kinds", {})
+	var full := PackedByteArray()
+	full.resize(w * h)
+	full.fill(255)
+	var dep := PackedByteArray()     # hloubka vody, 0 = DEPTH_MIN (sucho / neznámo)
+	dep.resize(w * h)
+	var ntx := (w + SHORE_TILE - 1) / SHORE_TILE
+	var ntz := (h + SHORE_TILE - 1) / SHORE_TILE
+	var used := PackedByteArray()
+	used.resize(ntx * ntz)
+	used.fill(0)
+	var dsc := 255.0 / (DEPTH_MAX - DEPTH_MIN)
+	for st in data.get("streams", []):
+		var hw := float(kinds.get(String(st.get("kind", "")), {}).get("half_w", 1.5))
+		var pts: Array = st.get("pts", [])
+		for i in pts.size() - 1:
+			var la := float(pts[i][2]) if pts[i].size() > 2 else NAN
+			var lb := float(pts[i + 1][2]) if pts[i + 1].size() > 2 else la
+			_shore_segment(full, dep, used, ntx, Vector2(pts[i][0], pts[i][1]), Vector2(pts[i + 1][0], pts[i + 1][1]), hw, la, lb)
+	for pd in data.get("ponds", []):
+		var poly := PackedVector2Array()
+		for q in pd.get("poly", []):
+			poly.append(Vector2(q[0], q[1]))
+		if poly.size() < 3:
+			continue
+		var lv := float(pd.get("level", NAN))
+		for i in poly.size():
+			_shore_segment(full, dep, used, ntx, poly[i], poly[(i + 1) % poly.size()], 0.0, lv, lv)
+		# vnitřek rybníka: záporná vzdálenost (do SHORE_MIN), ať lineární filtr nevytvoří u dna falešnou vodní čáru
+		var bb := Rect2(poly[0], Vector2.ZERO)
+		for q in poly:
+			bb = bb.expand(q)
+		var i0 := clampi(floori((bb.position.x - x0) / spacing), 0, w - 1)
+		var i1 := clampi(ceili((bb.end.x - x0) / spacing), 0, w - 1)
+		var j0 := clampi(floori((bb.position.y - z0) / spacing), 0, h - 1)
+		var j1 := clampi(ceili((bb.end.y - z0) / spacing), 0, h - 1)
+		for gj in range(j0, j1 + 1):
+			var pz := z0 + gj * spacing
+			for gi in range(i0, i1 + 1):
+				if not Geometry2D.is_point_in_polygon(Vector2(x0 + gi * spacing, pz), poly):
+					continue
+				var k := gj * w + gi
+				var sv := float(full[k]) / 255.0 * (SHORE_MAX - SHORE_MIN) + SHORE_MIN
+				full[k] = clampi(roundi((-minf(absf(sv), -SHORE_MIN) - SHORE_MIN) / (SHORE_MAX - SHORE_MIN) * 255.0), 0, 255)
+				if not is_nan(lv):
+					dep[k] = clampi(roundi((lv - heights[k] - DEPTH_MIN) * dsc), 0, 255)
+				used[(gj / SHORE_TILE) * ntx + gi / SHORE_TILE] = 1
+	var n := used.count(1)
+	if n == 0:
+		return []
+	var pad := SHORE_TILE + 2
+	var src := Image.create_from_data(w, h, false, Image.FORMAT_R8, full)
+	var srcd := Image.create_from_data(w, h, false, Image.FORMAT_R8, dep)
+	var aw := SHORE_ROW * pad
+	var ah := ((n + SHORE_ROW - 1) / SHORE_ROW) * pad
+	var atlas := Image.create(aw, ah, false, Image.FORMAT_R8)
+	atlas.fill(Color(1, 1, 1))
+	var atlasd := Image.create(aw, ah, false, Image.FORMAT_R8)
+	var idx := PackedByteArray()
+	idx.resize(ntx * ntz * 2)
+	idx.fill(255)
+	var k := 0
+	for tz in ntz:
+		for tx in ntx:
+			if used[tz * ntx + tx] == 0:
+				continue
+			var ax := k % SHORE_ROW
+			var ay := k / SHORE_ROW
+			# 34 × 34 bodů včetně okraje (sousední dlaždice nebo 255 = daleko; mimo mřížku blit ořízne)
+			var r := Rect2i(tx * SHORE_TILE - 1, tz * SHORE_TILE - 1, pad, pad)
+			atlas.blit_rect(src, r, Vector2i(ax * pad, ay * pad))
+			atlasd.blit_rect(srcd, r, Vector2i(ax * pad, ay * pad))
+			idx[(tz * ntx + tx) * 2] = ax
+			idx[(tz * ntx + tx) * 2 + 1] = ay
+			k += 1
+	# prokládání do RG8 (jen velikost atlasu, ne celé mřížky)
+	var ar := atlas.get_data()
+	var ad := atlasd.get_data()
+	var rg := PackedByteArray()
+	rg.resize(ar.size() * 2)
+	for i in ar.size():
+		rg[i * 2] = ar[i]
+		rg[i * 2 + 1] = ad[i]
+	return [Image.create_from_data(aw, ah, false, Image.FORMAT_RG8, rg),
+		Image.create_from_data(ntx, ntz, false, Image.FORMAT_RG8, idx), Vector2(ntx, ntz)]
+
+
+## Zapíše do `full` vzdálenost od vodní čáry úsečky a–b (osa toku s pološířkou `hw`; obrys rybníka hw = 0),
+## jen body bližší než SHORE_MAX; menší hodnota vyhrává (soutoky, rybník s přítokem). Do `dep` zároveň hloubku
+## vody nad terénem v bodě (hladina `la`..`lb` lineárně podél úsečky; NAN = neznámá → beze změny).
+func _shore_segment(full: PackedByteArray, dep: PackedByteArray, used: PackedByteArray, ntx: int, a: Vector2, b: Vector2,
+		hw: float, la: float, lb: float) -> void:
+	var r := hw + SHORE_MAX
+	var i0 := clampi(floori((minf(a.x, b.x) - r - x0) / spacing), 0, w - 1)
+	var i1 := clampi(ceili((maxf(a.x, b.x) + r - x0) / spacing), 0, w - 1)
+	var j0 := clampi(floori((minf(a.y, b.y) - r - z0) / spacing), 0, h - 1)
+	var j1 := clampi(ceili((maxf(a.y, b.y) + r - z0) / spacing), 0, h - 1)
+	var ab := b - a
+	var l2 := maxf(ab.length_squared(), 1e-6)
+	var sc := 255.0 / (SHORE_MAX - SHORE_MIN)
+	var dsc := 255.0 / (DEPTH_MAX - DEPTH_MIN)
+	var has_lv := not is_nan(la) and not is_nan(lb)
+	for gj in range(j0, j1 + 1):
+		var q := Vector2(0.0, z0 + gj * spacing)
+		var row := gj * w
+		var trow := (gj / SHORE_TILE) * ntx
+		for gi in range(i0, i1 + 1):
+			q.x = x0 + gi * spacing
+			var t := clampf((q - a).dot(ab) / l2, 0.0, 1.0)
+			var d := q.distance_to(a + ab * t) - hw
+			if d >= SHORE_MAX:
+				continue
+			var e := clampi(roundi((d - SHORE_MIN) * sc), 0, 255)
+			if e < full[row + gi]:
+				full[row + gi] = e
+				if has_lv:
+					dep[row + gi] = clampi(roundi((la + (lb - la) * t - heights[row + gi] - DEPTH_MIN) * dsc), 0, 255)
+				used[trow + gi / SHORE_TILE] = 1
 
 
 ## Neviditelné stěny na okraji výškové mřížky.
@@ -267,7 +668,8 @@ func _add_bounds(body: StaticBody3D) -> void:
 		body.add_child(c)
 
 
-## Výška terénu (bilineárně, stejně jako vizuál i kolize v rámci přesnosti).
+## Výška terénu po trojúhelnících jako síť terénu (`_grid_mesh`) i HeightMapShape3D: buňka 2 m se dělí
+## úhlopříčkou (x+1, z)–(x, z+1), takže výška sedí s vykreslenou zemí i kolizí (bilineárně by se lišila až o dm).
 func height_at(x: float, z: float) -> float:
 	var fx := clampf((x - x0) / spacing, 0.0, w - 1.001)
 	var fz := clampf((z - z0) / spacing, 0.0, h - 1.001)
@@ -280,7 +682,9 @@ func height_at(x: float, z: float) -> float:
 	var b := heights[i + 1]
 	var c := heights[i + w]
 	var d := heights[i + w + 1]
-	return lerpf(lerpf(a, b, tx), lerpf(c, d, tx), tz)
+	if tx + tz <= 1.0:
+		return a + (b - a) * tx + (c - a) * tz
+	return d + (c - d) * (1.0 - tx) + (b - d) * (1.0 - tz)
 
 
 func contains(x: float, z: float, margin := 10.0) -> bool:

@@ -76,7 +76,7 @@ static func build(m: CarModel) -> ArrayMesh:
 	# SPZ (bez popisku – jen bílá deska) a světla
 	kt.box(Vector3(0, 0.95, -1.5), Vector3(0.5, 0.11, 0.012), Color(0.95, 0.95, 0.95))
 	for sx in [-1.0, 1.0]:
-		kh.sphere(Vector3(sx * 0.24, s["head_y"], s["head_z"] - 0.05), 0.075, Color(1.0, 0.98, 0.9), Vector3(1.2, 1.0, 0.6))
+		kh.sphere(Vector3(sx * 0.24, s["head_y"], s["head_z"] - 0.05), 0.075, CarModel.HEAD_LENS, Vector3(1.2, 1.0, 0.6))
 		ktl.sphere(Vector3(sx * 0.4, s["tail_y"] + 0.1, s["tail_z"]), 0.05, Color(0.9, 0.05, 0.03), Vector3(1.2, 1.0, 0.6))
 	# kolizní kvádr: zvednutý spodek, výška po rám
 	var hp := PackedVector3Array()
@@ -86,12 +86,9 @@ static func build(m: CarModel) -> ArrayMesh:
 				hp.append(Vector3(x, y, z))
 	m.hull_points = hp
 	# materiály a plochy
-	m.paint_mat = StandardMaterial3D.new()
-	m.paint_mat.albedo_color = m.paint
-	m.paint_mat.metallic = 0.3
-	m.paint_mat.roughness = 0.45
+	m.paint_mat = MeshKit.paint_material(m.paint, 0.45, 0.3, 0.5, 0.3, 0.6)
 	m._add_surface(kp, m.paint_mat)
-	m._add_surface(kt, MeshKit.vc_material(0.55, 0.2, 0.0, false))
+	m._add_surface(kt, MeshKit.vc_material(0.55, 0.2, 0.0, false), 0.5)
 	m._add_surface(kh, m.head_mat)
 	m._add_surface(ktl, m.tail_mat)
 	# řidič: sedí uprostřed na sedadle, ruce na volantu, nohy na plošině

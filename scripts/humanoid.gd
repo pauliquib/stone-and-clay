@@ -206,13 +206,7 @@ func _ready() -> void:
 	_leg_l = _pivot(_hips, Vector3(-0.093 * sx, -0.03, 0))
 	_shin_r = _pivot(_leg_r, Vector3(0, -0.44, 0))
 	_shin_l = _pivot(_leg_l, Vector3(0, -0.44, 0))
-	_build_hips()
-	_build_torso()
-	_build_head()
-	for side in [1.0, -1.0]:
-		_build_arm(side)
-		_build_leg(side)
-	_build_belly()
+	_build_parts()
 
 
 # ---------------------------------------------------------------- oblečení hráče (M2.3)
@@ -277,6 +271,25 @@ func _rebuild() -> void:
 	_meshes.clear()
 	if _belly != null and is_instance_valid(_belly):
 		_belly.queue_free()
+	_build_parts()
+	set_first_person(_fp)
+
+
+## Postaví všechny díly. Barvy oblečení, kůže a vlasů dostanou po dobu stavby v alfě druh materiálu (MeshKit.tagged)
+## → vc_model.gdshader je bere jako sRGB a volí drsnost / šum podle druhu (látka, kůže, vlasy, useň), ne odhadem
+## z barvy (hnědé vlasy jako dřevo). Veřejné barvy se po stavbě vrátí (sleeve_c nese v alfě příznak „rukávy bundy“).
+func _build_parts() -> void:
+	var keep := [shirt, pants, skin, hair, shoes, jacket_color, sleeve_c, glove_color]
+	shirt = MeshKit.tagged(shirt, MeshKit.MAT_CLOTH)
+	pants = MeshKit.tagged(pants, MeshKit.MAT_CLOTH)
+	skin = MeshKit.tagged(skin, MeshKit.MAT_SKIN)
+	hair = MeshKit.tagged(hair, MeshKit.MAT_HAIR)
+	shoes = MeshKit.tagged(shoes, MeshKit.MAT_LEATHER)
+	if jacket_style != "reflexni_vesta":
+		jacket_color = MeshKit.tagged(jacket_color, MeshKit.MAT_CLOTH)
+	if sleeve_c.a > 0.0:
+		sleeve_c = MeshKit.tagged(sleeve_c, MeshKit.MAT_CLOTH)
+	glove_color = MeshKit.tagged(glove_color, MeshKit.MAT_LEATHER)
 	_build_hips()
 	_build_torso()
 	_build_head()
@@ -284,7 +297,14 @@ func _rebuild() -> void:
 		_build_arm(side)
 		_build_leg(side)
 	_build_belly()
-	set_first_person(_fp)
+	shirt = keep[0]
+	pants = keep[1]
+	skin = keep[2]
+	hair = keep[3]
+	shoes = keep[4]
+	jacket_color = keep[5]
+	sleeve_c = keep[6]
+	glove_color = keep[7]
 
 
 # ---------------------------------------------------------------- stavba
@@ -425,15 +445,14 @@ func _build_belly() -> void:
 func _build_head() -> void:
 	var k := MeshKit.new()
 	# lebka + obličej (vejčitý profil)
-	var hp := PackedVector2Array([Vector2(0.0, 0.0), Vector2(0.04, 0.005), Vector2(0.068, 0.03),
-		Vector2(0.085, 0.07), Vector2(0.096, 0.12), Vector2(0.099, 0.16), Vector2(0.093, 0.2),
-		Vector2(0.075, 0.232), Vector2(0.042, 0.252), Vector2(0.0, 0.258)])
-	k.lathe(hp, Transform3D(Basis.IDENTITY, Vector3(0, 0, 0.005)), skin, 18, 0.9, 1.04)
+	var hp := PackedVector2Array(HEAD_PROF)
+	k.lathe(hp, Transform3D(Basis.IDENTITY, Vector3(0, 0, HEAD_Z)), skin, 18, HEAD_SX, HEAD_SZ)
 	var dark := Color(0.08, 0.06, 0.05)
-	# oči
+	# oči (lesklé – odlesk oblohy v oku)
 	for s in [-1.0, 1.0]:
-		k.sphere(Vector3(0.034 * s, 0.14, 0.083), 0.015, Color(0.96, 0.96, 0.94), Vector3.ONE, Vector3.ZERO, 8, 5)
-		k.sphere(Vector3(0.034 * s, 0.14, 0.095), 0.0075, Color(0.25, 0.35, 0.45).lerp(dark, 0.4),
+		k.sphere(Vector3(0.034 * s, 0.14, 0.083), 0.015, MeshKit.tagged(Color(0.9, 0.88, 0.85), MeshKit.MAT_GLOSS),
+			Vector3.ONE, Vector3.ZERO, 8, 5)
+		k.sphere(Vector3(0.034 * s, 0.14, 0.095), 0.0075, MeshKit.tagged(Color(0.3, 0.38, 0.45).lerp(dark, 0.5), MeshKit.MAT_GLOSS),
 			Vector3.ONE, Vector3.ZERO, 6, 4)
 		# obočí
 		k.box(Vector3(0.036 * s, 0.163, 0.092), Vector3(0.034, 0.008, 0.01), hair.darkened(0.2),
@@ -444,29 +463,25 @@ func _build_head() -> void:
 	k.capsule(Vector3(0, 0.118, 0.098), 0.014, 0.05, skin.darkened(0.04), Vector3(-0.35, 0, 0))
 	k.sphere(Vector3(0, 0.1, 0.105), 0.016, skin.darkened(0.06), Vector3(1.2, 0.8, 1.0), Vector3.ZERO, 8, 5)
 	# ústa
-	k.box(Vector3(0, 0.068, 0.088), Vector3(0.036, 0.007, 0.012), Color(0.62, 0.32, 0.3))
+	k.box(Vector3(0, 0.068, 0.088), Vector3(0.036, 0.007, 0.012), MeshKit.tagged(skin.lerp(Color(0.62, 0.3, 0.3), 0.45), MeshKit.MAT_SKIN))
 	if moustache:
 		k.capsule(Vector3(0, 0.082, 0.097), 0.01, 0.06, hair, Vector3(0, 0, PI / 2))
 	if beard:
 		k.sphere(Vector3(0, 0.045, 0.06), 0.06, hair, Vector3(1.2, 0.9, 0.8), Vector3.ZERO, 10, 6)
 	# vlasy
+	# vlasy: slupka nad lebkou s vlasovou linií (čelo a obličej zůstanou volné – dřív rotační čepička přes celou
+	# hlavu zakrývala čelo i oči)
 	match hair_style:
-		0, 3:
-			var th := 0.012 if hair_style == 0 else 0.005
-			var cap := PackedVector2Array([Vector2(0.101 + th, 0.11), Vector2(0.104 + th, 0.16),
-				Vector2(0.098 + th, 0.2), Vector2(0.08 + th, 0.235), Vector2(0.045 + th, 0.258), Vector2(0.0, 0.265 + th)])
-			k.lathe(cap, Transform3D(Basis.IDENTITY, Vector3(0, 0.005, -0.012)), hair, 18, 0.92, 1.06)
-			if hair_style == 0:   # ofina
-				k.box(Vector3(0, 0.215, 0.082), Vector3(0.12, 0.035, 0.03), hair, Vector3(0.5, 0, 0))
+		0:
+			_hair_shell(k, 0.013, 0.196, 0.14, 0.055, hair)
+		3:
+			_hair_shell(k, 0.005, 0.212, 0.135, 0.07, hair)
 		1:
 			var ring := PackedVector2Array([Vector2(0.101, 0.1), Vector2(0.104, 0.14), Vector2(0.098, 0.17)])
 			k.lathe(ring, Transform3D(Basis.IDENTITY, Vector3(0, 0.0, -0.02)), hair, 18, 0.93, 1.04)
 		2:
-			var cap2 := PackedVector2Array([Vector2(0.108, 0.04), Vector2(0.11, 0.12), Vector2(0.108, 0.17),
-				Vector2(0.098, 0.21), Vector2(0.08, 0.24), Vector2(0.045, 0.262), Vector2(0.0, 0.272)])
-			k.lathe(cap2, Transform3D(Basis.IDENTITY, Vector3(0, 0.0, -0.018)), hair, 18, 0.95, 1.0)
-			k.box(Vector3(0, 0.0, -0.075), Vector3(0.19, 0.22, 0.05), hair, Vector3(-0.15, 0, 0))
-			k.box(Vector3(0, 0.205, 0.075), Vector3(0.15, 0.04, 0.03), hair, Vector3(0.4, 0, 0))
+			_hair_shell(k, 0.017, 0.198, 0.03, -0.01, hair)
+			k.box(Vector3(0, -0.01, -0.082), Vector3(0.18, 0.2, 0.045), hair, Vector3(-0.12, 0, 0))   # vlasy na zádech
 	# pokrývky hlavy
 	if outfit == "police":
 		var cap_c := Color(0.1, 0.13, 0.28)
@@ -483,6 +498,59 @@ func _build_head() -> void:
 		if outfit == "hunter":   # pírko
 			k.capsule(Vector3(-0.1, 0.3, -0.02), 0.01, 0.14, Color(0.3, 0.3, 0.3), Vector3(0, 0, 0.5))
 	_commit(_head, k)
+
+
+## Profil lebky (poloměr, výška) – rotační těleso hlavy, zúžené v ose X (HEAD_SX), protažené v Z (HEAD_SZ).
+const HEAD_PROF := [Vector2(0.0, 0.0), Vector2(0.04, 0.005), Vector2(0.068, 0.03),
+	Vector2(0.085, 0.07), Vector2(0.096, 0.12), Vector2(0.099, 0.16), Vector2(0.093, 0.2),
+	Vector2(0.075, 0.232), Vector2(0.042, 0.252), Vector2(0.0, 0.258)]
+const HEAD_SX := 0.9
+const HEAD_SZ := 1.04
+const HEAD_Z := 0.005
+
+
+## Poloměr lebky (před zúžením HEAD_SX / HEAD_SZ) ve výšce `y` hlavy.
+static func _head_r(y: float) -> float:
+	for i in range(1, HEAD_PROF.size()):
+		var b: Vector2 = HEAD_PROF[i]
+		if y <= b.y:
+			var a: Vector2 = HEAD_PROF[i - 1]
+			return lerpf(a.x, b.x, clampf((y - a.y) / maxf(b.y - a.y, 0.0001), 0.0, 1.0))
+	return 0.0
+
+
+## Vlasy jako slupka tloušťky `th` nad lebkou, spodní okraj (vlasová linie) ve výšce `y_front` nad čelem,
+## `y_side` nad ušima a `y_back` na zátylku. Okraj se stáčí k lebce (bez škvíry zespodu). Vinutí jako MeshKit.lathe.
+static func _hair_shell(k: MeshKit, th: float, y_front: float, y_side: float, y_back: float, col: Color) -> void:
+	const SEG := 20
+	const RINGS := 7
+	const TOP := 0.258
+	var c0 := Vector3(0.0, 0.13, HEAD_Z)
+	var base := k.verts.size()
+	for j in RINGS + 2:
+		for si in SEG + 1:
+			var ang := TAU * float(si) / SEG
+			var ca := cos(ang)
+			var sa := sin(ang)                   # +Z = obličej
+			var yb := lerpf(y_side, y_front, smoothstep(0.25, 0.8, sa)) if sa >= 0.0 \
+				else lerpf(y_side, y_back, smoothstep(0.1, 0.85, -sa))
+			var t := 0.0 if j == 0 else float(j - 1) / RINGS
+			var y := yb + (TOP - yb) * sin(t * PI * 0.5)
+			var r := _head_r(y)
+			var p := Vector3(r * ca * HEAD_SX, y, r * sa * HEAD_SZ + HEAD_Z)
+			var n := (p - c0).normalized()
+			if j > 0:
+				p += n * th
+			else:
+				p += n * th * 0.15 - Vector3(0, th * 0.4, 0)     # lem u kůže
+			k.verts.append(p)
+			k.norms.append(n)
+			k.cols.append(col)
+	for j in RINGS + 1:
+		for si in SEG:
+			var a0 := base + j * (SEG + 1) + si
+			var b0 := a0 + SEG + 1
+			k.idx.append_array([a0, a0 + 1, b0, a0 + 1, b0 + 1, b0])
 
 
 ## Pokrývky hlavy hráče (M2.3): čepice, kulich, klobouk, včelařská kukla, pilařská helma s chrániči sluchu a štítkem.

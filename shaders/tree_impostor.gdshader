@@ -3,6 +3,17 @@
 // Varianta stromu = barva instance MultiMeshe (COLOR.r · 255), rozměry varianty v `imp_ext`. Odstín koruny jako u
 // tree.gdshader z INSTANCE_CUSTOM.rgb, sezóna (rašení, podzim po chomáčích, opad, sníh) zjednodušeně stejně –
 // při změně sezónní logiky v tree.gdshader drž v souladu. Bez listí (zima) ukáže siluetu holých větví (normála.a).
+//
+// 2026-10 (dron, vítr, stín):
+//   * karta se natáčí i nahoru ke kameře (náklon = výška pohledu nad středem koruny, pivot ve středu koruny) – shora
+//     se nezplošťuje do čárky; od ~43° do ~70° se po pixelech (dither) prolne do procedurální koruny shora (kruh
+//     s laločnatým okrajem a chomáči, u jehličnanů přesleny, v zimě paprsky holých větví) se sférickou normálou.
+//   * vítr: rohy karty se hýbou stejným ohybem kmene jako LOD0/LOD1 (`wind_bend`, jen složka kmene).
+//   * stínový průchod (stíny impostorů zapíná TreeGen jen od Vysoké): karta se natočí ke světlu (svislá) – stín má
+//     siluetu stromu, ne čáru. Poznává se podle toho, že kamera průchodu není hlavní kamera.
+//   * osvětlení jako LOD1 (drsnost, prosvítání listí, okluze, variace barvy podle stromu).
+//   * sousední snímky atlasu se střídají ditherem (ne průměrem alfy), alfa zesílená podle mipu; rozměry variant
+//     (`imp_ext`) jdou jako PackedVector4Array (barvy by Godot převedl ze sRGB → úzké impostory).
 shader_type spatial;
 render_mode cull_disabled, diffuse_burley, world_vertex_coords;
 
@@ -20,8 +31,11 @@ global uniform float foliage;
 global uniform float autumn;
 global uniform float snow_cover;
 
+#include "res://shaders/include/wind.gdshaderinc"
 #include "res://shaders/include/tree_gen.gdshaderinc"
 #include "res://shaders/include/phenology.gdshaderinc"
+
+const float IMP_SELF_SHADE = 0.62;       // ztmavení listí impostoru na jas LOD1 (viz fragment)
 
 varying vec3 tint;
 varying vec2 tg_fade;
@@ -33,6 +47,11 @@ varying vec3 bb_right;
 varying vec3 bb_fwd;
 varying vec3 wpos;
 varying vec3 origin_w;
+varying vec2 v_q;            // poloha na kartě (m): x napříč, y podél karty od středu koruny
+varying vec3 v_ext;          // půlšířka, spodek a vrchol stromu vůči středu koruny (m)
+varying vec3 v_upv;          // osa karty „nahoru“ (nakloněná ke kameře)
+varying vec3 v_nrm;          // normála karty
+varying float top_k;         // 0 = boční snímek z atlasu, 1 = koruna shora
 // M8.11: fenologie druhu a místa jako v tree.gdshader (include/phenology)
 varying flat vec4 ph_st;
 varying flat vec3 ph_aut;
@@ -68,8 +87,23 @@ void vertex() {
 	vec3 az = MODEL_MATRIX[2].xyz;
 	float sxz = max(length(ax), 1e-4);
 	float sy = length(MODEL_MATRIX[1].xyz);
-	vec2 hv = cam.xz - origin.xz;
-	hv = hv / max(length(hv), 1e-4);
+	float w = ext.x * sxz;
+	float y_lo = ext.y * sy;
+	float y_hi = ext.z * sy;
+	float cy = mix(y_lo, y_hi, 0.6);                 // pivot karty ≈ střed koruny
+	// stínový průchod: kamera průchodu není hlavní kamera → karta svisle čelem ke světlu
+	bool shadow_pass = distance(CAMERA_POSITION_WORLD, cam) > 0.05;
+	vec2 hv;
+	float el = 0.0;
+	if (shadow_pass) {
+		hv = INV_VIEW_MATRIX[2].xz;                  // směr ke světlu (ortografická stínová kamera)
+	} else {
+		vec3 tc = cam - (origin + vec3(0.0, cy, 0.0));
+		hv = tc.xz;
+		el = clamp(atan(tc.y, max(length(tc.xz), 1e-3)), 0.0, 1.45);
+	}
+	float hl = length(hv);
+	hv = hl > 1e-4 ? hv / hl : vec2(0.0, 1.0);
 	bb_fwd = vec3(hv.x, 0.0, hv.y);
 	bb_right = vec3(hv.y, 0.0, -hv.x);              // cross(up, fwd) – shodně s pečením
 	// úhel pohledu v lokálu instance (rotace kolem Y) → snímek atlasu
@@ -82,10 +116,20 @@ void vertex() {
 	float f = phi / 6.2831853 * imp_views;
 	frame_a = floor(f);
 	frame_t = f - frame_a;
-	float qx = (UV.x * 2.0 - 1.0) * ext.x * sxz;
-	float qy = mix(ext.z, ext.y, UV.y) * sy;
-	VERTEX = origin + bb_right * qx + vec3(0.0, qy, 0.0);
-	NORMAL = bb_fwd;
+	// náklon ke kameře kolem vodorovné osy (shora se karta nezploští); karta pokryje i kruh koruny shora
+	v_upv = vec3(0.0, cos(el), 0.0) - bb_fwd * sin(el);
+	v_nrm = bb_fwd * cos(el) + vec3(0.0, sin(el), 0.0);
+	top_k = smoothstep(0.75, 1.22, el);
+	v_ext = vec3(w, y_lo - cy, y_hi - cy);
+	float qlo = min(y_lo - cy, -w);
+	float qhi = max(y_hi - cy, w);
+	v_q = vec2((UV.x * 2.0 - 1.0) * w, mix(qhi, qlo, UV.y));
+	VERTEX = origin + vec3(0.0, cy, 0.0) + bb_right * v_q.x + v_upv * v_q.y;
+	if (wind_hier > 0.5) {
+		// vítr: jen ohyb kmene (jako LOD0/LOD1 – na přechodu LOD nic neskočí)
+		VERTEX += wind_bend(VERTEX - origin, origin, vec4(0.0, 0.0, 0.0, 1.0), max(y_hi, 1.0), decid > 0.5 ? 1.0 : 1.3);
+	}
+	NORMAL = v_nrm;
 	if (tg_band_outside(dc, lod_band)) {
 		VERTEX = origin;                            // blízko: strom kreslí LOD0/LOD1
 	}
@@ -96,16 +140,60 @@ void fragment() {
 	if (tg_dither_out(FRAGCOORD.xy, tg_fade)) {
 		discard;
 	}
+	float th = tg_hash(floor(origin_w * 0.37) + 0.5);
+	// boční snímek z atlasu (UV z polohy na kartě – karta je vyšší / širší kvůli pohledu shora); čte se mimo větvení,
+	// aby mipmapy (derivace) seděly i na pixelech prolnutí s korunou shora
+	vec2 uvl = vec2(v_q.x / max(v_ext.x, 1e-3) * 0.5 + 0.5, (v_ext.z - v_q.y) / max(v_ext.z - v_ext.y, 1e-3));
+	bool inside = uvl.x >= 0.0 && uvl.y >= 0.0 && uvl.x <= 1.0 && uvl.y <= 1.0;
 	vec2 cell = vec2(1.0 / imp_views, 1.0 / imp_rows);
-	vec2 uvl = clamp(UV, vec2(0.004), vec2(0.996));
+	uvl = clamp(uvl, vec2(0.004), vec2(0.996));
 	float fa = mod(frame_a, imp_views);
 	float fb = mod(frame_a + 1.0, imp_views);
 	vec2 ua = (vec2(fa, row) + uvl) * cell;
 	vec2 ub = (vec2(fb, row) + uvl) * cell;
-	vec4 col = mix(texture(imp_color, ua), texture(imp_color, ub), frame_t);
-	vec4 nr = mix(texture(imp_normal, ua), texture(imp_normal, ub), frame_t);
-	if (col.a < 0.5) {
-		discard;
+	// 2026-10: snímky se neprolínají alfou (listí dvou pohledů se nepřekrývá → průměr alfy pod 0,5 → řídká koruna),
+	// ale ditherem po pixelech; alfa se zesílí podle mipu (jako tg_leaf) – vzdálená koruna neprořídne
+	bool fb_sel = tg_dither(FRAGCOORD.xy + vec2(31.0, 7.0)) < frame_t;
+	vec4 col_a = texture(imp_color, ua);
+	vec4 col_b = texture(imp_color, ub);
+	vec4 nr_a = texture(imp_normal, ua);
+	vec4 nr_b = texture(imp_normal, ub);
+	vec4 col = fb_sel ? col_b : col_a;
+	vec4 nr = fb_sel ? nr_b : nr_a;
+	vec2 tsz = vec2(textureSize(imp_color, 0));
+	vec2 ddx = dFdx(ua) * tsz;
+	vec2 ddy = dFdy(ua) * tsz;
+	float mip = clamp(0.5 * log2(max(max(dot(ddx, ddx), dot(ddy, ddy)), 1e-8)), 0.0, 6.0);
+	col.a *= 1.0 + mip * TG_ALPHA_MIP;
+	vec3 nw;
+	if (tg_dither(FRAGCOORD.yx + vec2(17.0, 5.0)) >= top_k) {
+		if (!inside || col.a < 0.5) {
+			discard;
+		}
+		vec2 nxy = nr.rg * 2.0 - 1.0;
+		nw = normalize(bb_right * nxy.x + vec3(0.0, nxy.y, 0.0) + bb_fwd * sqrt(clamp(1.0 - dot(nxy, nxy), 0.0, 1.0)));
+	} else {
+		// koruna shora: laločnatý kruh (jehličnan: přesleny), chomáče listí, sférická normála
+		vec2 d = v_q / max(v_ext.x * 0.95, 0.1);
+		float r = length(d);
+		float a = atan(d.y, d.x);
+		float cl = tg_vnoise(vec3(d * 2.6 + th * 11.0, th * 5.0));
+		float edge = decid > 0.5
+			? 0.78 + 0.2 * tg_vnoise(vec3(cos(a) * 2.2 + th * 7.0, sin(a) * 2.2, th * 3.0))
+			: 0.68 + 0.27 * pow(abs(sin(a * 4.0 + th * 9.0)), 0.6);
+		if (r > edge * (0.9 + 0.16 * cl)) {
+			discard;
+		}
+		float cl2 = tg_vnoise(vec3(d * 2.6 + 4.7 + th * 11.0, th * 5.0 + 2.0));
+		float hz = sqrt(max(1.0 - r * r, 0.05)) * (decid > 0.5 ? 1.0 : 0.6);
+		vec3 nl = normalize(vec3(d.x + (cl - 0.5) * 0.7, d.y + (cl2 - 0.5) * 0.7, hz));
+		nw = normalize(bb_right * nl.x + v_upv * nl.y + v_nrm * nl.z);
+		col = vec4(vec3(TG_LEAF_MEAN * (0.65 + 0.6 * cl)), 1.0);
+		float tw = abs(sin(a * 9.0 + r * 5.0 + th * 20.0));   // zima: paprsky holých větví
+		nr = vec4(0.5, 0.5, 1.0, (tw < 0.12 + 0.28 * (1.0 - r) && r < 0.92) ? 1.0 : 0.0);
+		if (decid < 0.5) {
+			nr.a = 1.0;
+		}
 	}
 	vec3 c;
 	bool leaf = nr.b > 0.5;
@@ -113,10 +201,10 @@ void fragment() {
 	if (leaf) {
 		c = mix(mix(base_color_conifer, base_color, decid), tint, instance_mix);
 		c *= mix(vec3(0.6, 0.7, 0.5), vec3(1.15), nz);
+		c *= tg_tree_var(th);                       // variace odstínu a jasu podle stromu (shodně s tree.gdshader)
 		bool dec = ph_fl.x > 0.5 ? ph_fl.y < 0.5 : decid > 0.5;   // M8.11: modřín opadává i jako jehličnan
 		float fol = ph_st.x;
 		float aut = ph_st.y;
-		float th = tg_hash(floor(origin_w * 0.37) + 0.5);
 		if (dec) {
 			float clump = tg_vnoise(wpos * 2.2 + th * 13.0);
 			bool flower = ph_bl.a > 0.5 && ph_st.z > 0.01 && tg_vnoise(wpos * 6.5 + th * 7.0) > 1.0 - 0.55 * ph_st.z;
@@ -144,20 +232,22 @@ void fragment() {
 			c = mix(c, ph_spr * (1.4 + 0.4 * nz), tip * ph_st.w * 0.6);
 		}
 		if (leaf) {
-			c *= col.r / TG_LEAF_MEAN;
+			// × IMP_SELF_SHADE: LOD1 má v koruně vlastní stíny a okluzi listů (COLOR.a), vypečený snímek ne – bez
+			// korekce byla koruna impostoru ~1,8× světlejší než stejný strom v LOD1 (měřeno na snímku z dronu)
+			c *= col.r / TG_LEAF_MEAN * IMP_SELF_SHADE;
 		}
 	} else {
-		c = col.rgb;
+		c = col.rgb * 0.7;                         // kůra: průměrná okluze jako LOD (COLOR.a), jinak bílé větve
 	}
-	vec2 nxy = nr.rg * 2.0 - 1.0;
-	vec3 nw = normalize(bb_right * nxy.x + vec3(0.0, nxy.y, 0.0) + bb_fwd * sqrt(clamp(1.0 - dot(nxy, nxy), 0.0, 1.0)));
 	float snow = clamp(snow_cover * 1.6 - (1.0 - nz) * 0.4, 0.0, 1.0) * smoothstep(0.2, 0.7, nw.y);
 	c = mix(c, vec3(0.88, 0.9, 0.95), snow);
 	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
 	ALBEDO = c;
-	ROUGHNESS = 0.85;
-	SPECULAR = 0.3;
+	ROUGHNESS = 0.8;
+	SPECULAR = leaf ? 0.12 : 0.3;                    // listí jako LOD1 (bez bílého odlesku na hraně)
+	AO = 0.85;                                      // průměrná okluze v koruně (LOD1: z barvy vrcholu)
+	AO_LIGHT_AFFECT = 0.0;
 	if (leaf) {
-		BACKLIGHT = c * 0.35;
+		BACKLIGHT = c * TG_LEAF_BACKLIGHT * 0.4;    // prosvítání listí jako LOD1 (průměr přes korunu)
 	}
 }

@@ -78,5 +78,7 @@ func _update_lut(doy: float, year: int) -> void:
 		world.terrain.set_field_lut(_lut)
 		if world.vegetation:
 			world.vegetation.set_field_lut(_lut)   # obilí zraje podle kalendáře pole
+		if flowers:
+			flowers.set_field_lut(_lut)            # květy LUT nečtou – jen ať sampler shaderu není prázdný
 	else:
 		_lut.update(img)

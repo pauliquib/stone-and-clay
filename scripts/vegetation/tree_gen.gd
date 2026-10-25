@@ -1,7 +1,8 @@
 ## M8.8 Generované stromy: modely podle druhu, věku a vitality z `data/tree_species_protos.bin` (DBT2, `tools/treegen/`),
 ## LOD0 / LOD1 zblízka (streamované po buňkách, `TreeLodStreamer`) a impostory v dálce (jeden MultiMesh na buňku 256 m).
 ## Podle čeho: space colonization (Runions et al. 2007) / přeslenový růst, Weber & Penn 1995, oktaedrické / více-pohledové
-## impostory (zjednodušeně 8 pohledů kolem osy Y) – viz hlavička `tools/treegen/treegen.py`.
+## impostory (zjednodušeně 8 pohledů kolem osy Y) – viz hlavička `tools/treegen/treegen.py`. 2026-10: impostor se
+## shora prolne do procedurální koruny, hýbe se ve větru a od Vysoké vrhá stín (`tree_impostor.gdshader`).
 ##
 ## Vstup za běhu: `trees.bin` (poloha, natočení, měřítko, barva z ortofota) + `tree_eco.bin` (M8.3: druh, věk, vitalita –
 ## čte se přímo, protože `TreeEco` vzniká až po indexu stromů). Bez `tree_eco.bin` druh z prototypu (`TreeEco.FALLBACK_PROTO`).
@@ -32,6 +33,11 @@ const XZ_MAX := 1.25
 const VIGOR_H := Vector2(0.86, 1.04)
 const YOUNG_H_FALLBACK := 9.0         # m – bez tree_eco.bin: nižší strom = „mladý“ model
 const STIFF_CONIFER := 1.3
+## 2026-10: měkčí normály koruny – normála karty listí se při načtení prolne s normálou elipsoidu koruny (ven ze
+## středu obálky listí). Koruna se pak stíní jako celek (světlá strana ke slunci, tmavší spodek), ne po jednotlivých
+## kartách se „zrnitými“ odlesky; obvyklý postup u karet listí. Cena jen při načtení (smyčka přes vrcholy už běží).
+const CROWN_SOFT := 0.6               # listnáč: podíl normály elipsoidu (0 = jen karta)
+const CROWN_SOFT_CONIFER := 0.45      # jehličnan: přesleny mají vlastní tvar, méně
 
 var shapes: Array = []                # {id, conifer, tile, stiff}
 var species_map := {}                 # id druhu → index tvaru
@@ -50,6 +56,10 @@ var lod0_k := 1.0
 var lod1_k := 1.0
 var _full := {}                       # varianta → LOD0 bez pásma (zasazené stromy)
 var _imp_mat: ShaderMaterial
+## 2026-10: MultiMeshe impostorů – stín vrhají jen od Vysoké (`gfx_quality` > 1,5; stíny tam sahají až 240–320 m,
+## tedy za hranici LOD1 → bez nich by stromům v pásmu impostorů stín „zmizel“). Přepíná `update_impostor_shadows`.
+var _imp_nodes: Array[MultiMeshInstance3D] = []
+var _imp_shadow := -1
 var _imp_mesh: ArrayMesh
 var _tex := {}
 
@@ -157,12 +167,18 @@ func _mesh(b: PackedByteArray, off: int, shape: int, conifer: bool, lod: int) ->
 		t.resize(nv)
 		t2.resize(nv)
 		c.resize(nv)
+		var lo := Vector3(INF, INF, INF)
+		var hi := -lo
 		for i in nv:
 			v[i] = Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2])
 			n[i] = Vector3(nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2])
 			t[i] = Vector2(uv[i * 2], uv[i * 2 + 1])
 			t2[i] = Vector2(uv2[i * 2], uv2[i * 2 + 1])
 			c[i] = Color8(col[i * 4], col[i * 4 + 1], col[i * 4 + 2], col[i * 4 + 3])
+			lo = lo.min(v[i])
+			hi = hi.max(v[i])
+		if s == 1:
+			_soften_crown(v, n, lo, hi, CROWN_SOFT_CONIFER if conifer else CROWN_SOFT)
 		var arr := []
 		arr.resize(Mesh.ARRAY_MAX)
 		arr[Mesh.ARRAY_VERTEX] = v
@@ -174,6 +190,20 @@ func _mesh(b: PackedByteArray, off: int, shape: int, conifer: bool, lod: int) ->
 		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 		m.surface_set_material(m.get_surface_count() - 1, material(shape, s == 1, lod))
 	return [m, off]
+
+
+## Normály listí → prolnutí s normálou elipsoidu obálky koruny (střed lehce pod středem obálky – spodek koruny
+## míří víc dolů a je tmavší, vršek ke slunci). Karta otočená proti normále elipsoidu se nejdřív obrátí.
+func _soften_crown(v: PackedVector3Array, n: PackedVector3Array, lo: Vector3, hi: Vector3, k: float) -> void:
+	var ctr := (lo + hi) * 0.5 - Vector3(0.0, (hi.y - lo.y) * 0.08, 0.0)
+	var ext := ((hi - lo) * 0.5).max(Vector3(0.05, 0.05, 0.05))
+	var inv2 := Vector3(1.0 / (ext.x * ext.x), 1.0 / (ext.y * ext.y), 1.0 / (ext.z * ext.z))
+	for i in v.size():
+		var e := ((v[i] - ctr) * inv2).normalized()
+		var nc := n[i]
+		if nc.dot(e) < 0.0:
+			nc = -nc
+		n[i] = nc.lerp(e, k).normalized()
 
 
 func _texture(path: String) -> Texture2D:
@@ -317,14 +347,28 @@ func impostor_material() -> ShaderMaterial:
 	m.set_shader_parameter("imp_views", float(imp_views))
 	m.set_shader_parameter("imp_rows", float(variants.size()))
 	m.set_shader_parameter("lod_band", Vector4(l1_end(), 1e6, LOD_FADE, 0.0))   # konec 1e6: v float32 ještě ± prolínání
-	var ext := PackedColorArray()
+	# 2026-10: PackedVector4Array, ne PackedColorArray – pole barev Godot u `vec4[]` převádí ze sRGB do lineáru,
+	# takže půlšířka (0,27 → 0,06) vycházela ~4,5× menší a impostory byly úzké „topoly“ (výška ~1 se skoro nemění)
+	var ext := PackedVector4Array()
 	ext.resize(64)
 	for k in variants.size():
 		var v: Dictionary = variants[k]
-		ext[k] = Color(float(v["w"]), float(v["y0"]), float(v["y1"]), 0.0 if is_conifer_variant(k) else 1.0)
+		ext[k] = Vector4(float(v["w"]), float(v["y0"]), float(v["y1"]), 0.0 if is_conifer_variant(k) else 1.0)
 	m.set_shader_parameter("imp_ext", ext)
 	_imp_mat = m
 	return m
+
+
+## Stín impostorů podle předvolby (volá TreeLodStreamer při kontrole buněk; mění se jen při změně kvality).
+func update_impostor_shadows() -> void:
+	var on := 1 if GameSettings.gfx_quality > 1.5 else 0
+	if on == _imp_shadow:
+		return
+	_imp_shadow = on
+	for mmi in _imp_nodes:
+		if is_instance_valid(mmi):
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if on == 1 \
+				else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 ## Karta impostoru: rohy jen v UV (shader ji staví ve světě – world_vertex_coords), barva vrcholu bílá
@@ -449,10 +493,12 @@ func build(parent: Node3D, skip: Dictionary, terrain: Terrain, mgr: TreeManager)
 		mmi.multimesh = mm
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mmi.visibility_range_end = MapLoader.TREE_FAR_RANGE
+		_imp_nodes.append(mmi)
 		far_mm[[key, "imp"]] = mm
 		MapLoader._far_mmis.append(mmi)
 		root.add_child(mmi)
 	root.add_child(streamer)
+	update_impostor_shadows()
 
 	# kolize kmenů – stejně jako MapLoader.build_trees (tvary přímo na fyzikálním serveru, jedno tělo na buňku 256 m)
 	var bodies := {}

@@ -7,12 +7,26 @@
 ## `level_at` (m vůči normálu); hladina pásu vody se zvedá/klesá (instance uniform `level_ofs`, max ±0,4 m),
 ## po přívalu kalní (`turbid`), proud zrychlí (`flow_mult`), v suchu malý potok vyschne (pás se schová).
 ## Bez bilance (přepínač Realismus → `soil_water` vypnutý) se chová jako dřív.
+## Vzhled: shaders/include/water.gdshaderinc – levná varianta (water.gdshader) pro Nízkou / Střední, od Vysoké
+## `water_hq.gdshader` (lom, odraz okolí, kapky deště); přepíná se podle globálního `gfx_quality` za běhu.
 class_name Water
 extends Node3D
 
 const CELL := 32.0                    # mřížka pro hledání nejbližšího úseku
 const VIS_RANGE := 1100.0
 const FLOW := {"river": 0.55, "canal": 0.3, "stream": 0.9, "ditch": 0.4, "drain": 0.4}
+const SHADER_LO := "res://shaders/water.gdshader"
+const SHADER_HQ := "res://shaders/water_hq.gdshader"
+## Vzhled vody (moravská pahorkatina – hnědozelená, zakalená): [mělká, rozptyl v hloubce, útlum 1/m R, G, B].
+const LOOK := {
+	"stream": [Color(0.31, 0.32, 0.21), Color(0.26, 0.25, 0.15), Vector3(1.2, 0.9, 1.6)],
+	"river": [Color(0.32, 0.33, 0.23), Color(0.24, 0.24, 0.14), Vector3(1.5, 1.1, 2.0)],
+	"pond": [Color(0.27, 0.31, 0.19), Color(0.17, 0.19, 0.10), Vector3(1.8, 1.3, 2.4)],
+}
+const LEVEL_STEP := 0.012             # m: výškový posun hladiny toku podle pořadí (překryv úseků → žádný z-fighting)
+const SLOPE_REF := 0.035              # sklon hladiny, při kterém teče proud „normálně“ (násobek 1)
+const END_FADE := 4.0                 # m: volný konec pásu toku (pramen, ústí do jiného toku) dozní a zúží se
+const JOIN_DIST := 1.5                # m: konec u konce jiného úseku = navazující úsek téhož toku (bez doznění)
 ## M8.7: normální průtok (m³/s) bez vodní bilance (fallback `flow_at`) a vizuál hladiny.
 ## M8.D2c: chování = `static var` (F3 → Příroda/Voda a půda), výchozí beze změny.
 static var FLOW_NOMINAL := {"river": 1.2, "canal": 0.3, "stream": 0.03, "ditch": 0.01, "drain": 0.01}
@@ -26,6 +40,7 @@ static var STREAM_FREEZE_C := 5.0     # tekoucí voda začne zamrzat pod −toli
 static var STREAM_FREEZE_SPAN := 6.0  # … úplně zamrzlá o tolik °C níž
 static var ICE_RATE_H := 0.08         # rychlost zamrzání / tání rybníka (za herní hodinu)
 static var ICE_FLOW_RATE_H := 0.05    # … tekoucí vody
+const SNOW_COLD_C := 4.0              # start hry: o kolik °C chladnější „minulé dny“ při plné sněhové pokrývce
 static var WAVES_RAIN := 0.8          # vlnky: přídavek při plném dešti
 static var WAVES_WIND := 0.7          # … při plném větru
 static var WAVES_WIND_FULL := 10.0    # … „plný vítr“ (m/s)
@@ -51,6 +66,7 @@ var level_ofs := PackedFloat32Array()        # M8.7: aktuální (vyhlazený) pos
 var _turb_vis := PackedFloat32Array()
 var _flow_vis := PackedFloat32Array()
 var _vis_tick := 0.0
+var _hq := false                             # právě použitá varianta shaderu (od Vysoké)
 
 
 ## Načte data (bez stavby) – hned po terénu, ať MapLoader ví, které stromy vynechat.
@@ -69,15 +85,8 @@ func build(w: World, t: Terrain) -> void:
 	terrain = t
 	if data.is_empty():
 		return
-	var noise := FastNoiseLite.new()
-	noise.frequency = 0.05
-	noise.fractal_octaves = 3
-	var ntex := NoiseTexture2D.new()
-	ntex.width = 256
-	ntex.height = 256
-	ntex.seamless = true
-	ntex.generate_mipmaps = true
-	ntex.noise = noise
+	_hq = _want_hq()
+	var ntex := _wave_texture()
 	var kinds: Dictionary = data.get("kinds", {})
 	var by_kind := {}
 	for s in data.get("streams", []):
@@ -107,23 +116,19 @@ func build(w: World, t: Terrain) -> void:
 	_flow_vis.resize(streams.size())
 	_flow_vis.fill(1.0)
 	for kind in by_kind:
-		var m := _material(ntex, float(FLOW.get(kind, 0.6)))
-		if kind == "river":
-			m.set_shader_parameter("shallow_color", Color(0.33, 0.36, 0.27))
-			m.set_shader_parameter("deep_color", Color(0.12, 0.14, 0.09))
+		var m := _material(ntex, float(FLOW.get(kind, 0.6)), "river" if kind == "river" else "stream")
 		for si in by_kind[kind]:
 			var mi := MeshInstance3D.new()
 			_stream_mi[si] = mi
 			mi.extra_cull_margin = 0.5          # M8.7: hladina se v shaderu posouvá o ±0,4 m
 			mi.name = "Tok_%d" % si
-			mi.mesh = _ribbon(streams[si])
+			mi.mesh = _ribbon(streams[si], float(si % 4) * LEVEL_STEP, _free_end(si, 0), _free_end(si, -1))
 			mi.material_override = m
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			mi.visibility_range_end = _vis_end(mi.mesh)
 			add_child(mi)
 	# rybníky
-	var mp := _material(ntex, 0.0)
-	mp.set_shader_parameter("shallow_color", Color(0.25, 0.33, 0.26))
+	var mp := _material(ntex, 0.0, "pond")
 	for pd in data.get("ponds", []):
 		var poly := PackedVector2Array()
 		for q in pd["poly"]:
@@ -148,6 +153,14 @@ func build(w: World, t: Terrain) -> void:
 		nn.resize(v.size())
 		nn.fill(Vector3.UP)
 		arr[Mesh.ARRAY_NORMAL] = nn
+		var tg := PackedFloat32Array()
+		for _i in v.size():
+			tg.append_array([1.0, 0.0, 0.0, 1.0])         # shader: směr „proudu“ (vlnky) = +X
+		arr[Mesh.ARRAY_TANGENT] = tg
+		var cc := PackedColorArray()
+		cc.resize(v.size())
+		cc.fill(Color.WHITE)                              # shader: COLOR.a = doznění okraje (rybník bez)
+		arr[Mesh.ARRAY_COLOR] = cc
 		var am := ArrayMesh.new()
 		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 		var mi := MeshInstance3D.new()
@@ -171,26 +184,134 @@ static func _vis_end(m: Mesh) -> float:
 	return VIS_RANGE + Vector2(ab.size.x, ab.size.z).length() * 0.5
 
 
-func _material(ntex: Texture2D, flow: float) -> ShaderMaterial:
+func _material(ntex: Texture2D, flow: float, look: String) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
-	m.shader = load("res://shaders/water.gdshader")
-	m.set_shader_parameter("noise_tex", ntex)
+	m.shader = load(SHADER_HQ if _hq else SHADER_LO)
+	m.set_shader_parameter("wave_tex", ntex)
 	m.set_shader_parameter("flow_speed", flow)
+	var lk: Array = LOOK[look]
+	m.set_shader_parameter("shallow_color", lk[0])
+	m.set_shader_parameter("deep_color", lk[1])
+	m.set_shader_parameter("absorb", lk[2])
 	m.set_meta("flowing", flow > 0.01)
 	_mats.append(m)
 	return m
 
 
-## Pás hladiny podél osy: v každém bodě dva vrcholy (vlevo / vpravo) ve výšce hladiny.
-func _ribbon(st: Dictionary) -> ArrayMesh:
+## Varianta shaderu podle předvolby: od Vysoké (`GameSettings.gfx_quality` ≥ 2 = global `gfx_quality`) lom a odraz
+## okolí (screen texture = kopie obrazu za snímek), Nízká / Střední levná hladina bez ní. Čte se ze static var –
+## `global_shader_parameter_get` mimo editor nevrací hodnotu. Než se grafika poprvé použije, platí výchozí Vysoká.
+## Renderer Mobile (slabá grafika) má vždy levnou variantu – tam je kopie obrazu dražší a jas screen texture
+## se kvůli jeho uložení barev (luminance multiplier) liší.
+static func _want_hq() -> bool:
+	if _mobile_renderer():
+		return false
+	return GameSettings.gfx_quality > 1.5
+
+
+static func _mobile_renderer() -> bool:
+	var args := OS.get_cmdline_args()
+	var i := args.find("--rendering-method")
+	if i >= 0 and i + 1 < args.size():
+		return args[i + 1] == "mobile"
+	return String(ProjectSettings.get_setting("rendering/renderer/rendering_method", "forward_plus")) == "mobile"
+
+
+## Při změně předvolby za běhu (Nastavení) vymění shader všem materiálům vody.
+func _sync_quality() -> void:
+	var hq := _want_hq()
+	if hq == _hq:
+		return
+	_hq = hq
+	var sh: Shader = load(SHADER_HQ if hq else SHADER_LO)
+	for m in _mats:
+		m.shader = sh
+
+
+## Vlnová textura (RGBA8 256², bezešvá, mipmapy): RG = sklon výškového šumu (normalizovaný na RMS 1, kódovaný
+## 0,5 ± s/6 – shader pak drží amplitudu vlnek v radiánech), B = výška šumu (pěna, praskliny ledu), A = druhý šum
+## (sníh na ledu). Jedno čtení dá normálu i šum – levná varianta má na hladinu 2 čtení vlnek + hloubku.
+static func _wave_texture() -> ImageTexture:
+	const N := 256
+	var noise := FastNoiseLite.new()
+	noise.seed = 7
+	noise.frequency = 0.05
+	noise.fractal_octaves = 3
+	var h := noise.get_seamless_image(N, N)
+	h.convert(Image.FORMAT_L8)
+	noise.seed = 31
+	noise.frequency = 0.03
+	var h2 := noise.get_seamless_image(N, N)
+	h2.convert(Image.FORMAT_L8)
+	var hb := h.get_data()
+	var h2b := h2.get_data()
+	var hv := PackedFloat32Array()
+	hv.resize(N * N)
+	for i in N * N:
+		hv[i] = float(hb[i]) / 255.0
+	var sx := PackedFloat32Array()
+	var sy := PackedFloat32Array()
+	sx.resize(N * N)
+	sy.resize(N * N)
+	var ss := 0.0
+	for y in N:
+		for x in N:
+			var gx := hv[y * N + (x + 1) % N] - hv[y * N + (x + N - 1) % N]
+			var gy := hv[((y + 1) % N) * N + x] - hv[((y + N - 1) % N) * N + x]
+			sx[y * N + x] = gx
+			sy[y * N + x] = gy
+			ss += gx * gx + gy * gy
+	var k := 1.0 / maxf(sqrt(ss / float(N * N) * 0.5), 1e-6)
+	var bytes := PackedByteArray()
+	bytes.resize(N * N * 4)
+	for i in N * N:
+		bytes[i * 4] = clampi(int((0.5 + sx[i] * k / 6.0) * 255.0 + 0.5), 0, 255)
+		bytes[i * 4 + 1] = clampi(int((0.5 + sy[i] * k / 6.0) * 255.0 + 0.5), 0, 255)
+		bytes[i * 4 + 2] = hb[i]
+		bytes[i * 4 + 3] = h2b[i]
+	var img := Image.create_from_data(N, N, false, Image.FORMAT_RGBA8, bytes)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
+## Je konec úseku `si` (`which` 0 = začátek, -1 = konec) volný? Volný = nenavazuje na konec jiného úseku (data toky
+## dělí na kusy) – pramen, ústí do jiného toku nebo konec v poli; tam pás dozní, aby hladina nekončila hranou.
+func _free_end(si: int, which: int) -> bool:
+	var pts: PackedVector3Array = streams[si]["pts"]
+	var e := pts[0] if which == 0 else pts[pts.size() - 1]
+	var e2 := Vector2(e.x, e.z)
+	for c in _cells.get(Vector2i(floori(e.x / CELL), floori(e.z / CELL)), []):
+		if c[0] == si:
+			continue
+		var op: PackedVector3Array = streams[c[0]]["pts"]
+		for q in [op[0], op[op.size() - 1]]:
+			if e2.distance_to(Vector2(q.x, q.z)) < JOIN_DIST:
+				return false
+	return true
+
+
+## Pás hladiny podél osy: v každém bodě dva vrcholy (vlevo / vpravo) ve výšce hladiny + `y_ofs` (posun podle pořadí
+## toku: úseky různých toků se na soutocích překrývají – stejná výška by blikala).
+## UV = metry (po proudu, napříč od osy), UV2 = (polovina šířky, násobek rychlosti proudu ze sklonu hladiny),
+## TANGENT = směr toku (shader: vlnky a pěna tečou po proudu), COLOR.a = doznění volného konce (`fade_a`, `fade_b`:
+## začátek / konec pásu volný → alfa a šířka ke konci klesají, END_FADE m, nejvýš třetina délky).
+func _ribbon(st: Dictionary, y_ofs := 0.0, fade_a := false, fade_b := false) -> ArrayMesh:
 	var pts: PackedVector3Array = st["pts"]
 	var hw: float = st["half_w"]
 	var n := pts.size()
 	var v := PackedVector3Array()
 	var uv := PackedVector2Array()
+	var uv2 := PackedVector2Array()
 	var nn := PackedVector3Array()
+	var tg := PackedFloat32Array()
+	var cc := PackedColorArray()
 	var idx := PackedInt32Array()
 	var along := 0.0
+	var dy := Vector3(0.0, y_ofs, 0.0)
+	var total := 0.0
+	for i in range(1, n):
+		total += Vector2(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z).length()
+	var fl := minf(END_FADE, total / 3.0) if n >= 3 and total >= END_FADE * 1.5 else 0.0   # krátké kusy celé
 	for i in n:
 		var a := pts[maxi(i - 1, 0)]
 		var b := pts[mini(i + 1, n - 1)]
@@ -198,12 +319,31 @@ func _ribbon(st: Dictionary) -> ArrayMesh:
 		var side := Vector3(-tng.z, 0.0, tng.x) * hw
 		if i > 0:
 			along += Vector2(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z).length()
-		v.append(pts[i] - side)
-		v.append(pts[i] + side)
-		uv.append(Vector2(along, 0.0))
-		uv.append(Vector2(along, 1.0))
+		# sklon hladiny přes ±3 body (data jsou schodovitá) → rychlost proudu ~ √sklon (peřej / tůň)
+		var a3 := pts[maxi(i - 3, 0)]
+		var b3 := pts[mini(i + 3, n - 1)]
+		var run := Vector2(b3.x - a3.x, b3.z - a3.z).length()
+		var slope := maxf(a3.y - b3.y, 0.0) / maxf(run, 0.5)
+		var sm := clampf(0.55 + 0.45 * sqrt(slope / SLOPE_REF), 0.5, 2.2)
+		var fd := 1.0
+		if fade_a and fl > 0.01:
+			fd = minf(fd, along / fl)
+		if fade_b and fl > 0.01:
+			fd = minf(fd, (total - along) / fl)
+		fd = clampf(fd, 0.0, 1.0)
+		side *= lerpf(0.55, 1.0, fd)                # zúžení ke konci (shader bere šířku z UV, okraj zůstane měkký)
+		cc.append(Color(1, 1, 1, fd))
+		cc.append(Color(1, 1, 1, fd))
+		v.append(pts[i] - side + dy)
+		v.append(pts[i] + side + dy)
+		var hwi := side.length()
+		uv.append(Vector2(along, -hwi))
+		uv.append(Vector2(along, hwi))
+		uv2.append(Vector2(hwi, sm))
+		uv2.append(Vector2(hwi, sm))
 		nn.append(Vector3.UP)
 		nn.append(Vector3.UP)
+		tg.append_array([tng.x, 0.0, tng.z, 1.0, tng.x, 0.0, tng.z, 1.0])
 	for i in n - 1:
 		var k := i * 2
 		idx.append_array([k, k + 2, k + 1, k + 1, k + 2, k + 3])
@@ -212,6 +352,9 @@ func _ribbon(st: Dictionary) -> ArrayMesh:
 	arr[Mesh.ARRAY_VERTEX] = v
 	arr[Mesh.ARRAY_NORMAL] = nn
 	arr[Mesh.ARRAY_TEX_UV] = uv
+	arr[Mesh.ARRAY_TEX_UV2] = uv2
+	arr[Mesh.ARRAY_TANGENT] = tg
+	arr[Mesh.ARRAY_COLOR] = cc
 	arr[Mesh.ARRAY_INDEX] = idx
 	var m := ArrayMesh.new()
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
@@ -388,6 +531,8 @@ func _process_impl(delta: float) -> void:
 	if _last_min < 0.0:
 		_last_min = now
 		var t0: float = world.micro.temp_valley() if world.micro != null else world.weather.temp   # M8.9: nádrže leží v údolí
+		# odhad bez historie: ležící sníh = mrazivé dny předtím (start v zimě se zasněženou krajinou → zamrzlý rybník)
+		t0 -= world.weather.snow_cover * SNOW_COLD_C
 		ice = clampf((-t0 - POND_FREEZE_C) / POND_FREEZE_SPAN, 0.0, 1.0)
 		ice_flow = clampf((-t0 - STREAM_FREEZE_C) / STREAM_FREEZE_SPAN, 0.0, 1.0)
 	var dh := clampf((now - _last_min) / 60.0, 0.0, 48.0)
@@ -399,9 +544,12 @@ func _process_impl(delta: float) -> void:
 	if _vis_tick >= STREAM_VIS_S:
 		_vis_tick = 0.0
 		_update_streams_vis()                     # M8.7: hladina, kalnost, proud podle průtoku
+		_sync_quality()                           # předvolba změněná v Nastavení → jiná varianta shaderu
 	var waves := 1.0 + world.weather.rain * WAVES_RAIN + clampf(world.weather.wind / WAVES_WIND_FULL, 0.0, 1.0) * WAVES_WIND
+	var drops: float = world.weather.rain if world.weather.temp > 0.5 else 0.0   # kapky na hladině (ne sníh)
 	for m in _mats:
 		var ic := ice_flow if m.get_meta("flowing") else ice
 		m.set_shader_parameter("ice", ic)
 		m.set_shader_parameter("snow", world.weather.snow_cover * ic)
 		m.set_shader_parameter("wave_scale", waves)
+		m.set_shader_parameter("rain", drops)

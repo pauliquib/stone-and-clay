@@ -7,6 +7,8 @@
 ## LOD: každá buňka × typ má vlastní MultiMeshInstance3D; `update(pos, …)` zapíná/vypíná
 ## celé chunky podle vzdálenosti hráče k AABB buňky (`view_range` na typ – keře dohlédnou
 ## dál než tráva). `detail` (Nastavení → Grafika → Vegetace) dosah násobí, 0 = vypnuto.
+## 2026-10: uvnitř dosahu instance plynule mizí (shader, `veg_fade_end` = dosah − FADE_MARGIN, mez podle hashe
+## instance 0,6–1 ×) – hustota do dálky řídne a zapnutí chunku není vidět; stíny jen od Vysoké (`SHADOW_Q`).
 ##
 ## Vítr: `_process` nastaví všem materiálům `wind_strength` z `Weather.wind_vector()` (stará cesta; M8.4: směr,
 ## rychlost a nárazy jsou globální uniformy `wind_*` z `World.wind_field`, nastavuje Atmosphere)
@@ -53,34 +55,43 @@ const MAX_TYPE := VegType.ROSEHIP
 ## bend_k = citlivost na vítr; season_mode: 0 bylina, 1 keř, 2 plodina (field_lut).
 ## M8.D2c: `static var` – `bend_k` laditelné v F3 → Příroda/Dřeviny a les (uniform materiálu, bez úpravy shaderu).
 static var VEG_CONFIG := {
-	VegType.GRASS_TALL: {"mesh": "res://assets/models/vegetation/grass_tall.res",
+	# 2026-10: i původní typy staví GroundVegMeshes (stébla, listy, karty listí) – barvy z `lo` / `hi` / `acc`
+	VegType.GRASS_TALL: {"mesh": "res://assets/models/vegetation/grass_tall.res", "gen": "grass_tall",
 		"density_per_m2": 0.004, "max_instances": 30000, "view_range": 95.0,
-		"bend_k": 1.5, "season_mode": 0, "shader_param": "wind_strength"},
-	VegType.NETTLE: {"mesh": "res://assets/models/vegetation/nettle.res",
+		"bend_k": 1.5, "season_mode": 0, "shader_param": "wind_strength",
+		"color": 1, "lo": Color(0.11, 0.22, 0.06), "hi": Color(0.40, 0.53, 0.19), "acc": Color(0.50, 0.44, 0.33)},
+	VegType.NETTLE: {"mesh": "res://assets/models/vegetation/nettle.res", "gen": "nettle",
 		"density_per_m2": 0.01, "max_instances": 8000, "view_range": 80.0,
-		"bend_k": 1.1, "season_mode": 0, "shader_param": "wind_strength"},
-	VegType.BUSH_HAZEL: {"mesh": "res://assets/models/vegetation/bush_hazel.res",
+		"bend_k": 1.1, "season_mode": 0, "shader_param": "wind_strength",
+		"color": 1, "lo": Color(0.06, 0.16, 0.05), "hi": Color(0.17, 0.34, 0.11), "acc": Color(0.30, 0.38, 0.16)},
+	VegType.BUSH_HAZEL: {"mesh": "res://assets/models/vegetation/bush_hazel.res", "gen": "bush_hazel",
 		"density_per_m2": 0.004, "max_instances": 6000, "view_range": 220.0,
-		"bend_k": 0.35, "season_mode": 1, "shader_param": "wind_strength"},
-	VegType.BUSH_BLACKTHORN: {"mesh": "res://assets/models/vegetation/bush_blackthorn.res",
+		"bend_k": 0.35, "season_mode": 1, "shader_param": "wind_strength",
+		"color": 1, "lo": Color(0.10, 0.20, 0.07), "hi": Color(0.27, 0.43, 0.15), "acc": Color(0.45, 0.32, 0.18)},
+	VegType.BUSH_BLACKTHORN: {"mesh": "res://assets/models/vegetation/bush_blackthorn.res", "gen": "bush_blackthorn",
 		"density_per_m2": 0.002, "max_instances": 4000, "view_range": 220.0,
-		"bend_k": 0.3, "season_mode": 1, "shader_param": "wind_strength"},
-	VegType.CROP_WHEAT: {"mesh": "res://assets/models/vegetation/wheat.res",
+		"bend_k": 0.3, "season_mode": 1, "shader_param": "wind_strength",
+		"color": 1, "lo": Color(0.09, 0.15, 0.07), "hi": Color(0.21, 0.33, 0.15), "acc": Color(0.16, 0.18, 0.32)},
+	VegType.CROP_WHEAT: {"mesh": "res://assets/models/vegetation/wheat.res", "gen": "wheat",
 		"density_per_m2": 0.02, "max_instances": 24000, "view_range": 130.0,
-		"bend_k": 1.3, "season_mode": 2, "shader_param": "wind_strength"},
-	VegType.WEED_FIELD: {"mesh": "res://assets/models/vegetation/weed_field.res",
+		"bend_k": 1.3, "season_mode": 2, "shader_param": "wind_strength",
+		"color": 1, "lo": Color(0.28, 0.38, 0.12), "hi": Color(0.52, 0.50, 0.19), "acc": Color(0.70, 0.57, 0.23)},
+	VegType.WEED_FIELD: {"mesh": "res://assets/models/vegetation/weed_field.res", "gen": "weed_field",
 		"density_per_m2": 0.006, "max_instances": 9000, "view_range": 75.0,
-		"bend_k": 1.2, "season_mode": 0, "shader_param": "wind_strength"},
-	VegType.GARDEN_VEG: {"mesh": "res://assets/models/vegetation/garden_veg.res",
+		"bend_k": 1.2, "season_mode": 0, "shader_param": "wind_strength",
+		"color": 1, "lo": Color(0.13, 0.25, 0.08), "hi": Color(0.32, 0.40, 0.14), "acc": Color(0.92, 0.80, 0.18), "petal": 1},
+	VegType.GARDEN_VEG: {"mesh": "res://assets/models/vegetation/garden_veg.res", "gen": "garden_veg",
 		"density_per_m2": 0.05, "max_instances": 5000, "view_range": 75.0,
-		"bend_k": 1.0, "season_mode": 0, "shader_param": "wind_strength"},
-	# M8.14 – nové typy (color 1 = barvy vrcholů podle kap. 4, albedo lo → hi po výšce, acc = květ / bobule)
+		"bend_k": 1.0, "season_mode": 0, "shader_param": "wind_strength",
+		"color": 1, "lo": Color(0.10, 0.22, 0.07), "hi": Color(0.28, 0.44, 0.15), "acc": Color(0.78, 0.22, 0.08)},
+	# M8.14 – nové typy (color 1 = barvy vrcholů podle kap. 4, albedo lo → hi po výšce, acc = květ / bobule;
+	# `petal` = tvar okvětí ve vegetation.gdshader: 0 kopretina, 1 pryskyřník, 2 úbor, 3 pětičetný)
 	VegType.HERB_WET: {"mesh": "res://assets/models/vegetation/herb_wet.res", "gen": "herb_wet",
 		"density_per_m2": 0.004, "max_instances": 7000, "view_range": 90.0, "bend_k": 1.3, "season_mode": 0,
-		"color": 1, "lo": Color(0.12, 0.24, 0.08), "hi": Color(0.34, 0.48, 0.20), "acc": Color(0.62, 0.30, 0.62)},
+		"color": 1, "lo": Color(0.12, 0.24, 0.08), "hi": Color(0.34, 0.48, 0.20), "acc": Color(0.62, 0.30, 0.62), "petal": 2},
 	VegType.HERB_DRY: {"mesh": "res://assets/models/vegetation/herb_dry.res", "gen": "herb_dry",
 		"density_per_m2": 0.004, "max_instances": 7000, "view_range": 70.0, "bend_k": 1.2, "season_mode": 0,
-		"color": 1, "lo": Color(0.26, 0.32, 0.14), "hi": Color(0.52, 0.56, 0.30), "acc": Color(0.50, 0.36, 0.72)},
+		"color": 1, "lo": Color(0.26, 0.32, 0.14), "hi": Color(0.52, 0.56, 0.30), "acc": Color(0.50, 0.36, 0.72), "petal": 3},
 	VegType.FERN: {"mesh": "res://assets/models/vegetation/fern.res", "gen": "fern",
 		"density_per_m2": 0.003, "max_instances": 5000, "view_range": 90.0, "bend_k": 0.8, "season_mode": 1,
 		"color": 1, "lo": Color(0.08, 0.20, 0.05), "hi": Color(0.26, 0.46, 0.14), "acc": Color(0.26, 0.46, 0.14)},
@@ -92,7 +103,7 @@ static var VEG_CONFIG := {
 		"color": 1, "lo": Color(0.12, 0.24, 0.06), "hi": Color(0.30, 0.44, 0.10), "acc": Color(0.30, 0.44, 0.10)},
 	VegType.SPRING_FLOWERS: {"mesh": "res://assets/models/vegetation/spring_flowers.res", "gen": "spring_flowers",
 		"density_per_m2": 0.004, "max_instances": 6000, "view_range": 60.0, "bend_k": 0.9, "season_mode": 3,
-		"color": 1, "lo": Color(0.12, 0.26, 0.08), "hi": Color(0.28, 0.46, 0.16), "acc": Color(0.92, 0.92, 0.88)},
+		"color": 1, "lo": Color(0.12, 0.26, 0.08), "hi": Color(0.28, 0.46, 0.16), "acc": Color(0.92, 0.92, 0.88), "petal": 3},
 	VegType.LITTER: {"mesh": "res://assets/models/vegetation/litter.res", "gen": "litter",
 		"density_per_m2": 0.004, "max_instances": 6000, "view_range": 55.0, "bend_k": 0.0, "season_mode": 4,
 		"color": 1, "lo": Color(0.42, 0.28, 0.15), "hi": Color(0.50, 0.34, 0.18), "acc": Color(0.50, 0.34, 0.18)},
@@ -103,6 +114,18 @@ static var VEG_CONFIG := {
 		"density_per_m2": 0.0, "max_instances": 2000, "view_range": 220.0, "bend_k": 0.3, "season_mode": 1,
 		"color": 1, "lo": Color(0.10, 0.18, 0.07), "hi": Color(0.24, 0.38, 0.14), "acc": Color(0.75, 0.10, 0.06)},
 }
+## 2026-10: od které hodnoty `gfx_quality` typ vrhá stín (2 Vysoká, 3 Ultra; chybí = nikdy). Instancí je málo
+## (desítky až stovky v dosahu stínů), na Nízké a Střední se stínový průchod vegetace nekreslí vůbec.
+static var SHADOW_Q := {
+	VegType.BUSH_HAZEL: 2, VegType.BUSH_BLACKTHORN: 2, VegType.ROSEHIP: 2, VegType.FERN: 2, VegType.BUTTERBUR: 2,
+	VegType.NETTLE: 2, VegType.HERB_WET: 2,
+	VegType.GRASS_TALL: 3, VegType.CROP_WHEAT: 3, VegType.GARDEN_VEG: 3, VegType.BILBERRY: 3, VegType.HERB_DRY: 3,
+	VegType.WEED_FIELD: 3,
+}
+## Rezerva (m) mezi plynulým zmizením instancí (`veg_fade_end`) a vypnutím chunku: kamera je kus od hráče
+## a viditelnost chunků se přepočítává po 6 m pohybu – chunk se tak zapne dřív, než jeho instance „vyrostou“.
+const FADE_MARGIN := 12.0
+
 ## M8.14: reakce typu na seč louky (`mow`), pěšiny (`path`) a sešlapání (`trample` – citlivost ohybu). Laditelné
 ## (F3 → Příroda/Louky a podrost); chybějící typ = 0.
 static var REACT := {
@@ -152,6 +175,8 @@ func set_detail(d: float) -> void:
 		return
 	detail = d
 	_refresh_visibility(_last_pos)
+	for typ in _mats:
+		_apply_fade(typ)
 
 
 func setup(w: World) -> void:
@@ -230,7 +255,7 @@ func _load_vegetation() -> void:
 		mmi.custom_aabb = aabb                  # instance drží světové souřadnice, uzel je v počátku
 		add_child(mmi)
 		_chunks.append({"mmi": mmi, "min": mn, "max": mn + Vector2(CHUNK, CHUNK),
-			"range": float(VEG_CONFIG[typ]["view_range"])})
+			"range": float(VEG_CONFIG[typ]["view_range"]), "typ": typ})
 		if not multimeshes.has(typ):
 			multimeshes[typ] = []
 		multimeshes[typ].append(mmi)
@@ -302,10 +327,37 @@ func _apply_params(typ: int) -> void:
 		m.set_shader_parameter("veg_lo", cfg["lo"])
 		m.set_shader_parameter("veg_hi", cfg["hi"])
 		m.set_shader_parameter("veg_acc", cfg["acc"])
+	m.set_shader_parameter("veg_petal", float(cfg.get("petal", 0)))
 	var re: Dictionary = REACT.get(typ, {})
 	m.set_shader_parameter("veg_mow", float(re.get("mow", 0.0)))
 	m.set_shader_parameter("veg_path", float(re.get("path", 0.0)))
 	m.set_shader_parameter("veg_trample", float(re.get("trample", 0.0)))
+	_apply_fade(typ)
+
+
+## Plynulé mizení instancí do dálky: mez = dosah chunků typu (× detail × RANGE_K) − rezerva FADE_MARGIN.
+func _apply_fade(typ: int) -> void:
+	var m: ShaderMaterial = _mats.get(typ)
+	if m == null:
+		return
+	var r := float(VEG_CONFIG[typ]["view_range"]) * detail * RANGE_K
+	m.set_shader_parameter("veg_fade_end", maxf(r - FADE_MARGIN, r * 0.6))
+
+
+## 2026-10: stíny vegetace podle předvolby (`gfx_quality`, SHADOW_Q) – kontrola při ticku větru, mění se jen při změně.
+var _shadow_q := -1.0
+
+func _update_shadows() -> void:
+	var q := GameSettings.gfx_quality
+	if is_equal_approx(q, _shadow_q):
+		return
+	_shadow_q = q
+	for ch in _chunks:
+		var need := int(SHADOW_Q.get(int(ch["typ"]), 99))
+		(ch["mmi"] as MultiMeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON \
+			if q >= float(need) - 0.5 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if fx != null:
+		fx.set_shadows(q > 1.5)
 
 
 ## Tabulka barev/stavu polí (Fields.lut_image jako ImageTexture) pro plodiny (season_mode 2).
@@ -353,6 +405,7 @@ func _process_impl(delta: float) -> void:
 	if _wind_t > 0.0:
 		return
 	_wind_t = WIND_TICK
+	_update_shadows()
 	if _seen_gen != _gen:                         # M8.D2c: změna citlivosti na vítr v menu F3
 		_seen_gen = _gen
 		for typ in _mats:

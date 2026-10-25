@@ -100,6 +100,11 @@ func spawn_patrol() -> void:
 	_new_patrol_route(true)
 
 
+## Nová trasa hlídky. Cíl jen v průjezdném uzlu sítě aut (`_through`) – slepý konec (rezidenční ulice, která
+## pokračuje jen polní cestou) by znamenal otočku: AI auto necouvá, otáčelo se obloukem mimo silnici a uvízlo
+## na terénu / převrátilo se (vizuální validátor: Policie_hlidka zabořená a vzhůru nohama u x −157, z 91).
+## Přeplánování za jízdy začíná uzlem před autem (`_ahead_node`), aby trasa nevedla zpátky; když přece jen
+## vede proti směru jízdy (auto stojí na konci slepé ulice), hlídka mimo dohled hráčů se otočí na místě.
 func _new_patrol_route(first := false) -> void:
 	var a := graph.astar(RoadGraph.CAR_KINDS)
 	var ends := graph.astar(RoadGraph.END_KINDS)     # start / cíl ne na účelové cestě (vjezd do dvora)
@@ -107,7 +112,10 @@ func _new_patrol_route(first := false) -> void:
 	var anchor: Vector3 = world.player_world_pos(near as Player) if near else world.player_anchor(0)
 	var pp := Vector2(anchor.x, anchor.z)
 	var far: bool = first or near == null or patrol.global_position.distance_to(anchor) > 700.0
-	for attempt in 20:
+	var here := Vector2(patrol.global_position.x, patrol.global_position.z)
+	var fwd3 := patrol.global_transform.basis.z
+	var fwd := Vector2(fwd3.x, fwd3.z).normalized() if Vector2(fwd3.x, fwd3.z).length() > 0.1 else Vector2.ZERO
+	for attempt in 30:
 		var ang := _rng.randf() * TAU
 		var s: int
 		if far:
@@ -115,21 +123,49 @@ func _new_patrol_route(first := false) -> void:
 			if s < 0 or not a.has_point(s):
 				continue
 		else:
-			s = a.get_closest_point(Vector2(patrol.global_position.x, patrol.global_position.z))
+			s = _ahead_node(a, here, fwd) if attempt < 20 else a.get_closest_point(here)
 		var e := ends.get_closest_point(graph.nodes[s] + Vector2(cos(ang + 1.0), sin(ang + 1.0)) * _rng.randf_range(600.0, 1500.0))
-		if e < 0 or not a.has_point(e):
+		if e < 0 or not a.has_point(e) or (attempt < 25 and not _through(a, e)):
 			continue
 		var ids := a.get_id_path(s, e)
 		if ids.size() < 6:
 			continue
+		if not far and attempt < 20 and fwd != Vector2.ZERO and ids.size() >= 2 \
+				and (graph.nodes[ids[1]] - graph.nodes[ids[0]]).normalized().dot(fwd) < -0.3:
+			continue                                  # trasa hned couvá zpět – zkusit jiný cíl
 		var pts := graph.lane_points(ids, terrain)
+		var d := Vector2(pts[1].x - pts[0].x, pts[1].z - pts[0].z)
 		if far:
-			var d := Vector2(pts[1].x - pts[0].x, pts[1].z - pts[0].z)
 			traffic.place_car(patrol, Vector2(pts[0].x, pts[0].z), atan2(d.x, d.y))
+		elif fwd != Vector2.ZERO and d.normalized().dot(fwd) < -0.3 and world.nearest_player_dist(patrol.global_position) > 150.0:
+			traffic.place_car(patrol, Vector2(pts[0].x, pts[0].z), atan2(d.x, d.y))   # otočka mimo dohled
 		patrol.set_ai_route(pts, 15.0)
 		if not far:
 			patrol.reroute(pts)       # jede odtud, kde stojí – body za autem přeskočit
 		return
+
+
+## Uzel sítě aut, který není slepý konec (v grafu aut má aspoň dva sousedy).
+func _through(a: AStar2D, id: int) -> bool:
+	return a.get_point_connections(id).size() >= 2
+
+
+## Nejbližší uzel sítě aut do 80 m před autem (±60° od směru jízdy); jinak nejbližší vůbec.
+func _ahead_node(a: AStar2D, pos: Vector2, fwd: Vector2) -> int:
+	var best := -1
+	var bd := INF
+	if fwd != Vector2.ZERO:
+		for i in graph.nodes_within(pos, 80.0, RoadGraph.CAR_KINDS):
+			if not a.has_point(i):
+				continue
+			var to: Vector2 = graph.nodes[i] - pos
+			var dl := to.length()
+			if dl < 4.0 or to.dot(fwd) < 0.5 * dl:
+				continue
+			if dl < bd:
+				bd = dl
+				best = i
+	return best if best >= 0 else a.get_closest_point(pos)
 
 
 ## Silniční kontrola na silnici v bodě `pos` (x, z) – vůz u krajnice, policista na kraji vozovky.

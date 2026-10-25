@@ -182,22 +182,70 @@ static func breathalyzer() -> Node3D:
 
 # ------------------------------------------------------------ pouliční vybavení (statický mesh)
 
+## Plastová popelnice 240 l na kolečkách: zúžené tělo se zaoblenými rohy, víko s přesahem, madlo a kola vzadu (−Z).
 static func trash_bin(color: Color) -> ArrayMesh:
 	var k := MeshKit.new()
-	k.box(Vector3(0, 0.5, 0), Vector3(0.58, 0.95, 0.72), color)
-	k.box(Vector3(0, 1.0, -0.02), Vector3(0.62, 0.06, 0.78), color.darkened(0.2), Vector3(0.05, 0, 0))
-	k.box(Vector3(0, 0.95, -0.4), Vector3(0.5, 0.04, 0.06), Color(0.1, 0.1, 0.1))
-	for s in [-1.0, 1.0]:
-		k.cylinder(Vector3(0.24 * s, 0.1, -0.36), 0.1, 0.1, 0.05, Color(0.08, 0.08, 0.08), Vector3(0, 0, PI / 2), 12)
-	return k.commit(MeshKit.vc_material(0.6))
+	var dark := color.darkened(0.25)
+	var rings := []
+	var rc := []
+	for lv in [[0.05, 0.25, 0.3], [0.62, 0.27, 0.33], [0.9, 0.285, 0.35], [0.93, 0.3, 0.365]]:
+		rings.append(_round_rect(lv[0], lv[1], lv[2], 16))
+		var cc := PackedColorArray()
+		cc.resize(16)
+		cc.fill(color if lv[0] < 0.92 else dark)
+		rc.append(cc)
+	k.loft(rings, rc, true)
+	k.box(Vector3(0, 0.04, 0), Vector3(0.48, 0.03, 0.58), dark)                               # dno
+	# prolisy na bocích a vpředu (lehce tmavší pruhy)
+	for sx in [-1.0, 1.0]:
+		k.box(Vector3(sx * 0.272, 0.5, 0.0), Vector3(0.01, 0.62, 0.42), color.darkened(0.08), Vector3(0, 0, sx * 0.035))
+	k.box(Vector3(0, 0.5, 0.326), Vector3(0.36, 0.62, 0.01), color.darkened(0.08), Vector3(-0.04, 0, 0))
+	# víko s přesahem a přední hranou na úchop
+	k.box(Vector3(0, 0.965, 0.01), Vector3(0.63, 0.045, 0.78), dark)
+	k.box(Vector3(0, 0.95, 0.395), Vector3(0.6, 0.05, 0.035), dark.darkened(0.15))
+	# závěs víka a madlo vzadu
+	k.cylinder(Vector3(0, 0.93, -0.385), 0.022, 0.022, 0.56, dark, Vector3(0, 0, PI / 2), 8)
+	k.cylinder(Vector3(0, 0.86, -0.405), 0.016, 0.016, 0.5, Color(0.12, 0.12, 0.12), Vector3(0, 0, PI / 2), 8)
+	for sx in [-1.0, 1.0]:
+		k.box(Vector3(sx * 0.24, 0.89, -0.39), Vector3(0.03, 0.08, 0.04), dark)
+	# kola s nábojem a osa, přední nožky
+	for sx in [-1.0, 1.0]:
+		k.cylinder(Vector3(sx * 0.28, 0.1, -0.31), 0.1, 0.1, 0.055, Color(0.06, 0.06, 0.06), Vector3(0, 0, PI / 2), 14)
+		k.cylinder(Vector3(sx * 0.31, 0.1, -0.31), 0.045, 0.045, 0.01, Color(0.35, 0.35, 0.36), Vector3(0, 0, PI / 2), 10)
+		k.box(Vector3(sx * 0.18, 0.025, 0.25), Vector3(0.08, 0.05, 0.08), dark)
+	k.cylinder(Vector3(0, 0.1, -0.31), 0.012, 0.012, 0.6, Color(0.4, 0.4, 0.42), Vector3(0, 0, PI / 2), 6)
+	k.box(Vector3(0, 0.15, -0.29), Vector3(0.44, 0.1, 0.08), dark)                            # držák osy
+	k.tag_all(MeshKit.MAT_SRGB)              # barvy předmětu zadané v sRGB
+	return k.commit(MeshKit.vc_material(0.6), null, 0.3)
 
 
+## Smyčka bodů zaobleného obdélníku (superelipsa) ve výšce y – pořadí pro MeshKit.loft (normály ven, osa nahoru).
+static func _round_rect(y: float, hx: float, hz: float, n: int) -> PackedVector3Array:
+	var r := PackedVector3Array()
+	for j in n:
+		var a := TAU * j / n
+		var c := cos(a)
+		var sn := sin(a)
+		r.append(Vector3(hx * signf(c) * pow(absf(c), 0.35), y, -hz * signf(sn) * pow(absf(sn), 0.35)))
+	return r
+
+
+## Poštovní schránka České pošty: oranžová skříňka se zaobleným vrškem, vhozem a tabulkou na sloupku.
 static func mailbox() -> ArrayMesh:
 	var k := MeshKit.new()
-	k.box(Vector3(0, 0.55, 0), Vector3(0.06, 1.1, 0.06), Color(0.3, 0.3, 0.3))
-	k.box(Vector3(0, 1.22, 0), Vector3(0.36, 0.3, 0.18), Color(0.85, 0.65, 0.1))
-	k.box(Vector3(0, 1.3, 0.091), Vector3(0.25, 0.02, 0.01), Color(0.1, 0.1, 0.1))
-	return k.commit(MeshKit.vc_material(0.45, 0.3))
+	var post := Color(0.28, 0.29, 0.3)
+	var orange := Color(0.95, 0.6, 0.06)
+	k.box(Vector3(0, 0.55, 0), Vector3(0.06, 1.1, 0.06), post)
+	k.box(Vector3(0, 0.02, 0), Vector3(0.16, 0.04, 0.16), post.darkened(0.2))               # patka
+	k.box(Vector3(0, 1.21, 0), Vector3(0.36, 0.28, 0.18), orange)
+	k.cylinder(Vector3(0, 1.35, 0), 0.09, 0.09, 0.36, orange, Vector3(0, 0, PI / 2), 12)     # zaoblená stříška
+	k.box(Vector3(0, 1.3, 0.091), Vector3(0.24, 0.022, 0.012), Color(0.08, 0.08, 0.08))      # vhoz
+	k.box(Vector3(0, 1.335, 0.098), Vector3(0.26, 0.02, 0.02), orange.darkened(0.2))         # stříška vhozu
+	k.box(Vector3(0, 1.17, 0.091), Vector3(0.16, 0.09, 0.006), Color(0.95, 0.95, 0.92))      # tabulka s výběrem
+	k.sphere(Vector3(0.12, 1.12, 0.092), 0.018, Color(0.15, 0.25, 0.55), Vector3(1, 1, 0.3))   # znak (modrá trubka)
+	k.box(Vector3(0, 1.06, 0.093), Vector3(0.05, 0.03, 0.01), Color(0.6, 0.6, 0.62))         # zámek
+	k.tag_all(MeshKit.MAT_SRGB)              # barvy předmětu zadané v sRGB
+	return k.commit(MeshKit.vc_material(0.45, 0.3), null, 0.25)
 
 
 static func street_lamp() -> ArrayMesh:
@@ -206,19 +254,34 @@ static func street_lamp() -> ArrayMesh:
 	k.capsule(Vector3(0, 5.95, 0.5), 0.035, 1.0, Color(0.35, 0.37, 0.38), Vector3(PI / 2, 0, 0))
 	k.box(Vector3(0, 5.9, 1.0), Vector3(0.22, 0.1, 0.5), Color(0.3, 0.3, 0.32))
 	k.box(Vector3(0, 5.84, 1.0), Vector3(0.18, 0.02, 0.42), Color(1.0, 0.95, 0.8))
-	return k.commit(MeshKit.vc_material(0.5, 0.4))
+	k.cylinder(Vector3(0, 0.25, 0), 0.11, 0.13, 0.5, Color(0.3, 0.32, 0.33), Vector3.ZERO, 10)   # patka sloupu
+	k.tag_all(MeshKit.MAT_SRGB)              # barvy předmětu zadané v sRGB
+	return k.commit(MeshKit.vc_material(0.5, 0.4), null, 0.4)
 
 
+## Parková lavička: dřevěné latě sedáku a opěradla na litinových bočnicích s područkami.
 static func bench() -> ArrayMesh:
 	var k := MeshKit.new()
 	var wood := Color(0.5, 0.33, 0.18)
+	var iron := Color(0.13, 0.13, 0.13)
+	for i in 4:
+		k.box(Vector3(0, 0.45, -0.15 + i * 0.1), Vector3(1.6, 0.035, 0.08), wood.darkened(0.04 * (i % 2)))
 	for i in 3:
-		k.box(Vector3(0, 0.45, -0.12 + i * 0.13), Vector3(1.6, 0.04, 0.1), wood)
-	for i in 2:
-		k.box(Vector3(0, 0.62 + i * 0.14, -0.23), Vector3(1.6, 0.1, 0.03), wood, Vector3(-0.2, 0, 0))
-	for s in [-1.0, 1.0]:
-		k.box(Vector3(0.7 * s, 0.22, 0), Vector3(0.05, 0.45, 0.4), Color(0.15, 0.15, 0.15))
-	return k.commit(MeshKit.vc_material(0.8))
+		k.box(Vector3(0, 0.6 + i * 0.12, -0.23 - i * 0.025), Vector3(1.6, 0.09, 0.028), wood.darkened(0.04 * (i % 2)), Vector3(-0.2, 0, 0))
+	for s in [-1.0, 0.0, 1.0]:
+		var x: float = 0.7 * s
+		if s == 0.0:
+			k.box(Vector3(0, 0.41, -0.01), Vector3(0.04, 0.04, 0.4), iron)                    # střední příčka
+			continue
+		k.box(Vector3(x, 0.22, 0.15), Vector3(0.05, 0.44, 0.05), iron, Vector3(-0.08, 0, 0))   # přední noha
+		k.box(Vector3(x, 0.22, -0.17), Vector3(0.05, 0.44, 0.05), iron, Vector3(0.12, 0, 0))   # zadní noha
+		k.box(Vector3(x, 0.41, -0.01), Vector3(0.05, 0.04, 0.4), iron)                        # nosník sedáku
+		k.box(Vector3(x, 0.66, -0.25), Vector3(0.05, 0.5, 0.04), iron, Vector3(-0.2, 0, 0))     # nosník opěradla
+		k.box(Vector3(x, 0.64, 0.03), Vector3(0.05, 0.04, 0.4), iron)                         # područka
+		k.box(Vector3(x, 0.54, 0.2), Vector3(0.04, 0.2, 0.04), iron)
+		k.box(Vector3(x, 0.02, 0.0), Vector3(0.07, 0.04, 0.42), iron)                         # patka
+	k.tag_all(MeshKit.MAT_SRGB)              # barvy předmětu zadané v sRGB
+	return k.commit(MeshKit.vc_material(0.8), null, 0.2)
 
 
 ## Kulatá/trojúhelníková dopravní značka s textem (Label3D).

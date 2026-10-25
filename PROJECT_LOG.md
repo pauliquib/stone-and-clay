@@ -3074,3 +3074,131 @@ shadery M8 v `shaders/` se na Mobile přeloží).
   `rendering/driver/threads/thread_model` v `project.godot`.
 - Postavy a auta – sloučení dílů / stíny jen zblízka (viz výš) po dokončení CPU optimalizace.
 - Hustota vegetace (ne jen dosah) by šla řídit `MultiMesh.visible_instance_count` po zamíchání instancí v chunku.
+
+## 2026-10-25 – Grafika: realističtější svět + vizuální validátor (cloud, bez GPU)
+
+Cíl: co nejhezčí a nejrealističtější krajina, terén, vegetace, voda, obloha a světlo, budovy a předměty; funkční validátor
+poloh a vzhledu 3D objektů, podle kterého se průběžně kontroluje a opravuje. Práce rozdělená mezi subagenty po souborech
+(sdílené `world.gd`, `local_client.gd`, `game_settings.gd`, `project.godot` měnil jen koordinátor nebo jediný přidělený agent).
+Výkon: dražší efekty jen od Vysoké – nový globální uniform **`gfx_quality`** (0–3 = detail přírody předvolby, `project.godot`
++ `GameSettings.apply_graphics`; v GDScriptu `GameSettings.gfx_quality`). Nízká a Střední cenu nezvyšují.
+
+### Prostředí v cloudu
+- `tools/vizual/godot_xvfb.sh` – Godot 4.3 přes Xvfb + softwarový Vulkan (lavapipe); `--audio-driver Dummy` povinně.
+- Import: `--headless --import` se v kontejneru zasekne na modálním dialogu editoru (0 % CPU, prázdné `.godot/imported`).
+  Funguje `godot --headless --path . --editor --quit-after 20000` (~5 min). Po přidání nového `class_name` znovu `--editor --quit`.
+- Snímek trvá ~5–8 min (svět ~40–70 s + shadery), běh validátoru ~4 min (svět se staví jednou pro všechny pohledy).
+- `tools/vizual/shot.sh výstup.png [argumenty]` – jeden snímek s frontou nejvýš 2 Godotů (4 jádra).
+- Nové ladicí argumenty snímku (`local_client.gd`): `--cam=x,výška,z` (volná kamera nad terénem, `--yaw/--pitch/--fov`),
+  `--nohud`.
+
+### Syntetický svět – `tools/vizual/synth_world.py`
+Čistý klon nemá `data/*.bin` (vyrábí je Blender ze soukromého `.blend`). Nástroj z `map.json`, `buildings.json` a `water.json`
+postaví věrohodnou náhradu; existující soubory bez `--force` nepřepíše (`--out=adresář` = zkušební výstup vedle dat).
+- Kostra terénu (mřížka 16 m přes katastr + 4 km okolí): kopce z šumu rostoucí od údolnic potoků + reziduum přes multigrid
+  Laplace s pevnými body (hladiny potoků, rybníky, paty domů); korekce u domů normalizovanou konvolucí; koryta s rovným dnem
+  a svahem břehu podle `tools/water.py`, rybníky s dnem pod hladinou.
+- Silnice: profil podél osy vyhlazený (σ 14 m), sklon ≤ 12 %, vodorovný příčný řez, 3 kola sladění profilů na křižovatkách,
+  profil přitažený k patám domů do 10 m (jinak u zdi vznikal schod 2–4 m).
+- Plošiny domů přesně na `ground_y` + náběh 6 m (vozovka má přednost před náběhem).
+- DBM1 zdi a střechy (sedlo, valba, plochá s atikou; domy do L/T = sedlo nad největším vepsaným obdélníkem + plochá
+  deska křídel), pata zdí 0,5 m pod nejnižší terén podél celé hrany; asfalt/štěrk podle `kind`.
+- Pole (protáhlé deformované Voronoi parcely, meze), louky, sady, zahrádky, les (šum + strmost + hřbety), dvory, břehy,
+  polní cesty → `landuse.bin`, `surface.bin`; okolí `surround_*.bin`.
+- Stromy: les po 15 m (zavřený zápoj z dronu), břehové porosty, aleje, ovocné stromy za domy, solitéry na mezích
+  (~111 tis.); 6 prototypů DBT1. Odvozená data dopočítají původní `tools/site.py`, `tree_species.py`, `vegetation.py --eco`
+  (potřebují scipy – `pip install scipy`).
+
+### Validátor – `tools/vizual/run.sh`
+Jeden příkaz (`--quick`, `--no-engine`, `--out=…`, `--res=WxH`); starý výstup se přesune do `prev` (porovnání snímků).
+- **Data** (`validate_data.py`): domy (výšky, sklon, překryvy, silnice, dveře na obvodu a k cestě), terén pod domy vůči
+  `ground_y` (≥ 1 m od zdi), profily silnic (schody, podélný a příčný sklon), stromy a vegetace vůči domům, silnicím
+  a terénu, sítě DBM1 (NaN, degenerace, visící zdi, štíty mimo půdorys).
+- **Engine** (`validator.gd` + `geom_checks.gd`, `world_checks.gd`, `gallery.gd`, `views.gd`): svět se postaví jednou,
+  kontroly geometrie v okruhu 400 m (vznášení/zaboření předmětů, aut, zvířat, postav, stromů; průnik s domy; velikost
+  podle kategorie; svislost; NaN; degenerované meshe; chybějící materiál a nenavázané samplery; dveře a okna v rovině zdi
+  a pod okapem; z-fighting silnice/terén/vodní pásy), galerie 25 procedurálních modelů ze 4 úhlů a 10 standardních
+  pohledů (ulice, náves, pole, okraj lesa, vyhlídka, dron, soumrak, noc, déšť, zima).
+- **Obraz** (`validate_images.py`): histogram a ořez, expozice podle denní doby, sytost, obloha/horizont, ploché skvrny,
+  osamělé extrémní pixely (NaN), šum a aliasing, změna proti minulému běhu.
+- **Report** (`report.py`): `report.json`, `report.html`, `contact_sheet.png`, PASS/WARN/FAIL, exit 1 při FAIL.
+
+### Grafika (agenti, každý vlastní soubory)
+- **Obloha a světlo** (`sky.gdshader`, `atmosphere.gd`, prostředí): analytický Rayleigh + Mie (ve čtvrtinovém rozlišení),
+  mraky na zakřivené vrstvě se světlem od slunce, zatažená vrstva, noc s hvězdami a Měsícem ve správné fázi, stejný model
+  pro barvu slunce, mlhy a okolního světla, `fog_sun_scatter`, ztlumení slunce pod mrakem, okamžitá expozice po skoku času.
+  Oprava: Purkyňův jev přepisoval sytost/kontrast → uživatelský barevný režim nefungoval. Nízká = původní obloha
+  (`sky_legacy.gdshader`). Vysoká: levné SSAO + jemné barevné ladění (LUT z kódu), Ultra: SSAO, SSIL, SSR (PRESETS_VER 3).
+- **Terén** (`terrain.gdshader`, `terrain_surface.gdshaderinc`, `terrain.gd`, okolí): procedurální povrch bez dlaždic
+  s normálou a drsností (tráva, ornice, hrabanka, dvůr, břeh, skála), makro variace, plynulý LOD (AABB souměrná kolem
+  geomorfingu), `height_at` po trojúhelnících jako síť i kolize, pobřežní pás z `water.json`, sníh bez hranatých skvrn,
+  ortofoto jen když existuje, okolí bilineárně a bez švu.
+- **Vegetace a stromy**: procedurální alfa karty listů a květů, plynulé řídnutí podle vzdálenosti, květy z karet místo
+  koulí, alpha-to-coverage, měkké normály korun, procedurální kůra bez textury, impostory s pohledem shora a větrem.
+  Oprava: `imp_ext` jako `PackedColorArray` se převáděl sRGB→lineár → impostory byly 4,5× užší („topoly“ z dronu).
+- **Voda**: levná varianta (Nízká, Střední, Mobile) a kvalitní (lom, pochod paprsku) se sdíleným includem, absorpce podle
+  hloubky, odraz s okluzí obzoru, vlnky po proudu a od větru (`wind_offset`), měkké a zužující se okraje, pěna, déšť,
+  led; konec z-fightingu překrývajících se toků (posun hladiny podle pořadí).
+- **Budovy a silnice**: procedurální materiály bez textur (ochrana `load()` – zdi, střechy a silnice byly plochá bílá),
+  omítka v barvě fasády, jemná špína u soklu a pod okapem, mech na severních střechách, prkenné fasády stodol, asfalt se
+  záplatami a krajnicemi, okna s Fresnelem a nočním svícením; drapování silnic dělí trojúhelníky podle terénu (terén
+  prorůstal 6,4 % asfaltu), dveře a vrata nikdy nad okapem.
+- **Procedurální modely**: druh materiálu v alfě barvy vrcholu (kůže, vlasy, látka, useň, lak, srst), sklo aut, reflektory,
+  vlasy postav. Opravy: kola uspaných aut ležela v počátku světa, kolo a Jawa visely nad zemí, popelnice a schránky se na
+  svahu převracely; `World._spawn_props` už nestaví popelnice do budov.
+
+### Závěrečné ladění (podle validátoru a snímků)
+- **Noc**: čitelná modrošedá (ambient z noční oblohy, expozice, světlejší obzor; střední jas 0,06 → ~0,10–0,12).
+- **Zima**: chladně bílá místo béžové (neutrální světlo pod souvislou oblačností, mlha při sněžení ~800 m, jemnější LUT;
+  terén: bílý sníh s modravými závějemi, dno rybníka vně hladiny se nestínuje → zmizely tmavé klíny u ledu).
+- **Pole**: řádky setí, kolejové řádky, souvrať a mez, vláhové skvrny, polehlé obilí, vlnění klasů (Vysoká+); geometrie
+  parcel (směr řádků, vzdálenost od okraje) se dopočítá ve vlákně při startu (~5 s).
+- **Koryta**: dno jen pod hladinou (atlas pobřeží nese hloubku), nepravidelné oblázky a písek místo „dlažby“.
+- **Veřejné osvětlení**: graf silnic je zahuštěný na hrany ≤ 12 m, ale lampa se stavěla jen na hraně delší než 15 m →
+  **nestála žádná lampa** (i se skutečnými daty). Teď se rozmisťují po celé silnici podle ujeté délky (na vsi 71 lamp).
+- **Policejní hlídka** jezdila do slepé ulice, otáčela se obloukem mimo silnici a zabořila se do svahu u plošiny domu
+  (i ve výchozím stavu) – cíle tras jen průjezdné uzly, přeplánování od uzlu před autem.
+- **Vesničané** v kinematické chůzi (> 160 m) stáli 13 cm v asfaltu – výška podle paprsku na povrch 2× za s.
+- Květy dostávají `field_lut`, validátor fotí skutečný okraj lesa a pole s obilím, `--quick` fotí soumrak před nocí.
+
+### Výsledek validátoru (`tools/vizual/run.sh`, výchozí stav → konec)
+| Vrstva | Před | Po |
+|---|---|---|
+| data | FAIL 18 / WARN 306 | FAIL 10 / WARN 207 |
+| geometrie | FAIL 15 / WARN 28 | **FAIL 0** / WARN 4 |
+| galerie (25 modelů) | 0 nálezů | 0 nálezů |
+| obraz (35 snímků) | WARN 14 | WARN ~8 (dron a kolo: vysoké frekvence) |
+
+Terén pod domy sedí na `ground_y` u 95 % domů (86 %). Zmizelo: kola aut v počátku světa (9×), převrácené popelnice (18×),
+popelnice v budovách, dveře nad okapem, terén prorůstající asfaltem (6,4 % → 0 %), z-fighting štěrk/asfalt i vodních
+toků, nenavázané samplery, zabořená policie, „noc osvětlená jako den“.
+Snímky před/po: `logs/screenshoty/pred_a_po_final.png` (lokálně, logs/ je v .gitignore), report `logs/vizual/final2/`.
+
+### Otevřené body
+- **Vady vstupních dat `data/buildings.json`** (platí i pro skutečná data): kůlny/garáž `dmp_1`, `279053586`, `dmp_77`,
+  `dmp_5` mají zdi 13–16 m; domy `dmp_108`, `dmp_51`, `dmp_7` zasahují 2,7–3,2 m do vozovky (kandidáti pro
+  `tools/clean_road_clashes.py REMOVE_BUILDINGS`); 19 domů má střed hřebene mimo půdorys.
+- Syntetický terén: 3 FAIL daleko od vsi (strmá účelová cesta #819 u Břehatic, příčný sklon ulice #1179, kůlna
+  918931174 u koryta) a dveře 279053673 nad zářezem silnice – jen pro cloudová data, ne pro hru se skutečnými daty.
+- Klasy obilí jsou řídké (~42/ha, `tools/vegetation.py` CROP_WHEAT) – pole zblízka působí plošně; hustota je otázka
+  rozpočtu vegetace.
+- Stíny mraků jsou zatím jen celkové ztlumení slunce (putující stín po zemi by potřeboval globální `cloud_tex` v terénu).
+- Hlídka po honičce ve slepé ulici s hráčem do 150 m se pořád může otočit obloukem mimo silnici.
+- Šípky a zahradní plody mají červené bobule i v červnu (akcentová barva bez sezóny).
+- Ve skutečné hře na GPU ověřit výkon Vysoké/Ultra (SSAO/SSIL/SSR, kvalitní voda, stíny vegetace) – v cloudu jen software.
+
+
+## 2026-10-25 – Rádio: odebrány stanice ČRo, vlastní stanice jen u hráče
+
+### Hotovo (staticky ověřeno čtením kódu)
+- `data/radia.json`: odebráno 5 stanic Českého rozhlasu (názvy + URL streamů). Zůstávají jen 3 smyšlené rockové stanice bez `url`
+  (v rádiu se nezobrazují).
+- `scripts/radio.gd`: načítání stanic přesunuto do `_load_stations(path)`; kromě `res://data/radia.json` se čte i
+  `user://radia.json` – vlastní seznam hráče na jeho počítači (mimo repozitář a build). Stejná URL se nepřidá dvakrát.
+- `README.md` → Právní zásady → Rádio: přepsáno – repozitář reálné stanice neobsahuje; návod, jak si hráč legálně přidá
+  stanici jen pro soukromý poslech (oficiální veřejná URL od provozovatele, podmínky užití, nic neobcházet, nenahrávat,
+  neštreamovat, soubor nesdílet). Navazující úpravy v `docs/SYSTEMS.md`, `docs/VIZE_A_ROADMAPA.md`, `docs/testy_M5.md`.
+
+### Otevřené body
+- Ruční test: bez `user://radia.json` jen vestavěné stanice; s vlastním souborem stanice hraje (checklist `docs/testy_M5.md`).
+- V multiplayeru má každý počítač vlastní seznam – stanice, kterou klient nemá, u něj nehraje (ticho, bez chyby).

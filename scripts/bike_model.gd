@@ -45,18 +45,15 @@ static func build(m: CarModel) -> ArrayMesh:
 			_krosak(m, kp, kt, kf, kh, ktl)
 		_:
 			_jawa(m, kp, kt, kf, kh, ktl)
-	m.paint_mat = StandardMaterial3D.new()
-	m.paint_mat.albedo_color = m.paint
-	m.paint_mat.metallic = 0.35
-	m.paint_mat.roughness = 0.35
-	m.paint_mat.clearcoat_enabled = true
-	m.paint_mat.clearcoat = 0.6
+	m.paint_mat = MeshKit.paint_material(m.paint, 0.35, 0.35, 0.6, 0.15, 0.25)
 	m.head_mat = StandardMaterial3D.new()
 	m.head_mat.vertex_color_use_as_albedo = true
 	m.head_mat.emission_enabled = true
 	m.head_mat.emission = Color(1.0, 0.95, 0.8)
 	m.head_mat.emission_energy_multiplier = 0.3
-	m.head_mat.roughness = 0.1
+	m.head_mat.roughness = 0.08
+	m.head_mat.metallic = 0.75           # chromový reflektor pod sklem (jako CarModel._light_mats)
+	m.head_mat.metallic_specular = 0.7
 	m.tail_mat = StandardMaterial3D.new()
 	m.tail_mat.vertex_color_use_as_albedo = true
 	m.tail_mat.emission_enabled = true
@@ -183,7 +180,7 @@ static func _bicycle(m: CarModel, kp: MeshKit, kt: MeshKit, kf: MeshKit, kh: Mes
 	# přední světlo na držáku u hlavové trubky, zadní odrazka na blatníku
 	var lamp := Vector3(0, m.spec["head_y"], m.spec["head_z"])
 	kt.cylinder(lamp - Vector3(0, 0, 0.04), 0.045, 0.04, 0.07, CHROME, Vector3(PI / 2, 0, 0), 14)
-	kh.cylinder(lamp + Vector3(0, 0, 0.0), 0.042, 0.042, 0.01, Color(1.0, 0.97, 0.85), Vector3(PI / 2, 0, 0), 14)
+	kh.cylinder(lamp + Vector3(0, 0, 0.0), 0.042, 0.042, 0.01, CarModel.HEAD_LENS, Vector3(PI / 2, 0, 0), 14)
 	tube(kt, lamp - Vector3(0, 0.02, 0.07), hb + Vector3(0, 0.02, 0.02), 0.006, CHROME, 4)
 	ktl.box(Vector3(0, m.spec["tail_y"], m.spec["tail_z"]), Vector3(0.05, 0.07, 0.02), Color(0.9, 0.05, 0.03), Vector3(-0.5, 0, 0))
 	# vidlice + představec + zahnutá řídítka (natáčí se kolem osy hlavové trubky)
@@ -288,7 +285,7 @@ static func _jawa(m: CarModel, kp: MeshKit, kt: MeshKit, kf: MeshKit, kh: MeshKi
 		tube(kf, Vector3(sx * 0.08, 0.0, 0.0) + fl * 0.5, fl + Vector3(sx * 0.08, 0, 0), 0.02, CHROME, 8)
 	kf.sphere(Vector3(0, 0.04, 0.06), 0.13, m.paint, Vector3(1.3, 0.8, 1.2), Vector3.ZERO, 16, 8)
 	kf.cylinder(Vector3(0, 0.04, 0.18), 0.1, 0.1, 0.03, CHROME, Vector3(PI / 2, 0, 0), 18)
-	kh.cylinder(Vector3(0, 0.04, 0.196), 0.088, 0.088, 0.008, Color(1.0, 0.97, 0.85), Vector3(PI / 2, 0, 0), 18)
+	kh.cylinder(Vector3(0, 0.04, 0.196), 0.088, 0.088, 0.008, CarModel.HEAD_LENS, Vector3(PI / 2, 0, 0), 18)
 	var grip := Vector3(0.26, 1.02 - head.y, 0.3 - head.z)
 	for sx in [-1.0, 1.0]:
 		tube(kf, Vector3(sx * 0.1, 0.1, 0.02), Vector3(sx * 0.18, 0.1, -0.05), 0.012, CHROME, 6)
@@ -353,7 +350,7 @@ static func _moped(m: CarModel, kp: MeshKit, kt: MeshKit, kf: MeshKit, kh: MeshK
 		tube(kf, Vector3(sx * 0.06, 0.0, 0.0), Vector3(sx * 0.06, 0.0, 0.0) + fl * 0.55, 0.02, frame, 8)
 		tube(kf, Vector3(sx * 0.06, 0.0, 0.0) + fl * 0.5, fl + Vector3(sx * 0.06, 0, 0), 0.015, CHROME, 8)
 	kf.cylinder(Vector3(0, 0.05, 0.1), 0.075, 0.07, 0.07, CHROME, Vector3(PI / 2, 0, 0), 14)
-	kh.cylinder(Vector3(0, 0.05, 0.138), 0.065, 0.065, 0.008, Color(1.0, 0.97, 0.85), Vector3(PI / 2, 0, 0), 14)
+	kh.cylinder(Vector3(0, 0.05, 0.138), 0.065, 0.065, 0.008, CarModel.HEAD_LENS, Vector3(PI / 2, 0, 0), 14)
 	var grip := Vector3(0.24, 0.98 - head.y, 0.05)
 	for sx in [-1.0, 1.0]:
 		tube(kf, Vector3(sx * 0.02, 0.0, 0.0), Vector3(sx * 0.06, 0.09, -0.02), 0.011, CHROME, 6)
@@ -404,7 +401,7 @@ static func _scooter(m: CarModel, kp: MeshKit, kt: MeshKit, kf: MeshKit, kh: Mes
 		tube(kf, Vector3(sx * 0.07, 0.0, 0.0) + fl * 0.5, fl + Vector3(sx * 0.07, 0, 0), 0.016, CHROME, 8)
 	kf.sphere(Vector3(0, 0.08, 0.05), 0.15, m.paint, Vector3(1.5, 0.8, 1.1), Vector3.ZERO, 16, 8)
 	kf.cylinder(Vector3(0, 0.02, 0.16), 0.07, 0.065, 0.03, CHROME, Vector3(PI / 2, 0, 0), 14)
-	kh.cylinder(Vector3(0, 0.02, 0.176), 0.06, 0.06, 0.008, Color(1.0, 0.97, 0.85), Vector3(PI / 2, 0, 0), 14)
+	kh.cylinder(Vector3(0, 0.02, 0.176), 0.06, 0.06, 0.008, CarModel.HEAD_LENS, Vector3(PI / 2, 0, 0), 14)
 	var grip := Vector3(0.26, 0.12, 0.0)
 	for sx in [-1.0, 1.0]:
 		tube(kf, Vector3(sx * 0.03, 0.1, 0.0), grip * Vector3(sx, 1, 1), 0.012, CHROME, 6)
@@ -494,7 +491,7 @@ static func _armadka(m: CarModel, kp: MeshKit, kt: MeshKit, kf: MeshKit, kh: Mes
 	kf.cylinder(fl, 0.035, 0.035, 0.14, CHROME, Vector3(0, 0, PI / 2), 12)
 	# velké světlo v baňce s krycí klapkou + houkačka
 	kf.cylinder(Vector3(0, 0.03, 0.21), 0.09, 0.095, 0.09, frame, Vector3(PI / 2, 0, 0), 16)
-	kh.cylinder(Vector3(0, 0.03, 0.257), 0.08, 0.08, 0.008, Color(1.0, 0.97, 0.85), Vector3(PI / 2, 0, 0), 16)
+	kh.cylinder(Vector3(0, 0.03, 0.257), 0.08, 0.08, 0.008, CarModel.HEAD_LENS, Vector3(PI / 2, 0, 0), 16)
 	kf.box(Vector3(0, 0.12, 0.23), Vector3(0.13, 0.06, 0.1), frame, Vector3(-0.2, 0, 0))
 	kf.cylinder(Vector3(0, -0.03, 0.24), 0.035, 0.04, 0.035, frame, Vector3(PI / 2, 0, 0), 10)
 	var grip := Vector3(0.3, 0.13, -0.2)
@@ -562,7 +559,7 @@ static func _krosak(m: CarModel, kp: MeshKit, kt: MeshKit, kf: MeshKit, kh: Mesh
 	kf.cylinder(fl, 0.03, 0.03, 0.16, alu, Vector3(0, 0, PI / 2), 12)
 	fender(kf, fl, wr + 0.11, 0.45, PI - 0.55, 0.075, m.paint)
 	kf.box(Vector3(0, 0.02, 0.15), Vector3(0.2, 0.32, 0.025), m.paint, Vector3(-0.48, 0, 0))
-	kh.cylinder(Vector3(0, 0.0, 0.163), 0.05, 0.05, 0.008, Color(1.0, 0.97, 0.85), Vector3(PI / 2 - 0.48, 0, 0), 14)
+	kh.cylinder(Vector3(0, 0.0, 0.163), 0.05, 0.05, 0.008, CarModel.HEAD_LENS, Vector3(PI / 2 - 0.48, 0, 0), 14)
 	var grip := Vector3(0.27, 0.12, -0.06)
 	tube(kf, Vector3(-0.27, 0.12, -0.06), Vector3(0.27, 0.12, -0.06), 0.012, CHROME, 6)
 	for sx in [-1.0, 1.0]:

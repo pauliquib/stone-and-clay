@@ -87,7 +87,7 @@ static var SHADOW_DIST_K := 1.0
 static var MESH_LOD_K := 1.0
 ## Verze tabulky PRESETS: uložené nastavení se starší verzí a pojmenovanou předvolbou (ne Vlastní) se při načtení
 ## přepíše novými hodnotami předvolby (jinak by hráč na „Střední“ dál měl staré drahé hodnoty z nastaveni.cfg).
-const PRESETS_VER := 2
+const PRESETS_VER := 3
 const VIEWS := [0.6, 0.8, 1.0, 1.25]
 const VIEW_NAMES := ["Krátká", "Střední", "Daleká", "Velmi daleká"]
 const VEGS := [0.0, 0.5, 0.75, 1.0]
@@ -116,13 +116,21 @@ const ECO_LEVELS := [
 ## předvolby: scale, upscale, aa, shadows, view, veg, sim, glow, ssao, eco (M8.19B)
 ## Optimalizace GPU (17. 10. 2026, PRESETS_VER 2): Střední mířena na 16,6 ms na GTX 1050 – rozlišení 3D 85 → 75 % (FSR 1),
 ## bez záře, stíny Střední = 2 pásma / 120 m / tvrdé, kratší LOD stromů (ECO_LEVELS[1]). Vysoká / Ultra beze změny.
+## Světlo a barvy (25. 10. 2026, PRESETS_VER 3) – jen Vysoká a Ultra, Nízká a Střední beze změny ceny:
+## ao_q = kvalita SSAO (0 nízká v polovičním rozlišení, 1 střední v plném), ssil = nepřímé světlo z obrazu,
+## ssr = odrazy z obrazu (voda, mokro), grade = jemné barevné ladění (3D LUT generovaná v kódu, `grade_lut`).
+## Vysoká nově s levným SSAO (dřív bez), Ultra SSAO střední + SSIL + SSR.
 const PRESETS := [
-	{"scale": 0, "upscale": 1, "aa": 0, "shadows": 0, "view": 0, "veg": 0, "sim": 0, "glow": false, "ssao": false, "eco": 0},
-	{"scale": 2, "upscale": 1, "aa": 1, "shadows": 2, "view": 1, "veg": 1, "sim": 1, "glow": false, "ssao": false, "eco": 1},
-	{"scale": 4, "upscale": 0, "aa": 2, "shadows": 3, "view": 2, "veg": 3, "sim": 2, "glow": true, "ssao": false, "eco": 2},
-	{"scale": 4, "upscale": 0, "aa": 3, "shadows": 4, "view": 3, "veg": 3, "sim": 3, "glow": true, "ssao": true, "eco": 3},
+	{"scale": 0, "upscale": 1, "aa": 0, "shadows": 0, "view": 0, "veg": 0, "sim": 0, "glow": false, "ssao": false, "eco": 0,
+		"ao_q": 0, "ssil": false, "ssr": false, "grade": false},
+	{"scale": 2, "upscale": 1, "aa": 1, "shadows": 2, "view": 1, "veg": 1, "sim": 1, "glow": false, "ssao": false, "eco": 1,
+		"ao_q": 0, "ssil": false, "ssr": false, "grade": false},
+	{"scale": 4, "upscale": 0, "aa": 2, "shadows": 3, "view": 2, "veg": 3, "sim": 2, "glow": true, "ssao": true, "eco": 2,
+		"ao_q": 0, "ssil": false, "ssr": false, "grade": true},
+	{"scale": 4, "upscale": 0, "aa": 3, "shadows": 4, "view": 3, "veg": 3, "sim": 3, "glow": true, "ssao": true, "eco": 3,
+		"ao_q": 1, "ssil": true, "ssr": true, "grade": true},
 ]
-const GFX_KEYS := ["scale", "upscale", "aa", "shadows", "view", "veg", "sim", "glow", "ssao", "eco"]
+const GFX_KEYS := ["scale", "upscale", "aa", "shadows", "view", "veg", "sim", "glow", "ssao", "eco", "ao_q", "ssil", "ssr", "grade"]
 ## podání barev: [tonemapper, sytost, kontrast, bílá (tonemap_white)] – Přirozené odpovídá původnímu
 ## vzhledu (LocalClient.build_environment); sytější režimy jedou přes ACES (víc kontrastu a nasycení
 ## než Filmic; AgX je až od Godotu 4.4)
@@ -141,6 +149,9 @@ var _view_applied := 1.0
 var _atlas := -1                 # naposledy nastavená velikost mapy stínů (přealokace = záškub – jen při změně)
 var _soft := -1
 var _hooked := false
+## Kvalita vzhledu 0–3 (= globální uniform `gfx_quality`) pro GDScript – `RenderingServer.global_shader_parameter_get`
+## mimo editor nefunguje (vrací null a hlásí chybu), proto čti tohle.
+static var gfx_quality := 2.0
 static var _live: GameSettings = null   # F3 (tune_m8_19.gd): kdo naposledy aplikoval grafiku – pro `reapply_live()`
 static var _live_client: WeakRef = null
 
@@ -290,6 +301,10 @@ func _apply_eco(client: Node) -> void:
 func apply_graphics(client: Node) -> void:
 	_live = self
 	_live_client = weakref(client)
+	# kvalita vzhledu pro shadery (global `gfx_quality` 0–3 = detail přírody): dražší efekty jen od Vysoké (≥ 2),
+	# Nízká a Střední zůstávají na původní ceně
+	gfx_quality = float(clampi(int(gfx.get("eco", 2)), 0, 3))
+	RenderingServer.global_shader_parameter_set("gfx_quality", gfx_quality)
 	var vp: Viewport = client.get_viewport()
 	# rozlišení 3D a upscaling (HUD zůstává v plném rozlišení)
 	var sc: float = SCALES[clampi(int(gfx["scale"]), 0, SCALES.size() - 1)]
@@ -328,11 +343,24 @@ func apply_graphics(client: Node) -> void:
 	if env:
 		env.glow_enabled = bool(gfx["glow"])
 		env.ssao_enabled = bool(gfx["ssao"])
+		if env.ssao_enabled:
+			# nízká kvalita v polovičním rozlišení (~0,4 ms na GTX 1050 při 1080p), Ultra střední v plném
+			var hq := int(gfx.get("ao_q", 0)) >= 1
+			RenderingServer.environment_set_ssao_quality(RenderingServer.ENV_SSAO_QUALITY_MEDIUM if hq
+				else RenderingServer.ENV_SSAO_QUALITY_LOW, not hq, 0.5, 2, 50.0, 300.0)
+		env.ssil_enabled = bool(gfx.get("ssil", false))
+		if env.ssil_enabled:
+			RenderingServer.environment_set_ssil_quality(RenderingServer.ENV_SSIL_QUALITY_LOW, true, 0.5, 4, 50.0, 300.0)
+		env.ssr_enabled = bool(gfx.get("ssr", false))
 		var cc: Array = COLORS[clampi(color_mode, 0, COLORS.size() - 1)]
 		env.tonemap_mode = cc[0]
 		env.adjustment_saturation = cc[1]
 		env.adjustment_contrast = cc[2]
 		env.tonemap_white = cc[3]
+		# základ podání barev pro Atmosphere (Purkyňův posun v noci ho jen násobí, nepřepisuje)
+		env.set_meta("color_saturation", cc[1])
+		env.set_meta("color_contrast", cc[2])
+		env.adjustment_color_correction = grade_lut() if bool(gfx.get("grade", false)) else null
 	# vegetace kolem hráče
 	var veg: float = VEGS[clampi(int(gfx["veg"]), 0, VEGS.size() - 1)]
 	if client.season_fx and client.season_fx.flowers:
@@ -380,6 +408,43 @@ func _scale_range(n: Node) -> void:
 	g.visibility_range_end = o.y * _view_applied
 	g.visibility_range_begin_margin = o.z * _view_applied
 	g.visibility_range_end_margin = o.w * _view_applied
+
+
+## Jemné barevné ladění (3D LUT 32³ v sRGB, generovaná v kódu – žádný soubor): lehce chladnější hluboké stíny,
+## o chlup teplejší světla (sníh a mraky zůstanou bílé, ne béžové), mírná S-křivka a o chlup sytější středy (zeleň, cihly) – jako film, ne „Instagram“.
+## Uplatní se po tonemappingu (Environment.adjustment_color_correction), jen Vysoká / Ultra (`gfx.grade`).
+static var _grade: ImageTexture3D
+static var GRADE_STRENGTH := 1.0
+static func grade_lut() -> ImageTexture3D:
+	if _grade != null:
+		return _grade
+	const N := 32
+	# texel i se čte na souřadnici (i + 0,5) / N (bez posunu o půl texelu v tonemapperu); krajní texely drží
+	# přesnou černou a bílou
+	var at := func(i: int) -> float: return 0.0 if i == 0 else (1.0 if i == N - 1 else (float(i) + 0.5) / float(N))
+	var imgs: Array[Image] = []
+	for bi in N:
+		var img := Image.create(N, N, false, Image.FORMAT_RGB8)
+		for gi in N:
+			for ri in N:
+				var c := Vector3(at.call(ri), at.call(gi), at.call(bi))
+				var l := c.x * 0.2126 + c.y * 0.7152 + c.z * 0.0722
+				var k := GRADE_STRENGTH
+				# S-křivka kolem středu (kontrast ve středních tónech, konce zůstávají)
+				var s := c + (c - Vector3.ONE * 0.5) * (Vector3.ONE - (c - Vector3.ONE * 0.5).abs() * 2.0) * 0.12 * k
+				# rozdělené tónování: stíny do modra, světla jen nepatrně do teplé (11/2026: dřív béžový sníh)
+				var sh := 6.75 * l * (1.0 - l) * (1.0 - l)        # vrchol ve třetině jasu, černá zůstane černá
+				var hi := 6.75 * l * l * (1.0 - l)                # vrchol ve dvou třetinách, bílá zůstane bílá
+				s += (Vector3(-0.012, 0.0, 0.022) * sh + Vector3(0.008, 0.004, -0.006) * hi) * k
+				# o chlup víc sytosti ve středních tónech
+				var l2 := s.x * 0.2126 + s.y * 0.7152 + s.z * 0.0722
+				s = Vector3.ONE * l2 + (s - Vector3.ONE * l2) * (1.0 + 0.06 * k * (1.0 - absf(l2 - 0.5) * 2.0))
+				s = s.clamp(Vector3.ZERO, Vector3.ONE)
+				img.set_pixel(ri, gi, Color(s.x, s.y, s.z))
+		imgs.append(img)
+	_grade = ImageTexture3D.new()
+	_grade.create(Image.FORMAT_RGB8, N, N, N, false, imgs)
+	return _grade
 
 
 ## F3 (tune_m8_19.gd): znovu uplatní grafiku po změně SHADOW_DIST_K / MESH_LOD_K (nic, dokud hra grafiku nenastavila).

@@ -241,6 +241,8 @@ static func live_spec(id: String) -> Dictionary:
 		LIVE[id] = (MODELS[id] as Dictionary).duplicate(true)
 	return LIVE[id]
 
+const HEAD_LENS := Color(0.62, 0.64, 0.66)   # barva reflektoru světlometu (chrom pod krytkou)
+
 var model_id := "octavia"
 var kind := "car"             # car / bike / moto
 var spec: Dictionary
@@ -249,8 +251,8 @@ var police := false
 var plate := "4QQ 3457"
 
 var body_mesh: ArrayMesh
-var paint_mat: StandardMaterial3D
-var glass_mat: StandardMaterial3D
+var paint_mat: Material            # ShaderMaterial vc_paint (MeshKit.paint_material)
+var glass_mat: Material            # ShaderMaterial vc_glass (MeshKit.glass_material)
 var head_mat: StandardMaterial3D
 var tail_mat: StandardMaterial3D
 var hull_points := PackedVector3Array()
@@ -490,24 +492,13 @@ func build() -> ArrayMesh:
 			hull_points.append(Vector3(-p.x, p.y, p.z))
 	_details(kt)
 	# materiály
-	paint_mat = StandardMaterial3D.new()
-	paint_mat.albedo_color = paint
-	paint_mat.vertex_color_use_as_albedo = false
-	paint_mat.metallic = 0.5
-	paint_mat.roughness = 0.3
-	paint_mat.clearcoat_enabled = true
-	paint_mat.clearcoat = 0.8
-	paint_mat.clearcoat_roughness = 0.15
-	glass_mat = StandardMaterial3D.new()
-	glass_mat.albedo_color = Color(0.08, 0.1, 0.12, 0.62)
-	glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glass_mat.metallic = 0.4
-	glass_mat.roughness = 0.04
-	glass_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	paint_mat = MeshKit.paint_material(paint, 0.3, 0.5, 0.8, 0.15)
+	# tmavé tónované sklo: interiér prosvítá jen při kolmém pohledu, k okrajům odraz oblohy (vc_glass.gdshader)
+	glass_mat = MeshKit.glass_material()
 	body_mesh = ArrayMesh.new()
 	_add_surface(kp, paint_mat)
 	_add_surface(kg, glass_mat)
-	_add_surface(kt, MeshKit.vc_material(0.55, 0.2, 0.0, false))
+	_add_surface(kt, MeshKit.vc_material(0.55, 0.2, 0.0, false), 0.45)
 	# světla
 	var kh := MeshKit.new()
 	var ktl := MeshKit.new()
@@ -518,7 +509,8 @@ func build() -> ArrayMesh:
 	var hw := _half_ring(hz)[4].x
 	var tw := _half_ring(tz + 0.05)[4].x
 	for s in [-1.0, 1.0]:
-		kh.sphere(Vector3(s * (hw - 0.19), hy, hz), 0.1, Color(1.0, 0.98, 0.9), Vector3(1.6, 0.55, 0.9), Vector3(-0.35, 0, 0), 12, 6)
+		# světlomet: čirá lesklá krytka nad stříbrným reflektorem (barva vrcholu = reflektor, svit dává emise)
+		kh.sphere(Vector3(s * (hw - 0.19), hy, hz), 0.1, HEAD_LENS, Vector3(1.6, 0.55, 0.9), Vector3(-0.35, 0, 0), 12, 6)
 		ktl.sphere(Vector3(s * (tw - 0.12), ty, tz), 0.09, Color(0.9, 0.05, 0.03), Vector3(1.3, 0.75, 0.6), Vector3.ZERO, 12, 6)
 		kh.sphere(Vector3(s * (hw - 0.02), hy - 0.02, hz - 0.1), 0.03, Color(1.0, 0.6, 0.1), Vector3(0.6, 0.6, 1.4), Vector3.ZERO, 8, 4)
 	_light_mats()
@@ -589,19 +581,24 @@ static func first_mesh(path: String) -> Mesh:
 	return found
 
 
+## Materiály světel: světlomet = lesklý chromový reflektor pod krytkou (ve dne šedostříbrný, ne bílá samolepka),
+## svit dává emise (Car._set_lights mění jen emission_energy_multiplier); zadní světla lesklý červený plast.
 func _light_mats() -> void:
 	head_mat = StandardMaterial3D.new()
 	head_mat.vertex_color_use_as_albedo = true
 	head_mat.emission_enabled = true
 	head_mat.emission = Color(1.0, 0.97, 0.88)
 	head_mat.emission_energy_multiplier = 0.3
-	head_mat.roughness = 0.1
+	head_mat.metallic = 0.75
+	head_mat.metallic_specular = 0.7
+	head_mat.roughness = 0.08
 	tail_mat = StandardMaterial3D.new()
 	tail_mat.vertex_color_use_as_albedo = true
 	tail_mat.emission_enabled = true
 	tail_mat.emission = Color(1.0, 0.05, 0.02)
 	tail_mat.emission_energy_multiplier = 0.4
-	tail_mat.roughness = 0.2
+	tail_mat.roughness = 0.12
+	tail_mat.metallic_specular = 0.7
 
 
 func _quad(kit: MeshKit, a: Vector3, c: Vector3, b: Vector3, d: Vector3,
@@ -740,9 +737,12 @@ func _cyl(r: float, h: float) -> CylinderMesh:
 	return m
 
 
-func _add_surface(kit: MeshKit, mat: Material) -> void:
+## `ground_ao` > 0 → barvy vrcholů do té výšky ztmavnou k zemi (upečené před zálohou pro deformaci).
+func _add_surface(kit: MeshKit, mat: Material, ground_ao := 0.0) -> void:
 	if kit.is_empty():
 		return
+	if ground_ao > 0.0:
+		kit.bake_ground_ao(ground_ao)
 	_surf.append({"v": kit.verts.duplicate(), "n": kit.norms.duplicate(), "c": kit.cols.duplicate(),
 		"i": kit.idx.duplicate(), "v0": kit.verts.duplicate()})
 	_mats.append(mat)
@@ -772,7 +772,7 @@ func deform(p: Vector3, dir: Vector3, depth: float, radius: float) -> void:
 		arr[Mesh.ARRAY_COLOR] = s["c"]
 		arr[Mesh.ARRAY_INDEX] = s["i"]
 		body_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
-		body_mesh.surface_set_material(si, _mats[si])
+		body_mesh.surface_set_material(si, MeshKit.shader_of(_mats[si]))
 
 
 func repair() -> void:
