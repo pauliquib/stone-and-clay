@@ -12,9 +12,13 @@ procedurální, ortofoto ČÚZK jen na přepnutí).
 
 ## Screenshoty
 
-| Letecký pohled na Dukelčice (dron) | Dialog s NPC na návsi |
+| Letecký pohled na Dukelčice (dron, den) | Letecký pohled na Dukelčice (noc) |
 |---|---|
-| ![Letecký pohled](docs/screenshots/dron-ves.png) | ![Dialog s NPC](docs/screenshots/dialog-kvetoslava.png) |
+| ![Letecký pohled ve dne](docs/screenshots/dron-ves.png) | ![Letecký pohled v noci](docs/screenshots/dron-ves-noc.png) |
+
+| Náves ve dne | Dialog s NPC na návsi |
+|---|---|
+| ![Náves](docs/screenshots/navs-den.png) | ![Dialog s NPC](docs/screenshots/dialog-kvetoslava.png) |
 
 | Motorka Javor 250 Kývačka za soumraku | Interiér pálenice |
 |---|---|
