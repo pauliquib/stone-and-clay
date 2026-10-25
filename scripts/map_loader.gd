@@ -24,7 +24,7 @@ const DRAPE_LONG := 8.0
 const DRAPE_W_LIFT := 0.003
 ## Posun výšky drapování podle druhu povrchu (přičte se k `drape_h` z World): štěrková cesta leží v terénu níž, asfalt
 ## o kus výš – kde štěrk najíždí na asfalt, je pod ním aspoň ~4 cm (dřív 1 cm → z-fighting) a štěrk nevisí nad trávou.
-const DRAPE_KIND_OFFSET := {KIND_ASPHALT: 0.01, KIND_GRAVEL: -0.02}
+const DRAPE_KIND_OFFSET := {KIND_ASPHALT: 0.015, KIND_GRAVEL: -0.015}
 
 ## Prototypy stromů (Mesh s materiály, pořadí jako v tree_protos.bin) po `build_trees`; pro zasazené stromy (M2.5). Prázdné = zatím nenačteno.
 static var shared_protos: Array = []

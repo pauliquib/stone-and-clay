@@ -57,6 +57,7 @@ vec4 nzs(vec2 uv) {
 vec3 plaster_tint(vec3 t) {
 	t.g = min(t.g, t.r * 0.975);
 	t.b = min(t.b, t.g * 0.93);
+	t = mix(vec3(dot(t, vec3(0.2126, 0.7152, 0.0722))), t, 0.85);   // za šera nežloutne do hořčicové
 	return t * 0.94;
 }
 
@@ -272,6 +273,8 @@ void fragment() {
 			acol *= mix(0.84, 1.0, smoothstep(0.05, 0.5, ez));
 			rough = mix(rough, 0.95, broken);
 			snow_k = 0.6 + 0.9 * (1.0 - smoothstep(0.3, 1.4, e)) - 0.45 * tr;   // prohrnuto: u krajů víc, stopy čisté
+		} else {
+			snow_k = 0.5;   // vnitřek křižovatky: prohrnutý jako střed pásů (jinak ostrý bílý mnohoúhelník)
 		}
 		if (hq) {
 			vec4 nc = nzs(g * 0.13 + vec2(0.77));
@@ -349,10 +352,13 @@ void fragment() {
 		float north = dot(normalize(n.xz + vec2(1e-4)), north_xz);
 		alb = mix(alb, vec3(0.05, 0.068, 0.022), smoothstep(0.0, 0.75, north) * smoothstep(0.55, 0.8, nb.g) * 0.7);
 	}
-	if (use_tex && mat_kind == 3 && road_uv && UV.y > 0.0) {
-		float e = min(UV.x, 1.0 - UV.x) * UV.y;
-		alb *= mix(0.8, 1.0, smoothstep(0.03, 0.45, e));
-		snow_k = 0.6 + 0.9 * (1.0 - smoothstep(0.3, 1.4, e));
+	if (use_tex && mat_kind == 3 && road_uv) {
+		snow_k = 0.5;
+		if (UV.y > 0.0) {
+			float e = min(UV.x, 1.0 - UV.x) * UV.y;
+			alb *= mix(0.8, 1.0, smoothstep(0.03, 0.45, e));
+			snow_k = 0.6 + 0.9 * (1.0 - smoothstep(0.3, 1.4, e));
+		}
 	}
 
 	// --- sníh na střechách a cestách (plochy natočené vzhůru), mokro – tmavší a lesklejší, louže
