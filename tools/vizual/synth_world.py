@@ -76,7 +76,7 @@ STREAM = {  # stejné jako tools/water.py KINDS: rovné dno, zahloubení, hloubk
     "drain": {"flat": 0.8, "cut": 0.35, "water": 0.1, "bank": 0.9},
 }
 POND_DEPTH = 1.2
-TREE_TARGET = 52000          # zhruba jako skutečná data (51 736)
+FOREST_SPACING = 15.0        # m – rozestup stromů v lese (zápoj korun z dronu; skutečná data z DMP ~20 m, řídká)
 
 # Fasády (sRGB) – omítky okolních vsí; střechy – pálené tašky, tmavý eternit / plech, hnědé šindele
 FACADES = [(0.86, 0.82, 0.72), (0.90, 0.87, 0.80), (0.82, 0.76, 0.62), (0.88, 0.80, 0.64), (0.78, 0.74, 0.68),
@@ -911,9 +911,7 @@ def build_trees(g, H, masks, lc, buildings, meta, water):
         return ~bad[r, c]
 
     # les
-    area = forest.sum() * cell * cell
-    others = 9000
-    spacing = math.sqrt(area / max(TREE_TARGET - others, 1000))
+    spacing = FOREST_SPACING
     nxs = int((g.w - 1) * g.sp / spacing)
     nzs = int((g.h - 1) * g.sp / spacing)
     gx, gz = np.meshgrid(np.arange(nxs), np.arange(nzs))
@@ -930,12 +928,12 @@ def build_trees(g, H, masks, lc, buildings, meta, water):
         if conifer[i]:
             p = 3 + int(rng.integers(3))
             sy = 20.0 + rng.random() * 12.0
-            sx = 3.6 + rng.random() * 1.6
+            sx = 4.0 + rng.random() * 1.6
             col = (0.05 + rng.random() * 0.02, 0.10 + rng.random() * 0.03, 0.06 + rng.random() * 0.02)
         else:
             p = int(rng.integers(3))
             sy = 18.0 + rng.random() * 10.0
-            sx = 5.0 + rng.random() * 2.0
+            sx = 6.0 + rng.random() * 2.2
             col = (0.08 + rng.random() * 0.04, 0.16 + rng.random() * 0.05, 0.05 + rng.random() * 0.03)
         out.append((X[i], Z[i], p, sx, sy, col))
     nforest = len(out)
