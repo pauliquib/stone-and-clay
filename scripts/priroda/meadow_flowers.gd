@@ -65,6 +65,12 @@ func setup(w: World) -> void:
 	_mat.set_shader_parameter("veg_lo", Color(0.12, 0.24, 0.07))
 	_mat.set_shader_parameter("veg_hi", Color(0.30, 0.46, 0.16))
 	_apply_fade()
+	# vegetation.gdshader deklaruje `field_lut` (čte ho jen season_mode 2 – plodiny); i nepoužitý sampler bez hodnoty
+	# hlásí validátor (shader_sampler_unbound) → stejná tabulka jako terén (SeasonFx ji pak předává přes set_field_lut)
+	if terrain != null and terrain.material != null:
+		var lut = terrain.material.get_shader_parameter("field_lut")
+		if lut is Texture2D:
+			set_field_lut(lut)
 	_mm = MultiMesh.new()
 	_mm.transform_format = MultiMesh.TRANSFORM_3D
 	_mm.use_custom_data = true             # rgb = barva květu, a = typ okvětí / 4 (vegetation.gdshader)
@@ -76,6 +82,12 @@ func setup(w: World) -> void:
 	_mmi.material_override = _mat
 	_mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_mmi)
+
+
+## Tabulka barev polí (Fields.lut_image) – květy ji nečtou, jen aby sampler `field_lut` nezůstal prázdný.
+func set_field_lut(tex: Texture2D) -> void:
+	if _mat != null:
+		_mat.set_shader_parameter("field_lut", tex)
 
 
 ## Plynulé řídnutí květů k okraji okruhu (shader): mez = okruh − rezerva na posun hráče do přestavby.

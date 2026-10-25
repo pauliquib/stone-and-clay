@@ -426,6 +426,15 @@ func _check_entity(e: Node3D, cat: String, vis: Node3D) -> void:
 	var bottom := wa.position.y
 	var label := _label(e, cat)
 	var hover := e is Item and (e as Item).kind in HOVER_ITEMS
+	# míč – obálka natočené koule je krychle o hraně až √3 × průměr → spodek z polohy středu a poloměru
+	var round_ := false
+	for ch in vis.get_children():
+		if ch is MeshInstance3D and (ch as MeshInstance3D).mesh is SphereMesh:
+			round_ = true
+			var mi := ch as MeshInstance3D
+			var r_ := (mi.mesh as SphereMesh).radius * mi.global_transform.basis.get_scale().y
+			if cat == "prop":
+				bottom = mi.global_position.y - r_
 	if e is Item:
 		bottom = (e as Item).global_position.y         # předmět bobuje ±2 cm – měří se počátek (stojí na zemi)
 	elif e is Car:
@@ -480,10 +489,6 @@ func _check_entity(e: Node3D, cat: String, vis: Node3D) -> void:
 	var basis := vis.global_transform.basis.orthonormalized()
 	var tilt := GeomChecks.tilt_deg(basis)
 	var slope := _slope_deg(pos.x, pos.z)
-	var round_ := false                  # míč – na natočení nezáleží
-	for ch in vis.get_children():
-		if ch is MeshInstance3D and (ch as MeshInstance3D).mesh is SphereMesh:
-			round_ = true
 	if not round_ and tilt - slope > float(rule["tilt"]):
 		_add("WARN", "not_upright", name_, "%s je nakloněný %.0f° od svislice (svah %.0f°, tolerance %.0f°)" % [
 			label, tilt, slope, rule["tilt"]], pos)

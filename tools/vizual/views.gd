@@ -19,6 +19,11 @@ const BASE_DATE := [2026, 6, 15]    # datum 1. dne (letní den – shoduje se s 
 const WINTER_DATE := [2027, 1, 20]  # zima: posun kalendáře dopředu (EcoClock dožene hrubým krokem)
 const FOV := 70.0
 const HIDE_LAYER := 1 << 19         # vrstva vizuálu hráče – kamera validátoru ji nekreslí
+const CEREALS := ["psenice", "jecmen"]   # obilniny (Fields.CROPS) – jen na nich rostou 3D klasy (tools/vegetation.py)
+const FIELD_PITCH := 6.0            # ° – pohled „pole“ mírně dolů přes porost
+const EDGE_OPEN := [SurfaceMap.GRASS, SurfaceMap.ARABLE, SurfaceMap.ORCHARD, SurfaceMap.TRACK]
+const EDGE_CAM_M := 32.0            # m – kamera před okrajem lesa (25–40 m)
+const EDGE_TREES_MIN := 5           # stromů do 25 m za okrajem (les v syntetickém světě má rozestup ~10 m)
 
 var tree: SceneTree
 var world: World
@@ -207,30 +212,62 @@ func _best_dir(p: Vector2, score: Callable) -> Vector2:
 	return best
 
 
-## Pole: nejbližší bod orné půdy (Fields.class_at == 1) 200–1200 m od středu bez budov a stromů v okolí;
-## bez landuse.bin otevřená plocha (bez budov do 80 m a stromů do 40 m). Směr = kam je nejvíc pole.
+## Pole: nejbližší bod orné půdy (Fields.class_at == 1) s obilninou letošního roku (`Fields.crop_at` ∈ CEREALS –
+## jen tam rostou 3D klasy CROP_WHEAT, tools/vegetation.py) 200–1200 m od středu bez budov a stromů v okolí.
+## Směr = kam je nejdál stejné obilné pole (ne přes louku / trávník); kamera v očích (EYE), mírně dolů (FIELD_PITCH).
+## Bez obilného pole libovolná orná půda, bez landuse.bin otevřená plocha (bez budov do 80 m a stromů do 40 m).
 func _field_place(c: Vector3) -> Dictionary:
 	var f: Fields = world.fields
 	var has_f := f != null and f.loaded
+	var year: int = world.clock.year() if world.clock else BASE_DATE[0]
+	var res := {}
+	if has_f:
+		res = _field_search(c, true, year)
+		if res.is_empty():
+			res = _field_search(c, false, year)
+	else:
+		res = _field_search(c, false, year)
+	return res if not res.is_empty() else _fallback(c, "pole nenalezeno")
+
+
+func _field_search(c: Vector3, cereal: bool, year: int) -> Dictionary:
+	var f: Fields = world.fields
+	var has_f := f != null and f.loaded
 	for p: Vector2 in _spiral(c, 200.0, 1200.0, 40.0):
-		if has_f and f.class_at(p.x, p.y) != 1:
-			continue
+		var fid := 0
+		if has_f:
+			if f.class_at(p.x, p.y) != 1:
+				continue
+			fid = f.field_at(p.x, p.y)
+			if cereal and (fid <= 0 or not (f.crop_at(p.x, p.y, year) in CEREALS)):
+				continue
 		if _building_near(p, 80.0) or _trees_near(p, 30.0 if has_f else 40.0) > 0:
 			continue
-		var dir := _best_dir(p, _field_score.bind(p, has_f))
+		var score := _field_score.bind(p, has_f, fid if cereal else -1)
+		var dir := _best_dir(p, score)
+		if cereal and float(score.call(dir)) < 6.0:
+			continue                                    # obilí jen kousek před kamerou – hledat dál
 		var pos := Vector3(p.x, _h(p.x, p.y) + EYE, p.y)
-		var la := p + dir * 120.0
-		return {"pos": pos, "look": Vector3(la.x, _h(la.x, la.y) + EYE * 0.5, la.y),
-			"why": "orná půda (landuse.bin)" if has_f else "otevřená plocha (bez landuse.bin)"}
-	return _fallback(c, "pole nenalezeno")
+		var la := p + dir * 60.0
+		var look := Vector3(la.x, pos.y - 60.0 * tan(deg_to_rad(FIELD_PITCH)), la.y)   # sklon od očí, ne od terénu
+		var why := "orná půda (landuse.bin)" if has_f else "otevřená plocha (bez landuse.bin)"
+		if cereal:
+			why = "pole s obilninou (%s, pole %d, rok %d – Fields.crop_at), pohled přes pole %.0f° dolů" % [
+				f.crop_at(p.x, p.y, year), fid, year, FIELD_PITCH]
+		return {"pos": pos, "look": look, "why": why}
+	return {}
 
 
-## Kolik vzorků po 20 m ve směru `d` od `p` leží na poli (bez landuse.bin: bez stromů).
-func _field_score(d: Vector2, p: Vector2, has_f: bool) -> float:
+## Kolik vzorků po 20 m ve směru `d` od `p` leží na poli (`fid` ≥ 0: na tomtéž poli; bez landuse.bin: bez stromů).
+func _field_score(d: Vector2, p: Vector2, has_f: bool, fid := -1) -> float:
 	var s := 0.0
 	for i in range(1, 10):
 		var q := p + d * (i * 20.0)
-		if (has_f and world.fields.class_at(q.x, q.y) == 1) or (not has_f and _trees_near(q, 10.0) == 0):
+		if has_f:
+			if world.fields.class_at(q.x, q.y) != 1 or (fid >= 0 and world.fields.field_at(q.x, q.y) != fid):
+				break                                   # za okrajem pole už se nepočítá
+			s += 1.0
+		elif _trees_near(q, 10.0) == 0:
 			s += 1.0
 	return s
 
@@ -239,8 +276,64 @@ func _forest_score(d: Vector2, p: Vector2) -> float:
 	return float(_trees_near(p + d * 60.0, 30.0))
 
 
-## Okraj lesa: nejbližší místo bez stromů do 25 m, za kterým (60 m) je hustý les (≥ 12 stromů do 30 m).
+## Okraj lesa z mapy povrchu (SurfaceMap.class_at == FOREST): soustředné kružnice od středu vsi (krok 8 m),
+## první buňka lesa, za kterou (proti směru `d`) je souvislý les (40 m) s ≥ EDGE_TREES_MIN stromy (TreeManager)
+## a před ní ve směru `d` 6–48 m otevřená plocha (tráva, orná půda, sad, polní cesta – ne dvůr ani budovy).
+## Kamera EDGE_CAM_M před okrajem v otevřené ploše, kouká na les. Bez surface.bin podle hustoty stromů (`_forest_edge_by_trees`).
 func _forest_edge_place(c: Vector3) -> Dictionary:
+	var sm: SurfaceMap = world.surface
+	if sm == null or not sm.loaded:
+		return _forest_edge_by_trees(c)
+	var r := 150.0
+	while r <= 2500.0:
+		var n := maxi(int(TAU * r / 8.0), 16)
+		for k in n:
+			var a := TAU * k / n
+			var p := Vector2(c.x + cos(a) * r, c.z + sin(a) * r)
+			if sm.class_at(p.x, p.y) != SurfaceMap.FOREST or not world.terrain.contains(p.x, p.y, 80.0):
+				continue
+			var res := _forest_edge_at(p, sm)
+			if not res.is_empty():
+				res["why"] = "%s, %.0f m od středu vsi" % [res["why"], r]
+				return res
+		r += 8.0
+	return _forest_edge_by_trees(c)
+
+
+## Je les v bodě `p` okrajem (viz `_forest_edge_place`)? Vrací místo pohledu nebo {}.
+func _forest_edge_at(p: Vector2, sm: SurfaceMap) -> Dictionary:
+	for k in 16:
+		var a := k * TAU / 16.0
+		var d := Vector2(cos(a), sin(a))
+		var ok := true
+		for i in range(2, 17):                          # 6–48 m před okrajem: otevřená plocha
+			var q := p + d * (i * 3.0)
+			if not (sm.class_at(q.x, q.y) in EDGE_OPEN):
+				ok = false
+				break
+		if not ok:
+			continue
+		for i in 9:                                     # 0–40 m za okrajem: les
+			var q2 := p - d * (i * 5.0)
+			if sm.class_at(q2.x, q2.y) != SurfaceMap.FOREST:
+				ok = false
+				break
+		if not ok:
+			continue
+		var nf := _trees_near(p - d * 25.0, 25.0)
+		var cp := p + d * EDGE_CAM_M
+		if nf < EDGE_TREES_MIN or _trees_near(cp, 10.0) > 0 or _building_near(cp, 40.0):
+			continue
+		var pos := Vector3(cp.x, _h(cp.x, cp.y) + EYE, cp.y)
+		var la := p - d * 20.0
+		return {"pos": pos, "look": Vector3(la.x, _h(la.x, la.y) + 4.0, la.y),
+			"why": "okraj lesa (surface.bin FOREST vedle otevřené plochy, %d stromů do 25 m za okrajem), kamera %.0f m před ním" % [
+				nf, EDGE_CAM_M]}
+	return {}
+
+
+## Okraj lesa bez surface.bin: nejbližší místo bez stromů do 25 m, za kterým (60 m) je hustý les (≥ 12 stromů do 30 m).
+func _forest_edge_by_trees(c: Vector3) -> Dictionary:
 	var best_p := Vector2.INF
 	var best_dir := Vector2.ZERO
 	var best_n := 0
