@@ -4,7 +4,8 @@
 // Oblast katastru se zapustí `hole_sink` pod detailní terén (ať se nepřekrývá), okraje
 // dlaždic mají sukně. Barvy tříd počítá stejný kód jako detailní terén (terrain_surface.gdshaderinc)
 // se zprůměrovaným jemným šumem a stejnými makro skvrnami → na hranici katastru bez švu.
-// Orná půda = mozaika polí (pseudo-parcely ~400 × 250 m) s barvami plodin z téže tabulky `field_lut` jako v katastru.
+// Orná půda = mozaika polí (pseudo-parcely ~400 × 250 m) s barvami plodin z téže tabulky `field_lut` jako v katastru,
+// vláhovými skvrnami, souvratí podél okraje a travnatými mezemi (jen ALU, bez čtení navíc).
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
@@ -115,6 +116,7 @@ void fragment() {
 	float grassy;
 	vec3 col = ts_class(c, s, grass_green, hgt, rough, own_wet, grassy);
 	col = ts_macro(col, s, grassy, c == 3, grass_green);
+	float pxm = length(fwidth(wpos.xz));   // m na pixel (mimo větvení)
 	if (c == 1 && use_fields) {
 		// mozaika polí: pseudo-parcela → číslo pole → barva plodiny pro dnešek (jako pole v katastru)
 		vec2 q = ROT_F * (wpos.xz + warp * 1.5) / vec2(410.0, 260.0);
@@ -122,6 +124,15 @@ void fragment() {
 		int fid = 1 + int(ts_hash(pc) * 254.0);
 		vec4 lut = texelFetch(field_lut, ivec2(fid, 0), 0);
 		vec3 cc = lut.rgb * (0.92 + 0.16 * s.n1.r) * (0.94 + 0.12 * s.nm.g);
+		// jako pole v katastru: vláhové skvrny, souvrať podél okraje (pás ~20 m) a travnatá mez mezi parcelami
+		float moist = s.n2.r * 0.6 + s.nm.r * 0.4 + (s.n1.g - 0.5) * 0.25;
+		cc *= mix(vec3(1.0), vec3(0.86, 0.94, 0.82), smoothstep(0.52, 0.72, moist));
+		vec2 fq = fract(q);
+		vec2 de = min(fq, 1.0 - fq) * vec2(410.0, 260.0);
+		float ed = min(de.x, de.y);                                   // m od okraje parcely
+		cc = mix(cc, cc * vec3(0.9, 0.97, 0.86), (1.0 - smoothstep(20.0 - pxm, 20.0 + pxm, ed)) * 0.4);
+		vec3 mez = mix(ts_s2l(vec3(0.46, 0.42, 0.26)), ts_s2l(vec3(0.27, 0.36, 0.14)), grass_green);
+		cc = mix(cc, mez, (1.0 - smoothstep(1.5 - pxm, 1.5 + pxm, ed)) * 0.6);
 		col = mix(col, cc, lut.a);
 	}
 	vec3 n = normalize(wnrm);

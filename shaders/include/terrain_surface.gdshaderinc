@@ -82,16 +82,18 @@ vec3 ts_yard(TsSig s, out float ts_h) {
 	return c;
 }
 
-// břeh (pás podél vody v masce): hlavně ostřice a vlhká bujná tráva (v zimě suchá), jen místy vyšlapané bahno.
-// Pruh mokrého bahna přímo u vodní čáry kreslí terrain.gdshader z pobřežního pásu (Terrain._compute_shore).
+// břeh (pás podél vody v masce): hlavně ostřice a vlhká bujná tráva (v zimě suchá), jen místy drobná vyšlapaná bahnitá
+// místa. Pruh mokrého bahna přímo u vodní čáry kreslí terrain.gdshader z pobřežního pásu (Terrain._compute_shore).
+// Odstín blízko běžné trávy (jen o něco sytější a tmavší) a skvrny bahna malé a měkké – jinak břehová třída
+// (pás 4 m rozbitý šumem) dělala v trávě kolem rybníků velké tmavé ostře ohraničené skvrny („maskáč“).
 // `ts_own_wet` = vlastní vlhkost, `ts_veg` = podíl porostu
 vec3 ts_bank(TsSig s, float ts_dry_season, out float ts_h, out float ts_own_wet, out float ts_veg) {
-	vec3 mud = ts_s2l(vec3(0.31, 0.26, 0.19)) * (0.8 + 0.4 * s.n0.r) * (0.9 + 0.2 * s.nf.r);
-	float ts_sed = 1.0 - smoothstep(0.66, 0.8, s.n1.g + (s.n0.r - 0.5) * 0.3) * 0.85;
-	vec3 sc = mix(ts_s2l(vec3(0.19, 0.28, 0.10)), ts_s2l(vec3(0.36, 0.43, 0.18)), smoothstep(0.3, 0.75, s.nf.r));
-	sc *= 0.85 + 0.3 * s.n0.g;                                                                     // trsy ostřic
-	sc = mix(sc, ts_s2l(vec3(0.58, 0.52, 0.34)), clamp(smoothstep(0.65, 0.9, s.nf.a) * 0.45 + ts_dry_season * 0.7, 0.0, 1.0));
-	ts_own_wet = (1.0 - ts_sed) * 0.6 + 0.1;
+	vec3 mud = ts_s2l(vec3(0.33, 0.28, 0.20)) * (0.85 + 0.3 * s.n0.r) * (0.9 + 0.2 * s.nf.r);
+	float ts_sed = 1.0 - smoothstep(0.72, 0.9, s.n1.g + (s.n0.r - 0.5) * 0.3) * 0.5;
+	vec3 sc = mix(ts_s2l(vec3(0.19, 0.27, 0.10)), ts_s2l(vec3(0.35, 0.43, 0.18)), smoothstep(0.2, 0.75, s.nf.r));
+	sc *= 0.9 + 0.2 * s.n0.g;                                                                      // trsy ostřic
+	sc = mix(sc, ts_s2l(vec3(0.58, 0.52, 0.34)), clamp(smoothstep(0.65, 0.9, s.nf.a) * 0.4 + ts_dry_season * 0.7, 0.0, 1.0));
+	ts_own_wet = (1.0 - ts_sed) * 0.5 + 0.08;
 	ts_veg = ts_sed;
 	ts_h = ts_sed * (s.nf.r - 0.5) * 0.03 + (s.n0.r - 0.5) * 0.012;
 	return mix(mud, sc, ts_sed);

@@ -20,6 +20,7 @@ static var MOON_ENERGY := 0.16
 static var FOG_BASE := 0.00022
 static var FOG_MIST := 0.012         # hustota v husté mlze
 static var FOG_RAIN := 0.0022
+static var FOG_SNOW := 0.0085        # 11/2026: sněžení (× intenzita) tlumí dohled víc než déšť: 0,4 → dohled ~650 m
 const RAIN_DROPS := 12000
 const SNOW_FLAKES := 7000
 ## M8.4: vítr u kamery
@@ -32,7 +33,8 @@ static var WIND_SND_FOREST := 0.6    # o kolik hlasitěji šumí vítr v lese (k
 ## chovalo jako dřív (≈1,0); v soumraku a v noci násobič roste, ať je scéna čitelná (Purkyně).
 static var EXPOSURE_MID_EV := 15.5
 static var EXPOSURE_DARK_GAIN := 0.07
-static var EXPOSURE_MAX_MULT := 3.2
+static var EXPOSURE_MAX_MULT := 3.8
+static var EXPOSURE_NIGHT_BOOST := 0.8   # 11/2026: v noci (EV100 −2 → −8) oko ještě přidá – obrysy domů a cesty čitelné
 static var ADAPT_RATE_LIGHT := 10.0  # EV/s – adaptace do světla rychlá (~2 s na typický skok)
 static var ADAPT_RATE_DARK := 1.0    # EV/s – adaptace do tmy pomalá (~20 s)
 static var INDOOR_REF_LUX := 150.0   # hrubý odhad osvětlení uvnitř budovy (umělé světlo) – jen pro skok expozice při vstupu/výstupu
@@ -63,8 +65,9 @@ static var FOG_SKY_MAX := 0.9
 static var AERIAL_LOW := 0.5         # vzdušná perspektiva u země
 static var AERIAL_HIGH := 0.85       # … ve výšce
 static var EXPOSURE_OVERCAST := 0.08 # zatažená obloha přidá expozici (×)
+static var EXPOSURE_SNOW := 0.2      # sníh na zemi přidá (oko se přizpůsobí jasné krajině, sníh je bílý, ne šedý)
 static var PURKINJE_EV := 8.0        # Purkyňův posun: plná desaturace při EV100 −hodnota
-static var PURKINJE_SAT := 0.35      # … sytost barev v hluboké tmě
+static var PURKINJE_SAT := 0.55      # … sytost barev v hluboké tmě
 static var LEGACY_EXPOSURE_NIGHT := 1.7  # stará obloha (realismus „sky“ vypnut): expozice v noci
 static var LEGACY_EXPOSURE_OVERCAST := 0.12
 static var TREE_FAR_HIGH := 2.6      # ve výšce vidět stromy dál (×)
@@ -79,11 +82,22 @@ static var CLOUD_SUN_K := 0.11       # světlo slunce na mraky (× jas slunce)
 static var CLOUD_AMB_K := 0.85       # světlo oblohy na mraky
 static var GROUND_ALBEDO := Vector3(0.12, 0.13, 0.09)   # průměr krajiny pod obzorem (odrazy, světlo zdola)
 static var GROUND_SUN_K := 0.12      # … podíl přímého slunce
-static var NIGHT_SKY := Vector3(0.0028, 0.0042, 0.0095)   # vzdušné světélkování + hvězdné pozadí
+static var GROUND_ALBEDO_SNOW := Vector3(0.6, 0.63, 0.68)   # … pod sněhem (světlo od sněhu zdola na zdi)
+## 11/2026: zataženo – světlo prošlé souvislou oblačností je po mnohonásobném rozptylu skoro neutrální a lehce chladné
+## (~7000 K), ne oranžové jako přímé nízké slunce (dřív béžová mlha a „béžový“ sníh v zimě)
+static var OVERCAST_NEUTRAL := 0.92
+static var OVERCAST_TINT := Vector3(0.93, 0.98, 1.07)
+static var NIGHT_SKY := Vector3(0.0038, 0.0058, 0.0128)   # vzdušné světélkování + hvězdné pozadí (11/2026 ×1,35 – noc čitelná)
+static var NIGHT_HORIZON := 2.4      # … u obzoru jasnější (silnější vrstva vzduchu) – obloha nad siluetou terénu
 static var MOON_SKY := 0.012         # měsícem nasvícená obloha při úplňku
 static var CLOUD_SHADOW_MIN := 0.12  # přímé slunce za mrakem (podíl) – když mrak zakryje slunce, ztmavne krajina
 static var FOG_SUN_SCATTER := 0.12   # mlha prosvícená sluncem (záře ve směru slunce)
-static var AMBIENT_NIGHT_SKY := 4.5  # světlo prostředí v noci u fyzikální oblohy (oko vidí víc, než unese expozice)
+static var AMBIENT_NIGHT_SKY := 12.0 # světlo prostředí v noci u fyzikální oblohy (oko vidí víc, než unese expozice)
+## 11/2026: noční podlaha světla prostředí – modrošedá barva (vzdušné světélkování, hvězdy, rozptýlené světlo obce),
+## přimíchaná k okolnímu světlu z cubemapy oblohy (ta je v noci na čitelné obrysy domů a cest moc slabá); jen v noci
+## (slunce pod −6° → naplno pod −12°), soumrak se nemění; × `ambient_light_energy` (AMBIENT_NIGHT_SKY)
+static var AMBIENT_NIGHT_COLOR := Vector3(0.0005, 0.0007, 0.0011)
+static var AMBIENT_NIGHT_MIX := 0.6
 static var AMBIENT_TWILIGHT := 1.8   # … v soumraku (slunce 0° až −8°: krajina ještě čitelná, ne černá)
 static var SKY_LIGHT_HZ := 4.0       # jak často přepočítat barvy oblohy pro skript (slunce se hýbe pomalu)
 static var GRASS_SNOW_DIM := 0.3     # sníh ubírá zeleň trávy (shader grass_green)
@@ -714,6 +728,8 @@ func update(delta: float) -> void:
 		var clear_lux := SkyModel.sun_illuminance_lux(elev, 0.0, haze)
 		var direct := lerpf(1.0, CLOUD_SHADOW_MIN, smoothstep(0.05, 0.7, _sun_occl))
 		var sc := _sun_col / maxf(maxf(_sun_col.x, _sun_col.y), maxf(_sun_col.z, 1e-4))
+		sc = sc.lerp(OVERCAST_TINT / OVERCAST_TINT.z, smoothstep(0.72, 0.97, cloud) * OVERCAST_NEUTRAL)   # zataženo: rozptýlené, ne oranžové
+		sc /= maxf(maxf(sc.x, sc.y), maxf(sc.z, 1e-4))
 		sun.light_color = Color(sc.x, sc.y, sc.z)
 		sun.light_energy = SUN_ENERGY * clampf(clear_lux / SkyModel.SUN_LUX_ZENITH, 0.0, 1.0) * direct * sun_up
 		moon.light_energy = MOON_ENERGY * clampf(moon_lux / SkyModel.MOON_LUX_FULL, 0.0, 1.0) * moon_up * (1.0 - day) * (1.0 - overcast * MOON_OVERCAST_DIM)
@@ -743,7 +759,9 @@ func update(delta: float) -> void:
 		smoothstep(-12.0, -5.0, elev)) * lerpf(1.0, 1.0 / AMBIENT_TWILIGHT, smoothstep(0.0, 8.0, elev))
 	env.ambient_light_energy = (lerpf(amb_night, 1.0, day) * (1.0 - dark * AMBIENT_DARK_DIM) * lerpf(1.0, AMBIENT_INDOOR, _indoor_s)
 		+ _flash * FLASH_AMBIENT * (1.0 - _indoor_s))
-	env.ambient_light_sky_contribution = 1.0
+	var nmix := AMBIENT_NIGHT_MIX * smoothstep(-6.0, -12.0, elev) if sky_on else 0.0
+	env.ambient_light_sky_contribution = 1.0 - nmix
+	env.ambient_light_color = Color(AMBIENT_NIGHT_COLOR.x, AMBIENT_NIGHT_COLOR.y, AMBIENT_NIGHT_COLOR.z)
 	if sky_on:
 		# mlha má barvu oblohy u obzoru (vzdušná perspektiva) a ve směru slunce se prosvítí
 		var m := maxf(maxf(_horizon.x, _horizon.y), maxf(_horizon.z, 1e-5))
@@ -762,7 +780,8 @@ func update(delta: float) -> void:
 	if cam != null:
 		var ground := terrain.height_at(cam.global_position.x, cam.global_position.z) if terrain else 0.0
 		high = smoothstep(HIGH_FROM_M, HIGH_TO_M, cam.global_position.y - ground)
-	env.fog_density = (FOG_BASE + FOG_MIST * fog * fog + FOG_RAIN * rain) * (1.0 - FOG_HIGH_THIN * high)
+	var precip_fog := (FOG_SNOW if weather != null and weather.is_snowing() else FOG_RAIN) * rain
+	env.fog_density = (FOG_BASE + FOG_MIST * fog * fog + precip_fog) * (1.0 - FOG_HIGH_THIN * high)
 	env.fog_sky_affect = clampf(fog * FOG_SKY_FOG + rain * FOG_SKY_RAIN + high * FOG_SKY_HIGH, 0.0, FOG_SKY_MAX)
 	env.fog_aerial_perspective = lerpf(AERIAL_LOW, AERIAL_HIGH, high) * (1.0 - fog)
 	_micro_fx_update(cam, delta)          # M8.9: údolní mlha (výšková) a rosa / jinovatka podle World.micro
@@ -776,8 +795,10 @@ func update(delta: float) -> void:
 	if sky_on:
 		# M8.5: expozice z vyhlazené EV100 (SkyModel) – kalibrováno, ať je jasné poledne ≈ jako dřív (1,0),
 		# v soumraku a v noci násobič roste (oko se roztáhne), ať zůstane scéna čitelná (Purkyně).
-		var exp_mult := 1.0 + EXPOSURE_DARK_GAIN * maxf(EXPOSURE_MID_EV - exposure_ev, 0.0)
-		env.tonemap_exposure = clampf(exp_mult, 1.0, EXPOSURE_MAX_MULT) * (1.0 + overcast * EXPOSURE_OVERCAST)
+		var exp_mult := 1.0 + EXPOSURE_DARK_GAIN * maxf(EXPOSURE_MID_EV - exposure_ev, 0.0) \
+			+ EXPOSURE_NIGHT_BOOST * smoothstep(-2.0, -8.0, exposure_ev)
+		env.tonemap_exposure = clampf(exp_mult, 1.0, EXPOSURE_MAX_MULT) * (1.0 + overcast * EXPOSURE_OVERCAST) \
+			* (1.0 + EXPOSURE_SNOW * clampf(weather.snow_cover if weather else 0.0, 0.0, 1.0) * day)
 		# Purkyňův posun: pod cca 1 lx ztrácí oko barvocit (tyčinkové vidění) – postupná desaturace do ~8 EV tmy
 		var purkinje := clampf(-exposure_ev / PURKINJE_EV, 0.0, 1.0)
 		env.adjustment_saturation = base_sat * lerpf(1.0, PURKINJE_SAT, purkinje)
@@ -785,6 +806,8 @@ func update(delta: float) -> void:
 		env.tonemap_exposure = lerpf(LEGACY_EXPOSURE_NIGHT, 1.0, day) * (1.0 + overcast * LEGACY_EXPOSURE_OVERCAST)
 		env.adjustment_saturation = base_sat
 	MapLoader.set_tree_far_mult(lerpf(1.0, TREE_FAR_HIGH, high))      # M6.2: ve výšce vidět stromy dál
+	if OS.get_environment("SC_ATM_DBG") != "" and fmod(_t, 2.0) < delta:   # DBG-P1
+		print("ATMDBG elev=%.1f ev=%.2f exp=%.2f amb=%.2f fogd=%.5f fogcol=%s fogE=%.3f sky_aff=%.2f aer=%.2f hgt_d=%.4f hz=%s sat=%.2f lp=%.2f lamps=%s cloud=%.2f rain=%.2f fog=%.2f snow=%s" % [elev, exposure_ev, env.tonemap_exposure, env.ambient_light_energy, env.fog_density, env.fog_light_color, env.fog_light_energy, env.fog_sky_affect, env.fog_aerial_perspective, env.fog_height_density, _horizon, env.adjustment_saturation, _lp, str(get_parent().get("street_lights").lamp_count if get_parent().get("street_lights") else -1), cloud, rain, fog, str(weather.is_snowing() if weather else false)])   # DBG-P1
 
 	# --- srážky kolem kamery
 	var snowing := weather != null and weather.is_snowing()
@@ -885,16 +908,20 @@ func _sky_light(sd: Vector3, md: Vector3, elev: float, haze: float, cloud: float
 	var avg_h := (hs + ha + h90 * 2.0) * 0.25 * wb
 	var side_h := (ha + h90 * 2.0) / 3.0 * wb           # obzor mimo slunce – barva mlhy (záři ke slunci dodá fog_sun_scatter)
 	var zen_w := zen * wb
-	var amb := (zen_w * 0.5 + avg_h * 0.5) * (e * CLOUD_AMB_K) + NIGHT_SKY * 2.0 + moon_tint * 1.2
+	var amb := (zen_w * 0.5 + avg_h * 0.5) * (e * CLOUD_AMB_K)
+	amb = amb.lerp(OVERCAST_TINT * SkyModel.luminance(amb), ov * OVERCAST_NEUTRAL) + NIGHT_SKY * 2.0 + moon_tint * 1.2
 	var csun := ts_c * (e * CLOUD_SUN_K)
+	csun = csun.lerp(OVERCAST_TINT * SkyModel.luminance(csun), ov * OVERCAST_NEUTRAL)   # souvislá vrstva: neutrální šedá
 	# obzor: jasná obloha, při zatažení šedá vrstva (stejně jako shader), noc a měsíc
-	_horizon = side_h * e + NIGHT_SKY * 2.5 + moon_tint * 1.5
+	_horizon = side_h * e + NIGHT_SKY * (1.0 + NIGHT_HORIZON) + moon_tint * 1.5
 	var sl := SkyModel.luminance(csun)
 	var st := (csun * 0.4 + Vector3.ONE * sl * 0.6) * 0.2 * 0.75 + amb * 0.38
 	st *= 1.0 - dark * 0.55
 	_horizon = _horizon.lerp(st, ov)
 	var sun_k := maxf(sd.y, 0.0) * GROUND_SUN_K * (1.0 - ov * 0.9)
-	var ground := GROUND_ALBEDO * (_sun_col * (e * sun_k) + (zen_w + avg_h) * (0.5 * e) * (1.0 - ov * 0.5) + st * ov) \
+	var snow := weather.snow_cover if weather else 0.0
+	var galb := GROUND_ALBEDO.lerp(GROUND_ALBEDO_SNOW, clampf(snow, 0.0, 1.0))
+	var ground := galb * (_sun_col * (e * sun_k) + (zen_w + avg_h) * (0.5 * e) * (1.0 - ov * 0.5) + st * ov) \
 		+ NIGHT_SKY * 0.6
 	_cloud_thr = cloud_threshold(clampf(cloud, 0.0, 1.0))
 	var m := sky_mat
@@ -910,6 +937,7 @@ func _sky_light(sd: Vector3, md: Vector3, elev: float, haze: float, cloud: float
 	m.set_shader_parameter("horizon_col", _horizon)
 	m.set_shader_parameter("ground_col", ground)
 	m.set_shader_parameter("night_col", NIGHT_SKY)
+	m.set_shader_parameter("night_horizon", NIGHT_HORIZON)
 	m.set_shader_parameter("moon_e", moon_e)
 	m.set_shader_parameter("cloud_thr", _cloud_thr)
 

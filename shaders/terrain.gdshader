@@ -26,7 +26,8 @@ uniform float skirt_depth = 4.0;
 uniform vec3 lod_cam = vec3(0.0, -100000.0, 0.0);
 uniform float chunk_size = 256.0;
 // pole a louky podle kalendáře (Fields: data/landuse.bin, tabulka barev plodin field_lut se přepočítává denně)
-uniform sampler2D landuse_tex : filter_nearest, repeat_disable;   // R = třída plochy, G = číslo pole
+uniform sampler2D landuse_tex : filter_nearest, repeat_disable;   // R = třída plochy, G = číslo pole (+ B, A viz field_geo)
+uniform bool field_geo = false;   // landuse_tex má i geometrii polí (Terrain._field_geo): B = směr řádků 0..π, A = vzdálenost od okraje (¼ m)
 uniform sampler2D field_lut : filter_nearest, repeat_disable;     // 256×2: barva + síla, rýhy + směr
 uniform vec4 landuse_rect = vec4(0.0);   // x0, z0, šířka, výška (m); šířka 0 = vypnuto
 uniform float meadow_bloom = 0.0;        // květy na loukách 0..1 (Seasons.bloom)
@@ -52,6 +53,9 @@ global uniform float grass_green;  // svěžest trávy 0..1 (zima / sucho → hn
 global uniform float micro_dew;    // M8.9: rosa na trávě 0..1 (Microclimate → MicroFx)
 global uniform float micro_frost;  // M8.9: 1 = rosa na dně údolí je zmrzlá (jinovatka)
 global uniform float micro_frost_y; // M8.9: svět Y, pod kterým je zem zmrzlá
+global uniform sampler2D wind_gust;  // pole nárazů větru (WindField) – Vysoká+: vlnění klasů na polích
+global uniform vec2 wind_offset;
+global uniform float wind_speed;
 #include "res://shaders/include/ground_veg.gdshaderinc"   // M8.14: pěšiny (path_tex) – prošlapaná hlína
 #include "res://shaders/include/terrain_surface.gdshaderinc"   // procedurální povrch tříd (sdílí surroundings)
 // M8.13: koleje a stopy v blátě (RutMap) – hloubka v m, okno 3 × 3 dlaždic kolem hráče jako kruhový buffer
@@ -63,7 +67,8 @@ uniform float rut_normal = 0.6;       // posun normál (svahy koleje)
 uniform float rut_puddle = 1.0;       // louže v hlubších kolejích za mokra
 uniform float rut_vis = 120.0;        // do jaké vzdálenosti od kamery (m)
 uniform vec2 north_xz = vec2(-0.98, -0.20);   // světový směr severu (z map.json north_angle; pro sněhové jazyky)
-// pobřežní pás (Terrain._compute_shore): vzdálenost od vodní čáry potoků a rybníků v bodech mřížky DMR, R8 = (m + 2) / 5;
+// pobřežní pás (Terrain._compute_shore): vzdálenost od vodní čáry potoků a rybníků v bodech mřížky DMR, R = (m + 2) / 5,
+// G = hloubka vody nad terénem (m + 1) / 3 (dno jen pod hladinou – ne na terénu, který z vody vyčnívá);
 // jen dlaždice 32 × 32 bodů s vodou v atlasu (okraj 1 px), shore_idx = dlaždice → místo v atlasu (255 = bez vody)
 uniform sampler2D shore_atlas : hint_default_white, filter_linear, repeat_disable;
 uniform sampler2D shore_idx : hint_default_white, filter_nearest, repeat_disable;
@@ -163,40 +168,92 @@ vec2 track_detail(vec2 p, float jit) {
 	return vec2(rut, mid) * conf;
 }
 
-// Pole podle plodiny (LUT) – realističtěji: řádky setí 12,5 cm, kolejové řádky po 18 m, na zralém / strništi pruhy
-// po kombajnu, orba = brázdy ~0,36 m s hroudami a pruhy záběrů pluhu. Všechny pruhy se antialiasují podle `fwa`
-// (m na pixel napříč řádky) – zdálky splynou do průměru místo moaré. `hgt` += reliéf pro normálu.
-vec3 field_color(int lid, vec4 lut, vec4 fur, TsSig s, vec2 p, vec2 fw, vec3 soil_proc, inout float hgt) {
-	bool dirx = fur.g > 0.5;
-	float across = dirx ? p.x : p.y;
-	float fwa = max(dirx ? fw.x : fw.y, 1e-4);
-	float ph = fract(float(lid) * 0.618034);
-	vec3 cc = lut.rgb * (0.88 + 0.24 * s.n0.r) * (0.92 + 0.16 * s.n1.r) * (0.94 + 0.12 * s.nm.g);
+// Pole podle plodiny (LUT) a geometrie parcely: `fang` = směr řádků (hlavní osa parcely), `fdist` = vzdálenost od okraje
+// pole (m), `fwd` = její změna na pixel, `fgeo` = 1 když geometrie je (jinak bez souvratě, směr z hashe čísla pole).
+// - řádky setí 12,5 cm podél osy parcely, kolejové řádky (dvě stopy 0,45 m, rozchod 1,8 m) po TW = 18 / 21 / 24 m podle pole;
+// - souvrať (pás šířky TW podél okraje): řádky, brázdy i kolejový řádek (TW/2 od okraje) kopírují okraj, porost hustší;
+// - u meze řidší porost s plevelem a prosvítající hlínou (přechod do okolní trávy);
+// - barevné vlny: pruhy rozmetadla po TW/2, vláhové skvrny (sušší místa do žluta, vlhčí sytější), polehlé obilí
+//   (světlé lesklé skvrny ve vzrostlém porostu), zblízka klasy a mezery v porostu; Vysoká+ vlnění klasů ve větru;
+// - zralé obilí / strniště: pruhy po kombajnu, orba: brázdy s hroudami a pruhy záběrů pluhu.
+// Pruhy se antialiasují podle šířky pixelu napříč (m) – zdálky splynou do průměru místo moaré. `hgt` += reliéf pro normálu.
+vec3 field_color(int lid, vec4 lut, vec4 fur, TsSig s, vec2 p, vec2 pdx, vec2 pdy, float fang, float fdist, float fwd,
+		float fgeo, bool hq, vec3 soil_proc, inout float hgt, inout float frough) {
+	float h1 = fract(float(lid) * 0.618034);
+	float h2 = fract(float(lid) * 0.414214 + 0.37);
+	float h3 = fract(float(lid) * 0.302775 + 0.11);
+	vec2 nd = vec2(-sin(fang), cos(fang));                 // napříč řádky
+	float tw = 18.0 + 3.0 * floor(h2 * 2.999);             // záběr postřikovače 18 / 21 / 24 m
+	// souvrať: v pásu podél okraje se jezdí rovnoběžně s okrajem → souřadnice napříč = vzdálenost od okraje
+	float head = (1.0 - step(tw, fdist + (s.n1.g - 0.5) * 1.2)) * fgeo;
+	float a_main = dot(p, nd) + (s.n2.r - 0.5) * 0.8;      // řádky nejsou jako podle pravítka
+	float fwa_main = abs(dot(pdx, nd)) + abs(dot(pdy, nd));
+	float across = mix(a_main, fdist, head);
+	float fwa = max(mix(fwa_main, fwd, head), 1e-4);
+	float ph = mix(h1, 0.0, head);                         // kolejový řádek souvratě uprostřed pásu
 	float green = clamp((lut.g - max(lut.r, lut.b)) * 8.0, 0.0, 1.0);    // roste (zelená plodina)
 	float bare = clamp(fur.r * 1.3, 0.0, 1.0);                            // zoráno / podmítnuto (jako vegetation.gdshader)
 	float grow = 1.0 - bare;
+	float llum = dot(lut.rgb, vec3(0.3, 0.5, 0.2));
+	float tall = grow * smoothstep(0.12, 0.24, llum);                     // vzrostlý porost (klasy, zrání)
+	vec3 cc = lut.rgb * (0.94 + 0.12 * s.n0.r) * (0.94 + 0.12 * s.n1.r) * (0.94 + 0.12 * s.nm.g);
 	vec3 soilc = ts_s2l(vec3(0.36, 0.28, 0.20)) * (0.85 + 0.3 * s.n0.r);
+	// vláhové rozdíly (skvrny ~20–60 m, makro): vlhčí sytější a tmavší, sušší (písčité hřbítky) světlejší do žluta
+	float moist = s.n2.r * 0.6 + s.nm.r * 0.4 + (s.n1.g - 0.5) * 0.25;
+	float wetp = smoothstep(0.52, 0.72, moist);
+	float dryp = smoothstep(0.42, 0.24, moist);
+	cc *= mix(vec3(1.0), vec3(0.84, 0.93, 0.80), wetp * grow);
+	cc = mix(cc, cc * vec3(1.16, 1.07, 0.74) + vec3(0.012, 0.009, 0.0), dryp * grow * mix(0.4, 0.7, 1.0 - green));
+	// pruhy rozmetadla / překryvy postřiku po TW/2 (z dronu jemné rovnoběžné pásy), zdálky splynou
+	float bfa = clamp(1.0 - fwa / (tw * 0.12), 0.0, 1.0);
+	cc *= 1.0 + 0.045 * cos(6.2832 * (across / (tw * 0.5) + ph * 2.0)) * bfa * grow;
+	// souvrať hustší a sytější (dvojí setí a hnojení), zraje později
+	cc = mix(cc, cc * vec3(0.9, 0.97, 0.86), head * grow * (0.45 + 0.3 * green));
+	// porost zblízka: klasy / listy na světle, mezery a stín mezi rostlinami (jemný šum; zdálky průměr)
+	float ear = smoothstep(0.62, 0.9, s.nf.g);
+	float gap = smoothstep(0.7, 0.95, s.nf.b) * (0.6 + 0.4 * s.nf.r);
+	cc *= mix(1.0, (0.86 + 0.28 * s.nf.r) * (1.0 + 0.18 * ear) * (1.0 - 0.3 * gap), grow);
+	cc = mix(cc, vec3(dot(cc, vec3(0.3, 0.5, 0.2))), 0.1 * grow) * mix(1.0, 0.93, grow);
 	// řádky setí (12,5 cm) – mezi řádky stín a hlína
 	float raa = clamp(1.0 - fwa / 0.125 * 1.6, 0.0, 1.0);
 	float row = (0.5 + 0.5 * cos(6.2832 * across / 0.125)) * raa;
 	cc = mix(cc, mix(soilc, cc * 0.7, 0.5), row * grow * 0.3 * green);
-	// porost: stín mezi rostlinami – o něco tmavší a méně sytý než samotná barva plodiny
-	cc = mix(cc, vec3(dot(cc, vec3(0.3, 0.5, 0.2))), 0.15 * grow) * mix(1.0, 0.9, grow);
-	// kolejové řádky (dvě stopy 1,8 m od sebe, 0,45 m široké, po 18 m) – zdálky průměrné pokrytí
-	float tq = abs(fract(across / 18.0 + ph) - 0.5) * 18.0;
-	float aw = max(fwa * 0.7, 0.01);
-	float lane = 1.0 - smoothstep(0.22 - aw, 0.22 + aw, abs(tq - 0.9));
-	lane = mix(lane, 0.05, smoothstep(0.2, 0.6, fwa));
-	cc = mix(cc, mix(soilc, cc * 0.75, 0.35 + 0.4 * (1.0 - green)), lane * grow * 0.8);
+	// polehlé obilí: na části polí světlé lesklé skvrny (stébla leží, odrážejí), s tmavším lemem
+	float lodg = smoothstep(0.66, 0.73, s.n2.g + (s.n1.r - 0.5) * 0.35 + (s.n0.g - 0.5) * 0.08) * tall * step(h3, 0.45);
+	float lrim = smoothstep(0.6, 0.66, s.n2.g + (s.n1.r - 0.5) * 0.35 + (s.n0.g - 0.5) * 0.08) * tall * step(h3, 0.45) - lodg;
+	cc *= 1.0 - 0.1 * lrim;
+	cc = mix(cc, cc * vec3(1.22, 1.2, 1.05) + vec3(0.02, 0.018, 0.008), lodg * 0.75);
+	frough = mix(frough, 0.8, lodg);
+	// kolejové řádky: dvě stopy 1,8 m od sebe, 0,45 m široké; místy zarostlé; okolní porost lehce stíní
+	float tq = abs(fract(across / tw + ph) - 0.5) * tw;    // vzdálenost od osy kolejového řádku (m)
+	float aw = max(fwa * 0.7, 0.02);
+	float dtr = abs(tq - 0.9);
+	float lane = 1.0 - smoothstep(0.22 - aw, 0.22 + aw, dtr);
+	float flank = (1.0 - smoothstep(0.5 - aw, 0.5 + aw, dtr)) - lane;
+	float lfar = smoothstep(0.3, 0.9, fwa);
+	lane = mix(lane, 0.9 / tw, lfar);
+	flank = mix(flank, 0.56 / tw, lfar);
+	float worn = 0.65 + 0.35 * smoothstep(0.3, 0.7, s.n1.g + (s.n0.r - 0.5) * 0.3);
+	cc *= 1.0 - 0.1 * flank * grow;
+	cc = mix(cc, mix(soilc, cc * 0.72, 0.3 + 0.45 * (1.0 - green)) * (0.9 + 0.2 * s.nf.r), lane * grow * 0.85 * worn);
+	// u meze: řidší porost, plevel a prosvítající hlína (plynulý přechod do okolní trávy)
+	float marg = (1.0 - smoothstep(0.0, 2.6, fdist + (s.n0.r - 0.5) * 1.2 + (s.nf.g - 0.5) * 0.4)) * fgeo;
+	vec3 weed = mix(ts_s2l(vec3(0.46, 0.42, 0.26)), ts_s2l(vec3(0.27, 0.37, 0.14)), grass_green) * (0.85 + 0.3 * s.nf.r);
+	cc = mix(cc, mix(weed, soilc, 0.35 * step(0.55, s.n0.a)), marg * grow * 0.55);
+	// Vysoká+: vlnění klasů ve větru – pole nárazů (stejné jako tráva a obilí) zesvětlí ohnuté klasy
+	if (hq) {
+		float gst = textureLod(wind_gust, fract((p - wind_offset) / 1024.0), 0.0).r;
+		float wk = clamp(wind_speed / 7.0, 0.0, 1.0) * tall * (1.0 - lodg);
+		cc *= 1.0 + (gst - 0.5) * 0.22 * wk;
+	}
 	// zralé obilí / strniště: pruhy po záběrech kombajnu (~6 m) a hlína mezi stébly
-	float ripe = (1.0 - green) * grow * smoothstep(0.08, 0.2, dot(lut.rgb, vec3(0.3, 0.5, 0.2)));
+	float ripe = (1.0 - green) * grow * smoothstep(0.08, 0.2, llum);
 	float swq = abs(fract(across / 6.1 + ph * 3.0) - 0.5);
 	float swath = (1.0 - smoothstep(0.17, 0.25, swq)) * clamp(1.0 - fwa / 6.1 * 3.0, 0.0, 1.0);
 	cc *= 1.0 + ripe * (swath - 0.25) * 0.12;
 	cc = mix(cc, soilc, ripe * smoothstep(0.6, 0.85, s.nf.r) * 0.25);
 	// orba: procedurální hlína (hroudy, kamínky) v odstínu plodiny z LUT, brázdy ~0,36 m (nepravidelné – fáze
-	// i hloubka se mění šumem), pruhy záběrů pluhu (1,4 m)
-	float llum = dot(lut.rgb, vec3(0.3, 0.5, 0.2));
+	// i hloubka se mění šumem), pruhy záběrů pluhu (1,4 m); souvrať orána podél okraje
 	vec3 tilled = soil_proc * (llum / 0.068) * 0.95;                   // 0,068 = průměrný jas ts_soil
 	cc = mix(cc, tilled, 0.65 * bare);
 	float faa = clamp(1.0 - fwa / 0.36 * 1.5, 0.0, 1.0);
@@ -205,7 +262,9 @@ vec3 field_color(int lid, vec4 lut, vec4 fur, TsSig s, vec2 p, vec2 fw, vec3 soi
 	float clod = 1.0 - smoothstep(0.05, 0.75, s.n0.b);
 	cc *= 1.0 - bare * (0.17 * (1.0 - furw) * faa + 0.08 * (1.0 - clod));
 	cc *= 1.0 + bare * 0.07 * sin(6.2832 * across / 1.4 + ph * 6.0) * clamp(1.0 - fwa / 1.4 * 1.5, 0.0, 1.0);
-	hgt += bare * (furw * 0.035 * faa + clod * 0.02) + grow * row * 0.008 - lane * grow * 0.02;
+	cc *= 1.0 - bare * head * 0.05;                                     // souvrať víc ujetá
+	hgt += bare * (furw * 0.035 * faa + clod * 0.02) + grow * (row * 0.008 + s.nf.r * 0.012 * (1.0 - lodg))
+		- lane * grow * 0.03;
 	return cc;
 }
 
@@ -275,7 +334,6 @@ void fragment() {
 	vec2 pdy = dFdy(wpos.xz);
 	vec3 wdx = dFdx(wpos);
 	vec3 wdy = dFdy(wpos);
-	vec2 fw = abs(pdx) + abs(pdy);
 	// --- šum (jeden RGBA vzorek = 4 hodnoty): 4 měřítka + jemné zblízka; průměr šumu = nejmenší mip
 	TsSig s;
 	s.n0 = texture(detail_noise, wpos.xz * 0.23);
@@ -309,6 +367,8 @@ void fragment() {
 	vec2 warp = (s.n1.gr - 0.5) * 9.0;
 	int lcls = 0;
 	int lid = 0;
+	float fang = 0.0;      // směr řádků pole (rad)
+	float fdist = 100.0;   // vzdálenost od okraje pole (m)
 	if (landuse_rect.z > 0.0) {
 		// 4 sousední buňky, hranice = vrstevnice bilineární váhy (ne schody rastru 4 m)
 		ivec2 lsz = textureSize(landuse_tex, 0);
@@ -318,9 +378,13 @@ void fragment() {
 			vec2 lf = fract(lg);
 			ivec2 lv[4];
 			float lw[4];
+			float lgd[4];
+			float lga[4];
 			for (int k = 0; k < 4; k++) {
-				vec2 lu = texelFetch(landuse_tex, l0 + ivec2(k & 1, k >> 1), 0).rg * 255.0;
-				lv[k] = ivec2(lu + 0.5);
+				vec4 lu = texelFetch(landuse_tex, l0 + ivec2(k & 1, k >> 1), 0) * 255.0;
+				lv[k] = ivec2(lu.rg + 0.5);
+				lga[k] = lu.b;
+				lgd[k] = lu.a;
 			}
 			lw[0] = (1.0 - lf.x) * (1.0 - lf.y);
 			lw[1] = lf.x * (1.0 - lf.y);
@@ -344,8 +408,23 @@ void fragment() {
 			int lsel = (lsame + (s.n0.r - 0.5) * 0.25 >= 0.5) ? la : lb;
 			lcls = lv[lsel].x;
 			lid = lv[lsel].y;
+			if (lcls == 1) {
+				// geometrie pole (týž texelFetch): vzdálenost od okraje bilineárně přes buňky téhož pole, cizí buňky
+				// = −půl buňky → na hranici (přepnutí lsel) vychází ~0; bez geometrie směr z hashe čísla pole
+				if (field_geo) {
+					float hc = landuse_rect.z / float(lsz.x) * 0.5;
+					fdist = 0.0;
+					for (int k = 0; k < 4; k++) {
+						fdist += lw[k] * (lv[k] == lv[lsel] ? lgd[k] * 0.25 : -hc);
+					}
+					fang = (lga[lsel] + 0.5) / 256.0 * 3.14159;
+				} else {
+					fang = fract(float(lid) * 0.7548777) * 3.14159;
+				}
+			}
 		}
 	}
+	float fwd = fwidth(fdist);   // mimo větvení (derivace)
 	vec3 col;
 	float greenish = 0.0;           // podíl zelené plochy (sezónní hnědnutí, květy na loukách)
 	float field_keep = 1.0;   // kolik z pole se smí projevit (les, dvůr, břeh a cesta ho zakrývají)
@@ -416,7 +495,9 @@ void fragment() {
 				for (int k = 0; k < 4; k++) {
 					if (c[k] == cb) wb += wt[k];
 				}
-				tb = smoothstep(0.3, 0.7, wb / max(wa + wb, 0.0001) + (d1 - 0.5) * 0.4 + (s.nf.g - 0.5) * 0.25 * ffade);
+				// břeh ↔ tráva měkce (pás břehu je úzký a šum by z něj jinak dělal ostře ohraničené skvrny)
+				float tsoft = (ca == 5 || cb == 5) ? 0.25 : 0.0;
+				tb = smoothstep(0.3 - tsoft, 0.7 + tsoft, wb / max(wa + wb, 0.0001) + (d1 - 0.5) * 0.4 + (s.nf.g - 0.5) * 0.25 * ffade);
 			} else {
 				cb = ca;
 			}
@@ -505,10 +586,12 @@ void fragment() {
 		float fk = lut.a * field_keep;
 		float fh = 0.0;
 		float hs;
-		vec3 cc = field_color(lid, lut, fur, s, wpos.xz, fw, ts_soil(s, hs), fh);
+		float frg = 0.93;
+		vec3 cc = field_color(lid, lut, fur, s, wpos.xz, pdx, pdy, fang, fdist, fwd, field_geo ? 1.0 : 0.0, hq,
+			ts_soil(s, hs), fh, frg);
 		col = mix(col, cc, fk);
 		hgt = mix(hgt, fh, fk);
-		rough = mix(rough, 0.93, fk);
+		rough = mix(rough, frg, fk);
 		puddle_ok = mix(puddle_ok, clamp(fur.r * 1.3, 0.0, 1.0) * 0.6, fk);   // holá oranice drží louže v brázdách
 	} else if (lcls >= 2) {
 		// louky, sady a zahrádky: v době květu drobné bílé, žluté a fialové kvítky (buňky jemného šumu);
@@ -519,8 +602,9 @@ void fragment() {
 		fc = mix(fc, vec3(0.5, 0.25, 0.6), step(0.75, s.n0.a));
 		col = mix(col, fc, spots * 0.7);
 	}
-	// --- pobřežní pás u potoků a rybníků (od Střední, do ~130 / 260 m): dno pod hladinou tmavé bahno se štěrkem,
-	// u vodní čáry pruh mokrého bahna (roztřepený šumem, místy vyšlapaný), nad ním bujná vlhká tráva / ostřice
+	// --- pobřežní pás u potoků a rybníků (od Střední, do ~130 / 260 m): dno jen pod hladinou (hloubka z atlasu) –
+	// písek a jemné bahno s nepravidelnými oblázky ve shlucích, pod vodou utlumené; u vodní čáry pruh mokrého bahna
+	// (roztřepený šumem, místy vyšlapaný), nad ním bujná vlhká tráva / ostřice
 	float bed = 0.0;
 	if (shore_ntiles.x > 0.0 && gfx_quality > 0.5) {
 		float shore_vis = hq ? 260.0 : 130.0;
@@ -530,23 +614,41 @@ void fragment() {
 			vec2 sti = texelFetch(shore_idx, ivec2(stl), 0).rg * 255.0;
 			if (sti.x < 254.5) {
 				vec2 spx = sti * 34.0 + 1.5 + (sg - stl * 32.0);
-				float shs = textureLod(shore_atlas, spx / vec2(textureSize(shore_atlas, 0)), 0.0).r * 5.0 - 2.0;
+				vec2 shv = textureLod(shore_atlas, spx / vec2(textureSize(shore_atlas, 0)), 0.0).rg;
+				float shs = shv.r * 5.0 - 2.0;      // vzdálenost od vodní čáry (m, ve vodě záporná)
+				float sdep = shv.g * 3.0 - 1.0;     // hloubka vody nad terénem (m)
 				float shf = 1.0 - smoothstep(shore_vis * 0.6, shore_vis, dist);
 				if (shs < 2.95 && shf > 0.0) {
 					float sj = shs + (s.n0.r - 0.5) * 0.6 + (s.nf.g - 0.5) * 0.3 - smoothstep(0.74, 0.9, s.n1.g) * 0.7;
-					bed = smoothstep(0.05, -0.3, sj) * shf;
-					float mud = smoothstep(0.85, 0.3, sj) * shf - bed;
+					bed = smoothstep(0.0, 0.1, sdep) * smoothstep(0.35, 0.0, shs + (s.n0.r - 0.5) * 0.2) * shf;
+					float mud = clamp(smoothstep(0.85, 0.3, sj) * shf - bed, 0.0, 1.0);
 					float lush = smoothstep(2.7, 1.1, sj) * shf * (1.0 - mud - bed);
 					// bujná tráva / ostřice: sytější a tmavší, v sezóně svěží (hnědne s grass_green v ts_macro barvě)
-					col = mix(col, col * vec3(0.74, 0.90, 0.64), lush * greenish);
+					col = mix(col, col * vec3(0.8, 0.92, 0.72), lush * greenish);
 					vec3 mudc = ts_s2l(vec3(0.31, 0.26, 0.19)) * (0.8 + 0.4 * s.n0.r) * (0.88 + 0.24 * s.nf.r);
-					mudc = mix(mudc, ts_s2l(vec3(0.42, 0.40, 0.35)) * (0.8 + 0.4 * s.nf.a),
-						smoothstep(0.3, 0.2, s.n0.b) * step(0.8, s.n0.a) * 0.8);            // oblázky
-					vec3 bedc = mix(ts_s2l(vec3(0.22, 0.19, 0.14)), ts_s2l(vec3(0.40, 0.37, 0.31)),
-						smoothstep(0.35, 0.15, s.n0.b) * (0.4 + 0.6 * s.n0.a)) * (0.85 + 0.3 * s.nf.r);   // štěrk dna
+					mudc = mix(mudc, ts_s2l(vec3(0.40, 0.38, 0.33)) * (0.85 + 0.3 * s.nf.a),
+						smoothstep(0.24, 0.16, s.n0.b) * step(0.85, s.n0.a) * 0.6);          // ojedinělé oblázky
+					// dno: písek / bahno (skvrny ~3 m), oblázky jen ve shlucích, velikost podle buňky (14 cm buňky, poloměr
+					// 0,1–0,3), obrys rozbitý jemným šumem; vzácně větší kameny (buňky ~1 m) a drobný štěrk v písku
+					vec3 sand = ts_s2l(vec3(0.37, 0.33, 0.25)) * (0.9 + 0.2 * s.nf.r);
+					vec3 silt = ts_s2l(vec3(0.25, 0.22, 0.16)) * (0.9 + 0.2 * s.nf.g);
+					vec3 bedc = mix(silt, sand, smoothstep(0.35, 0.65, s.n1.r + (s.n0.r - 0.5) * 0.35));
+					float clus = smoothstep(0.45, 0.65, s.n1.g + (s.n0.g - 0.5) * 0.4);
+					float prad = mix(0.1, 0.3, s.n0.a * s.n0.a) * clus;
+					float peb = smoothstep(prad, prad - 0.07, s.n0.b + (s.nf.r - 0.5) * 0.14) * step(0.3, s.n0.a + clus * 0.4);
+					float stone = smoothstep(0.2, 0.12, s.n1.b + (s.n0.r - 0.5) * 0.08) * step(0.86, s.n1.a);
+					float grit = smoothstep(0.22, 0.1, s.nf.b) * step(0.55, s.nf.a) * (1.0 - clus);
+					vec3 pebc = ts_s2l(mix(vec3(0.34, 0.33, 0.30), vec3(0.42, 0.36, 0.28), step(0.7, fract(s.n0.a * 7.0))))
+						* (0.8 + 0.35 * fract(s.n0.a * 13.0));
+					bedc = mix(bedc, pebc, max(peb, stone) * 0.6);
+					bedc *= 1.0 + 0.12 * grit;
+					// pod vodou: rozptyl a sediment tlumí kontrast, s hloubkou tmavší a do zelena
+					float uw = smoothstep(0.0, 0.5, sdep);
+					bedc = mix(bedc, mix(silt, sand, 0.45), uw * 0.5) * mix(vec3(1.0), vec3(0.8, 0.86, 0.8), uw);
 					col = mix(col, mudc, mud);
 					col = mix(col, bedc, bed);
-					hgt = mix(hgt, (s.nf.r - 0.5) * 0.012 + (1.0 - s.n0.b) * 0.008, mud + bed);
+					hgt = mix(hgt, (s.nf.r - 0.5) * 0.012 + (1.0 - s.n0.b) * 0.008, mud);
+					hgt = mix(hgt, (s.nf.r - 0.5) * 0.008 + (peb + stone) * 0.02 * (1.0 - uw), bed);
 					rough = mix(rough, 0.86, lush * 0.5);
 					own_wet = max(own_wet, mud * 0.85 + bed + lush * 0.2);
 					greenish *= 1.0 - mud - bed;
@@ -621,8 +723,9 @@ void fragment() {
 	float wet_all = max(wet, own_wet * 0.6 * (1.0 - snow));   // bahno břehu: vlhký lesk, ne zrcadlo
 	col *= 1.0 - (0.18 + 0.24 * porous) * wet;
 	col *= 1.0 - 0.12 * own_wet * (1.0 - wet);       // bahno břehu i za sucha tmavší
-	// sníh: lehce modravý, jemné závěje; Vysoká+: třpyt (drobné lesklé body)
-	vec3 snowc = vec3(0.88, 0.91, 0.96) * (0.92 + 0.08 * d1) * (0.96 + 0.04 * s.n1.r);
+	// sníh: čistě bílý, v závějích a prohlubních jemně modravý (rozptýlené světlo oblohy); Vysoká+: třpyt (drobné lesklé body)
+	float sdrift = smoothstep(0.35, 0.75, s.n1.g + (s.n0.g - 0.5) * 0.3);
+	vec3 snowc = mix(vec3(0.91, 0.93, 0.96), vec3(0.84, 0.88, 0.95), sdrift * 0.6) * (0.95 + 0.05 * d1);
 	col = mix(col, snowc, snow);
 	col = mix(col, vec3(0.80, 0.84, 0.88) * (0.9 + 0.1 * d1), rime * (0.35 + 0.35 * d2));   // M8.9 jinovatka
 	col = mix(col, col * 0.55 + vec3(0.02, 0.025, 0.03), rpud);     // M8.13: voda v koleji
@@ -637,7 +740,7 @@ void fragment() {
 	SPECULAR = mix(mix(mix(0.25, 0.45, max(wet, own_wet * 0.3)), 0.5, snow), 0.5, max(rpud, wpatch));
 	// drobný reliéf → normála (derivace výšky v obrazovce); zdálky slábne (Vysoká+ dosáhne dál)
 	float bfade = 1.0 - smoothstep(hq ? 90.0 : 45.0, hq ? 170.0 : 95.0, dist);
-	float hb2 = mix(hgt, (d1 - 0.5) * 0.01, snow * 0.8) * (1.0 - max(rpud, wpatch));
+	float hb2 = mix(hgt, (d1 - 0.5) * 0.01 + sdrift * 0.03, snow * 0.8) * (1.0 - max(rpud, wpatch));   // sníh: měkké závěje
 	// sklon reliéfu omezený (skok výšky na hranici tříd / polí by jinak dal černé tečkované čáry)
 	float lx = length(wdx) * 0.35;
 	float ly = length(wdy) * 0.35;

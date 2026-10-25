@@ -40,7 +40,8 @@ uniform vec3 cirrus_sun = vec3(1.5);     // … na řasy v 8 km (svítí ještě
 uniform vec3 cloud_amb = vec3(0.4, 0.5, 0.7);  // světlo oblohy na mraky
 uniform vec3 horizon_col = vec3(0.7, 0.75, 0.8); // obloha u obzoru (opar, mlha)
 uniform vec3 ground_col = vec3(0.12);    // jas země pod obzorem (odrazy, světlo zdola v cubemapě)
-uniform vec3 night_col = vec3(0.003, 0.0045, 0.01);  // vzdušné světélkování + hvězdné pozadí
+uniform vec3 night_col = vec3(0.0038, 0.0058, 0.0128);  // vzdušné světélkování + hvězdné pozadí
+uniform float night_horizon = 2.4;      // … u obzoru jasnější (silnější vrstva vzduchu)
 uniform float moon_e = 0.0;              // měsícem nasvícená obloha
 
 // km; Země, horní hranice atmosféry, výška pozorovatele (Morava ~300 m n. m.)
@@ -131,7 +132,7 @@ vec3 sky_base(vec3 d, vec3 sd, int n) {
 	float cm = dot(d, normalize(moon_dir));
 	col += moon_e * (vec3(0.30, 0.42, 0.75) * (0.55 + 0.45 * lo * lo * lo) + vec3(0.9, 0.9, 0.85) * hg(cm, 0.8) * 0.35);
 	// vzdušné světélkování a hvězdné pozadí (u obzoru silnější vrstva)
-	col += night_col * (1.0 + 1.5 * lo * lo * lo * lo);
+	col += night_col * (1.0 + night_horizon * lo * lo * lo * lo);
 	// teplý opar nad obcí (sodíková / LED světla), mraky ho zesílí
 	col += vec3(1.0, 0.6, 0.3) * 0.05 * light_pollution * sky_night * smoothstep(0.45, 0.0, mu) * (1.0 + cloud_cover);
 	return col;

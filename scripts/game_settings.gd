@@ -411,7 +411,7 @@ func _scale_range(n: Node) -> void:
 
 
 ## Jemné barevné ladění (3D LUT 32³ v sRGB, generovaná v kódu – žádný soubor): lehce chladnější hluboké stíny,
-## teplejší světla, mírná S-křivka a o chlup sytější středy (zeleň, cihly) – jako film, ne „Instagram“.
+## o chlup teplejší světla (sníh a mraky zůstanou bílé, ne béžové), mírná S-křivka a o chlup sytější středy (zeleň, cihly) – jako film, ne „Instagram“.
 ## Uplatní se po tonemappingu (Environment.adjustment_color_correction), jen Vysoká / Ultra (`gfx.grade`).
 static var _grade: ImageTexture3D
 static var GRADE_STRENGTH := 1.0
@@ -432,10 +432,10 @@ static func grade_lut() -> ImageTexture3D:
 				var k := GRADE_STRENGTH
 				# S-křivka kolem středu (kontrast ve středních tónech, konce zůstávají)
 				var s := c + (c - Vector3.ONE * 0.5) * (Vector3.ONE - (c - Vector3.ONE * 0.5).abs() * 2.0) * 0.12 * k
-				# rozdělené tónování: stíny do modra, světla do teplé
+				# rozdělené tónování: stíny do modra, světla jen nepatrně do teplé (11/2026: dřív béžový sníh)
 				var sh := 6.75 * l * (1.0 - l) * (1.0 - l)        # vrchol ve třetině jasu, černá zůstane černá
 				var hi := 6.75 * l * l * (1.0 - l)                # vrchol ve dvou třetinách, bílá zůstane bílá
-				s += (Vector3(-0.012, 0.0, 0.022) * sh + Vector3(0.018, 0.008, -0.016) * hi) * k
+				s += (Vector3(-0.012, 0.0, 0.022) * sh + Vector3(0.008, 0.004, -0.006) * hi) * k
 				# o chlup víc sytosti ve středních tónech
 				var l2 := s.x * 0.2126 + s.y * 0.7152 + s.z * 0.0722
 				s = Vector3.ONE * l2 + (s - Vector3.ONE * l2) * (1.0 + 0.06 * k * (1.0 - absf(l2 - 0.5) * 2.0))

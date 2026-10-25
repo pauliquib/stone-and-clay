@@ -29,6 +29,12 @@ const SHORE_MIN := -2.0
 const SHORE_MAX := 3.0
 const SHORE_TILE := 32
 const SHORE_ROW := 64             # dlaždic v řádku atlasu
+## Hloubka vody nad terénem v bodech pobřežního pásu (kanál G atlasu): DEPTH_MIN..DEPTH_MAX m. Dno se v shaderu kreslí
+## jen pod hladinou (výška hladiny z water.json: body toků / level rybníka) – ne na terénu, který z vody vyčnívá.
+const DEPTH_MIN := -1.0
+const DEPTH_MAX := 2.0
+## Geometrie polí (`_field_geo`): jednotka vzdálenosti od okraje pole v kanálu A rastru landuse (m).
+const FIELD_DIST_UNIT := 0.25
 
 var w: int
 var h: int
@@ -44,6 +50,7 @@ var has_ortho := false            # ortofoto (textures/ortho_*.jpg) je k dispozi
 var linked_materials: Array[ShaderMaterial] = []
 var shore_ready := false          # pobřežní pás spočítán (počítá se ve vlákně po build)
 var _shore_task := -1
+var _field_task := -1
 
 static var _noise_cache: Texture2D = null
 
@@ -160,9 +167,149 @@ func build(meta: Dictionary) -> void:
 
 
 ## Pole a louky podle kalendáře (Fields): mapa využití ploch a její obdélník (x0, z0, šířka, výška).
+## Hned se použije rastr RG8 (třída, číslo pole); ve vlákně se k němu dopočítá geometrie polí (`_field_geo`)
+## a textura se nahradí RGBA8 – shader do té doby bere směr řádků z hashe čísla pole (`field_geo` = false).
 func set_landuse(tex: Texture2D, rect: Vector4) -> void:
 	material.set_shader_parameter("landuse_tex", tex)
 	material.set_shader_parameter("landuse_rect", rect)
+	material.set_shader_parameter("field_geo", false)
+	if tex == null or _field_task >= 0:
+		return
+	var img := tex.get_image()
+	if img == null or img.get_format() != Image.FORMAT_RG8 or img.get_width() < 3 or img.get_height() < 3:
+		return
+	_field_task = WorkerThreadPool.add_task(_field_geo_job.bind(img.get_data(), img.get_width(), img.get_height(),
+		rect.z / img.get_width()), false, "Terrain: geometrie polí")
+
+
+func _field_geo_job(d: PackedByteArray, nx: int, nz: int, cell: float) -> void:
+	var img := Image.create_from_data(nx, nz, false, Image.FORMAT_RGBA8, _field_geo(d, nx, nz, cell))
+	call_deferred("_field_geo_done", img)
+
+
+func _field_geo_done(img: Image) -> void:
+	if _field_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_field_task)
+		_field_task = -1
+	if material != null:
+		material.set_shader_parameter("landuse_tex", ImageTexture.create_from_image(img))
+		material.set_shader_parameter("field_geo", true)
+
+
+## Geometrie polí pro shader z rastru landuse (RG8 prokládaně: třída, číslo pole) → RGBA8:
+## R, G beze změny; B = směr řádků setí = hlavní osa souvislé plochy pole (momenty buněk, 0..π → 0..255) – u malých
+## a kulatých parcel směr z hashe čísla pole; A = vzdálenost od okraje pole v FIELD_DIST_UNIT (chamfer 3 × 3,
+## strop 63,75 m) – souvratě, meze a kolejový řádek podél okraje. Shader to čte týmž texelFetch jako třídu (bez čtení navíc).
+## Okraj = buňka pole se sousedem jiné třídy / čísla (vzdálenost středu buňky od hranice = půl buňky).
+## ~5 M buněk ≈ 4–6 s GDScriptu ve vlákně (jednou při startu).
+func _field_geo(d: PackedByteArray, nx: int, nz: int, cell: float) -> PackedByteArray:
+	var n := nx * nz
+	var key := PackedByteArray()   # číslo pole na orné půdě, jinak 0
+	key.resize(n)
+	for k in n:
+		if d[k * 2] == 1:
+			key[k] = d[k * 2 + 1]
+	var so := roundi(cell / FIELD_DIST_UNIT)                 # krok k sousedovi
+	var sd := roundi(cell * 1.41421 / FIELD_DIST_UNIT)       # krok po úhlopříčce
+	var e0 := roundi(cell * 0.5 / FIELD_DIST_UNIT)           # okrajová buňka
+	var ed := roundi(cell * 0.70711 / FIELD_DIST_UNIT)       # roh cizí buňky po úhlopříčce
+	var dist := PackedByteArray()
+	dist.resize(n)
+	# chamfer – dopředný průchod (sousedé vlevo a v řádku nad)
+	for j in nz:
+		var row := j * nx
+		for i in nx:
+			var k := row + i
+			var kk := key[k]
+			if kk == 0:
+				continue
+			if i == 0 or j == 0 or i == nx - 1 or j == nz - 1 \
+					or key[k - 1] != kk or key[k + 1] != kk or key[k - nx] != kk or key[k + nx] != kk:
+				dist[k] = e0
+				continue
+			var v := mini(dist[k - 1], dist[k - nx]) + so
+			v = mini(v, dist[k - nx - 1] + sd if key[k - nx - 1] == kk else ed)
+			v = mini(v, dist[k - nx + 1] + sd if key[k - nx + 1] == kk else ed)
+			dist[k] = mini(v, 255)
+	var out := PackedByteArray()
+	out.resize(n * 4)
+	# souvislé plochy pole (BFS, 4-sousedství): hlavní osa z momentů → kanál B všech buněk plochy
+	var seen := PackedByteArray()
+	seen.resize(n)
+	var q := PackedInt32Array()
+	q.resize(n)
+	for k0 in n:
+		var kk := key[k0]
+		if kk == 0 or seen[k0] != 0:
+			continue
+		seen[k0] = 1
+		q[0] = k0
+		var qh := 0
+		var qt := 1
+		var sx := 0.0
+		var sz := 0.0
+		var sxx := 0.0
+		var szz := 0.0
+		var sxz := 0.0
+		while qh < qt:
+			var k := q[qh]
+			qh += 1
+			var x := k % nx
+			var z := k / nx
+			sx += x
+			sz += z
+			sxx += x * x
+			szz += z * z
+			sxz += x * z
+			if x > 0 and seen[k - 1] == 0 and key[k - 1] == kk:
+				seen[k - 1] = 1
+				q[qt] = k - 1
+				qt += 1
+			if x < nx - 1 and seen[k + 1] == 0 and key[k + 1] == kk:
+				seen[k + 1] = 1
+				q[qt] = k + 1
+				qt += 1
+			if z > 0 and seen[k - nx] == 0 and key[k - nx] == kk:
+				seen[k - nx] = 1
+				q[qt] = k - nx
+				qt += 1
+			if z < nz - 1 and seen[k + nx] == 0 and key[k + nx] == kk:
+				seen[k + nx] = 1
+				q[qt] = k + nx
+				qt += 1
+		var cnt := float(qt)
+		var mx := sx / cnt
+		var mz := sz / cnt
+		var cxx := sxx / cnt - mx * mx
+		var czz := szz / cnt - mz * mz
+		var cxz := sxz / cnt - mx * mz
+		var disc := sqrt(0.25 * (cxx - czz) * (cxx - czz) + cxz * cxz)
+		var l1 := 0.5 * (cxx + czz) + disc
+		var l2 := 0.5 * (cxx + czz) - disc
+		var ang := 0.5 * atan2(2.0 * cxz, cxx - czz)
+		if qt < 40 or l1 < 1.5 * maxf(l2, 0.01):
+			ang = fposmod(sin(kk * 12.9898) * 43758.5453, 1.0) * PI   # kulatá / malá parcela: stabilní směr z čísla pole
+		var b := clampi(int(fposmod(ang, PI) / PI * 256.0), 0, 255)
+		for t in qt:
+			out[q[t] * 4 + 2] = b
+	# chamfer – zpětný průchod (sousedé vpravo a v řádku pod) + zápis R, G, A
+	for j in range(nz - 1, -1, -1):
+		var row := j * nx
+		for i in range(nx - 1, -1, -1):
+			var k := row + i
+			out[k * 4] = d[k * 2]
+			out[k * 4 + 1] = d[k * 2 + 1]
+			var kk := key[k]
+			if kk == 0:
+				continue
+			var v := dist[k]
+			if v > e0:
+				v = mini(v, mini(dist[k + 1], dist[k + nx]) + so)
+				v = mini(v, dist[k + nx + 1] + sd if key[k + nx + 1] == kk else ed)
+				v = mini(v, dist[k + nx - 1] + sd if key[k + nx - 1] == kk else ed)
+				dist[k] = v
+			out[k * 4 + 3] = v
+	return out
 
 
 ## Maska povrchu (SurfaceMap, data/surface.bin) pro shader. Bez ní se třída odvodí z landuse + lesa + sklonu.
@@ -362,10 +509,15 @@ func _exit_tree() -> void:
 	if _shore_task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_shore_task)
 		_shore_task = -1
+	if _field_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_field_task)
+		_field_task = -1
 
 
 ## Vzdálenost od vodní čáry v bodech mřížky: toky = vzdálenost od osy − pološířka druhu (water.json kinds),
-## rybníky = vzdálenost od obrysu, uvnitř záporná. Vrací [atlas R8, tabulka RG8, počet dlaždic] nebo [] bez dat.
+## rybníky = vzdálenost od obrysu, uvnitř záporná. K tomu hloubka vody nad terénem (hladina toku z výšek jeho bodů,
+## rybníka z `level`; nejbližší úsek vyhrává). Vrací [atlas RG8 (R vzdálenost, G hloubka), tabulka RG8, počet dlaždic]
+## nebo [] bez dat.
 func _compute_shore() -> Array:
 	const PATH := "res://data/water.json"
 	if not FileAccess.file_exists(PATH):
@@ -377,24 +529,30 @@ func _compute_shore() -> Array:
 	var full := PackedByteArray()
 	full.resize(w * h)
 	full.fill(255)
+	var dep := PackedByteArray()     # hloubka vody, 0 = DEPTH_MIN (sucho / neznámo)
+	dep.resize(w * h)
 	var ntx := (w + SHORE_TILE - 1) / SHORE_TILE
 	var ntz := (h + SHORE_TILE - 1) / SHORE_TILE
 	var used := PackedByteArray()
 	used.resize(ntx * ntz)
 	used.fill(0)
+	var dsc := 255.0 / (DEPTH_MAX - DEPTH_MIN)
 	for st in data.get("streams", []):
 		var hw := float(kinds.get(String(st.get("kind", "")), {}).get("half_w", 1.5))
 		var pts: Array = st.get("pts", [])
 		for i in pts.size() - 1:
-			_shore_segment(full, used, ntx, Vector2(pts[i][0], pts[i][1]), Vector2(pts[i + 1][0], pts[i + 1][1]), hw)
+			var la := float(pts[i][2]) if pts[i].size() > 2 else NAN
+			var lb := float(pts[i + 1][2]) if pts[i + 1].size() > 2 else la
+			_shore_segment(full, dep, used, ntx, Vector2(pts[i][0], pts[i][1]), Vector2(pts[i + 1][0], pts[i + 1][1]), hw, la, lb)
 	for pd in data.get("ponds", []):
 		var poly := PackedVector2Array()
 		for q in pd.get("poly", []):
 			poly.append(Vector2(q[0], q[1]))
 		if poly.size() < 3:
 			continue
+		var lv := float(pd.get("level", NAN))
 		for i in poly.size():
-			_shore_segment(full, used, ntx, poly[i], poly[(i + 1) % poly.size()], 0.0)
+			_shore_segment(full, dep, used, ntx, poly[i], poly[(i + 1) % poly.size()], 0.0, lv, lv)
 		# vnitřek rybníka: záporná vzdálenost (do SHORE_MIN), ať lineární filtr nevytvoří u dna falešnou vodní čáru
 		var bb := Rect2(poly[0], Vector2.ZERO)
 		for q in poly:
@@ -411,14 +569,20 @@ func _compute_shore() -> Array:
 				var k := gj * w + gi
 				var sv := float(full[k]) / 255.0 * (SHORE_MAX - SHORE_MIN) + SHORE_MIN
 				full[k] = clampi(roundi((-minf(absf(sv), -SHORE_MIN) - SHORE_MIN) / (SHORE_MAX - SHORE_MIN) * 255.0), 0, 255)
+				if not is_nan(lv):
+					dep[k] = clampi(roundi((lv - heights[k] - DEPTH_MIN) * dsc), 0, 255)
 				used[(gj / SHORE_TILE) * ntx + gi / SHORE_TILE] = 1
 	var n := used.count(1)
 	if n == 0:
 		return []
 	var pad := SHORE_TILE + 2
 	var src := Image.create_from_data(w, h, false, Image.FORMAT_R8, full)
-	var atlas := Image.create(SHORE_ROW * pad, ((n + SHORE_ROW - 1) / SHORE_ROW) * pad, false, Image.FORMAT_R8)
+	var srcd := Image.create_from_data(w, h, false, Image.FORMAT_R8, dep)
+	var aw := SHORE_ROW * pad
+	var ah := ((n + SHORE_ROW - 1) / SHORE_ROW) * pad
+	var atlas := Image.create(aw, ah, false, Image.FORMAT_R8)
 	atlas.fill(Color(1, 1, 1))
+	var atlasd := Image.create(aw, ah, false, Image.FORMAT_R8)
 	var idx := PackedByteArray()
 	idx.resize(ntx * ntz * 2)
 	idx.fill(255)
@@ -430,16 +594,29 @@ func _compute_shore() -> Array:
 			var ax := k % SHORE_ROW
 			var ay := k / SHORE_ROW
 			# 34 × 34 bodů včetně okraje (sousední dlaždice nebo 255 = daleko; mimo mřížku blit ořízne)
-			atlas.blit_rect(src, Rect2i(tx * SHORE_TILE - 1, tz * SHORE_TILE - 1, pad, pad), Vector2i(ax * pad, ay * pad))
+			var r := Rect2i(tx * SHORE_TILE - 1, tz * SHORE_TILE - 1, pad, pad)
+			atlas.blit_rect(src, r, Vector2i(ax * pad, ay * pad))
+			atlasd.blit_rect(srcd, r, Vector2i(ax * pad, ay * pad))
 			idx[(tz * ntx + tx) * 2] = ax
 			idx[(tz * ntx + tx) * 2 + 1] = ay
 			k += 1
-	return [atlas, Image.create_from_data(ntx, ntz, false, Image.FORMAT_RG8, idx), Vector2(ntx, ntz)]
+	# prokládání do RG8 (jen velikost atlasu, ne celé mřížky)
+	var ar := atlas.get_data()
+	var ad := atlasd.get_data()
+	var rg := PackedByteArray()
+	rg.resize(ar.size() * 2)
+	for i in ar.size():
+		rg[i * 2] = ar[i]
+		rg[i * 2 + 1] = ad[i]
+	return [Image.create_from_data(aw, ah, false, Image.FORMAT_RG8, rg),
+		Image.create_from_data(ntx, ntz, false, Image.FORMAT_RG8, idx), Vector2(ntx, ntz)]
 
 
 ## Zapíše do `full` vzdálenost od vodní čáry úsečky a–b (osa toku s pološířkou `hw`; obrys rybníka hw = 0),
-## jen body bližší než SHORE_MAX; menší hodnota vyhrává (soutoky, rybník s přítokem).
-func _shore_segment(full: PackedByteArray, used: PackedByteArray, ntx: int, a: Vector2, b: Vector2, hw: float) -> void:
+## jen body bližší než SHORE_MAX; menší hodnota vyhrává (soutoky, rybník s přítokem). Do `dep` zároveň hloubku
+## vody nad terénem v bodě (hladina `la`..`lb` lineárně podél úsečky; NAN = neznámá → beze změny).
+func _shore_segment(full: PackedByteArray, dep: PackedByteArray, used: PackedByteArray, ntx: int, a: Vector2, b: Vector2,
+		hw: float, la: float, lb: float) -> void:
 	var r := hw + SHORE_MAX
 	var i0 := clampi(floori((minf(a.x, b.x) - r - x0) / spacing), 0, w - 1)
 	var i1 := clampi(ceili((maxf(a.x, b.x) + r - x0) / spacing), 0, w - 1)
@@ -448,6 +625,8 @@ func _shore_segment(full: PackedByteArray, used: PackedByteArray, ntx: int, a: V
 	var ab := b - a
 	var l2 := maxf(ab.length_squared(), 1e-6)
 	var sc := 255.0 / (SHORE_MAX - SHORE_MIN)
+	var dsc := 255.0 / (DEPTH_MAX - DEPTH_MIN)
+	var has_lv := not is_nan(la) and not is_nan(lb)
 	for gj in range(j0, j1 + 1):
 		var q := Vector2(0.0, z0 + gj * spacing)
 		var row := gj * w
@@ -461,6 +640,8 @@ func _shore_segment(full: PackedByteArray, used: PackedByteArray, ntx: int, a: V
 			var e := clampi(roundi((d - SHORE_MIN) * sc), 0, 255)
 			if e < full[row + gi]:
 				full[row + gi] = e
+				if has_lv:
+					dep[row + gi] = clampi(roundi((la + (lb - la) * t - heights[row + gi] - DEPTH_MIN) * dsc), 0, 255)
 				used[trow + gi / SHORE_TILE] = 1
 
 
