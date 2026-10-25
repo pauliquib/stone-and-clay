@@ -62,29 +62,32 @@ func setup(world: World, settings: GameSettings) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
 	var placed: Array[Vector2] = []
-	var nodes := graph.nodes_within(centre, Traffic.VILLAGE_R, ROAD_KINDS)
-	for i in nodes:
+	# po celých silnicích z map.json (ujetá délka přes všechny vrcholy): graf silnic je zahuštěný na hrany ≤ 12 m,
+	# takže rozmístění po jednotlivých hranách (dřív) nepostavilo ani jednu lampu
+	for rd in world.meta.get("roads", []):
 		if placed.size() >= MAX_LAMPS:
 			break
-		for j in graph.adj[i]:
-			if not ROAD_KINDS.has(graph.edge(i, j)):
-				continue
-			var a: Vector2 = graph.nodes[i]
-			var b: Vector2 = graph.nodes[j]
+		if not ROAD_KINDS.has(String(rd.get("kind", ""))):
+			continue
+		var pts: Array = rd["pts"]
+		var side := 1.0 if rng.randf() < 0.5 else -1.0
+		var next := 6.0                       # ujetá délka (m), kde stojí další lampa
+		var run := 0.0
+		for k in range(1, pts.size()):
+			var a := Vector2(pts[k - 1][0], pts[k - 1][1])
+			var b := Vector2(pts[k][0], pts[k][1])
 			var len_m := a.distance_to(b)
-			if len_m < 2.0:
+			if len_m < 0.01:
 				continue
 			var dir := (b - a) / len_m
 			var normal := Vector2(-dir.y, dir.x)
-			var side := 1.0 if rng.randf() < 0.5 else -1.0
-			var d := 6.0 if graph.adj[i].size() <= 2 else JUNCTION_GAP
-			while d < len_m - JUNCTION_GAP:
-				var p := a + dir * d + normal * OFFSET * side
-				d += SPACING * rng.randf_range(0.9, 1.15)
+			while next <= run + len_m:
+				var p := a + dir * (next - run) + normal * OFFSET * side
+				next += SPACING * rng.randf_range(0.9, 1.15)
 				side = -side
 				if p.distance_to(centre) > Traffic.VILLAGE_R:
 					continue
-				if _near_junction(graph, p) or world.dist_to_roads(p) < OFFSET - 1.0:
+				if _near_junction(graph, p) or world.dist_to_roads(p) < OFFSET - 1.0 or world._near_building(p, 1.0):
 					continue
 				var too_close := false
 				for q in placed:
@@ -100,6 +103,7 @@ func setup(world: World, settings: GameSettings) -> void:
 				_xz.append(p)
 				if placed.size() >= MAX_LAMPS:
 					break
+			run += len_m
 			if placed.size() >= MAX_LAMPS:
 				break
 	_build_meshes(world)

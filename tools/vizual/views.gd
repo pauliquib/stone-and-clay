@@ -66,7 +66,8 @@ func run(t: SceneTree, w: World, c: LocalClient, out: String, quick: bool) -> Di
 		["zima", "ulice", 11.0, "snih", true],
 	]
 	if quick:
-		plan = plan.filter(func(p): return p[0] in ["ulice", "naves", "dron", "noc"])
+		# soumrak před nocí: skok 11 → 23 h rovnou nechá v radiance mapě denní oblohu (noc pak vyjde moc světlá)
+		plan = plan.filter(func(p): return p[0] in ["ulice", "naves", "dron", "soumrak", "noc"])
 	var views := []
 	for p in plan:
 		var e := await _shoot(p[0], places[p[1]], float(p[2]), String(p[3]), bool(p[4]))
