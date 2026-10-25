@@ -19,9 +19,9 @@ const SHADER_LO := "res://shaders/water.gdshader"
 const SHADER_HQ := "res://shaders/water_hq.gdshader"
 ## Vzhled vody (moravská pahorkatina – hnědozelená, zakalená): [mělká, rozptyl v hloubce, útlum 1/m R, G, B].
 const LOOK := {
-	"stream": [Color(0.31, 0.32, 0.21), Color(0.14, 0.15, 0.08), Vector3(1.2, 0.9, 1.6)],
-	"river": [Color(0.32, 0.33, 0.23), Color(0.13, 0.14, 0.08), Vector3(1.5, 1.1, 2.0)],
-	"pond": [Color(0.27, 0.31, 0.19), Color(0.12, 0.145, 0.075), Vector3(1.8, 1.3, 2.4)],
+	"stream": [Color(0.31, 0.32, 0.21), Color(0.26, 0.25, 0.15), Vector3(1.2, 0.9, 1.6)],
+	"river": [Color(0.32, 0.33, 0.23), Color(0.24, 0.24, 0.14), Vector3(1.5, 1.1, 2.0)],
+	"pond": [Color(0.27, 0.31, 0.19), Color(0.17, 0.19, 0.10), Vector3(1.8, 1.3, 2.4)],
 }
 const LEVEL_STEP := 0.012             # m: výškový posun hladiny toku podle pořadí (překryv úseků → žádný z-fighting)
 const SLOPE_REF := 0.035              # sklon hladiny, při kterém teče proud „normálně“ (násobek 1)

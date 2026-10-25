@@ -175,7 +175,7 @@ void fragment() {
 		slope = wdir * dot(slope, wdir) * 1.25 + wperp * dot(slope, wperp) * 0.6;
 	}
 	// amplituda (RMS sklonu): potok podle rychlosti, rybník hladký za bezvětří
-	float amp = flowing ? (0.026 + 0.032 * min(fs * max(smul, 0.4), 2.0)) * wave_scale
+	float amp = flowing ? (0.02 + 0.026 * min(fs * max(smul, 0.4), 2.0)) * wave_scale
 		: 0.006 + 0.02 * wave_scale * wave_scale;
 #ifdef WATER_HQ
 	if (!flowing) {
