@@ -15,6 +15,16 @@ const VC_SHADER := "res://shaders/vc_model.gdshader"
 const VC_SHADER_2S := "res://shaders/vc_model_2s.gdshader"
 const VC_PAINT := "res://shaders/vc_paint.gdshader"
 const VC_FUR := "res://shaders/vc_fur.gdshader"
+const VC_GLASS := "res://shaders/vc_glass.gdshader"
+
+## Druh materiálu v alfě barvy vrcholu (`tagged`) – vc_model.gdshader podle něj volí drsnost a šum místo odhadu
+## z barvy. Označené barvy se berou jako sRGB (jako v editoru), neoznačené (alfa 1) zůstávají lineární.
+const MAT_SKIN := 0.9
+const MAT_HAIR := 0.8
+const MAT_CLOTH := 0.7
+const MAT_LEATHER := 0.6
+const MAT_GLOSS := 0.5
+const MAT_SRGB := 0.4          # jen barva v sRGB, druh materiálu odhadne shader z barvy
 
 
 ## Sdílený materiál s barvou z vrcholů. Vrací StandardMaterial3D (API pro volající, kteří ho přiřazují přímo),
@@ -73,6 +83,27 @@ static func fur_shader(rough: float, tint: float) -> ShaderMaterial:
 	sm.shader = _shader(VC_FUR)
 	sm.set_shader_parameter("vc_rough", rough)
 	sm.set_shader_parameter("vc_tint", tint)
+	return sm
+
+
+## Barva s druhem materiálu v alfě (MAT_*) – jen pro plochy kreslené vc_model.gdshader (vc_material).
+static func tagged(c: Color, mat: float) -> Color:
+	return Color(c.r, c.g, c.b, mat)
+
+
+## Označí všechny dosud neoznačené barvy (alfa 1) druhem `mat` – např. MAT_SRGB pro celý předmět s barvami v sRGB.
+func tag_all(mat: float) -> void:
+	for i in cols.size():
+		if cols[i].a > 0.99:
+			cols[i].a = mat
+
+
+## Tónované sklo vozidel: tmavé, průhlednost a odraz oblohy podle úhlu pohledu (Fresnel), odlesky nezeslabené
+## průhledností (premultiplied alpha) – vc_glass.gdshader. `tint` = barva skla v sRGB, alfa = krytí při kolmém pohledu.
+static func glass_material(tint := Color(0.03, 0.045, 0.055, 0.86)) -> ShaderMaterial:
+	var sm := ShaderMaterial.new()
+	sm.shader = _shader(VC_GLASS)
+	sm.set_shader_parameter("glass_tint", tint)
 	return sm
 
 

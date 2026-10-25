@@ -215,6 +215,7 @@ static func trash_bin(color: Color) -> ArrayMesh:
 		k.box(Vector3(sx * 0.18, 0.025, 0.25), Vector3(0.08, 0.05, 0.08), dark)
 	k.cylinder(Vector3(0, 0.1, -0.31), 0.012, 0.012, 0.6, Color(0.4, 0.4, 0.42), Vector3(0, 0, PI / 2), 6)
 	k.box(Vector3(0, 0.15, -0.29), Vector3(0.44, 0.1, 0.08), dark)                            # držák osy
+	k.tag_all(MeshKit.MAT_SRGB)              # barvy předmětu zadané v sRGB
 	return k.commit(MeshKit.vc_material(0.6), null, 0.3)
 
 
@@ -243,6 +244,7 @@ static func mailbox() -> ArrayMesh:
 	k.box(Vector3(0, 1.17, 0.091), Vector3(0.16, 0.09, 0.006), Color(0.95, 0.95, 0.92))      # tabulka s výběrem
 	k.sphere(Vector3(0.12, 1.12, 0.092), 0.018, Color(0.15, 0.25, 0.55), Vector3(1, 1, 0.3))   # znak (modrá trubka)
 	k.box(Vector3(0, 1.06, 0.093), Vector3(0.05, 0.03, 0.01), Color(0.6, 0.6, 0.62))         # zámek
+	k.tag_all(MeshKit.MAT_SRGB)              # barvy předmětu zadané v sRGB
 	return k.commit(MeshKit.vc_material(0.45, 0.3), null, 0.25)
 
 
@@ -253,6 +255,7 @@ static func street_lamp() -> ArrayMesh:
 	k.box(Vector3(0, 5.9, 1.0), Vector3(0.22, 0.1, 0.5), Color(0.3, 0.3, 0.32))
 	k.box(Vector3(0, 5.84, 1.0), Vector3(0.18, 0.02, 0.42), Color(1.0, 0.95, 0.8))
 	k.cylinder(Vector3(0, 0.25, 0), 0.11, 0.13, 0.5, Color(0.3, 0.32, 0.33), Vector3.ZERO, 10)   # patka sloupu
+	k.tag_all(MeshKit.MAT_SRGB)              # barvy předmětu zadané v sRGB
 	return k.commit(MeshKit.vc_material(0.5, 0.4), null, 0.4)
 
 
@@ -277,6 +280,7 @@ static func bench() -> ArrayMesh:
 		k.box(Vector3(x, 0.64, 0.03), Vector3(0.05, 0.04, 0.4), iron)                         # područka
 		k.box(Vector3(x, 0.54, 0.2), Vector3(0.04, 0.2, 0.04), iron)
 		k.box(Vector3(x, 0.02, 0.0), Vector3(0.07, 0.04, 0.42), iron)                         # patka
+	k.tag_all(MeshKit.MAT_SRGB)              # barvy předmětu zadané v sRGB
 	return k.commit(MeshKit.vc_material(0.8), null, 0.2)
 
 

@@ -285,8 +285,10 @@ const SPECIES := {
 		"ears": [0.1, 0.04, 0.7],
 		"tail": [0.1, 0.03, 1.0],
 		"leg_r": [0.035, 0.015], "hoof": [0.018, 0.03],
-		"coat": Color(0.88, 0.86, 0.8), "belly_col": Color(0.9, 0.88, 0.83), "dark": Color(0.2, 0.18, 0.16),
-		"nose": Color(0.2, 0.18, 0.16), "inner_ear": Color(0.5, 0.4, 0.35),
+		# vlna není čistě bílá: krémová, k břichu zašedlá; hlava s krátkou srstí světlejší
+		"coat": Color(0.82, 0.79, 0.7), "belly_col": Color(0.7, 0.67, 0.6), "dark": Color(0.2, 0.18, 0.16),
+		"nose": Color(0.2, 0.18, 0.16), "inner_ear": Color(0.5, 0.4, 0.35), "wool": true,
+		"head_col": Color(0.86, 0.83, 0.77),
 		"mass": 65.0,
 		"gaits": {"walk": 0.9, "trot": 2.4, "canter": 4.0, "gallop": 5.5},
 		"accel": 4.5, "brake": 6.5, "turn": 2.8, "lat_acc": 5.5, "jump": 0.5, "max_slope": 35.0,
@@ -296,12 +298,12 @@ const SPECIES := {
 	"krava": {
 		"name": "Kráva domácí",
 		# český strakatý skot: mohutný hranatý trup, silné nohy, bílá hlava, nohy a břicho, červenohnědé skvrny
-		"length": 2.05, "withers": 1.38, "croup": 1.42,
+		"length": 1.92, "withers": 1.38, "croup": 1.42,
 		"chest": [0.4, 0.52], "belly": [0.5, 0.56], "hips": [0.42, 0.46], "belly_drop": 0.1,
-		"neck": [0.5, 0.24, 0.5], "neck_top_r": 0.17,
+		"neck": [0.44, 0.24, 0.5], "neck_top_r": 0.17,
 		"head": [0.5, 0.15, 0.12, 1.1],
 		"ears": [0.2, 0.11, 1.3],
-		"tail": [0.85, 0.03, 1.5], "tail_hair": 0.3,
+		"tail": [0.75, 0.03, 1.5], "tail_hair": 0.3,
 		"leg_r": [0.12, 0.045], "hoof": [0.065, 0.07],
 		"front_seg": [0.48, 0.35, 0.17], "hind_seg": [0.4, 0.4, 0.2],
 		"coat": Color(0.56, 0.3, 0.16), "belly_col": Color(0.92, 0.89, 0.83), "dark": Color(0.85, 0.82, 0.76),

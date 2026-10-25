@@ -175,6 +175,7 @@ static func _build_meshes(spec: Dictionary, g: Dictionary, male: bool, winter: b
 	var stripes: Color = spec["stripes"]
 	var spots: Color = spec.get("spots", Color(-1, 0, 0))     # strakatá srst (skot): bílé skvrny přes základní barvu
 	var spot_seed := float(hash(String(spec["id"])) % 97) * 0.37
+	var wool: bool = spec.get("wool", false)               # vlna (ovce): alfa barvy → kudrnatý šum ve vc_fur
 	for u in us:
 		var st := station(spec, g, u)
 		var ring := PackedVector3Array()
@@ -196,6 +197,8 @@ static func _build_meshes(spec: Dictionary, g: Dictionary, male: bool, winter: b
 					+ 0.3 * sin(u * 17.0 - a * 3.0 + spot_seed * 2.0)
 				if w > 0.3 or sa < -0.45 or u > 0.93:
 					c = spots
+			if wool:
+				c.a = WOOL_A
 			rc.append(c)
 		rings.append(ring)
 		cols.append(rc)
@@ -231,7 +234,8 @@ static func _build_meshes(spec: Dictionary, g: Dictionary, male: bool, winter: b
 	var nl: float = nk[0]
 	var to_z := Transform3D(Basis(Vector3.RIGHT, PI / 2), Vector3.ZERO)
 	k.lathe(PackedVector2Array([Vector2(r0 * 0.3, -r0 * 1.1), Vector2(r0 * 0.95, -r0 * 0.5), Vector2(r0, 0.0),
-		Vector2(lerpf(r0, rt, 0.55), nl * 0.5), Vector2(rt, nl), Vector2(rt * 0.7, nl + rt * 0.5)]), to_z, coat, 14, 0.72, 1.0)
+		Vector2(lerpf(r0, rt, 0.55), nl * 0.5), Vector2(rt, nl), Vector2(rt * 0.7, nl + rt * 0.5)]), to_z,
+		Color(coat, WOOL_A) if wool else coat, 14, 0.72, 1.0)
 	if mane > 0.0 and spec.get("tack", false):
 		var hair: Color = spec.get("hair", dark)
 		for i in 11:
@@ -452,6 +456,10 @@ static func _reins(k: MeshKit, spec: Dictionary, nl: float, rt: float) -> void:
 
 
 # ------------------------------------------------------------------ pomocné
+
+## Alfa barvy vrcholu u vlny (vc_fur.gdshader: < 0,95 = kudrnatá vlna místo chlupů podél těla).
+const WOOL_A := 0.7
+
 
 static func fur_material(tint := 1.0) -> StandardMaterial3D:
 	var key := "fur_%.2f" % tint
