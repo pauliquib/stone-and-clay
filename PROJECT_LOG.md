@@ -3074,3 +3074,18 @@ shadery M8 v `shaders/` se na Mobile přeloží).
   `rendering/driver/threads/thread_model` v `project.godot`.
 - Postavy a auta – sloučení dílů / stíny jen zblízka (viz výš) po dokončení CPU optimalizace.
 - Hustota vegetace (ne jen dosah) by šla řídit `MultiMesh.visible_instance_count` po zamíchání instancí v chunku.
+
+## 2026-10-25 – Rádio: odebrány stanice ČRo, vlastní stanice jen u hráče
+
+### Hotovo (staticky ověřeno čtením kódu)
+- `data/radia.json`: odebráno 5 stanic Českého rozhlasu (názvy + URL streamů). Zůstávají jen 3 smyšlené rockové stanice bez `url`
+  (v rádiu se nezobrazují).
+- `scripts/radio.gd`: načítání stanic přesunuto do `_load_stations(path)`; kromě `res://data/radia.json` se čte i
+  `user://radia.json` – vlastní seznam hráče na jeho počítači (mimo repozitář a build). Stejná URL se nepřidá dvakrát.
+- `README.md` → Právní zásady → Rádio: přepsáno – repozitář reálné stanice neobsahuje; návod, jak si hráč legálně přidá
+  stanici jen pro soukromý poslech (oficiální veřejná URL od provozovatele, podmínky užití, nic neobcházet, nenahrávat,
+  neštreamovat, soubor nesdílet). Navazující úpravy v `docs/SYSTEMS.md`, `docs/VIZE_A_ROADMAPA.md`, `docs/testy_M5.md`.
+
+### Otevřené body
+- Ruční test: bez `user://radia.json` jen vestavěné stanice; s vlastním souborem stanice hraje (checklist `docs/testy_M5.md`).
+- V multiplayeru má každý počítač vlastní seznam – stanice, kterou klient nemá, u něj nehraje (ticho, bez chyby).
