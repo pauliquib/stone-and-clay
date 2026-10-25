@@ -993,6 +993,22 @@ func screenshot() -> void:
 		cam.global_transform = Transform3D(Basis.from_euler(Vector3(-PI / 2, 0, 0)), c + Vector3(0, 400, 0))
 		cam.current = true
 		hud.visible = false
+	elif args.has("cam"):
+		# volná kamera (vizuální kontrola, tools/vizual): --cam=x,y,z (y = výška nad terénem), směr --yaw / --pitch
+		var cv: PackedStringArray = String(args["cam"]).split(",")
+		var cx := float(cv[0])
+		var cz := float(cv[2]) if cv.size() > 2 else 0.0
+		var cam := Camera3D.new()
+		cam.fov = float(args.get("fov", "70"))
+		cam.far = 6000.0
+		add_child(cam)
+		cam.global_position = Vector3(cx, world.terrain.height_at(cx, cz) + float(cv[1]), cz)
+		cam.rotation = Vector3(deg_to_rad(float(args.get("pitch", "-8"))), deg_to_rad(float(args.get("yaw", "0"))), 0.0)
+		cam.current = true
+		hud.visible = false
+		player.visual.visible = false     # hráč stojí u kamery (--pos), ať streamování LOD jede kolem záběru
+	if args.has("nohud"):
+		hud.visible = false
 	await get_tree().create_timer(float(args.get("wait", "4"))).timeout
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(args["shot"])

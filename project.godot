@@ -74,6 +74,11 @@ drone_photo={"deadzone": 0.5, "events": [Object(InputEventKey,"resource_local_to
 
 [shader_globals]
 
+gfx_quality={
+"type": "float",
+"value": 2.0
+}
+
 snow_cover={
 "type": "float",
 "value": 0.0

@@ -290,6 +290,9 @@ func _apply_eco(client: Node) -> void:
 func apply_graphics(client: Node) -> void:
 	_live = self
 	_live_client = weakref(client)
+	# kvalita vzhledu pro shadery (global `gfx_quality` 0–3 = detail přírody): dražší efekty jen od Vysoké (≥ 2),
+	# Nízká a Střední zůstávají na původní ceně
+	RenderingServer.global_shader_parameter_set("gfx_quality", float(clampi(int(gfx.get("eco", 2)), 0, 3)))
 	var vp: Viewport = client.get_viewport()
 	# rozlišení 3D a upscaling (HUD zůstává v plném rozlišení)
 	var sc: float = SCALES[clampi(int(gfx["scale"]), 0, SCALES.size() - 1)]
