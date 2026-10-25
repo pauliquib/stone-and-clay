@@ -1101,6 +1101,9 @@ func _spawn_bots() -> void:
 
 
 ## Fyzikální předměty: u domu míč, bedny, sudy; u silnic v obci popelnice a schránky.
+var _bld_polys: Array[PackedVector2Array] = []   # půdorysy budov pro `_near_building` (načtou se při prvním dotazu)
+
+
 func _spawn_props() -> void:
 	var sp: Dictionary = meta["spawn"]
 	var base := Vector3(float(sp["x"]), 0, float(sp["z"]))
@@ -1138,7 +1141,7 @@ func _spawn_props() -> void:
 		var off := 4.4 if kind in ["tertiary", "secondary"] else 3.6
 		var p := graph.nodes[i] + Vector2(-dir.y, dir.x) * off * side
 		# ne na křižovatce – kolmice od jedné silnice by padla doprostřed druhé
-		var ok := nb.size() <= 2 and dist_to_roads(p) > off - 0.3
+		var ok := nb.size() <= 2 and dist_to_roads(p) > off - 0.3 and not _near_building(p, 0.8)
 		for u in used:
 			if u.distance_to(p) < 18.0:
 				ok = false
@@ -1153,6 +1156,31 @@ func _spawn_props() -> void:
 		root.add_child(pr)
 		if k == "schranka":    # M7.2: roznos letáků kampaně (Campaign.interactables)
 			street_mailboxes.append(Vector3(p.x, y + 0.02, p.y))
+
+
+## Leží bod v půdorysu budovy nebo blíž než `margin` m od její zdi? (data/buildings.json; vizuální validátor
+## našel popelnice uvnitř kůlen a garáží – kolmice od silnice padla do budovy u cesty)
+func _near_building(p: Vector2, margin: float) -> bool:
+	if _bld_polys.is_empty():
+		var d = JSON.parse_string(FileAccess.get_file_as_string(BuildingDetails.DATA_PATH)) \
+			if FileAccess.file_exists(BuildingDetails.DATA_PATH) else null
+		_bld_polys.append(PackedVector2Array())     # i bez dat neprázdné – načte se jen jednou
+		if d is Array:
+			for b in d:
+				var poly := PackedVector2Array()
+				for q in b.get("poly", []):
+					poly.append(Vector2(float(q[0]), float(q[1])))
+				if poly.size() >= 3:
+					_bld_polys.append(poly)
+	for poly in _bld_polys:
+		if poly.size() < 3 or poly[0].distance_to(p) > 120.0:
+			continue
+		if Geometry2D.is_point_in_polygon(p, poly):
+			return true
+		for i in poly.size():
+			if Geometry2D.get_closest_point_to_segment(p, poly[i], poly[(i + 1) % poly.size()]).distance_to(p) < margin:
+				return true
+	return false
 
 
 ## Vzdálenost bodu od nejbližší osy silnice (pro auta) v okolí 40 m.

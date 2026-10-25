@@ -277,8 +277,16 @@ def analyze(path, prof, F, label, prev_path=None, quick=False):
     # izolované extrémní pixely (NaN/inf z renderu)
     med = ndimage.median_filter(Y, size=3)
     diff = np.abs(Y - med)
-    iso_b = (mx < 2 / 255) & (diff > ISO_DIFF)
-    iso_w = (mn > 253 / 255) & (diff > ISO_DIFF)
+    # NaN/inf dá osamělý pixel: žádný z 8 sousedů není extrémní (tahy písma a čáry mřížky v galerii jsou souvislé)
+    ext_b = mx < 2 / 255
+    ext_w = mn > 253 / 255
+    nb_b = ndimage.convolve(ext_b.astype(np.uint8), np.ones((3, 3), np.uint8), mode="constant") - ext_b
+    nb_w = ndimage.convolve(ext_w.astype(np.uint8), np.ones((3, 3), np.uint8), mode="constant") - ext_w
+    # … a v okolí 5×5 není jiný tmavý/světlý pixel (tečky a háčky drobného písma popisků)
+    dark5 = ndimage.convolve((Y < 0.3).astype(np.uint8), np.ones((5, 5), np.uint8), mode="constant")
+    lite5 = ndimage.convolve((Y > 0.8).astype(np.uint8), np.ones((5, 5), np.uint8), mode="constant")
+    iso_b = ext_b & (diff > ISO_DIFF) & (nb_b == 0) & (dark5 <= 1)
+    iso_w = ext_w & (diff > ISO_DIFF) & (nb_w == 0) & (lite5 <= 1)
     mpx = Y.size / 1e6
     m["iso_black_per_mpx"] = float(iso_b.sum() / mpx)
     m["iso_white_per_mpx"] = float(iso_w.sum() / mpx)
