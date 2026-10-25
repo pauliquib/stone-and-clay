@@ -147,7 +147,8 @@ func _scatter(pos: Vector3) -> void:
 
 
 ## Textury louže: albedo – tmavá nepravidelná skvrna s měkkým okrajem (šum),
-## ORM – uprostřed nízká roughness a vysoký metal (odraz oblohy), ke kraji běžný povrch.
+## ORM – uprostřed hladká voda (roughness ~0,03), ke kraji běžný povrch. Metal 0: voda je dielektrikum – kovový
+## odraz by se násobil tmavým albedem a louže by místo oblohy odrážela černou.
 func _make_textures() -> void:
 	var noise := FastNoiseLite.new()
 	noise.seed = 1211
@@ -159,9 +160,9 @@ func _make_textures() -> void:
 			var p := Vector2(float(x), float(y)) / TEX_S * 2.0 - Vector2.ONE
 			var edge := 0.62 + noise.get_noise_2d(float(x), float(y)) * 0.30
 			var a := smoothstep(0.0, 1.0, clampf((edge - p.length()) / 0.28, 0.0, 1.0))
-			alb.set_pixel(x, y, Color(0.04, 0.05, 0.06, a * 0.8))
+			alb.set_pixel(x, y, Color(0.05, 0.047, 0.04, a * 0.8))
 			var t := clampf(p.length() / maxf(edge, 0.05), 0.0, 1.0)
-			orm.set_pixel(x, y, Color(1.0, lerpf(0.05, 1.0, t * t), lerpf(0.9, 0.0, t)))
+			orm.set_pixel(x, y, Color(1.0, lerpf(0.03, 1.0, t * t * t), 0.0))
 	_alb = ImageTexture.create_from_image(alb)
 	_orm = ImageTexture.create_from_image(orm)
 

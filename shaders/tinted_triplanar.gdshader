@@ -2,7 +2,7 @@
 //  • s texturami Poly Haven: triplanární projekce ve světových souřadnicích, jas textury × barva budovy (atribut
 //    'tint' z Blenderu → barva vrcholu), stejně jako v Blender scéně;
 //  • bez textur (čistý checkout – textury nejsou v gitu, ASSETY.md): procedurální materiál podle `mat_kind`
-//    (1 omítka, 2 střecha – pálené tašky / eternit / lepenka, 3 asfalt se záplatami a vyjetými stopami,
+//    (1 omítka v barvě tintu, u tmavých fasád stodol prkna, 2 střecha – pálené tašky / eternit / lepenka, 3 asfalt se záplatami a vyjetými stopami,
 //    4 štěrková cesta) ze sdílené RGBA textury šumů `noise_tex` (ProcTextures) – 2–4 čtení místo 9 u textur.
 // Na obou cestách: sokl, vlhkost a odstřik u paty zdí, šmouhy a stín pod okapem (UV = pata a vrchol sloupce zdi,
 // `wall_cols`), mech na severních stranách střech, krajnice a stopy cest (UV = (s, šířka pásu), `road_uv`;
@@ -52,6 +52,14 @@ vec4 nzs(vec2 uv) {
 	return texture(noise_tex, uv);
 }
 
+// Barva omítky z tintu budovy (lineární): bez olivového nádechu – zelená nejvýš jako červená, modrá pod zelenou
+// (šedozelené tinty pod modrou oblohou působily zašle), mírně ztlumená.
+vec3 plaster_tint(vec3 t) {
+	t.g = min(t.g, t.r * 0.975);
+	t.b = min(t.b, t.g * 0.93);
+	return t * 0.94;
+}
+
 // Bump z výšky (m) přes derivace obrazovky (Mikkelsen 2010) – bez tangent, jen Vysoká+.
 vec3 bump_world(vec3 nw, vec3 pw, float hgt) {
 	vec3 dpx = dFdx(pw);
@@ -96,7 +104,7 @@ void fragment() {
 		float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
 		patchy = lum;
 		c = mix(c, vec3(lum), desaturate) * gain;
-		alb = c * tint;
+		alb = c * (mat_kind == 1 ? plaster_tint(tint) / 0.94 : tint);
 		float r = texture(rough_tex, p.zy).g * bw.x + texture(rough_tex, p.xz).g * bw.y + texture(rough_tex, p.xy).g * bw.z;
 		rough = clamp(r, 0.12, 1.0);
 		vec2 tx = texture(normal_tex, p.zy).xy * 2.0 - 1.0;
@@ -107,18 +115,33 @@ void fragment() {
 			wnz = nzs(wuv * 0.31);
 		}
 	} else if (mat_kind == 1 || mat_kind == 0) {
-		// --- omítka: jemná zrnitost, velké skvrny a zašednutí
+		// --- omítka: barva = tint budovy (lineární albedo světlých omítek ~0,45–0,8), jen jemná zrnitost a skvrny;
+		// tmavé fasády stodol a kůlen (jas tintu < 0,36) jsou svislá prkna
 		wnz = nzs(wuv * 0.31);
 		vec4 nb = nzs(wuv * 0.043 + vec2(0.37, 0.11));
-		float v = (nb.g - 0.5) * 0.2 + (wnz.a - 0.5) * 0.1 + (wnz.r - 0.5) * 0.035;
-		alb = tint * 0.78 * (1.0 + v);
-		alb *= mix(vec3(1.0), vec3(1.035, 1.0, 0.92), nb.a * 0.8);
+		vec3 pt = plaster_tint(tint);
+		float v = (nb.g - 0.5) * 0.08 + (wnz.a - 0.5) * 0.05 + (wnz.r - 0.5) * 0.02;
+		alb = pt * (1.0 + v);
+		alb *= mix(vec3(1.0), vec3(1.02, 1.0, 0.96), nb.a * 0.6);
 		rough = 0.92 - wnz.a * 0.08;
 		patchy = 0.4 + 0.4 * nb.g;
-		if (hq) {
+		if (dot(tint, vec3(0.2126, 0.7152, 0.0722)) < 0.36 && wall_cols) {
+			float bx = wuv.x / 0.16;
+			float bid = floor(bx);
+			float bf = fract(bx);
+			float aa = 1.0 - smoothstep(0.15, 0.5, fwidth(bx));
+			float hb = hash12(vec2(bid, floor(tint.r * 97.0)));
+			float gap = (1.0 - smoothstep(0.0, 0.06, bf)) * aa;
+			vec3 wood = pt * vec3(1.05, 0.96, 0.86) * (0.8 + 0.3 * hb) * (0.9 + 0.2 * wnz.a);
+			alb = mix(alb, wood * (1.0 - 0.6 * gap), aa * 0.9 + 0.1);
+			rough = 0.9;
+			if (hq) {
+				wn = normalize(n - vec3(wdir.x, 0.0, wdir.y) * gap * 0.6 * aa);
+			}
+		} else if (hq) {
 			vec4 nf = nzs(wuv * 2.3 + vec2(0.5));
 			float fade = 1.0 - smoothstep(6.0, 25.0, dist);
-			alb *= 0.96 + 0.08 * nf.a;
+			alb *= 0.97 + 0.06 * nf.a;
 			wn = bump_world(n, wpos, (nf.a + 0.5 * nf.r) * 0.0012 * fade);
 		}
 	} else if (mat_kind == 2) {
@@ -306,16 +329,17 @@ void fragment() {
 		float sk = 1.0 - smoothstep(sokl_h - ew, sokl_h + ew, hg);
 		alb = mix(alb, scol * (0.88 + 0.18 * wnz.a + 0.1 * hash12(floor(wuv * 90.0)) * (1.0 - smoothstep(4.0, 12.0, dist))), sk);   // brizolit
 		rough = mix(rough, 0.95, sk);
-		float damp = (1.0 - smoothstep(0.0, 0.3 + 0.4 * wnz.g, hg - sokl_h)) * (1.0 - sk) * 0.22;
+		float damp = (1.0 - smoothstep(0.0, 0.3 + 0.4 * wnz.g, hg - sokl_h)) * (1.0 - sk) * 0.12;
 		alb *= 1.0 - damp;
-		alb *= mix(vec3(0.7, 0.66, 0.6), vec3(1.0), smoothstep(0.0, 0.3, hg + (wnz.a - 0.5) * 0.12));
+		alb *= mix(vec3(0.8, 0.77, 0.72), vec3(1.0), smoothstep(0.0, 0.3, hg + (wnz.a - 0.5) * 0.12));   // odstřik
 		ao *= mix(0.6, 1.0, smoothstep(-0.05, 0.35, hg));
 		if (!use_tex || hq) {
 			vec4 ns = nzs(vec2(wuv.x * 0.7, wpos.y * 0.025) + vec2(0.29, 0.83));
-			float streak = smoothstep(0.5, 0.82, ns.g) * exp(-max(dtop, 0.0) / 1.8);
-			alb *= 1.0 - 0.28 * streak * vec3(0.9, 1.0, 1.05);
+			// šmouhy jen těsně pod okapem (~do 1 m), ne přes celou zeď
+			float streak = smoothstep(0.58, 0.85, ns.g) * exp(-max(dtop, 0.0) / 0.7);
+			alb *= 1.0 - 0.16 * streak * vec3(0.9, 0.96, 1.0);
 		}
-		alb *= mix(0.86, 1.0, smoothstep(0.0, 0.6, dtop));
+		alb *= mix(0.92, 1.0, smoothstep(0.0, 0.5, dtop));
 		ao *= mix(0.55, 1.0, smoothstep(0.0, 0.7, dtop));
 		under_eave = min(1.0, smoothstep(0.0, 1.2, dtop) * 0.5 + 0.5 * (1.0 - smoothstep(0.0, 0.5, hg)) + 0.5 * smoothstep(1.2, 3.0, dtop));   // pod přesahem sucho
 		wet_rough = 0.5;

@@ -548,7 +548,8 @@ func _glass_quad(tile: Tile, bl: Vector3, tl: Vector3, tr: Vector3, br: Vector3,
 
 ## Dveře / vrata na stěně `e` v poloze `t`. Vrací skutečnou polohu na stěně, nebo −1, když se nevešly.
 ## Dveře nesmí přesáhnout okap (validátor: vrata 2,8 m o 0,32 m nad okapem): nejdřív se zkusí posunout po stěně
-## k nižšímu terénu, pak se sníží (nejvýš na okap − 0,1 m), a pod DOOR_MIN_H se vynechají.
+## k nižšímu terénu; vrata, která se nevejdou, se nahradí dveřmi; dveře se sníží (nejvýš na okap − 0,1 m) a pod
+## DOOR_MIN_H se vynechají.
 func _emit_door(tiles: Dictionary, b: Dictionary, e: Dictionary, t: float, kind: String, rule: Dictionary,
 		look: Dictionary) -> float:
 	var op: Vector2 = e["o"]
@@ -586,10 +587,14 @@ func _emit_door(tiles: Dictionary, b: Dictionary, e: Dictionary, t: float, kind:
 					best_t = tt
 			if best_d < INF:
 				t = best_t
+			elif kind == "gate":
+				# vrata se v plné výšce nevejdou nikam na stěnu (nízká stavba na svahu) – snížená vrata by
+				# nesla rozměr z RULES jen naoko (validátor, Estate); místo nich obyčejné dveře
+				return _emit_door(tiles, b, e, t, "door", rule, look)
 			else:
 				t = low_t
 				h = room - low_g
-				if h < (DOOR_MIN_H if kind == "door" else 1.9):
+				if h < DOOR_MIN_H:
 					return -1.0
 			p2 = op + up_ * t
 			gy = _terrain.height_at(p2.x, p2.y)

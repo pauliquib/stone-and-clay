@@ -16,12 +16,15 @@ const KIND_GRAVEL := 4
 ## Drapování silnic na terén (load_chunks): hrana se půlí, když terén v její polovině uhne od přímky o víc než
 ## DRAPE_TOL (a hrana je delší než DRAPE_MIN_EDGE), nebo je delší než DRAPE_LONG. Rozhoduje se jen podle hrany →
 ## sousední trojúhelníky ji rozdělí stejně (žádné T-spoje ani škvíry). Mřížka terénu je 2 m.
-const DRAPE_TOL := 0.04
-const DRAPE_MIN_EDGE := 0.6
+const DRAPE_TOL := 0.03
+const DRAPE_MIN_EDGE := 0.45
 const DRAPE_LONG := 8.0
 ## Zdvih pásu silnice o šířku × DRAPE_W_LIFT: na křižovatkách se pásy překrývají – širší silnice leží o pár mm výš,
 ## krajnice vedlejší pod ní zmizí a koplanární plochy neblikají.
 const DRAPE_W_LIFT := 0.003
+## Posun výšky drapování podle druhu povrchu (přičte se k `drape_h` z World): štěrková cesta leží v terénu níž, asfalt
+## o kus výš – kde štěrk najíždí na asfalt, je pod ním aspoň ~4 cm (dřív 1 cm → z-fighting) a štěrk nevisí nad trávou.
+const DRAPE_KIND_OFFSET := {KIND_ASPHALT: 0.01, KIND_GRAVEL: -0.02}
 
 ## Prototypy stromů (Mesh s materiály, pořadí jako v tree_protos.bin) po `build_trees`; pro zasazené stromy (M2.5). Prázdné = zatím nenačteno.
 static var shared_protos: Array = []
@@ -173,6 +176,8 @@ static func load_chunks(path: String, mat: Material, drape: Terrain = null, drap
 		off += n * 36
 		jobs.append(job)
 	var field: DrapeField = DrapeField.new(drape) if drape else null
+	if field != null:
+		drape_h += float(DRAPE_KIND_OFFSET.get(kind, 0.0))
 	var work := func(i: int) -> void:
 		var job: Dictionary = jobs[i]
 		if field != null:
@@ -448,12 +453,23 @@ static func _drape_chunk(job: Dictionary, f: DrapeField, drape_h: float) -> void
 				if fz[e] < 0.5 and l2 > min2:
 					hm = f.at((e0.x + e1.x) * 0.5, (e0.z + e1.z) * 0.5)
 					need = l2 > long2 or absf(hm - (e0.y + e1.y) * 0.5) > tol
+					if not need and l2 > 4.0 * min2:
+						# delší hrana přes víc buněk mřížky: odchylka nemusí být největší uprostřed – i čtvrtiny
+						# (symetricky – soused na stejné hraně rozhodne stejně)
+						var q1 := e0 * 0.75 + e1 * 0.25
+						var q3 := e0 * 0.25 + e1 * 0.75
+						need = absf(f.at(q1.x, q1.z) - q1.y) > tol or absf(f.at(q3.x, q3.z) - q3.y) > tol
 				any = any or need
 				if l2 > ll:
 					ll = l2
 					longest = e
 					need_l = need
 					hm_l = hm
+			if not any and ll > min2 and guard <= 4000:
+				# hrany sedí, ale terén se může vyboulit uvnitř trojúhelníku (prorůstání asfaltem) – těžiště;
+				# rozpůlí se nejdelší hrana (v přímce, když sama dělení nepotřebuje)
+				var ct := (a + b + c) / 3.0
+				any = absf(f.at(ct.x, ct.z) - ct.y) > tol
 			if not any or guard > 4000:
 				for j in 3:
 					var q: Vector3 = a if j == 0 else (b if j == 1 else c)

@@ -348,7 +348,7 @@ func _apply_fade(typ: int) -> void:
 var _shadow_q := -1.0
 
 func _update_shadows() -> void:
-	var q := float(RenderingServer.global_shader_parameter_get("gfx_quality"))
+	var q := GameSettings.gfx_quality
 	if is_equal_approx(q, _shadow_q):
 		return
 	_shadow_q = q

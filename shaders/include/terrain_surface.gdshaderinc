@@ -75,13 +75,16 @@ vec3 ts_yard(TsSig s, out float ts_h) {
 	return c;
 }
 
-// břeh: mokré bahno (lesk) a trsy ostřic / rákosu (v zimě suché); `ts_own_wet` = vlastní vlhkost, `ts_veg` = podíl porostu
+// břeh (pás podél vody v masce): hlavně ostřice a vlhká bujná tráva (v zimě suchá), jen místy vyšlapané bahno.
+// Pruh mokrého bahna přímo u vodní čáry kreslí terrain.gdshader z pobřežního pásu (Terrain._compute_shore).
+// `ts_own_wet` = vlastní vlhkost, `ts_veg` = podíl porostu
 vec3 ts_bank(TsSig s, float ts_dry_season, out float ts_h, out float ts_own_wet, out float ts_veg) {
-	vec3 mud = ts_s2l(vec3(0.28, 0.22, 0.15)) * (0.8 + 0.4 * s.n0.r) * (0.9 + 0.2 * s.nf.r);
-	float ts_sed = smoothstep(0.42, 0.62, s.n1.g + (s.n0.r - 0.5) * 0.35);
-	vec3 sc = mix(ts_s2l(vec3(0.26, 0.33, 0.13)), ts_s2l(vec3(0.42, 0.46, 0.21)), smoothstep(0.3, 0.75, s.nf.r));
-	sc = mix(sc, ts_s2l(vec3(0.60, 0.53, 0.34)), clamp(smoothstep(0.65, 0.9, s.nf.a) * 0.6 + ts_dry_season * 0.7, 0.0, 1.0));
-	ts_own_wet = (1.0 - ts_sed) * 0.6;
+	vec3 mud = ts_s2l(vec3(0.31, 0.26, 0.19)) * (0.8 + 0.4 * s.n0.r) * (0.9 + 0.2 * s.nf.r);
+	float ts_sed = 1.0 - smoothstep(0.66, 0.8, s.n1.g + (s.n0.r - 0.5) * 0.3) * 0.85;
+	vec3 sc = mix(ts_s2l(vec3(0.19, 0.28, 0.10)), ts_s2l(vec3(0.36, 0.43, 0.18)), smoothstep(0.3, 0.75, s.nf.r));
+	sc *= 0.85 + 0.3 * s.n0.g;                                                                     // trsy ostřic
+	sc = mix(sc, ts_s2l(vec3(0.58, 0.52, 0.34)), clamp(smoothstep(0.65, 0.9, s.nf.a) * 0.45 + ts_dry_season * 0.7, 0.0, 1.0));
+	ts_own_wet = (1.0 - ts_sed) * 0.6 + 0.1;
 	ts_veg = ts_sed;
 	ts_h = ts_sed * (s.nf.r - 0.5) * 0.03 + (s.n0.r - 0.5) * 0.012;
 	return mix(mud, sc, ts_sed);
@@ -132,7 +135,7 @@ vec3 ts_class(int c, TsSig s, float ts_green, out float ts_h, out float ts_rough
 		ts_rough = 0.88;
 	} else if (c == 5) {
 		col = ts_bank(s, 1.0 - ts_green, ts_h, ts_own_wet, ts_grassy);
-		ts_rough = mix(0.62, 0.88, ts_grassy);
+		ts_rough = mix(0.72, 0.88, ts_grassy);
 	} else if (c == 6) {
 		col = ts_rock(s, ts_h);
 		ts_rough = 0.82;

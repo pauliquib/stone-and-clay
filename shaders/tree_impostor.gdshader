@@ -230,7 +230,7 @@ void fragment() {
 	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
 	ALBEDO = c;
 	ROUGHNESS = 0.8;
-	SPECULAR = 0.3;
+	SPECULAR = leaf ? 0.12 : 0.3;                    // listí jako LOD1 (bez bílého odlesku na hraně)
 	AO = 0.85;                                      // průměrná okluze v koruně (LOD1: z barvy vrcholu)
 	AO_LIGHT_AFFECT = 0.0;
 	if (leaf) {

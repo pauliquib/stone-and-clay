@@ -21,10 +21,12 @@ const SHADER_HQ := "res://shaders/water_hq.gdshader"
 const LOOK := {
 	"stream": [Color(0.31, 0.32, 0.21), Color(0.14, 0.15, 0.08), Vector3(1.2, 0.9, 1.6)],
 	"river": [Color(0.32, 0.33, 0.23), Color(0.13, 0.14, 0.08), Vector3(1.5, 1.1, 2.0)],
-	"pond": [Color(0.27, 0.31, 0.19), Color(0.10, 0.13, 0.07), Vector3(1.8, 1.3, 2.4)],
+	"pond": [Color(0.27, 0.31, 0.19), Color(0.12, 0.145, 0.075), Vector3(1.8, 1.3, 2.4)],
 }
 const LEVEL_STEP := 0.012             # m: výškový posun hladiny toku podle pořadí (překryv úseků → žádný z-fighting)
 const SLOPE_REF := 0.035              # sklon hladiny, při kterém teče proud „normálně“ (násobek 1)
+const END_FADE := 4.0                 # m: volný konec pásu toku (pramen, ústí do jiného toku) dozní a zúží se
+const JOIN_DIST := 1.5                # m: konec u konce jiného úseku = navazující úsek téhož toku (bez doznění)
 ## M8.7: normální průtok (m³/s) bez vodní bilance (fallback `flow_at`) a vizuál hladiny.
 ## M8.D2c: chování = `static var` (F3 → Příroda/Voda a půda), výchozí beze změny.
 static var FLOW_NOMINAL := {"river": 1.2, "canal": 0.3, "stream": 0.03, "ditch": 0.01, "drain": 0.01}
@@ -119,7 +121,7 @@ func build(w: World, t: Terrain) -> void:
 			_stream_mi[si] = mi
 			mi.extra_cull_margin = 0.5          # M8.7: hladina se v shaderu posouvá o ±0,4 m
 			mi.name = "Tok_%d" % si
-			mi.mesh = _ribbon(streams[si], float(si % 4) * LEVEL_STEP)
+			mi.mesh = _ribbon(streams[si], float(si % 4) * LEVEL_STEP, _free_end(si, 0), _free_end(si, -1))
 			mi.material_override = m
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			mi.visibility_range_end = _vis_end(mi.mesh)
@@ -154,6 +156,10 @@ func build(w: World, t: Terrain) -> void:
 		for _i in v.size():
 			tg.append_array([1.0, 0.0, 0.0, 1.0])         # shader: směr „proudu“ (vlnky) = +X
 		arr[Mesh.ARRAY_TANGENT] = tg
+		var cc := PackedColorArray()
+		cc.resize(v.size())
+		cc.fill(Color.WHITE)                              # shader: COLOR.a = doznění okraje (rybník bez)
+		arr[Mesh.ARRAY_COLOR] = cc
 		var am := ArrayMesh.new()
 		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 		var mi := MeshInstance3D.new()
@@ -191,16 +197,15 @@ func _material(ntex: Texture2D, flow: float, look: String) -> ShaderMaterial:
 	return m
 
 
-## Varianta shaderu podle předvolby: od Vysoké (detail přírody „eco“ ≥ 2 = global `gfx_quality`) lom a odraz okolí
-## (screen texture = kopie obrazu za snímek), Nízká / Střední levná hladina bez ní. Čte se z GameSettings –
+## Varianta shaderu podle předvolby: od Vysoké (`GameSettings.gfx_quality` ≥ 2 = global `gfx_quality`) lom a odraz
+## okolí (screen texture = kopie obrazu za snímek), Nízká / Střední levná hladina bez ní. Čte se ze static var –
 ## `global_shader_parameter_get` mimo editor nevrací hodnotu. Než se grafika poprvé použije, platí výchozí Vysoká.
 ## Renderer Mobile (slabá grafika) má vždy levnou variantu – tam je kopie obrazu dražší a jas screen texture
 ## se kvůli jeho uložení barev (luminance multiplier) liší.
 static func _want_hq() -> bool:
 	if _mobile_renderer():
 		return false
-	var gs := GameSettings._live
-	return gs == null or int(gs.gfx.get("eco", 2)) >= 2
+	return GameSettings.gfx_quality > 1.5
 
 
 static func _mobile_renderer() -> bool:
@@ -268,11 +273,28 @@ static func _wave_texture() -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
+## Je konec úseku `si` (`which` 0 = začátek, -1 = konec) volný? Volný = nenavazuje na konec jiného úseku (data toky
+## dělí na kusy) – pramen, ústí do jiného toku nebo konec v poli; tam pás dozní, aby hladina nekončila hranou.
+func _free_end(si: int, which: int) -> bool:
+	var pts: PackedVector3Array = streams[si]["pts"]
+	var e := pts[0] if which == 0 else pts[pts.size() - 1]
+	var e2 := Vector2(e.x, e.z)
+	for c in _cells.get(Vector2i(floori(e.x / CELL), floori(e.z / CELL)), []):
+		if c[0] == si:
+			continue
+		var op: PackedVector3Array = streams[c[0]]["pts"]
+		for q in [op[0], op[op.size() - 1]]:
+			if e2.distance_to(Vector2(q.x, q.z)) < JOIN_DIST:
+				return false
+	return true
+
+
 ## Pás hladiny podél osy: v každém bodě dva vrcholy (vlevo / vpravo) ve výšce hladiny + `y_ofs` (posun podle pořadí
 ## toku: úseky různých toků se na soutocích překrývají – stejná výška by blikala).
 ## UV = metry (po proudu, napříč od osy), UV2 = (polovina šířky, násobek rychlosti proudu ze sklonu hladiny),
-## TANGENT = směr toku (shader: vlnky a pěna tečou po proudu).
-func _ribbon(st: Dictionary, y_ofs := 0.0) -> ArrayMesh:
+## TANGENT = směr toku (shader: vlnky a pěna tečou po proudu), COLOR.a = doznění volného konce (`fade_a`, `fade_b`:
+## začátek / konec pásu volný → alfa a šířka ke konci klesají, END_FADE m, nejvýš třetina délky).
+func _ribbon(st: Dictionary, y_ofs := 0.0, fade_a := false, fade_b := false) -> ArrayMesh:
 	var pts: PackedVector3Array = st["pts"]
 	var hw: float = st["half_w"]
 	var n := pts.size()
@@ -281,9 +303,14 @@ func _ribbon(st: Dictionary, y_ofs := 0.0) -> ArrayMesh:
 	var uv2 := PackedVector2Array()
 	var nn := PackedVector3Array()
 	var tg := PackedFloat32Array()
+	var cc := PackedColorArray()
 	var idx := PackedInt32Array()
 	var along := 0.0
 	var dy := Vector3(0.0, y_ofs, 0.0)
+	var total := 0.0
+	for i in range(1, n):
+		total += Vector2(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z).length()
+	var fl := minf(END_FADE, total / 3.0) if n >= 3 and total >= END_FADE * 1.5 else 0.0   # krátké kusy celé
 	for i in n:
 		var a := pts[maxi(i - 1, 0)]
 		var b := pts[mini(i + 1, n - 1)]
@@ -297,12 +324,22 @@ func _ribbon(st: Dictionary, y_ofs := 0.0) -> ArrayMesh:
 		var run := Vector2(b3.x - a3.x, b3.z - a3.z).length()
 		var slope := maxf(a3.y - b3.y, 0.0) / maxf(run, 0.5)
 		var sm := clampf(0.55 + 0.45 * sqrt(slope / SLOPE_REF), 0.5, 2.2)
+		var fd := 1.0
+		if fade_a and fl > 0.01:
+			fd = minf(fd, along / fl)
+		if fade_b and fl > 0.01:
+			fd = minf(fd, (total - along) / fl)
+		fd = clampf(fd, 0.0, 1.0)
+		side *= lerpf(0.55, 1.0, fd)                # zúžení ke konci (shader bere šířku z UV, okraj zůstane měkký)
+		cc.append(Color(1, 1, 1, fd))
+		cc.append(Color(1, 1, 1, fd))
 		v.append(pts[i] - side + dy)
 		v.append(pts[i] + side + dy)
-		uv.append(Vector2(along, -hw))
-		uv.append(Vector2(along, hw))
-		uv2.append(Vector2(hw, sm))
-		uv2.append(Vector2(hw, sm))
+		var hwi := side.length()
+		uv.append(Vector2(along, -hwi))
+		uv.append(Vector2(along, hwi))
+		uv2.append(Vector2(hwi, sm))
+		uv2.append(Vector2(hwi, sm))
 		nn.append(Vector3.UP)
 		nn.append(Vector3.UP)
 		tg.append_array([tng.x, 0.0, tng.z, 1.0, tng.x, 0.0, tng.z, 1.0])
@@ -316,6 +353,7 @@ func _ribbon(st: Dictionary, y_ofs := 0.0) -> ArrayMesh:
 	arr[Mesh.ARRAY_TEX_UV] = uv
 	arr[Mesh.ARRAY_TEX_UV2] = uv2
 	arr[Mesh.ARRAY_TANGENT] = tg
+	arr[Mesh.ARRAY_COLOR] = cc
 	arr[Mesh.ARRAY_INDEX] = idx
 	var m := ArrayMesh.new()
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)

@@ -6,9 +6,12 @@
 // variantě vůbec není (větvení podle uniformu by kopii nevypnulo).
 //
 // Mesh (Water._ribbon): UV = metry (x po proudu, y napříč od osy), UV2 = (polovina šířky m, násobek rychlosti
-// proudu ze sklonu hladiny), TANGENT = směr toku. Rybník: UV = světové x, z, UV2 = 0, TANGENT = +X.
+// proudu ze sklonu hladiny), TANGENT = směr toku, COLOR.a = doznění volného konce pásu (pramen, soutok).
+// Rybník: UV = světové x, z, UV2 = 0, TANGENT = +X, COLOR = bílá.
 // Odraz oblohy (Fresnel, odlesky slunce) dává engine z radiance oblohy (`reflected_light_source = SKY`) přes SPECULAR
-// a nízkou ROUGHNESS; SSR enginu průhledné plochy nezasahuje, proto odraz okolí počítá HQ varianta sama.
+// a nízkou ROUGHNESS; SSR enginu průhledné plochy nezasahuje, proto odraz okolí počítá HQ varianta sama. Obě varianty
+// tlumí odraz oblohy pod „obzorem“ břehů (okluze obzoru: koryto, olše na březích, linie stromů za rybníkem) a místo
+// něj dají tmavý olivový odraz okolí – HQ jen tam, kde pochod paprskem nic netrefí.
 // M8.7: per-úsek (instance uniform, nastavuje Water z vodní bilance): posun hladiny `level_ofs` (m),
 // kalnost po přívalu `turbid` 0..1 a násobek rychlosti proudu `flow_mult`. Rybníky mají výchozí hodnoty.
 
@@ -36,18 +39,21 @@ instance uniform float flow_mult = 1.0;   // M8.7: × rychlost proudu podle prů
 
 global uniform vec2 wind_dir;        // kam fouká (svět xz) – vlnky na rybníce
 global uniform float wind_speed;
+global uniform vec2 wind_offset;     // m, posun pole nárazů (WindField, modulo 1 024 m) – unáší vlnky na rybníce
 #ifdef WATER_HQ
 global uniform float gfx_quality;
 global uniform sampler2D wind_gust;  // chuchvalce nárazů (WindField) – tmavší zčeřené plochy na rybníce
-global uniform vec2 wind_offset;
 #endif
 
 varying vec3 world_pos;
 varying vec3 v_flow_dir;             // svět: směr toku (u rybníka +X)
 varying vec2 v_info;                 // UV2: polovina šířky toku (0 = rybník), násobek rychlosti ze sklonu
+varying float v_fade;                // COLOR.a: doznění konce pásu toku
 
 const vec3 FOAM_COLOR = vec3(0.70, 0.70, 0.64);   // špinavě bílá pěna
 const float WATER_SPEC = 0.35;                     // F0 ≈ 0,02 (0,16 · 0,35²)
+const vec3 BANK_REFL = vec3(0.050, 0.064, 0.034);  // odraz břehů, rákosu a olší (osvětlí ho slunce jako ALBEDO)
+const float POND_DRIFT = 0.05;                     // vlnky na rybníce: × posun nárazů větru (5 m/s → 0,25 m/s)
 
 void vertex() {
 	VERTEX.y += level_ofs;
@@ -56,16 +62,31 @@ void vertex() {
 	tg.y = 0.0;
 	v_flow_dir = dot(tg, tg) > 1e-6 ? normalize(tg) : vec3(1.0, 0.0, 0.0);
 	v_info = UV2;
+	v_fade = COLOR.a;
 }
 
-// Sklon dvou vrstev vlnek (tečný prostor: x po proudu, y napříč); `wl_ofs` = posun proudem (m).
-// Šum (B) druhé vrstvy → `wl_n` (pěna), první vrstvy → `wl_n1`.
-vec2 water_layers(vec2 wl_p, vec2 wl_ofs, out float wl_n, out float wl_n1) {
-	vec4 a = texture(wave_tex, (wl_p - wl_ofs) * vec2(0.20, 0.30));
-	vec4 b = texture(wave_tex, (wl_p - wl_ofs * 1.25) * vec2(0.55, 0.75) + vec2(0.37, 0.61));
+// Sklon dvou vrstev vlnek (tečný prostor: x po proudu, y napříč); `wl_ofs` = posun proudem (m), `wl_sa`, `wl_sb` =
+// měřítko vrstev (1/m; potok: podél proudu delší čeřiny). Šum (B) druhé vrstvy → `wl_n` (pěna), první → `wl_n1`.
+vec2 water_layers(vec2 wl_p, vec2 wl_ofs, vec2 wl_sa, vec2 wl_sb, out float wl_n, out float wl_n1) {
+	vec4 a = texture(wave_tex, (wl_p - wl_ofs) * wl_sa);
+	vec4 b = texture(wave_tex, (wl_p - wl_ofs * 1.25) * wl_sb + vec2(0.37, 0.61));
 	wl_n = b.b;
 	wl_n1 = a.b;
-	return (a.rg * 2.0 - 1.0) * 3.0 + (b.rg * 2.0 - 1.0) * 1.8;
+	return (a.rg * 2.0 - 1.0) * 2.6 + (b.rg * 2.0 - 1.0) * 1.5;
+}
+
+// Výška „obzoru“ okolí (sinus sklonu) ve směru odraženého paprsku: kde paprsek míří níž, odráží břeh, ne oblohu.
+// Potok v zářezu: napříč korytem blízký břeh vysoko, po proudu dál a níž; u břehu výš (olše nad vodou).
+// Rybník: linie stromů za hladinou – nízká, nepravidelná podle azimutu (jen ALU, žádné čtení textury).
+float water_horizon(vec3 wh_rd, vec3 wh_tan, float wh_edge, bool wh_flow) {
+	vec2 d = normalize(wh_rd.xz + vec2(1e-5));
+	float az = atan(d.y, d.x);
+	float line = 0.5 + 0.22 * sin(az * 3.0 + 1.3) + 0.16 * sin(az * 7.0 + 0.4) + 0.12 * sin(az * 17.0 + 2.1);
+	if (wh_flow) {
+		float across = abs(dot(d, vec2(-wh_tan.z, wh_tan.x)));
+		return mix(0.03, 0.24, across * across) + 0.10 * (1.0 - wh_edge) + 0.06 * line;
+	}
+	return 0.015 + 0.075 * line;
 }
 
 #ifdef WATER_HQ
@@ -108,9 +129,14 @@ void fragment() {
 	float edge = flowing ? clamp(1.0 - abs(p.y) / halfw, 0.0, 1.0) : 1.0;   // 0 u břehu, 1 v ose toku
 	float icy = ice;
 
-	// --- vlnky: proud (podél UV.x) nebo vítr (rybník, UV = svět xz → wind_dir přímo)
-	vec2 wdir = normalize(wind_dir + vec2(0.0001));
-	vec2 vel = flowing ? vec2(fs, 0.0) : wdir * (0.02 + 0.03 * wind_speed);
+	// --- vlnky: potok – čeřiny protažené po proudu, unášené proudem; rybník – drobné vlnky od větru, unášené
+	// posunem nárazů (`wind_offset`, plynulý i při změně rychlosti větru; měřítka 1/6,4 a 1/3,2 m dělí skok
+	// modula 1 024 m · POND_DRIFT beze švu), čeřené kolmo na vítr silněji než podél
+	vec2 wdir = normalize(wind_dir + vec2(0.0001, 0.0));
+	vec2 vel = vec2(fs, 0.0);
+	vec2 pofs = wind_offset * POND_DRIFT;
+	vec2 sc_a = flowing ? vec2(0.11, 0.30) : vec2(0.15625);
+	vec2 sc_b = flowing ? vec2(0.32, 0.70) : vec2(0.3125);
 	float n_foam;
 	float n_big;
 	vec2 slope;
@@ -126,23 +152,31 @@ void fragment() {
 		float fb;
 		float ga;
 		float gb;
-		vec2 s0 = water_layers(p + vec2(0.0, 0.0), vloc * cyc_len * ph0, fa, ga);
-		vec2 s1 = water_layers(p + vec2(1.73, 0.91), vloc * cyc_len * ph1, fb, gb);
+		vec2 s0 = water_layers(p, vloc * cyc_len * ph0, sc_a, sc_b, fa, ga);
+		vec2 s1 = water_layers(p + vec2(1.73, 0.91), vloc * cyc_len * ph1, sc_a, sc_b, fb, gb);
 		slope = (s0 * w0 + s1 * (1.0 - w0)) / sqrt(w0 * w0 + (1.0 - w0) * (1.0 - w0));
 		n_foam = mix(fb, fa, w0);
 		n_big = mix(gb, ga, w0);
+		// jemné čeřiny po proudu (rychlejší než velké vlnky)
+		vec2 det = texture(wave_tex, (p - vel * smul * t * 1.4) * vec2(0.9, 1.6) + vec2(0.13, 0.77)).rg * 2.0 - 1.0;
+		slope += det * 0.8;
 	} else {
-		slope = water_layers(p, vel * t, n_foam, n_big);
+		slope = water_layers(p, pofs, sc_a, sc_b, n_foam, n_big);
+		// jemné vlnky od větru (perioda 0,8 m: 1 024 · 0,05 · 1,5 · 1,25 = 96 period → modulo beze švu)
+		vec2 det = texture(wave_tex, (p - pofs * 1.5) * 1.25 + vec2(0.13, 0.77)).rg * 2.0 - 1.0;
+		slope += det * 1.1 * clamp(wind_speed * 0.25, 0.0, 1.0);
 	}
-	// jemné vlnky (čeří je vítr i proud)
-	vec2 det = texture(wave_tex, (p - vel * t * 1.6) * 1.7 + vec2(0.13, 0.77)).rg * 2.0 - 1.0;
-	slope += det * 1.2 * (0.5 + 0.5 * clamp(wind_speed * 0.2, 0.0, 1.0));
 #else
-	slope = water_layers(p, vel * t, n_foam, n_big);
+	slope = water_layers(p, flowing ? vel * t : pofs, sc_a, sc_b, n_foam, n_big);
 #endif
+	if (!flowing) {
+		// rybník: hřebeny vlnek kolmo na vítr – sklon podél větru silnější
+		vec2 wperp = vec2(-wdir.y, wdir.x);
+		slope = wdir * dot(slope, wdir) * 1.25 + wperp * dot(slope, wperp) * 0.6;
+	}
 	// amplituda (RMS sklonu): potok podle rychlosti, rybník hladký za bezvětří
-	float amp = flowing ? (0.035 + 0.04 * min(fs * max(smul, 0.4), 2.0)) * wave_scale
-		: 0.008 + 0.022 * wave_scale * wave_scale;
+	float amp = flowing ? (0.026 + 0.032 * min(fs * max(smul, 0.4), 2.0)) * wave_scale
+		: 0.006 + 0.02 * wave_scale * wave_scale;
 #ifdef WATER_HQ
 	if (!flowing) {
 		// chuchvalce nárazů větru: tmavší zčeřené plochy, které přebíhají přes rybník
@@ -175,11 +209,12 @@ void fragment() {
 	vec3 vdir = normalize(-VERTEX);
 	float ndv = clamp(dot(vdir, nv), 0.0, 1.0);
 	float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
-	// odraz těsně nad obzorem nevidí oblohu, ale břehy, rákos a stromy (potok v zářezu víc než rybník): engine
-	// odráží jen oblohu, proto tam se SPECULAR ubere a odraz dostane tmavou olivovou barvu břehu (osvětlenou)
+	// okluze obzoru: odraz pod výškou okolí (water_horizon) nevidí oblohu, ale břehy, rákos a stromy – engine odráží
+	// jen oblohu, proto tam se SPECULAR ubere a odraz dostane tmavou olivovou barvu břehu (osvětlenou sluncem)
 	vec3 rd_w = reflect(-normalize(INV_VIEW_MATRIX * vec4(vdir, 0.0)).xyz, nw);
-	float sky_vis = flowing ? smoothstep(0.04, 0.42, rd_w.y) : smoothstep(0.0, 0.16, rd_w.y);
-	vec3 bank_refl = vec3(0.045, 0.06, 0.03) * fres * (1.0 - sky_vis) * 3.0;
+	float hz = water_horizon(rd_w, tan_w, edge, flowing);
+	float sky_vis = smoothstep(hz - 0.04, hz + 0.07, rd_w.y);
+	vec3 bank_refl = BANK_REFL * fres * (1.0 - sky_vis) * 3.0;
 #ifdef WATER_HQ
 	// lom: posun podle odchylky normály od klidné hladiny, menší v mělčině a v dálce; co je před hladinou, se nelomí
 	vec3 flat_v = (VIEW_MATRIX * vec4(up_w, 0.0)).xyz;
@@ -198,8 +233,9 @@ void fragment() {
 	float dv = clamp(world_pos.y - bot_w.y, 0.0, 20.0);
 
 	// --- pěna: u břehu a kamenů (mělko), v peřejích; teče s vodou
-	float shore = 1.0 - smoothstep(0.02, 0.22, dv);
-	float foam = shore * smoothstep(0.35, 0.75, n_foam + shore * 0.35) * (flowing ? 1.0 : 0.35);   // rybník: jen proužek nánosu
+	// (práh hloubky rozkmitaný šumem → nepravidelný lem, ne čára podél vrstevnice dna)
+	float shore = 1.0 - smoothstep(0.02, 0.16 + 0.14 * n_big, dv);
+	float foam = shore * smoothstep(0.4, 0.78, n_foam + shore * 0.3) * (flowing ? 0.85 : 0.3);   // rybník: jen proužek nánosu
 	if (flowing) {
 		foam += smoothstep(0.62, 0.85, n_foam) * smoothstep(1.2, 2.2, smul * fs * 1.6) * 0.6;
 		foam += smoothstep(0.7, 0.9, n_foam) * 0.18 * min(fs, 1.0);
@@ -268,15 +304,20 @@ void fragment() {
 	col = mix(shallow_color, scat, op) + bank_refl;
 	SPECULAR = (WATER_SPEC + 0.1) * mix(0.2, 1.0, sky_vis);   // průhlednost odraz zeslabí – trochu víc lesku
 	alpha = clamp(0.22 + op * 0.75 + fres * 0.6, 0.0, 0.96) * smoothstep(0.0, 0.04, dv);
+	// déšť bez kroužků (levná varianta): hladina zdrsní a ztratí zrcadlový lesk
+	SPECULAR *= 1.0 - rain * 0.3 * (1.0 - icy);
 #endif
 	col = mix(col, FOAM_COLOR, foam);
-	// okraj pásu toku: rozostřený a nepravidelný (kde terén u břehu klesne pod hladinu, nekončí rovnou čarou)
+	// okraj pásu toku: rozostřený a nepravidelný (kde terén u břehu klesne pod hladinu, nekončí rovnou čarou),
+	// volné konce pásu (pramen, ústí do jiného toku) doznívají
 	if (flowing) {
-		alpha *= smoothstep(0.0, 0.14, edge + (n_big - 0.5) * 0.12);
+		float ef = smoothstep(0.0, 0.3, edge + (n_big - 0.5) * 0.22) * smoothstep(0.0, 1.0, v_fade + (n_foam - 0.5) * 0.3);
+		alpha *= ef;
+		foam *= ef;
 	}
 	alpha = max(alpha, foam * smoothstep(0.0, 0.02, dv));
-	// rybník: hladší pruhy („zrcadla“) a zčeřenější plochy střídavě
-	float rough = mix(flowing ? 0.035 : mix(0.02, 0.06, n_big), 0.5, foam);
+	// rybník: hladší pruhy („zrcadla“) a zčeřenější plochy střídavě; déšť zdrsní hladinu
+	float rough = mix(flowing ? 0.035 : mix(0.02, 0.06, n_big), 0.5, foam) + rain * 0.06 * (1.0 - icy);
 
 	// --- led: zamrzá od břehů (potok) a od mělčin (rybník), praskliny, na ledu sníh
 	if (icy > 0.001) {

@@ -33,6 +33,11 @@ const XZ_MAX := 1.25
 const VIGOR_H := Vector2(0.86, 1.04)
 const YOUNG_H_FALLBACK := 9.0         # m – bez tree_eco.bin: nižší strom = „mladý“ model
 const STIFF_CONIFER := 1.3
+## 2026-10: měkčí normály koruny – normála karty listí se při načtení prolne s normálou elipsoidu koruny (ven ze
+## středu obálky listí). Koruna se pak stíní jako celek (světlá strana ke slunci, tmavší spodek), ne po jednotlivých
+## kartách se „zrnitými“ odlesky; obvyklý postup u karet listí. Cena jen při načtení (smyčka přes vrcholy už běží).
+const CROWN_SOFT := 0.6               # listnáč: podíl normály elipsoidu (0 = jen karta)
+const CROWN_SOFT_CONIFER := 0.45      # jehličnan: přesleny mají vlastní tvar, méně
 
 var shapes: Array = []                # {id, conifer, tile, stiff}
 var species_map := {}                 # id druhu → index tvaru
@@ -162,12 +167,18 @@ func _mesh(b: PackedByteArray, off: int, shape: int, conifer: bool, lod: int) ->
 		t.resize(nv)
 		t2.resize(nv)
 		c.resize(nv)
+		var lo := Vector3(INF, INF, INF)
+		var hi := -lo
 		for i in nv:
 			v[i] = Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2])
 			n[i] = Vector3(nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2])
 			t[i] = Vector2(uv[i * 2], uv[i * 2 + 1])
 			t2[i] = Vector2(uv2[i * 2], uv2[i * 2 + 1])
 			c[i] = Color8(col[i * 4], col[i * 4 + 1], col[i * 4 + 2], col[i * 4 + 3])
+			lo = lo.min(v[i])
+			hi = hi.max(v[i])
+		if s == 1:
+			_soften_crown(v, n, lo, hi, CROWN_SOFT_CONIFER if conifer else CROWN_SOFT)
 		var arr := []
 		arr.resize(Mesh.ARRAY_MAX)
 		arr[Mesh.ARRAY_VERTEX] = v
@@ -179,6 +190,20 @@ func _mesh(b: PackedByteArray, off: int, shape: int, conifer: bool, lod: int) ->
 		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 		m.surface_set_material(m.get_surface_count() - 1, material(shape, s == 1, lod))
 	return [m, off]
+
+
+## Normály listí → prolnutí s normálou elipsoidu obálky koruny (střed lehce pod středem obálky – spodek koruny
+## míří víc dolů a je tmavší, vršek ke slunci). Karta otočená proti normále elipsoidu se nejdřív obrátí.
+func _soften_crown(v: PackedVector3Array, n: PackedVector3Array, lo: Vector3, hi: Vector3, k: float) -> void:
+	var ctr := (lo + hi) * 0.5 - Vector3(0.0, (hi.y - lo.y) * 0.08, 0.0)
+	var ext := ((hi - lo) * 0.5).max(Vector3(0.05, 0.05, 0.05))
+	var inv2 := Vector3(1.0 / (ext.x * ext.x), 1.0 / (ext.y * ext.y), 1.0 / (ext.z * ext.z))
+	for i in v.size():
+		var e := ((v[i] - ctr) * inv2).normalized()
+		var nc := n[i]
+		if nc.dot(e) < 0.0:
+			nc = -nc
+		n[i] = nc.lerp(e, k).normalized()
 
 
 func _texture(path: String) -> Texture2D:
@@ -334,7 +359,7 @@ func impostor_material() -> ShaderMaterial:
 
 ## Stín impostorů podle předvolby (volá TreeLodStreamer při kontrole buněk; mění se jen při změně kvality).
 func update_impostor_shadows() -> void:
-	var on := 1 if float(RenderingServer.global_shader_parameter_get("gfx_quality")) > 1.5 else 0
+	var on := 1 if GameSettings.gfx_quality > 1.5 else 0
 	if on == _imp_shadow:
 		return
 	_imp_shadow = on

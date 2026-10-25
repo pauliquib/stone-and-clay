@@ -63,6 +63,11 @@ uniform float rut_normal = 0.6;       // posun normál (svahy koleje)
 uniform float rut_puddle = 1.0;       // louže v hlubších kolejích za mokra
 uniform float rut_vis = 120.0;        // do jaké vzdálenosti od kamery (m)
 uniform vec2 north_xz = vec2(-0.98, -0.20);   // světový směr severu (z map.json north_angle; pro sněhové jazyky)
+// pobřežní pás (Terrain._compute_shore): vzdálenost od vodní čáry potoků a rybníků v bodech mřížky DMR, R8 = (m + 2) / 5;
+// jen dlaždice 32 × 32 bodů s vodou v atlasu (okraj 1 px), shore_idx = dlaždice → místo v atlasu (255 = bez vody)
+uniform sampler2D shore_atlas : filter_linear, repeat_disable;
+uniform sampler2D shore_idx : filter_nearest, repeat_disable;
+uniform vec2 shore_ntiles = vec2(0.0);   // počet dlaždic (x, z); 0 = pás není (chybí water.json / ještě se počítá)
 
 varying vec3 wpos;
 
@@ -213,17 +218,31 @@ vec3 bump_normal(vec3 nrm, vec3 dpdx, vec3 dpdy, float dhx, float dhy) {
 	return normalize(abs(det) * nrm - grad + nrm * 1e-8);
 }
 
+// Prohloubení terénu (≈ laplacián výšky, 1/m): divergence normál ze 4 vzorků normálové mapy ±2 buňky (4 m).
+// n.xz ≈ −grad h, takže prohlubeň (koryto, mísa) má zápornou divergenci. Lineární filtr + mip o 1 hrubší → plynulé,
+// bez schodů mřížky 2 m (dřív texelFetch výšek → hranaté skvrny sněhu). Kladné = prohlubeň, záporné = hřbet.
+float hollow_lap(vec2 nuv) {
+	vec2 o = 2.0 / grid_size;
+	float ddx = texture(normal_tex, nuv + vec2(o.x, 0.0), 1.0).r - texture(normal_tex, nuv - vec2(o.x, 0.0), 1.0).r;
+	float ddz = texture(normal_tex, nuv + vec2(0.0, o.y), 1.0).b - texture(normal_tex, nuv - vec2(0.0, o.y), 1.0).b;
+	return -(ddx + ddz) * 2.0 / (4.0 * spacing);   // ×2: kódování normály 0..1
+}
+
 void vertex() {
 	vec3 w = (MODEL_MATRIX * vec4(VERTEX.x, 0.0, VERTEX.z, 1.0)).xyz;
 	ivec2 gmax = ivec2(grid_size) - 1;
-	ivec2 cell = clamp(ivec2(round((w.xz - grid_origin) / spacing)), ivec2(0), gmax);
+	ivec2 rcell = ivec2(round((w.xz - grid_origin) / spacing));
+	ivec2 cell = clamp(rcell, ivec2(0), gmax);
 	float h = texelFetch(height_tex, cell, 0).r;
+	// poslední dlaždice přesahují mřížku DMR (45 × 256 m > 11,35 km): vrcholy za okrajem se zapustí pod okolí
+	// (Surroundings tam má vlastní výšky) – jinak by vznikla vodorovná „police“ s výškou okraje a šev s okolím
+	bool beyond = any(notEqual(rcell, cell));
 	// geomorfing: blíží-li se dlaždice konci dosahu své LOD (vzdálenost středu AABB jako u visibility_range),
 	// vrcholy mezi uzly hrubší sítě se plynule stáhnou na její trojúhelníky → přepnutí LOD je beze skoku.
 	// U kamery (do ~6–30 m) se nemorfuje: země pod nohama zůstává přesně jako kolize (height_at).
 	if (UV.x > 0.5 && lod_cam.y > -50000.0) {
 		vec3 cc = (MODEL_MATRIX * vec4(chunk_size * 0.5, 0.0, chunk_size * 0.5, 1.0)).xyz;
-		cc.y = texelFetch(height_tex, clamp(ivec2((cc.xz - grid_origin) / spacing), ivec2(0), gmax), 0).r;
+		cc.y = texelFetch(height_tex, clamp(ivec2(round((cc.xz - grid_origin) / spacing)), ivec2(0), gmax), 0).r;
 		float morph = smoothstep(UV.y * 0.72, UV.y * 0.97, distance(lod_cam, cc))
 			* smoothstep(6.0, 30.0, distance(lod_cam.xz, w.xz));
 		if (morph > 0.001) {
@@ -242,7 +261,7 @@ void vertex() {
 			}
 		}
 	}
-	float skirt = VERTEX.y < -0.5 ? skirt_depth : 0.0;
+	float skirt = (VERTEX.y < -0.5 ? skirt_depth : 0.0) + (beyond ? 40.0 : 0.0);
 	VERTEX.y = h - skirt;
 	wpos = vec3(w.x, VERTEX.y, w.z);
 }
@@ -499,6 +518,41 @@ void fragment() {
 		fc = mix(fc, vec3(0.5, 0.25, 0.6), step(0.75, s.n0.a));
 		col = mix(col, fc, spots * 0.7);
 	}
+	// --- pobřežní pás u potoků a rybníků (od Střední, do ~130 / 260 m): dno pod hladinou tmavé bahno se štěrkem,
+	// u vodní čáry pruh mokrého bahna (roztřepený šumem, místy vyšlapaný), nad ním bujná vlhká tráva / ostřice
+	float bed = 0.0;
+	if (shore_ntiles.x > 0.0 && gfx_quality > 0.5) {
+		float shore_vis = hq ? 260.0 : 130.0;
+		vec2 sg = (wpos.xz - grid_origin) / spacing;
+		vec2 stl = floor(sg / 32.0);
+		if (dist < shore_vis && stl.x >= 0.0 && stl.y >= 0.0 && stl.x < shore_ntiles.x && stl.y < shore_ntiles.y) {
+			vec2 sti = texelFetch(shore_idx, ivec2(stl), 0).rg * 255.0;
+			if (sti.x < 254.5) {
+				vec2 spx = sti * 34.0 + 1.5 + (sg - stl * 32.0);
+				float shs = textureLod(shore_atlas, spx / vec2(textureSize(shore_atlas, 0)), 0.0).r * 5.0 - 2.0;
+				float shf = 1.0 - smoothstep(shore_vis * 0.6, shore_vis, dist);
+				if (shs < 2.95 && shf > 0.0) {
+					float sj = shs + (s.n0.r - 0.5) * 0.6 + (s.nf.g - 0.5) * 0.3 - smoothstep(0.7, 0.9, s.n1.g) * 0.8;
+					bed = smoothstep(0.05, -0.3, sj) * shf;
+					float mud = smoothstep(0.85, 0.3, sj) * shf - bed;
+					float lush = smoothstep(2.7, 1.1, sj) * shf * (1.0 - mud - bed);
+					// bujná tráva / ostřice: sytější a tmavší, v sezóně svěží (hnědne s grass_green v ts_macro barvě)
+					col = mix(col, col * vec3(0.80, 0.93, 0.72), lush * greenish);
+					vec3 mudc = ts_s2l(vec3(0.31, 0.26, 0.19)) * (0.8 + 0.4 * s.n0.r) * (0.88 + 0.24 * s.nf.r);
+					mudc = mix(mudc, ts_s2l(vec3(0.42, 0.40, 0.35)) * (0.8 + 0.4 * s.nf.a),
+						smoothstep(0.3, 0.2, s.n0.b) * step(0.8, s.n0.a) * 0.8);            // oblázky
+					vec3 bedc = mix(ts_s2l(vec3(0.22, 0.19, 0.14)), ts_s2l(vec3(0.40, 0.37, 0.31)),
+						smoothstep(0.35, 0.15, s.n0.b) * (0.4 + 0.6 * s.n0.a)) * (0.85 + 0.3 * s.nf.r);   // štěrk dna
+					col = mix(col, mudc, mud);
+					col = mix(col, bedc, bed);
+					hgt = mix(hgt, (s.nf.r - 0.5) * 0.012 + (1.0 - s.n0.b) * 0.008, mud + bed);
+					rough = mix(rough, 0.86, lush * 0.5);
+					own_wet = max(own_wet, mud * 0.85 + bed + lush * 0.2);
+					greenish *= 1.0 - mud - bed;
+				}
+			}
+		}
+	}
 	porous = 1.0 - 0.45 * greenish;
 	// sníh: na rovině víc, na strmých svazích méně, okraje rozbité šumem.
 	// Sněhové jazyky (§12.3): při couvající pokrývce sníh déle drží v prohlubních
@@ -507,13 +561,8 @@ void fragment() {
 	float hold = 0.0;
 	float snow = 0.0;
 	if (snow_cover > 0.005) {
-		// buňka okolí s chvěním ±1 m – hranice prohlubní nejsou čtverce mřížky 2 m
-		ivec2 hc = ivec2(clamp((wpos.xz + (s.n0.gr - 0.5) * 4.0 - grid_origin) / spacing, vec2(0.0), grid_size - 1.0));
-		ivec2 hlo = max(hc - 3, ivec2(0));
-		ivec2 hhi = min(hc + 3, ivec2(grid_size) - 1);
-		float hav = (texelFetch(height_tex, ivec2(hlo.x, hc.y), 0).r + texelFetch(height_tex, ivec2(hhi.x, hc.y), 0).r
-			+ texelFetch(height_tex, ivec2(hc.x, hlo.y), 0).r + texelFetch(height_tex, ivec2(hc.x, hhi.y), 0).r) * 0.25;
-		float dep = clamp((hav - wpos.y) * 0.8, 0.0, 1.0);              // prohlubeň
+		// prohlubeň z divergence normál (plynulá, bez schodů mřížky 2 m; ~ dřívější průměr okolí ±6 m − vlastní výška)
+		float dep = clamp(hollow_lap(nuv) * 7.2 + (s.n0.g - 0.5) * 0.15, 0.0, 1.0);
 		vec2 dhv = n.xz / max(length(n.xz), 0.02);                       // směr spádu (protažení jazyků)
 		vec2 tc = wpos.xz * 0.045;
 		tc -= dhv * dot(tc, dhv) * 0.6;
@@ -523,7 +572,7 @@ void fragment() {
 		snow = clamp((snow_cover * 1.35 + hold - (1.0 - dt) * 0.40 - (1.0 - d2) * 0.20
 			- (1.0 - d1) * 0.10) * 3.0, 0.0, 1.0) * smoothstep(0.55, 0.85, n.y);   // ostřejší okraje skvrn
 		// tenká pokrývka: na okraji prosvítají špičky trávy a hroudy (vyšší reliéf = dřív bez sněhu)
-		snow = clamp(snow - (hgt * 12.0 + (s.nf.r - 0.5) * 0.5) * snow * (1.0 - snow) * 2.0, 0.0, 1.0);
+		snow = clamp(snow - (hgt * 12.0 + (s.nf.r - 0.5) * 0.5) * snow * (1.0 - snow) * 2.0, 0.0, 1.0) * (1.0 - bed);
 	}
 	// M8.13: vyjeté koleje a stopy v blátě – tmavá mokrá hlína, svahy koleje v normále, v hlubších louže
 	float rdep = 0.0;
@@ -583,7 +632,8 @@ void fragment() {
 	rgh = mix(rgh, mix(0.72, 0.25, glint), snow);
 	rgh = mix(rgh, 0.06, max(rpud, wpatch));
 	ROUGHNESS = rgh;
-	SPECULAR = mix(mix(mix(0.25, 0.45, wet_all), 0.5, snow), 0.5, max(rpud, wpatch));
+	// vlastní vlhkost (bahno břehu) odráží méně než mokro po dešti – jinak modrofialový odlesk oblohy na bahně
+	SPECULAR = mix(mix(mix(0.25, 0.45, max(wet, own_wet * 0.3)), 0.5, snow), 0.5, max(rpud, wpatch));
 	// drobný reliéf → normála (derivace výšky v obrazovce); zdálky slábne (Vysoká+ dosáhne dál)
 	float bfade = 1.0 - smoothstep(hq ? 90.0 : 45.0, hq ? 170.0 : 95.0, dist);
 	float hb2 = mix(hgt, (d1 - 0.5) * 0.01, snow * 0.8) * (1.0 - max(rpud, wpatch));

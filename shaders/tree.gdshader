@@ -11,7 +11,8 @@
 //   * prosvítání listí (BACKLIGHT žlutozelené, víc na okraji koruny podle COLOR.a), okluze uvnitř koruny do AO,
 //     variace odstínu podle stromu (`tg_tree_var`, shodně s impostorem).
 //   * od Vysoké (`gfx_quality` > 1,5) „normálová mapa“ listí odvozená z jasu atlasu (derivace po pixelech, bez
-//     dalšího čtení textury) – listy v kartě dostanou plastičnost; měkkou sférickou normálu koruny dodává generátor.
+//     dalšího čtení textury) – listy v kartě dostanou plastičnost; měkkou normálu koruny (elipsoid) prolne do normál
+//     karet TreeGen._soften_crown při načtení. Odlesk listí nízký (SPECULAR 0,12 – jinak bílý lesk proti slunci).
 //   * kůra bez textury (`bark_tex` chybí → `hint_default_transparent`, alfa 0): procedurální podélně rozbrázděná kůra.
 shader_type spatial;
 render_mode cull_disabled, diffuse_burley, alpha_to_coverage;   // M8.8: karty listí jsou oboustranné (dřív cull_back)
@@ -186,7 +187,9 @@ void fragment() {
 		c = mix(c, vec3(0.88, 0.9, 0.95), snow);
 		ALBEDO = c;
 		ROUGHNESS = 0.8;
-		SPECULAR = 0.3;
+		// nízký odlesk: Godot zvedá Fresnel na hraně (f90) podle SPECULAR – s 0,3 svítily karty listí natočené
+		// proti slunci bíle (pohled do koruny proti světlu); 0,12 nechá jen slabý lesk a prosvítání vynikne
+		SPECULAR = 0.12;
 		// prosvítání: okrajové listy (COLOR.a → 1) víc, světlo prošlé listem je žlutozelenější
 		BACKLIGHT = c * TG_LEAF_BACKLIGHT * (use_atlas ? mix(0.22, 0.55, COLOR.a) : 0.35);
 	} else if (use_atlas) {                     // M8.8: kůra podle druhu z atlasu, okluze z barvy vrcholu
