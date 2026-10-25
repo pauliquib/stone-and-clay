@@ -20,7 +20,7 @@ static var MOON_ENERGY := 0.16
 static var FOG_BASE := 0.00022
 static var FOG_MIST := 0.012         # hustota v husté mlze
 static var FOG_RAIN := 0.0022
-static var FOG_SNOW := 0.0085        # 11/2026: sněžení (× intenzita) tlumí dohled víc než déšť: 0,4 → dohled ~650 m
+static var FOG_SNOW := 0.007         # 11/2026: sněžení (× intenzita) tlumí dohled víc než déšť: 0,4 → dohled ~800 m
 const RAIN_DROPS := 12000
 const SNOW_FLAKES := 7000
 ## M8.4: vítr u kamery
@@ -96,7 +96,7 @@ static var AMBIENT_NIGHT_SKY := 12.0 # světlo prostředí v noci u fyzikální 
 ## 11/2026: noční podlaha světla prostředí – modrošedá barva (vzdušné světélkování, hvězdy, rozptýlené světlo obce),
 ## přimíchaná k okolnímu světlu z cubemapy oblohy (ta je v noci na čitelné obrysy domů a cest moc slabá); jen v noci
 ## (slunce pod −6° → naplno pod −12°), soumrak se nemění; × `ambient_light_energy` (AMBIENT_NIGHT_SKY)
-static var AMBIENT_NIGHT_COLOR := Vector3(0.0005, 0.0007, 0.0011)
+static var AMBIENT_NIGHT_COLOR := Vector3(0.0135, 0.019, 0.03)
 static var AMBIENT_NIGHT_MIX := 0.6
 static var AMBIENT_TWILIGHT := 1.8   # … v soumraku (slunce 0° až −8°: krajina ještě čitelná, ne černá)
 static var SKY_LIGHT_HZ := 4.0       # jak často přepočítat barvy oblohy pro skript (slunce se hýbe pomalu)
@@ -806,8 +806,6 @@ func update(delta: float) -> void:
 		env.tonemap_exposure = lerpf(LEGACY_EXPOSURE_NIGHT, 1.0, day) * (1.0 + overcast * LEGACY_EXPOSURE_OVERCAST)
 		env.adjustment_saturation = base_sat
 	MapLoader.set_tree_far_mult(lerpf(1.0, TREE_FAR_HIGH, high))      # M6.2: ve výšce vidět stromy dál
-	if OS.get_environment("SC_ATM_DBG") != "" and fmod(_t, 2.0) < delta:   # DBG-P1
-		print("ATMDBG elev=%.1f ev=%.2f exp=%.2f amb=%.2f fogd=%.5f fogcol=%s fogE=%.3f sky_aff=%.2f aer=%.2f hgt_d=%.4f hz=%s sat=%.2f lp=%.2f lamps=%s cloud=%.2f rain=%.2f fog=%.2f snow=%s" % [elev, exposure_ev, env.tonemap_exposure, env.ambient_light_energy, env.fog_density, env.fog_light_color, env.fog_light_energy, env.fog_sky_affect, env.fog_aerial_perspective, env.fog_height_density, _horizon, env.adjustment_saturation, _lp, str(get_parent().get("street_lights").lamp_count if get_parent().get("street_lights") else -1), cloud, rain, fog, str(weather.is_snowing() if weather else false)])   # DBG-P1
 
 	# --- srážky kolem kamery
 	var snowing := weather != null and weather.is_snowing()
