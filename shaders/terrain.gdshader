@@ -12,8 +12,8 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 
 uniform sampler2D height_tex : filter_nearest, repeat_disable;
 uniform sampler2D normal_tex : filter_linear_mipmap, repeat_disable;
-uniform sampler2D ortho_full : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
-uniform sampler2D ortho_core : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
+uniform sampler2D ortho_full : source_color, hint_default_black, filter_linear_mipmap_anisotropic, repeat_disable;
+uniform sampler2D ortho_core : source_color, hint_default_black, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform sampler2D detail_noise : filter_linear_mipmap, repeat_enable;   // RGBA šum (Terrain.detail_noise_texture)
 uniform vec2 grid_origin;
 uniform float spacing = 2.0;
@@ -34,7 +34,7 @@ uniform float meadow_bloom = 0.0;        // květy na loukách 0..1 (Seasons.blo
 uniform bool use_ortho = false;                                     // true = barva z ortofota (porovnání, F2)
 uniform sampler2D surface_tex : filter_nearest, repeat_disable;     // R8 = třída (data/surface.bin, 4 m)
 uniform vec4 surface_rect = vec4(0.0);                              // x0, z0, šířka, výška (m); šířka 0 = soubor chybí
-uniform sampler2D forest_tex : filter_linear, repeat_disable;       // fallback: R = hustota lesa 0..1 (Fauna.forest, 32 m)
+uniform sampler2D forest_tex : hint_default_black, filter_linear, repeat_disable;       // fallback: R = hustota lesa 0..1 (Fauna.forest, 32 m)
 uniform vec4 forest_rect = vec4(0.0);
 uniform sampler2D tex_grass : source_color, hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D tex_soil : source_color, hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -65,8 +65,8 @@ uniform float rut_vis = 120.0;        // do jaké vzdálenosti od kamery (m)
 uniform vec2 north_xz = vec2(-0.98, -0.20);   // světový směr severu (z map.json north_angle; pro sněhové jazyky)
 // pobřežní pás (Terrain._compute_shore): vzdálenost od vodní čáry potoků a rybníků v bodech mřížky DMR, R8 = (m + 2) / 5;
 // jen dlaždice 32 × 32 bodů s vodou v atlasu (okraj 1 px), shore_idx = dlaždice → místo v atlasu (255 = bez vody)
-uniform sampler2D shore_atlas : filter_linear, repeat_disable;
-uniform sampler2D shore_idx : filter_nearest, repeat_disable;
+uniform sampler2D shore_atlas : hint_default_white, filter_linear, repeat_disable;
+uniform sampler2D shore_idx : hint_default_white, filter_nearest, repeat_disable;
 uniform vec2 shore_ntiles = vec2(0.0);   // počet dlaždic (x, z); 0 = pás není (chybí water.json / ještě se počítá)
 
 varying vec3 wpos;
@@ -374,7 +374,8 @@ void fragment() {
 		hgt = (s.nf.r - 0.5) * 0.015 + (d1 - 0.5) * 0.03;
 	} else {
 		// --- třída povrchu: dvě nejbližší třídy a jejich poměr (hranice rozbité šumem)
-		vec2 wp = wpos.xz + warp * 0.85;
+		// posun hranic tříd: ±3,8 m po ~32 m + ±1,5 m po ~4 m (rozbije schody rastru 4 m na okraji lesa a dvorů)
+		vec2 wp = wpos.xz + warp * 0.85 + (s.n0.rg - 0.5) * 3.0;
 		int ca = 0;
 		int cb = 0;
 		float tb = 0.0;
@@ -382,7 +383,7 @@ void fragment() {
 			ivec2 sz = textureSize(surface_tex, 0);
 			vec2 g = (wp - surface_rect.xy) / surface_rect.zw * vec2(sz) - 0.5;
 			ivec2 i0 = ivec2(floor(g));
-			vec2 f = smoothstep(0.0, 1.0, fract(g));
+			vec2 f = fract(g);   // lineárně: vrstevnice bilineárních vah jsou oblé, smoothstep dával hranaté „kostky“
 			int c[4];
 			float wt[4];
 			for (int k = 0; k < 4; k++) {
@@ -415,7 +416,7 @@ void fragment() {
 				for (int k = 0; k < 4; k++) {
 					if (c[k] == cb) wb += wt[k];
 				}
-				tb = smoothstep(0.3, 0.7, wb / max(wa + wb, 0.0001) + (d1 - 0.5) * 0.4);
+				tb = smoothstep(0.3, 0.7, wb / max(wa + wb, 0.0001) + (d1 - 0.5) * 0.4 + (s.nf.g - 0.5) * 0.25 * ffade);
 			} else {
 				cb = ca;
 			}
@@ -532,12 +533,12 @@ void fragment() {
 				float shs = textureLod(shore_atlas, spx / vec2(textureSize(shore_atlas, 0)), 0.0).r * 5.0 - 2.0;
 				float shf = 1.0 - smoothstep(shore_vis * 0.6, shore_vis, dist);
 				if (shs < 2.95 && shf > 0.0) {
-					float sj = shs + (s.n0.r - 0.5) * 0.6 + (s.nf.g - 0.5) * 0.3 - smoothstep(0.7, 0.9, s.n1.g) * 0.8;
+					float sj = shs + (s.n0.r - 0.5) * 0.6 + (s.nf.g - 0.5) * 0.3 - smoothstep(0.74, 0.9, s.n1.g) * 0.7;
 					bed = smoothstep(0.05, -0.3, sj) * shf;
 					float mud = smoothstep(0.85, 0.3, sj) * shf - bed;
 					float lush = smoothstep(2.7, 1.1, sj) * shf * (1.0 - mud - bed);
 					// bujná tráva / ostřice: sytější a tmavší, v sezóně svěží (hnědne s grass_green v ts_macro barvě)
-					col = mix(col, col * vec3(0.80, 0.93, 0.72), lush * greenish);
+					col = mix(col, col * vec3(0.74, 0.90, 0.64), lush * greenish);
 					vec3 mudc = ts_s2l(vec3(0.31, 0.26, 0.19)) * (0.8 + 0.4 * s.n0.r) * (0.88 + 0.24 * s.nf.r);
 					mudc = mix(mudc, ts_s2l(vec3(0.42, 0.40, 0.35)) * (0.8 + 0.4 * s.nf.a),
 						smoothstep(0.3, 0.2, s.n0.b) * step(0.8, s.n0.a) * 0.8);            // oblázky

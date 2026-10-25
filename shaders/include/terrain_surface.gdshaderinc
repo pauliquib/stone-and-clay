@@ -50,16 +50,23 @@ vec3 ts_soil(TsSig s, out float ts_h) {
 	return c;
 }
 
-// lesní hrabanka: listí a jehličí (buňky s odstínem), tmavé mezery, mech; `ts_aut` = podzim (čerstvé zrzavé listí)
+// lesní půda: tmavá hnědo-olivová hrabanka (listí v rozkladu, jehličí), tmavé mezery, mech a zelený podrost
+// (borůvčí, kapradí, tráva) ve skvrnách ~3–16 m, ať les z výšky působí tmavě zeleno-hnědě, ne rudě;
+// `ts_aut` = podzim (čerstvé, jen mírně zrzavé listí)
 vec3 ts_forest(TsSig s, float ts_aut, out float ts_h) {
 	float ts_leaf = 1.0 - smoothstep(0.35, 0.8, s.n0.b);
-	vec3 lc = mix(ts_s2l(vec3(0.21, 0.15, 0.09)), ts_s2l(vec3(0.40, 0.28, 0.15)), s.n0.a);
-	lc = mix(lc, ts_s2l(vec3(0.52, 0.33, 0.14)), step(0.78, s.n0.a) * ts_aut);
-	vec3 c = mix(ts_s2l(vec3(0.13, 0.10, 0.06)), lc, 0.45 + 0.55 * ts_leaf);
+	vec3 lc = mix(ts_s2l(vec3(0.19, 0.16, 0.11)), ts_s2l(vec3(0.31, 0.26, 0.17)), s.n0.a);   // rozložené listí / jehličí
+	lc = mix(lc, ts_s2l(vec3(0.42, 0.31, 0.17)), step(0.8, s.n0.a) * ts_aut * 0.7);
+	vec3 c = mix(ts_s2l(vec3(0.10, 0.09, 0.06)), lc, 0.45 + 0.55 * ts_leaf);
 	c *= 0.85 + 0.30 * s.nf.r;
 	float ts_moss = smoothstep(0.52, 0.72, s.n1.g + (s.nm.g - 0.5) * 0.35 + (s.n0.r - 0.5) * 0.2);
-	c = mix(c, ts_s2l(vec3(0.22, 0.30, 0.11)) * (0.8 + 0.4 * s.nf.g), ts_moss * 0.85);
-	ts_h = ts_leaf * 0.012 + ts_moss * 0.02 + (s.n0.r - 0.5) * 0.03;
+	c = mix(c, ts_s2l(vec3(0.20, 0.27, 0.11)) * (0.8 + 0.4 * s.nf.g), ts_moss * 0.8);
+	// podrost: skvrny ~16 m (n2) rozbité trsy ~3 m (n1); v zimě a na podzim hnědne s ostatní zelení (ts_macro)
+	float ts_under = smoothstep(0.5, 0.68, s.n2.g + (s.n1.r - 0.5) * 0.3) * (0.6 + 0.4 * smoothstep(0.3, 0.7, s.nf.r));
+	vec3 uc = mix(ts_s2l(vec3(0.15, 0.21, 0.09)), ts_s2l(vec3(0.24, 0.30, 0.13)), s.n0.g);
+	uc = mix(uc, ts_s2l(vec3(0.30, 0.26, 0.15)), ts_aut * 0.6);
+	c = mix(c, uc, ts_under * 0.7);
+	ts_h = ts_leaf * 0.012 + ts_moss * 0.02 + ts_under * 0.015 + (s.n0.r - 0.5) * 0.03;
 	return c;
 }
 
@@ -159,7 +166,7 @@ vec3 ts_macro(vec3 col, TsSig s, float ts_grassy, bool ts_forest_c, float ts_gre
 		g = mix(g, dry * (0.95 + 0.15 * s.nm.g), (1.0 - ts_green) * 0.85);
 		col = mix(col, g, ts_grassy);
 	} else if (ts_forest_c) {
-		vec3 dry = vec3(dot(col, vec3(0.3, 0.5, 0.2))) * vec3(1.25, 1.0, 0.75);
+		vec3 dry = vec3(dot(col, vec3(0.3, 0.5, 0.2))) * vec3(1.15, 1.0, 0.8);
 		col = mix(col, dry, (1.0 - ts_green) * 0.3);
 	}
 	return col;

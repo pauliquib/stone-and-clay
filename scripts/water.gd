@@ -40,6 +40,7 @@ static var STREAM_FREEZE_C := 5.0     # tekoucí voda začne zamrzat pod −toli
 static var STREAM_FREEZE_SPAN := 6.0  # … úplně zamrzlá o tolik °C níž
 static var ICE_RATE_H := 0.08         # rychlost zamrzání / tání rybníka (za herní hodinu)
 static var ICE_FLOW_RATE_H := 0.05    # … tekoucí vody
+const SNOW_COLD_C := 4.0              # start hry: o kolik °C chladnější „minulé dny“ při plné sněhové pokrývce
 static var WAVES_RAIN := 0.8          # vlnky: přídavek při plném dešti
 static var WAVES_WIND := 0.7          # … při plném větru
 static var WAVES_WIND_FULL := 10.0    # … „plný vítr“ (m/s)
@@ -530,6 +531,8 @@ func _process_impl(delta: float) -> void:
 	if _last_min < 0.0:
 		_last_min = now
 		var t0: float = world.micro.temp_valley() if world.micro != null else world.weather.temp   # M8.9: nádrže leží v údolí
+		# odhad bez historie: ležící sníh = mrazivé dny předtím (start v zimě se zasněženou krajinou → zamrzlý rybník)
+		t0 -= world.weather.snow_cover * SNOW_COLD_C
 		ice = clampf((-t0 - POND_FREEZE_C) / POND_FREEZE_SPAN, 0.0, 1.0)
 		ice_flow = clampf((-t0 - STREAM_FREEZE_C) / STREAM_FREEZE_SPAN, 0.0, 1.0)
 	var dh := clampf((now - _last_min) / 60.0, 0.0, 48.0)

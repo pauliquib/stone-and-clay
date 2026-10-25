@@ -80,7 +80,9 @@ void vertex() {
 	vec2 inn = min(w.xz - kat_rect.xy, kat_rect.xy + kat_rect.zw - w.xz);
 	float sink = 0.0;
 	if (inn.x > 0.0 && inn.y > 0.0) {
-		sink = hole_sink * smoothstep(0.0, hole_blend, min(inn.x, inn.y));
+		// hlouběji uvnitř ještě o 20 m: trojúhelníky po 32 m by v údolích (vydutý terén) jinak vykukovaly nad detailní terén
+		float ki = min(inn.x, inn.y);
+		sink = hole_sink * smoothstep(0.0, hole_blend, ki) + 20.0 * smoothstep(hole_blend, hole_blend + 100.0, ki);
 	}
 	if (VERTEX.y < -0.5) {
 		sink += skirt_depth;        // sukně okrajů dlaždic

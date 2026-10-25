@@ -159,12 +159,12 @@ void fragment() {
 		n_big = mix(gb, ga, w0);
 		// jemné čeřiny po proudu (rychlejší než velké vlnky)
 		vec2 det = texture(wave_tex, (p - vel * smul * t * 1.4) * vec2(0.9, 1.6) + vec2(0.13, 0.77)).rg * 2.0 - 1.0;
-		slope += det * 0.8;
+		slope += det * 0.8 / (1.0 + length(VERTEX) * 0.08);   // v dálce by drobné čeřiny jen jiskřily
 	} else {
 		slope = water_layers(p, pofs, sc_a, sc_b, n_foam, n_big);
 		// jemné vlnky od větru (perioda 0,8 m: 1 024 · 0,05 · 1,5 · 1,25 = 96 period → modulo beze švu)
 		vec2 det = texture(wave_tex, (p - pofs * 1.5) * 1.25 + vec2(0.13, 0.77)).rg * 2.0 - 1.0;
-		slope += det * 1.1 * clamp(wind_speed * 0.25, 0.0, 1.0);
+		slope += det * 1.1 * clamp(wind_speed * 0.25, 0.0, 1.0) / (1.0 + length(VERTEX) * 0.08);
 	}
 #else
 	slope = water_layers(p, flowing ? vel * t : pofs, sc_a, sc_b, n_foam, n_big);
@@ -194,7 +194,7 @@ void fragment() {
 		}
 	}
 #endif
-	amp *= (1.0 - icy) / (1.0 + length(VERTEX) * 0.025);   // v dálce klidnější (méně třpytu a moaré)
+	amp *= (1.0 - icy) / (1.0 + length(VERTEX) * 0.04);   // v dálce klidnější (méně třpytu a moaré)
 	vec3 nw = normalize(tan_w * (-slope.x * amp) + bin_w * (-slope.y * amp) + up_w);
 	vec3 nv = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
 	NORMAL = nv;
@@ -211,9 +211,10 @@ void fragment() {
 	float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
 	// okluze obzoru: odraz pod výškou okolí (water_horizon) nevidí oblohu, ale břehy, rákos a stromy – engine odráží
 	// jen oblohu, proto tam se SPECULAR ubere a odraz dostane tmavou olivovou barvu břehu (osvětlenou sluncem)
-	vec3 rd_w = reflect(-normalize(INV_VIEW_MATRIX * vec4(vdir, 0.0)).xyz, nw);
+	// (směr odrazu z vyhlazené normály – jinak by vlnky přeskakovaly přes obzor a hladina zrnitě jiskřila)
+	vec3 rd_w = reflect(-normalize(INV_VIEW_MATRIX * vec4(vdir, 0.0)).xyz, normalize(mix(up_w, nw, 0.35)));
 	float hz = water_horizon(rd_w, tan_w, edge, flowing);
-	float sky_vis = smoothstep(hz - 0.04, hz + 0.07, rd_w.y);
+	float sky_vis = smoothstep(hz - 0.06, hz + 0.10, rd_w.y);
 	vec3 bank_refl = BANK_REFL * fres * (1.0 - sky_vis) * 3.0;
 #ifdef WATER_HQ
 	// lom: posun podle odchylky normály od klidné hladiny, menší v mělčině a v dálce; co je před hladinou, se nelomí
@@ -317,7 +318,9 @@ void fragment() {
 	}
 	alpha = max(alpha, foam * smoothstep(0.0, 0.02, dv));
 	// rybník: hladší pruhy („zrcadla“) a zčeřenější plochy střídavě; déšť zdrsní hladinu
-	float rough = mix(flowing ? 0.035 : mix(0.02, 0.06, n_big), 0.5, foam) + rain * 0.06 * (1.0 - icy);
+	// v dálce mírně drsnější: vlnky menší než pixel rozmažou odraz (místo jiskření)
+	float rough = mix(flowing ? 0.035 : mix(0.02, 0.06, n_big), 0.5, foam) + rain * 0.06 * (1.0 - icy)
+		+ min(surf_d * 0.0015, 0.05);
 
 	// --- led: zamrzá od břehů (potok) a od mělčin (rybník), praskliny, na ledu sníh
 	if (icy > 0.001) {
